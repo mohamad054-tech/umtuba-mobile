@@ -1,68 +1,77 @@
-import { SymbolView } from 'expo-symbols';
-import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
+import { Redirect, Tabs } from "expo-router";
+import { Text, type ColorValue } from "react-native";
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { WalletTierBadge } from "@/components/WalletTierBadge";
+import { useAuth } from "@/src/lib/auth/AuthContext";
+import { colors } from "@/src/theme/colors";
+
+function TabLabel({
+  label,
+  color,
+}: {
+  label: string;
+  color: ColorValue;
+}) {
+  return (
+    <Text style={{ color, fontSize: 11, fontWeight: "600" }}>{label}</Text>
+  );
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { session, loading } = useAuth();
+
+  if (!loading && !session) {
+    return <Redirect href="/(auth)/login" />;
+  }
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        tabBarActiveTintColor: colors.accentCyan,
+        tabBarInactiveTintColor: colors.textSubtle,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        headerRight: () => <WalletTierBadge />,
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="watch"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
-                {({ pressed }) => (
-                  <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-                    size={25}
-                    tintColor={Colors[colorScheme].text}
-                    style={{ opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          title: "Watch",
+          headerShown: false,
+          tabBarIcon: ({ color }) => <TabLabel label="▶" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="discover"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
+          title: "Discover",
+          tabBarIcon: ({ color }) => <TabLabel label="◎" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{
+          title: "Create",
+          tabBarIcon: ({ color }) => <TabLabel label="＋" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="live"
+        options={{
+          title: "Live",
+          tabBarIcon: ({ color }) => <TabLabel label="◉" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          tabBarIcon: ({ color }) => <TabLabel label="✉" color={color} />,
         }}
       />
     </Tabs>

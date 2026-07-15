@@ -1,56 +1,103 @@
-import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { DarkTheme, Stack, ThemeProvider, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, type ReactNode } from "react";
+import "react-native-reanimated";
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
+import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
+import {
+  deepLinkToHref,
+  parseDeepLink,
+} from "@/src/lib/linking/deepLinks";
+import { colors } from "@/src/theme/colors";
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from "expo-router";
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: "index",
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.bg,
+    card: colors.surface,
+    text: colors.text,
+    border: colors.border,
+    primary: colors.accentViolet,
+  },
+};
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+function DeepLinkHandler() {
+  const router = useRouter();
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    const handleUrl = async (url: string | null) => {
+      if (!url) return;
+      const parsed = parseDeepLink(url);
+      if (parsed.referralCode) {
+        await saveReferralAttribution(parsed.referralCode);
+      }
+      const href = deepLinkToHref(parsed.target);
+      router.push(href as never);
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener("url", (event) => {
+      void handleUrl(event.url);
+    });
+    return () => sub.remove();
+  }, [router]);
+
+  return null;
+}
+
+function SplashGate({ children }: { children: ReactNode }) {
+  const { loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading) {
+      void SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loading]);
 
-  if (!loaded) {
+  if (loading) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return <>{children}</>;
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={navTheme}>
+        <StatusBar style="light" />
+        <SplashGate>
+          <DeepLinkHandler />
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.surface },
+              headerTintColor: colors.text,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          >
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="profile/index" options={{ title: "Profile" }} />
+            <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
+            <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
+            <Stack.Screen name="settings" options={{ title: "Settings" }} />
+            <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
+          </Stack>
+        </SplashGate>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
