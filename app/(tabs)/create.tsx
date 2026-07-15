@@ -1,5 +1,5 @@
+import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PhasePlaceholder } from "@/components/PhasePlaceholder";
 import {
@@ -14,20 +14,24 @@ import { colors } from "@/src/theme/colors";
 export default function CreateScreen() {
   const [last, setLast] = useState<PermissionOutcome | null>(null);
 
-  const run = async (
-    fn: () => Promise<PermissionOutcome>
-  ) => {
+  const run = async (fn: () => Promise<PermissionOutcome>) => {
     const result = await fn();
     setLast(result);
   };
 
   return (
-    <View style={styles.root}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <PhasePlaceholder
         title="Create — Phase 2"
         body="Composer, upload, and publish land next. You can preview permission prompts now."
+        compact
       />
       <View style={styles.actions}>
+        <Text style={styles.section}>Device permissions</Text>
         <Pressable
           style={styles.btn}
           onPress={() => void run(requestCameraPermission)}
@@ -54,7 +58,7 @@ export default function CreateScreen() {
           </Text>
         ) : null}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -63,10 +67,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  content: {
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
   actions: {
     paddingHorizontal: 24,
-    paddingBottom: 32,
+    paddingTop: 8,
     gap: 10,
+  },
+  section: {
+    color: colors.textSubtle,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
   btn: {
     borderWidth: 1,

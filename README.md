@@ -31,7 +31,17 @@ EXPO_PUBLIC_LIVEKIT_URL=
 npx expo start
 ```
 
-5. Run on **Android emulator** (Android Studio) or scan the QR code with **Expo Go**.
+5. Run on an **Android phone** (same Wi‑Fi as your PC):
+
+```powershell
+npx expo start
+```
+
+- Install **Expo Go** from the Play Store on the phone.
+- Scan the QR code from the terminal (or Expo Dev Tools in the browser).
+- Or press `a` if an Android emulator is running.
+
+LAN tip: if the phone cannot reach Metro, press `s` to switch to tunnel mode, or set your PC firewall to allow Node.js inbound connections.
 
 ### iOS
 

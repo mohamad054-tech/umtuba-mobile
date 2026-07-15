@@ -5,11 +5,17 @@ import { colors } from "@/src/theme/colors";
 type PhasePlaceholderProps = {
   title: string;
   body: string;
+  /** When true, do not expand to fill the screen (e.g. Create tab with controls below). */
+  compact?: boolean;
 };
 
-export function PhasePlaceholder({ title, body }: PhasePlaceholderProps) {
+export function PhasePlaceholder({
+  title,
+  body,
+  compact = false,
+}: PhasePlaceholderProps) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, compact ? styles.compact : styles.fill]}>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>
       <Text style={styles.badge}>Phase 2</Text>
@@ -19,10 +25,15 @@ export function PhasePlaceholder({ title, body }: PhasePlaceholderProps) {
 
 const styles = StyleSheet.create({
   wrap: {
-    flex: 1,
     backgroundColor: colors.bg,
     padding: 24,
+  },
+  fill: {
+    flex: 1,
     justifyContent: "center",
+  },
+  compact: {
+    paddingBottom: 12,
   },
   title: {
     color: colors.text,
