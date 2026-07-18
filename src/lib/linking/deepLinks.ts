@@ -7,6 +7,7 @@ export type DeepLinkTarget =
   | { type: "invite"; code: string }
   | { type: "rewards" }
   | { type: "notifications" }
+  | { type: "messages"; conversationId: string | null; messageId: string | null; creatorId: string | null }
   | { type: "signup"; ref: string | null }
   | { type: "login" }
   | { type: "forgot-password" }
@@ -132,6 +133,30 @@ export function parseDeepLink(url: string): ParsedDeepLink {
     };
   }
 
+  if (head === "messages") {
+    const fromQuery = query.get("conversation");
+    const fromPath =
+      segments[1] &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        segments[1]
+      )
+        ? segments[1]
+        : null;
+    const conversationId = fromQuery || fromPath || null;
+    const messageId = query.get("message");
+    const creatorId = query.get("creatorId");
+    return {
+      target: {
+        type: "messages",
+        conversationId,
+        messageId,
+        creatorId,
+      },
+      referralCode: refFromQuery,
+      rawUrl,
+    };
+  }
+
   if (
     head === "signup" ||
     (head === "(auth)" && segments[1]?.toLowerCase() === "signup")
@@ -200,6 +225,18 @@ export function deepLinkToHref(target: DeepLinkTarget): string {
       return "/rewards";
     case "notifications":
       return "/notifications";
+    case "messages": {
+      if (target.creatorId) {
+        return `/(tabs)/messages?creatorId=${encodeURIComponent(target.creatorId)}`;
+      }
+      if (target.conversationId) {
+        const base = `/messages/${encodeURIComponent(target.conversationId)}`;
+        return target.messageId
+          ? `${base}?message=${encodeURIComponent(target.messageId)}`
+          : base;
+      }
+      return "/(tabs)/messages";
+    }
     case "signup":
       return target.ref
         ? `/(auth)/signup?ref=${encodeURIComponent(target.ref)}`

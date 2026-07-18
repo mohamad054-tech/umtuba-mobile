@@ -43,6 +43,20 @@ describe("parseDeepLink", () => {
       "update-password"
     );
   });
+
+  it("parses messages conversation deep links", () => {
+    const conversationId = "11111111-1111-4111-8111-111111111111";
+    const messageId = "22222222-2222-4222-8222-222222222222";
+    const parsed = parseDeepLink(
+      `umtuba://messages?conversation=${conversationId}&message=${messageId}`
+    );
+    expect(parsed.target).toEqual({
+      type: "messages",
+      conversationId,
+      messageId,
+      creatorId: null,
+    });
+  });
 });
 
 describe("deepLinkToHref", () => {
@@ -60,5 +74,13 @@ describe("deepLinkToHref", () => {
     expect(deepLinkToHref({ type: "update-password" })).toBe(
       "/(auth)/forgot-password"
     );
+    expect(
+      deepLinkToHref({
+        type: "messages",
+        conversationId: "11111111-1111-4111-8111-111111111111",
+        messageId: null,
+        creatorId: null,
+      })
+    ).toBe("/messages/11111111-1111-4111-8111-111111111111");
   });
 });

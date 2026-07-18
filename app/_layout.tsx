@@ -160,6 +160,10 @@ export default function RootLayout() {
               <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
               <Stack.Screen name="settings" options={{ title: "Settings" }} />
               <Stack.Screen
+                name="messages/[id]"
+                options={{ title: "Conversation" }}
+              />
+              <Stack.Screen
                 name="invite/[code]"
                 options={{ headerShown: false }}
               />
