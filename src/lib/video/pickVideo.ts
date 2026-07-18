@@ -37,7 +37,8 @@ function fileNameFromUri(uri: string, mimeType: string): string {
 }
 
 /**
- * Android media picker for Create. Requests library permission first.
+ * Native media-library picker for Create (iOS and Android).
+ * Requests library permission first, then opens the system video picker.
  */
 export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
   const permission = await requestMediaLibraryPermission();

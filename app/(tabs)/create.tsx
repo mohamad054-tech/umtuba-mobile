@@ -334,7 +334,7 @@ export default function CreateScreen() {
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Choose video from library"
-            accessibilityHint="Opens the Android media picker"
+            accessibilityHint="Opens the device media library to choose a video"
             accessibilityState={{ disabled: busy, busy: journey.phase === "picking" }}
           >
             <Text style={styles.secondaryText}>

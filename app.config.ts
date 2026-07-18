@@ -17,6 +17,10 @@ const config: ExpoConfig = {
       "applinks:umtuba.com",
       "applinks:www.umtuba.com",
     ],
+    config: {
+      // Standard HTTPS / OS keychain only — no custom non-exempt crypto in the app.
+      usesNonExemptEncryption: false,
+    },
     infoPlist: {
       NSCameraUsageDescription:
         "UMTUBA needs camera access so you can take photos and join video sessions.",
