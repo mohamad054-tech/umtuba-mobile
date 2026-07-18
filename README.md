@@ -8,7 +8,7 @@ Expo Router app sharing domain contracts with `umtuba-web` (Watch feed, auth, wa
 2. Open a terminal in this folder:
 
 ```powershell
-cd c:\Users\1\Desktop\umtuba\umtuba-mobile
+cd C:\Users\Admin\Desktop\umtuba\umtuba-mobile
 npm install
 ```
 

@@ -12,6 +12,14 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": ["expo-av"],
+        "listUnknownPackages": false
+      }
+    }
+  },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@supabase/supabase-js": "^2.110.5",

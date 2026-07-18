@@ -50,6 +50,13 @@ export function getEnv(): AppEnv {
     );
   }
 
+  const key = parsed.data.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (/service[_-]?role/i.test(key) || key.includes("service_role")) {
+    throw new Error(
+      "Invalid UMTUBA mobile env. Do not use a Supabase service-role key in the app. Use the publishable/anon key only."
+    );
+  }
+
   const livekitRaw = parsed.data.EXPO_PUBLIC_LIVEKIT_URL?.trim() || "";
   if (livekitRaw) {
     try {

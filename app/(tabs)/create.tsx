@@ -35,18 +35,24 @@ export default function CreateScreen() {
         <Pressable
           style={styles.btn}
           onPress={() => void run(requestCameraPermission)}
+          accessibilityRole="button"
+          accessibilityLabel="Request camera permission"
         >
           <Text style={styles.btnText}>Request camera</Text>
         </Pressable>
         <Pressable
           style={styles.btn}
           onPress={() => void run(requestMicrophonePermission)}
+          accessibilityRole="button"
+          accessibilityLabel="Request microphone permission"
         >
           <Text style={styles.btnText}>Request microphone</Text>
         </Pressable>
         <Pressable
           style={styles.btn}
           onPress={() => void run(requestMediaLibraryPermission)}
+          accessibilityRole="button"
+          accessibilityLabel="Request media library permission"
         >
           <Text style={styles.btnText}>Request media library</Text>
         </Pressable>
@@ -91,6 +97,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 14,
+    minHeight: 48,
+    justifyContent: "center",
   },
   btnText: {
     color: colors.text,

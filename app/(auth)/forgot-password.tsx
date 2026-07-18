@@ -1,4 +1,5 @@
 import { Link, Redirect, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -9,16 +10,21 @@ import {
 } from "react-native";
 
 import { AuthScreen } from "@/components/AuthScreen";
+import {
+  getErrorMessage,
+  isValidEmail,
+} from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
-export default function LoginScreen() {
-  const { signIn, session, loading } = useAuth();
+export default function ForgotPasswordScreen() {
+  const { session, loading } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
 
   if (!loading && session) {
     return <Redirect href="/(tabs)/watch" />;
@@ -27,11 +33,26 @@ export default function LoginScreen() {
   const onSubmit = async () => {
     setBusy(true);
     setError(null);
+    setSent(false);
     try {
-      await signIn(email, password);
-      router.replace("/(tabs)/watch");
+      if (!isValidEmail(email)) {
+        throw new Error("Please enter a valid email address.");
+      }
+      const redirectTo = Linking.createURL("auth/update-password");
+      const { error: resetError } = await getSupabase().auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo }
+      );
+      if (resetError) {
+        throw new Error(
+          getErrorMessage(resetError, "Unable to send reset email.")
+        );
+      }
+      setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to sign in.");
+      setError(
+        err instanceof Error ? err.message : "Unable to send reset email."
+      );
     } finally {
       setBusy(false);
     }
@@ -39,30 +60,16 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      title="Welcome back"
-      subtitle="Sign in to Watch, earn UM Points, and continue your journey."
+      title="Reset password"
+      subtitle="We'll email you a link to choose a new password."
       footer={
-        <>
-          <Link href="/(auth)/forgot-password" asChild>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Forgot password"
-            >
-              <Text style={styles.forgot}>Forgot password?</Text>
-            </Pressable>
-          </Link>
-          <Link href="/(auth)/signup" asChild>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Create an account"
-            >
-              <Text style={styles.link}>
-                New here?{" "}
-                <Text style={styles.linkStrong}>Create an account</Text>
-              </Text>
-            </Pressable>
-          </Link>
-        </>
+        <Link href="/(auth)/login" asChild>
+          <Pressable accessibilityRole="link" accessibilityLabel="Back to sign in">
+            <Text style={styles.link}>
+              Remembered it? <Text style={styles.linkStrong}>Sign in</Text>
+            </Text>
+          </Pressable>
+        </Link>
       }
     >
       <TextInput
@@ -77,20 +84,14 @@ export default function LoginScreen() {
         onChangeText={setEmail}
         accessibilityLabel="Email"
       />
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        autoComplete="password"
-        textContentType="password"
-        placeholder="Password"
-        placeholderTextColor={colors.textSubtle}
-        value={password}
-        onChangeText={setPassword}
-        accessibilityLabel="Password"
-      />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
+        </Text>
+      ) : null}
+      {sent ? (
+        <Text style={styles.success} accessibilityLiveRegion="polite">
+          If an account exists for that email, a reset link is on the way.
         </Text>
       ) : null}
       <Pressable
@@ -98,13 +99,16 @@ export default function LoginScreen() {
         onPress={() => void onSubmit()}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Sign in"
+        accessibilityLabel="Send password reset email"
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
         ) : (
-          <Text style={styles.buttonText}>Sign in</Text>
+          <Text style={styles.buttonText}>Send reset link</Text>
         )}
+      </Pressable>
+      <Pressable onPress={() => router.back()} accessibilityRole="button">
+        <Text style={styles.back}>Cancel</Text>
       </Pressable>
     </AuthScreen>
   );
@@ -141,11 +145,10 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 14,
   },
-  forgot: {
+  success: {
     color: colors.accentCyan,
     fontSize: 14,
-    marginBottom: 12,
-    textAlign: "center",
+    lineHeight: 20,
   },
   link: {
     color: colors.textMuted,
@@ -154,5 +157,11 @@ const styles = StyleSheet.create({
   linkStrong: {
     color: colors.accentCyan,
     fontWeight: "700",
+  },
+  back: {
+    marginTop: 8,
+    textAlign: "center",
+    color: colors.textSubtle,
+    fontSize: 14,
   },
 });

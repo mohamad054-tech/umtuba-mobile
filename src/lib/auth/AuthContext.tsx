@@ -5,9 +5,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import {
@@ -33,6 +35,8 @@ type AuthContextValue = {
   profile: UserProfile | null;
   loading: boolean;
   error: string | null;
+  /** Set when public env is missing/invalid — blocks auth without crashing. */
+  configError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: {
     email: string;
@@ -42,7 +46,7 @@ type AuthContextValue = {
     referralCode?: string | null;
   }) => Promise<void>;
   signOut: () => Promise<void>;
-  restore: () => Promise<void>;
+  restore: (opts?: { silent?: boolean }) => Promise<void>;
   clearError: () => void;
 };
 
@@ -55,7 +59,7 @@ async function claimReferralAfterSignup(): Promise<void> {
 
   try {
     const { error } = await supabase.rpc("claim_my_referral_signup", {
-      p_code: code,
+      p_referral_code: code,
       p_anonymous_visitor_id: anonymousVisitorId,
       p_ip_hash: null,
       p_user_agent_hash: null,
@@ -76,6 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const applySession = useCallback(async (next: Session | null) => {
     setSession(next);
@@ -94,34 +100,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const restore = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const supabase = getSupabase();
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        throw sessionError;
+  const restore = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoading(true);
       }
-      await applySession(data.session);
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to restore session."));
-      await applySession(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [applySession]);
+      setError(null);
+      try {
+        const supabase = getSupabase();
+        setConfigError(null);
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          throw sessionError;
+        }
+        await applySession(data.session);
+      } catch (err) {
+        const raw =
+          err instanceof Error ? err.message : getErrorMessage(err, "");
+        if (raw.includes("Invalid UMTUBA mobile env")) {
+          setConfigError(
+            err instanceof Error
+              ? err.message
+              : "Missing Supabase configuration. Copy .env.example to .env."
+          );
+        } else {
+          setError(getErrorMessage(err, "Unable to restore session."));
+        }
+        await applySession(null);
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [applySession]
+  );
 
   useEffect(() => {
     void restore();
-    const supabase = getSupabase();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      void applySession(nextSession);
-    });
-    return () => subscription.unsubscribe();
-  }, [applySession, restore]);
+    let subscription: { unsubscribe: () => void } | null = null;
+    try {
+      const supabase = getSupabase();
+      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        void applySession(nextSession);
+      });
+      subscription = data.subscription;
+    } catch (err) {
+      setConfigError(
+        err instanceof Error
+          ? err.message
+          : "Missing Supabase configuration. Copy .env.example to .env."
+      );
+      setLoading(false);
+    }
+    return () => subscription?.unsubscribe();
+    // Bootstrap once on mount; restore/applySession are stable enough via refs pattern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only bootstrap
+  }, []);
+
+  useEffect(() => {
+    const onChange = (next: AppStateStatus) => {
+      const prev = appStateRef.current;
+      appStateRef.current = next;
+      if (
+        (prev === "background" || prev === "inactive") &&
+        next === "active" &&
+        !configError
+      ) {
+        void restore({ silent: true });
+      }
+    };
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, [configError, restore]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -251,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       error,
+      configError,
       signIn,
       signUp,
       signOut,
@@ -263,6 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       error,
+      configError,
       signIn,
       signUp,
       signOut,

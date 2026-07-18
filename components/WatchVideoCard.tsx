@@ -70,7 +70,12 @@ export function WatchVideoCard({
       />
 
       <View style={styles.overlay} pointerEvents="box-none">
-        <Pressable style={styles.muteBtn} onPress={onToggleMute}>
+        <Pressable
+          style={styles.muteBtn}
+          onPress={onToggleMute}
+          accessibilityRole="button"
+          accessibilityLabel={muted ? "Unmute video" : "Mute video"}
+        >
           <Text style={styles.muteText}>{muted ? "Unmute" : "Mute"}</Text>
         </Pressable>
 
@@ -84,13 +89,23 @@ export function WatchVideoCard({
         </View>
 
         <View style={styles.rail}>
-          <Pressable style={styles.action} onPress={onToggleLike}>
+          <Pressable
+            style={styles.action}
+            onPress={onToggleLike}
+            accessibilityRole="button"
+            accessibilityLabel={video.likedByMe ? "Unlike" : "Like"}
+          >
             <Text style={[styles.actionIcon, video.likedByMe && styles.on]}>
               ♥
             </Text>
             <Text style={styles.actionCount}>{video.stats.likes}</Text>
           </Pressable>
-          <Pressable style={styles.action} onPress={onToggleSave}>
+          <Pressable
+            style={styles.action}
+            onPress={onToggleSave}
+            accessibilityRole="button"
+            accessibilityLabel={video.savedByMe ? "Unsave" : "Save"}
+          >
             <Text style={[styles.actionIcon, video.savedByMe && styles.on]}>
               ★
             </Text>
@@ -120,7 +135,9 @@ const styles = StyleSheet.create({
     top: 16,
     right: 16,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
+    minHeight: 44,
+    justifyContent: "center",
     borderRadius: 8,
     backgroundColor: colors.overlay,
     borderWidth: 1,
@@ -155,6 +172,9 @@ const styles = StyleSheet.create({
   },
   action: {
     alignItems: "center",
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: "center",
   },
   actionIcon: {
     color: colors.text,

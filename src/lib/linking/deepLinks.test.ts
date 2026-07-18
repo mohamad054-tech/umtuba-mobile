@@ -34,6 +34,15 @@ describe("parseDeepLink", () => {
     expect(parsed.target).toEqual({ type: "signup", ref: "ZZZZ9999" });
     expect(parsed.referralCode).toBe("ZZZZ9999");
   });
+
+  it("parses password-reset deep links", () => {
+    expect(parseDeepLink("umtuba://forgot-password").target.type).toBe(
+      "forgot-password"
+    );
+    expect(parseDeepLink("umtuba://auth/update-password").target.type).toBe(
+      "update-password"
+    );
+  });
 });
 
 describe("deepLinkToHref", () => {
@@ -45,5 +54,11 @@ describe("deepLinkToHref", () => {
       "/invite/ABC123"
     );
     expect(deepLinkToHref({ type: "rewards" })).toBe("/rewards");
+    expect(deepLinkToHref({ type: "forgot-password" })).toBe(
+      "/(auth)/forgot-password"
+    );
+    expect(deepLinkToHref({ type: "update-password" })).toBe(
+      "/(auth)/forgot-password"
+    );
   });
 });

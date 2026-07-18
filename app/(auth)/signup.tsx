@@ -77,7 +77,10 @@ export default function SignupScreen() {
       subtitle="Create your account to watch, create, and earn."
       footer={
         <Link href="/(auth)/login" asChild>
-          <Pressable>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Sign in to existing account"
+          >
             <Text style={styles.link}>
               Already have an account?{" "}
               <Text style={styles.linkStrong}>Sign in</Text>
@@ -92,6 +95,9 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={fullName}
         onChangeText={setFullName}
+        autoComplete="name"
+        textContentType="name"
+        accessibilityLabel="Full name"
       />
       <TextInput
         style={styles.input}
@@ -100,6 +106,9 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={username}
         onChangeText={setUsername}
+        autoComplete="username"
+        textContentType="username"
+        accessibilityLabel="Username"
       />
       <TextInput
         style={styles.input}
@@ -109,6 +118,9 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
+        autoComplete="email"
+        textContentType="emailAddress"
+        accessibilityLabel="Email"
       />
       <TextInput
         style={styles.input}
@@ -117,6 +129,9 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={password}
         onChangeText={setPassword}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        accessibilityLabel="Password"
       />
       <TextInput
         style={styles.input}
@@ -125,12 +140,19 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={referralCode}
         onChangeText={setReferralCode}
+        accessibilityLabel="Referral code, optional"
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
       <Pressable
         style={[styles.button, busy && styles.buttonDisabled]}
         onPress={() => void onSubmit()}
         disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Create account"
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
@@ -152,13 +174,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: colors.text,
     fontSize: 16,
+    minHeight: 48,
   },
   button: {
     marginTop: 8,
     backgroundColor: colors.text,
     borderRadius: 12,
     paddingVertical: 14,
+    minHeight: 48,
     alignItems: "center",
+    justifyContent: "center",
   },
   buttonDisabled: { opacity: 0.7 },
   buttonText: {

@@ -26,20 +26,39 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
+const TECHNICAL_PATTERN =
+  /\b(sql|supabase|postgres|stack|traceback|exception|enoent|econnrefused|typescript|\.ts\b|\.tsx\b|\.js\b|node_modules|process\.env|secret|jwt|authorization|rls|api[_-]?key|service[_-]?role|refresh.?token)\b|_KEY\b|SUPABASE_/i;
+
+/**
+ * Sanitize user-facing auth/API errors. Never surface SQL, stacks, or secrets.
+ */
+export function sanitizeUserFacingMessage(
+  message: string | null | undefined,
+  fallback: string
+): string {
+  const trimmed = (message ?? "").trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  if (TECHNICAL_PATTERN.test(trimmed)) {
+    return fallback;
+  }
+  if (trimmed.length > 180) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export function getErrorMessage(error: unknown, fallback: string): string {
+  let raw = "";
+
   if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message: unknown }).message).trim();
-
-    if (message) {
-      return message;
-    }
+    raw = String((error as { message: unknown }).message).trim();
+  } else if (error instanceof Error && error.message.trim()) {
+    raw = error.message.trim();
   }
 
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  return fallback;
+  return sanitizeUserFacingMessage(raw, fallback);
 }
 
 export function isUsernameTakenError(message: string): boolean {

@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-
 import {
-  emptyActivityTierProgress,
-  type ActivityTierProgress,
-} from "@/src/contracts/tiers";
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+import type { ActivityTierProgress } from "@/src/contracts/tiers";
 import type { WalletBalance } from "@/src/contracts/wallet";
+import { getErrorMessage } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { getMyActivityTierProgress } from "@/src/lib/tiers/fetchTier";
@@ -16,39 +20,38 @@ import { colors } from "@/src/theme/colors";
 export default function RewardsScreen() {
   const { user } = useAuth();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
-  const [tier, setTier] = useState<ActivityTierProgress>(
-    emptyActivityTierProgress()
-  );
+  const [tier, setTier] = useState<ActivityTierProgress | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = async () => {
     if (!user) {
       setLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const supabase = getSupabase();
-        const [wallet, progress] = await Promise.all([
-          fetchUmPointsWalletBalance(supabase, user.id),
-          getMyActivityTierProgress(supabase, user.id),
-        ]);
-        if (cancelled) return;
-        setBalance(wallet);
-        setTier(progress);
-      } catch {
-        if (!cancelled) {
-          setBalance({ assetId: "um_points", amount: 0, updatedAt: null });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = getSupabase();
+      const [wallet, progress] = await Promise.all([
+        fetchUmPointsWalletBalance(supabase, user.id),
+        getMyActivityTierProgress(supabase, user.id),
+      ]);
+      setBalance(wallet);
+      setTier(progress);
+    } catch (err) {
+      setBalance(null);
+      setTier(null);
+      setError(getErrorMessage(err, "Unable to load rewards."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when user changes
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -58,11 +61,31 @@ export default function RewardsScreen() {
     );
   }
 
+  if (error || !balance || !tier) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.error} accessibilityRole="alert">
+          {error ?? "Unable to load rewards."}
+        </Text>
+        <Pressable
+          onPress={() => void load()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading rewards"
+        >
+          <Text style={styles.retry}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <Text style={styles.label}>UM Points</Text>
-      <Text style={styles.amount}>
-        {formatWalletAmountExact(balance?.amount ?? 0)}
+      <Text
+        style={styles.amount}
+        accessibilityLabel={`${formatWalletAmountExact(balance.amount)} UM Points`}
+      >
+        {formatWalletAmountExact(balance.amount)}
       </Text>
       <Text style={styles.tier}>
         {tier.tier.icon} {tier.tier.displayTitle}
@@ -91,6 +114,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
+    gap: 12,
+    padding: 24,
   },
   label: {
     color: colors.textMuted,
@@ -116,5 +141,13 @@ const styles = StyleSheet.create({
   note: {
     color: colors.textSubtle,
     lineHeight: 20,
+  },
+  error: {
+    color: colors.danger,
+    textAlign: "center",
+  },
+  retry: {
+    color: colors.accentCyan,
+    fontWeight: "700",
   },
 });

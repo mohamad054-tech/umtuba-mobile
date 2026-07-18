@@ -9,6 +9,8 @@ export type DeepLinkTarget =
   | { type: "notifications" }
   | { type: "signup"; ref: string | null }
   | { type: "login" }
+  | { type: "forgot-password" }
+  | { type: "update-password" }
   | { type: "unknown"; path: string };
 
 export type ParsedDeepLink = {
@@ -149,6 +151,29 @@ export function parseDeepLink(url: string): ParsedDeepLink {
     };
   }
 
+  if (
+    head === "forgot-password" ||
+    head === "reset-password" ||
+    (head === "auth" && segments[1]?.toLowerCase() === "forgot-password")
+  ) {
+    return {
+      target: { type: "forgot-password" },
+      referralCode: refFromQuery,
+      rawUrl,
+    };
+  }
+
+  if (
+    head === "update-password" ||
+    (head === "auth" && segments[1]?.toLowerCase() === "update-password")
+  ) {
+    return {
+      target: { type: "update-password" },
+      referralCode: refFromQuery,
+      rawUrl,
+    };
+  }
+
   return {
     target: { type: "unknown", path: pathOnly },
     referralCode: refFromQuery,
@@ -181,6 +206,11 @@ export function deepLinkToHref(target: DeepLinkTarget): string {
         : "/(auth)/signup";
     case "login":
       return "/(auth)/login";
+    case "forgot-password":
+      return "/(auth)/forgot-password";
+    case "update-password":
+      // Full update-password UI ships in Phase 2; land on forgot flow for now.
+      return "/(auth)/forgot-password";
     case "unknown":
       return "/";
   }

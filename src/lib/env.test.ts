@@ -26,6 +26,16 @@ describe("getEnv", () => {
     expect(() => getEnv()).toThrow(/EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
   });
 
+  it("rejects service-role-looking publishable keys", () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv(
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.service_role.fake"
+    );
+
+    expect(() => getEnv()).toThrow(/service-role/i);
+  });
+
   it("does not require service-role variables", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test");

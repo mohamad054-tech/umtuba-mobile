@@ -2,7 +2,6 @@ import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { emptyActivityTierProgress } from "@/src/contracts/tiers";
 import type { WalletBalance } from "@/src/contracts/wallet";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { getSupabase } from "@/src/lib/supabase/client";
@@ -14,12 +13,14 @@ import { colors } from "@/src/theme/colors";
 export function WalletTierBadge() {
   const { user, session } = useAuth();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
-  const [tierLabel, setTierLabel] = useState("Spark");
+  const [tierLabel, setTierLabel] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!session || !user) {
       setBalance(null);
-      setTierLabel("Spark");
+      setTierLabel(null);
+      setFailed(false);
       return;
     }
 
@@ -35,14 +36,12 @@ export function WalletTierBadge() {
         if (cancelled) return;
         setBalance(wallet);
         setTierLabel(tier.tier.displayLabel);
+        setFailed(false);
       } catch {
         if (cancelled) return;
-        setBalance({
-          assetId: "um_points",
-          amount: 0,
-          updatedAt: null,
-        });
-        setTierLabel(emptyActivityTierProgress().tier.displayLabel);
+        setBalance(null);
+        setTierLabel(null);
+        setFailed(true);
       }
     })();
 
@@ -51,15 +50,25 @@ export function WalletTierBadge() {
     };
   }, [session, user]);
 
-  const amount = formatWalletAmount(balance?.amount ?? 0);
+  const amountLabel =
+    balance != null ? `${formatWalletAmount(balance.amount)} UM` : failed ? "—" : "…";
+  const tier = tierLabel ?? (failed ? "Unavailable" : "…");
+  const a11y = failed
+    ? "Wallet and tier unavailable. Open rewards."
+    : `Wallet ${amountLabel}, tier ${tier}. Open rewards.`;
 
   return (
     <Link href="/rewards" asChild>
-      <Pressable style={styles.wrap} hitSlop={8}>
+      <Pressable
+        style={styles.wrap}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={a11y}
+      >
         <View style={styles.pill}>
-          <Text style={styles.amount}>{amount} UM</Text>
+          <Text style={styles.amount}>{amountLabel}</Text>
           <Text style={styles.dot}>·</Text>
-          <Text style={styles.tier}>{tierLabel}</Text>
+          <Text style={styles.tier}>{tier}</Text>
         </View>
       </Pressable>
     </Link>
@@ -76,6 +85,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    minHeight: 44,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,

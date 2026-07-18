@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IdentityHeader } from "@/components/IdentityHeader";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
+import { getErrorMessage } from "@/src/contracts/validation";
 import { fetchWatchFeedPage } from "@/src/lib/feed/watchFeed";
 import {
   togglePostLike,
@@ -56,9 +57,7 @@ export default function WatchScreen() {
       setCursor(page.nextCursor);
       setActiveIndex(0);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to load Watch feed."
-      );
+      setError(getErrorMessage(err, "Unable to load Watch feed."));
     } finally {
       setLoading(false);
     }

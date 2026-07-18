@@ -1,5 +1,6 @@
 import { Link, useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { colors } from "@/src/theme/colors";
@@ -14,8 +15,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.avatar}>
+    <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <View style={styles.avatar} accessibilityLabel="Profile avatar">
         <Text style={styles.avatarText}>
           {profile?.avatar_initial || "U"}
         </Text>
@@ -31,28 +32,46 @@ export default function ProfileScreen() {
 
       <View style={styles.links}>
         <Link href="/rewards" asChild>
-          <Pressable style={styles.linkRow}>
+          <Pressable
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Open rewards"
+          >
             <Text style={styles.linkText}>Rewards</Text>
           </Pressable>
         </Link>
         <Link href="/notifications" asChild>
-          <Pressable style={styles.linkRow}>
+          <Pressable
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Open notifications"
+          >
             <Text style={styles.linkText}>Notifications</Text>
           </Pressable>
         </Link>
         <Link href="/settings" asChild>
-          <Pressable style={styles.linkRow}>
+          <Pressable
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Open settings"
+          >
             <Text style={styles.linkText}>Settings</Text>
           </Pressable>
         </Link>
       </View>
 
-      <Pressable style={styles.signOut} onPress={() => void onSignOut()}>
+      <Pressable
+        style={styles.signOut}
+        onPress={() => void onSignOut()}
+        accessibilityRole="button"
+        accessibilityLabel="Sign out"
+      >
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
-    </View>
+    </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   root: {

@@ -11,6 +11,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.umtuba.app",
+    buildNumber: "1",
     associatedDomains: [
       "applinks:umtuba.com",
       "applinks:www.umtuba.com",
@@ -28,6 +29,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.umtuba.app",
+    versionCode: 1,
     adaptiveIcon: {
       backgroundColor: "#050510",
       foregroundImage: "./assets/images/android-icon-foreground.png",

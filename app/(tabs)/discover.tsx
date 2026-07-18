@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import type { WatchVideo } from "@/src/contracts/watch";
+import { getErrorMessage } from "@/src/contracts/validation";
 import { fetchWatchFeedPage } from "@/src/lib/feed/watchFeed";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
@@ -26,7 +27,7 @@ export default function DiscoverScreen() {
       const page = await fetchWatchFeedPage(getSupabase(), { limit: 12 });
       setVideos(page.videos);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load.");
+      setError(getErrorMessage(err, "Unable to load."));
     } finally {
       setLoading(false);
     }

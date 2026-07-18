@@ -38,4 +38,16 @@ describe("getErrorMessage", () => {
     expect(getErrorMessage(new Error("x"), "fallback")).toBe("x");
     expect(getErrorMessage(null, "fallback")).toBe("fallback");
   });
+
+  it("sanitizes technical / secret-looking messages", () => {
+    expect(
+      getErrorMessage({ message: "relation profiles does not exist SQL" }, "fallback")
+    ).toBe("fallback");
+    expect(
+      getErrorMessage({ message: "Invalid Refresh Token" }, "Unable to restore session.")
+    ).toBe("Unable to restore session.");
+    expect(
+      getErrorMessage({ message: "SUPABASE_SERVICE_ROLE_KEY missing" }, "fallback")
+    ).toBe("fallback");
+  });
 });

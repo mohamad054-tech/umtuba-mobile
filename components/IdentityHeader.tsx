@@ -21,7 +21,12 @@ export function IdentityHeader({ title = "UMTUBA" }: IdentityHeaderProps) {
       <View style={styles.right}>
         <WalletTierBadge />
         <Link href="/profile" asChild>
-          <Pressable style={styles.avatar} hitSlop={8}>
+          <Pressable
+            style={styles.avatar}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+          >
             <Text style={styles.avatarText}>{initial}</Text>
           </Pressable>
         </Link>
