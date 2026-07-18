@@ -27,7 +27,7 @@ export function validatePassword(password: string): string | null {
 }
 
 const TECHNICAL_PATTERN =
-  /\b(sql|supabase|postgres|stack|traceback|exception|enoent|econnrefused|typescript|\.ts\b|\.tsx\b|\.js\b|node_modules|process\.env|secret|jwt|authorization|rls|api[_-]?key|service[_-]?role|refresh.?token)\b|_KEY\b|SUPABASE_/i;
+  /\b(sql|supabase|postgres|stack|traceback|exception|enoent|econnrefused|typescript|\.ts\b|\.tsx\b|\.js\b|node_modules|process\.env|secret|jwt|authorization|rls|api[_-]?key|service[_-]?role|refresh.?token|http\/?\d*|status\s*code|signed.?url|storage)\b|_KEY\b|SUPABASE_|HTTP\s*[45]\d{2}/i;
 
 /**
  * Sanitize user-facing auth/API errors. Never surface SQL, stacks, or secrets.

@@ -19,7 +19,7 @@ Framework-neutral copies of domain rules used by both `umtuba-web` and `umtuba-m
 |---------|-----|--------|
 | Auth session storage | Cookies / SSR client | Expo SecureStore (+ AsyncStorage fallback note) |
 | Referral attribution | HTTP cookies | SecureStore first-touch keys |
-| Video playback | HTML `<video>` / web player | `expo-av` `Video` |
+| Video playback | HTML `<video>` / web player | `expo-video` `VideoPlayer` + `VideoView` |
 | Deep links | Next.js routes | `umtuba://` + universal links via expo-linking |
 | Env | `NEXT_PUBLIC_*` / server secrets | `EXPO_PUBLIC_*` publishable key only — never service role |
 | Permissions | Browser prompts | `expo-camera` / mic / media-library / notifications wrappers |

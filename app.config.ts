@@ -85,13 +85,6 @@ const config: ExpoConfig = {
       },
     ],
     [
-      "expo-av",
-      {
-        microphonePermission:
-          "UMTUBA needs microphone access so you can record audio and join live sessions.",
-      },
-    ],
-    [
       "expo-image-picker",
       {
         photosPermission:
@@ -119,7 +112,13 @@ const config: ExpoConfig = {
       },
     ],
     "expo-secure-store",
-    "expo-video",
+    [
+      "expo-video",
+      {
+        supportsBackgroundPlayback: false,
+        supportsPictureInPicture: false,
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

@@ -73,7 +73,7 @@ Invite / `?ref=` codes are stored first-touch for 30 days (`umtuba_ref` + `umtub
 
 - Contracts live under `src/contracts/` — see `SHARED.md`.
 - Supabase client uses Expo SecureStore for auth (AsyncStorage fallback documented in `src/lib/supabase/client.ts`).
-- Watch tab: vertical paging FlatList + `expo-av` Video; only the active index plays.
+- Watch tab: vertical paging FlatList + `expo-video` VideoView; only the active index plays (current + adjacent players mounted).
 
 ## Phase 2
 
