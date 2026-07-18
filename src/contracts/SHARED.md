@@ -8,7 +8,7 @@ Framework-neutral copies of domain rules used by both `umtuba-web` and `umtuba-m
 |--------|----------|
 | `validation.ts` | Username / email / password helpers, error message parsing |
 | `referral.ts` | Referral code normalize, cookie/key names, TTL, invite paths |
-| `video.ts` | `POST_VIDEOS_BUCKET`, signed URL TTL, size/caption limits |
+| `video.ts` | Bucket, MIME allowlist, size/caption/duration validation, ownership helpers, hashtag parse |
 | `wallet.ts` | `WalletBalance`, `PRIMARY_WALLET_ASSET_ID` (`um_points`) |
 | `tiers.ts` | `ACTIVITY_TIERS`, `resolveTierFromScore`, progress helpers |
 | `watch.ts` | `WatchVideo`, feed cursor/page types, `WATCH_FEED_PAGE_SIZE` |

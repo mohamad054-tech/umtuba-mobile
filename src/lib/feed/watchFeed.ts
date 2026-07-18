@@ -151,6 +151,7 @@ export async function fetchWatchFeedPage(
     .from("posts")
     .select(postColumns)
     .eq("post_type", "video")
+    .eq("media_status", "ready")
     .not("video_path", "is", null)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -179,6 +180,7 @@ export async function fetchWatchFeedPage(
         .select(postColumns)
         .eq("id", input.focusPostId)
         .eq("post_type", "video")
+        .eq("media_status", "ready")
         .not("video_path", "is", null)
         .maybeSingle();
       if (focused) {
