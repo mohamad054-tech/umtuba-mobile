@@ -2,7 +2,8 @@ import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
   name: "UMTUBA",
-  slug: "umtuba",
+  slug: "umtuba-mobile",
+  owner: "umtuba",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
@@ -125,7 +126,7 @@ const config: ExpoConfig = {
   },
   extra: {
     eas: {
-      projectId: "umtuba-mobile-placeholder",
+      projectId: "d2593b45-8f18-4c57-9d71-0419193cfd77",
     },
   },
 };
