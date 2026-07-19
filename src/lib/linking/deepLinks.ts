@@ -23,6 +23,13 @@ export type ParsedDeepLink = {
 
 function stripPrefix(path: string): string {
   let p = path.trim();
+
+  // Auth callbacks may append #access_token=… — route on path/query only.
+  const hashIndex = p.indexOf("#");
+  if (hashIndex >= 0) {
+    p = p.slice(0, hashIndex);
+  }
+
   if (p.startsWith("umtuba://")) {
     p = p.slice("umtuba://".length);
   } else if (p.startsWith("https://umtuba.com")) {
@@ -33,14 +40,28 @@ function stripPrefix(path: string): string {
     p = p.slice("http://umtuba.com".length);
   } else if (p.startsWith("http://www.umtuba.com")) {
     p = p.slice("http://www.umtuba.com".length);
+  } else if (/^exp:\/\//i.test(p)) {
+    // Expo Go / Metro: exp://host:port/--/path
+    const marker = "/--/";
+    const markerIndex = p.indexOf(marker);
+    if (markerIndex >= 0) {
+      p = p.slice(markerIndex + marker.length - 1); // keep leading "/"
+    } else {
+      const withoutScheme = p.replace(/^exp:\/\//i, "");
+      const slash = withoutScheme.indexOf("/");
+      p = slash >= 0 ? withoutScheme.slice(slash) : "/";
+    }
   }
 
   if (!p.startsWith("/")) {
     p = `/${p}`;
   }
 
-  // Drop host-style umtuba:///path leftovers
+  // Drop host-style umtuba:///path leftovers and Expo Router "/--/" prefix.
   p = p.replace(/^\/+/, "/");
+  if (p.startsWith("/--/")) {
+    p = p.slice(3);
+  }
   return p;
 }
 

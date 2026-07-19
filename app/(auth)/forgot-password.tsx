@@ -1,5 +1,4 @@
 import { Link, Redirect, useRouter } from "expo-router";
-import * as Linking from "expo-linking";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +14,7 @@ import {
   isValidEmail,
 } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { createAuthRedirectUrl } from "@/src/lib/auth/redirectUrls";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -38,7 +38,7 @@ export default function ForgotPasswordScreen() {
       if (!isValidEmail(email)) {
         throw new Error("Please enter a valid email address.");
       }
-      const redirectTo = Linking.createURL("auth/update-password");
+      const redirectTo = createAuthRedirectUrl();
       const { error: resetError } = await getSupabase().auth.resetPasswordForEmail(
         email.trim(),
         { redirectTo }

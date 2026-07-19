@@ -34,6 +34,7 @@ export function AuthScreen({
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           <Text style={styles.brand}>UMTUBA</Text>
           <Text style={styles.title}>{title}</Text>

@@ -311,6 +311,7 @@ export default function CreateScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
           <Text style={styles.title}>Create</Text>
           <Text style={styles.body}>

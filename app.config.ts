@@ -22,6 +22,7 @@ const config: ExpoConfig = {
       usesNonExemptEncryption: false,
     },
     infoPlist: {
+      UIStatusBarStyle: "UIStatusBarStyleLightContent",
       NSCameraUsageDescription:
         "UMTUBA needs camera access so you can take photos and join video sessions.",
       NSMicrophoneUsageDescription:
@@ -70,7 +71,13 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
-    "expo-router",
+    [
+      "expo-router",
+      {
+        // Used for universal-link / createURL origin alignment with associated domains.
+        origin: "https://umtuba.com",
+      },
+    ],
     [
       "expo-splash-screen",
       {

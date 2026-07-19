@@ -42,6 +42,16 @@ describe("parseDeepLink", () => {
     expect(parseDeepLink("umtuba://auth/update-password").target.type).toBe(
       "update-password"
     );
+    expect(
+      parseDeepLink("umtuba://auth/update-password#access_token=demo").target
+        .type
+    ).toBe("update-password");
+    expect(
+      parseDeepLink("umtuba:///--/auth/update-password").target.type
+    ).toBe("update-password");
+    expect(
+      parseDeepLink("exp://127.0.0.1:8081/--/auth/update-password").target.type
+    ).toBe("update-password");
   });
 
   it("parses messages conversation deep links", () => {
