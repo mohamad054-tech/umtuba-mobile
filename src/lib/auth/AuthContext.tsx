@@ -27,6 +27,7 @@ import {
   getReferralAttribution,
 } from "@/src/lib/auth/referralAttribution";
 import type { UserProfile } from "@/src/lib/auth/types";
+import { unregisterPushOnLogout } from "@/src/lib/push/service";
 import { getSupabase } from "@/src/lib/supabase/client";
 
 type AuthContextValue = {
@@ -300,6 +301,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     setError(null);
+    const currentUserId = user?.id ?? null;
+    try {
+      await unregisterPushOnLogout(currentUserId);
+    } catch (err) {
+      console.warn("push unregister on logout failed:", err);
+    }
     const supabase = getSupabase();
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) {
@@ -309,7 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setPasswordRecoveryPending(false);
     await applySession(null);
-  }, [applySession]);
+  }, [applySession, user?.id]);
 
   const markPasswordRecoveryPending = useCallback(() => {
     setPasswordRecoveryPending(true);

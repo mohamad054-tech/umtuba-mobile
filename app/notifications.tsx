@@ -7,8 +7,9 @@ export default function NotificationsScreen() {
     <View style={styles.root}>
       <Text style={styles.title}>Notifications</Text>
       <Text style={styles.body}>
-        Inbox sync and push delivery land in Phase 2. Permission helper is
-        already available under Create.
+        Push delivery foundation is active. Inbox sync and rich notification
+        history will layer on top of the device token registration already
+        wired for signed-in accounts.
       </Text>
     </View>
   );

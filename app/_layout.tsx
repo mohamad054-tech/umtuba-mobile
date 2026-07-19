@@ -18,6 +18,7 @@ import {
   deepLinkToHref,
   parseDeepLink,
 } from "@/src/lib/linking/deepLinks";
+import { PushNotificationsBridge } from "@/src/lib/push/PushNotificationsBridge";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -169,6 +170,7 @@ export default function RootLayout() {
           <StatusBar style="light" />
           <SplashGate>
             <DeepLinkHandler />
+            <PushNotificationsBridge />
             <Stack
               screenOptions={{
                 headerStyle: { backgroundColor: colors.surface },
