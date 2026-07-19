@@ -267,8 +267,7 @@ export function deepLinkToHref(target: DeepLinkTarget): string {
     case "forgot-password":
       return "/(auth)/forgot-password";
     case "update-password":
-      // Full update-password UI ships in Phase 2; land on forgot flow for now.
-      return "/(auth)/forgot-password";
+      return "/(auth)/update-password";
     case "unknown":
       return "/";
   }

@@ -37,6 +37,13 @@ type AuthContextValue = {
   error: string | null;
   /** Set when public env is missing/invalid — blocks auth without crashing. */
   configError: string | null;
+  /**
+   * True while the user must finish password recovery (PASSWORD_RECOVERY
+   * event or recovery deep-link session). Prevents redirecting into tabs.
+   */
+  passwordRecoveryPending: boolean;
+  markPasswordRecoveryPending: () => void;
+  clearPasswordRecoveryPending: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: {
     email: string;
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const applySession = useCallback(async (next: Session | null) => {
@@ -142,7 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const supabase = getSupabase();
-      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setPasswordRecoveryPending(true);
+        }
+        if (event === "SIGNED_OUT") {
+          setPasswordRecoveryPending(false);
+        }
         void applySession(nextSession);
       });
       subscription = data.subscription;
@@ -293,8 +307,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(message);
       throw new Error(message);
     }
+    setPasswordRecoveryPending(false);
     await applySession(null);
   }, [applySession]);
+
+  const markPasswordRecoveryPending = useCallback(() => {
+    setPasswordRecoveryPending(true);
+  }, []);
+
+  const clearPasswordRecoveryPending = useCallback(() => {
+    setPasswordRecoveryPending(false);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -304,6 +327,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       configError,
+      passwordRecoveryPending,
+      markPasswordRecoveryPending,
+      clearPasswordRecoveryPending,
       signIn,
       signUp,
       signOut,
@@ -317,6 +343,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       configError,
+      passwordRecoveryPending,
+      markPasswordRecoveryPending,
+      clearPasswordRecoveryPending,
       signIn,
       signUp,
       signOut,

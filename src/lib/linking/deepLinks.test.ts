@@ -82,7 +82,7 @@ describe("deepLinkToHref", () => {
       "/(auth)/forgot-password"
     );
     expect(deepLinkToHref({ type: "update-password" })).toBe(
-      "/(auth)/forgot-password"
+      "/(auth)/update-password"
     );
     expect(
       deepLinkToHref({

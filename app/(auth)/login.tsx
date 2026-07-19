@@ -13,12 +13,16 @@ import { useAuth } from "@/src/lib/auth/AuthContext";
 import { colors } from "@/src/theme/colors";
 
 export default function LoginScreen() {
-  const { signIn, session, loading } = useAuth();
+  const { signIn, session, loading, passwordRecoveryPending } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!loading && session && passwordRecoveryPending) {
+    return <Redirect href="/(auth)/update-password" />;
+  }
 
   if (!loading && session) {
     return <Redirect href="/(tabs)/watch" />;

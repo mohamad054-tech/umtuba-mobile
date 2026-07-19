@@ -18,7 +18,7 @@ import {
 import { colors } from "@/src/theme/colors";
 
 export default function SignupScreen() {
-  const { signUp, session, loading } = useAuth();
+  const { signUp, session, loading, passwordRecoveryPending } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ ref?: string }>();
   const [fullName, setFullName] = useState("");
@@ -42,6 +42,10 @@ export default function SignupScreen() {
       if (code) setReferralCode(code);
     });
   }, [params.ref]);
+
+  if (!loading && session && passwordRecoveryPending) {
+    return <Redirect href="/(auth)/update-password" />;
+  }
 
   if (!loading && session) {
     return <Redirect href="/(tabs)/watch" />;

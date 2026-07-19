@@ -18,7 +18,11 @@ function TabLabel({
 }
 
 export default function TabLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, passwordRecoveryPending } = useAuth();
+
+  if (!loading && session && passwordRecoveryPending) {
+    return <Redirect href="/(auth)/update-password" />;
+  }
 
   if (!loading && !session) {
     return <Redirect href="/(auth)/login" />;

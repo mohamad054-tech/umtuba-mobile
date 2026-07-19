@@ -10,9 +10,15 @@ import "react-native-reanimated";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import {
+  establishRecoverySession,
+  isRecoveryCallbackUrl,
+  parseRecoveryAuthUrl,
+} from "@/src/lib/auth/passwordRecovery";
+import {
   deepLinkToHref,
   parseDeepLink,
 } from "@/src/lib/linking/deepLinks";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export { ErrorBoundary } from "expo-router";
@@ -37,13 +43,34 @@ const navTheme = {
 
 function DeepLinkHandler() {
   const router = useRouter();
+  const { markPasswordRecoveryPending } = useAuth();
 
   useEffect(() => {
     const handleUrl = async (url: string | null) => {
       if (!url) return;
+
+      if (isRecoveryCallbackUrl(url)) {
+        const recovery = parseRecoveryAuthUrl(url);
+        const result = await establishRecoverySession(getSupabase(), recovery);
+        if (!result.ok) {
+          router.push({
+            pathname: "/(auth)/update-password",
+            params: { error: result.message },
+          } as never);
+          return;
+        }
+        markPasswordRecoveryPending();
+        router.push("/(auth)/update-password" as never);
+        return;
+      }
+
       const parsed = parseDeepLink(url);
       if (parsed.referralCode) {
         await saveReferralAttribution(parsed.referralCode);
+      }
+      if (parsed.target.type === "update-password") {
+        router.push("/(auth)/update-password" as never);
+        return;
       }
       const href = deepLinkToHref(parsed.target);
       router.push(href as never);
@@ -54,7 +81,7 @@ function DeepLinkHandler() {
       void handleUrl(event.url);
     });
     return () => sub.remove();
-  }, [router]);
+  }, [markPasswordRecoveryPending, router]);
 
   return null;
 }
