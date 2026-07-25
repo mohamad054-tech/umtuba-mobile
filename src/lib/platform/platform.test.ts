@@ -21,6 +21,8 @@ import {
 describe("platform enums", () => {
   it("accepts known ids and rejects unknown", () => {
     expect(parsePlatformEntityType("video")).toBe("video");
+    expect(parsePlatformEntityType("wallet")).toBe("wallet");
+    expect(parsePlatformEntityType("transaction")).toBe("transaction");
     expect(parsePlatformEntityType("spaceship")).toBeNull();
     expect(parsePlatformActionId("join")).toBe("join");
     expect(parsePlatformActionId("explode")).toBeNull();

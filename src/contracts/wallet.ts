@@ -1,6 +1,12 @@
 /**
  * Application-layer wallet / digital asset model.
  * UM Points is the primary asset on mobile V1.
+ *
+ * Authority: this contract + `src/lib/wallet` are the operational UM Points
+ * source of truth for balances shown in the app today.
+ * `src/lib/economy` is a separate provider-agnostic integration domain and
+ * must not compete with or duplicate this balance authority until a bridge
+ * adapter is explicitly bound.
  */
 
 export type AssetId = "um_points" | "umtuba_token";

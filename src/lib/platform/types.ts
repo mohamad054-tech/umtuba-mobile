@@ -18,6 +18,10 @@ export type PlatformEntityType =
   | "business"
   | "world"
   | "reward"
+  | "wallet"
+  | "transaction"
+  | "purchase"
+  | "subscription"
   | "future";
 
 export type PlatformActionId =

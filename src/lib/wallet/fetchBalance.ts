@@ -8,6 +8,10 @@ import {
 /**
  * Reads the signed-in user's UM Points balance from `um_point_balances`
  * (RLS: own rows only).
+ *
+ * This is the operational UM Points read path. Do not replace it with
+ * `src/lib/economy` balances; economy remains contract-only until a bridge
+ * adapter is bound.
  */
 export async function fetchUmPointsWalletBalance(
   supabase: SupabaseClient,

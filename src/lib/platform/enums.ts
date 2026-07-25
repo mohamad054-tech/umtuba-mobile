@@ -23,6 +23,10 @@ const ENTITY_TYPES = new Set<PlatformEntityType>([
   "business",
   "world",
   "reward",
+  "wallet",
+  "transaction",
+  "purchase",
+  "subscription",
   "future",
 ]);
 
