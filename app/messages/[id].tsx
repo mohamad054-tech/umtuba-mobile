@@ -72,6 +72,7 @@ export default function ConversationThreadScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [peerTyping, setPeerTyping] = useState(false);
   const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -88,6 +89,7 @@ export default function ConversationThreadScreen() {
       if (!user || !conversationId) return;
       if (!opts?.soft) setLoading(true);
       setError(null);
+      setUnavailable(false);
 
       const membership = await assertConversationMembership(
         getSupabase(),
@@ -96,6 +98,7 @@ export default function ConversationThreadScreen() {
       );
       if (!membership.ok) {
         setError(membership.message);
+        setUnavailable(Boolean(membership.unavailable));
         setLoading(false);
         return;
       }
@@ -120,6 +123,7 @@ export default function ConversationThreadScreen() {
 
       if (!page.ok) {
         setError(page.message);
+        setUnavailable(Boolean(page.unavailable));
         setLoading(false);
         return;
       }
@@ -343,6 +347,9 @@ export default function ConversationThreadScreen() {
   if (error && messages.length === 0) {
     return (
       <View style={styles.center}>
+        <Text style={styles.errorTitle} accessibilityRole="header">
+          {unavailable ? "Conversation unavailable" : "Couldn’t load conversation"}
+        </Text>
         <Text style={styles.error} accessibilityRole="alert">
           {error}
         </Text>
@@ -393,7 +400,17 @@ export default function ConversationThreadScreen() {
           contentContainerStyle={[
             styles.list,
             { paddingBottom: 12 + insets.bottom },
+            messages.length === 0 ? styles.listFill : null,
           ]}
+          ListEmptyComponent={
+            <View style={styles.emptyThread}>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyBody}>
+                Say hello to start the conversation. Attachments and calls are
+                not available yet.
+              </Text>
+            </View>
+          }
           ListHeaderComponent={
             loadingMore ? (
               <ActivityIndicator
@@ -517,6 +534,29 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   error: { color: colors.danger, textAlign: "center" },
+  errorTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  emptyThread: {
+    paddingHorizontal: 24,
+    paddingVertical: 48,
+    alignItems: "center",
+    gap: 8,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  emptyBody: {
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  listFill: { flexGrow: 1 },
   banner: {
     color: colors.danger,
     paddingHorizontal: 16,

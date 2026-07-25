@@ -32,15 +32,23 @@ export function mapMessengerMessageRow(
   const isMine = row.sender_id === currentUserId;
   const status = options?.status ?? "sent";
 
+  let text: string;
+  if (isDeleted) {
+    text = deletedMessagePlaceholder();
+  } else if (row.message_type === "text" && row.body?.trim()) {
+    text = row.body;
+  } else if (row.message_type === "text") {
+    text = "";
+  } else {
+    // Fail-closed: do not invent readable content for unsupported types.
+    text = "Unsupported message";
+  }
+
   return {
     id: row.id,
     conversationId: row.conversation_id,
-    senderId: row.sender_id ?? "system",
-    text: isDeleted
-      ? deletedMessagePlaceholder()
-      : row.message_type !== "text" || !row.body
-        ? row.body || `[${row.message_type}]`
-        : row.body,
+    senderId: row.sender_id ?? "",
+    text,
     sentAt: row.created_at,
     isMine,
     status,

@@ -24,13 +24,17 @@ export type Message = {
 export type Conversation = {
   id: string;
   peerId: string;
+  /** Display title — never an invented personal identity. */
   peerName: string;
   peerInitials: string;
+  /** Trusted http(s) avatar when present. */
+  peerAvatarUrl?: string | null;
   unreadCount: number;
   isTyping: boolean;
   lastMessagePreview: string;
   lastMessageAt: string | null;
   peerLastReadAt?: string | null;
+  muted?: boolean;
 };
 
 export const MESSAGE_PAGE_SIZE = 40;
@@ -62,10 +66,14 @@ export function formatMessageTime(iso: string | null | undefined): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
 
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
 }
 
 export function formatBubbleTime(iso: string): string {

@@ -11,22 +11,29 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ConversationListItem } from "@/components/messenger/ConversationListItem";
+import { MessengerStatePanel } from "@/components/messenger/MessengerStatePanel";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   getOrCreateDirectConversation,
   listConversationsForUser,
   subscribeMessengerRealtime,
 } from "@/src/lib/messenger/api";
+import { conversationThreadHref } from "@/src/lib/messenger/mapDestination";
 import {
   dedupeConversations,
   preserveDeepLinkMessageId,
 } from "@/src/lib/messenger/threadState";
-import {
-  formatMessageTime,
-  type Conversation,
-} from "@/src/lib/messenger/types";
+import type { Conversation } from "@/src/lib/messenger/types";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
+
+type InboxPhase =
+  | "loading"
+  | "ready"
+  | "empty"
+  | "unavailable"
+  | "error";
 
 export default function MessagesInboxScreen() {
   const { user, session, loading: authLoading } = useAuth();
@@ -39,7 +46,7 @@ export default function MessagesInboxScreen() {
   }>();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<InboxPhase>("loading");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -50,17 +57,20 @@ export default function MessagesInboxScreen() {
       if (!user || inFlight.current) return;
       inFlight.current = true;
       if (opts?.soft) setRefreshing(true);
-      else setLoading(true);
+      else setPhase("loading");
       setError(null);
       try {
         const result = await listConversationsForUser(getSupabase(), user.id);
         if (!result.ok) {
+          setConversations([]);
           setError(result.message);
+          setPhase(result.unavailable ? "unavailable" : "error");
           return;
         }
-        setConversations(dedupeConversations(result.conversations));
+        const next = dedupeConversations(result.conversations);
+        setConversations(next);
+        setPhase(next.length === 0 ? "empty" : "ready");
       } finally {
-        setLoading(false);
         setRefreshing(false);
         inFlight.current = false;
       }
@@ -108,11 +118,16 @@ export default function MessagesInboxScreen() {
         );
         if (!result.ok) {
           setError(result.message);
+          setPhase(result.unavailable ? "unavailable" : "error");
           return;
         }
-        router.replace(
-          `/messages/${result.conversationId}` as never
-        );
+        const href = conversationThreadHref(result.conversationId);
+        if (!href) {
+          setError("Unable to open that conversation.");
+          setPhase("error");
+          return;
+        }
+        router.replace(href as never);
       })();
       return;
     }
@@ -126,10 +141,13 @@ export default function MessagesInboxScreen() {
       openedDeepLink.current !== `c:${preserved.conversationId}`
     ) {
       openedDeepLink.current = `c:${preserved.conversationId}`;
-      const href = preserved.messageId
-        ? `/messages/${preserved.conversationId}?message=${preserved.messageId}`
-        : `/messages/${preserved.conversationId}`;
-      router.replace(href as never);
+      const href = conversationThreadHref(
+        preserved.conversationId,
+        preserved.messageId
+      );
+      if (href) {
+        router.replace(href as never);
+      }
     }
   }, [
     authLoading,
@@ -140,9 +158,18 @@ export default function MessagesInboxScreen() {
     user,
   ]);
 
+  const onOpenConversation = useCallback(
+    (conversation: Conversation) => {
+      const href = conversationThreadHref(conversation.id);
+      if (!href) return;
+      router.push(href as never);
+    },
+    [router]
+  );
+
   if (authLoading) {
     return (
-      <View style={styles.center}>
+      <View style={styles.center} accessibilityRole="progressbar">
         <ActivityIndicator color={colors.accentCyan} />
       </View>
     );
@@ -151,7 +178,9 @@ export default function MessagesInboxScreen() {
   if (!session || !user) {
     return (
       <View style={styles.center}>
-        <Text style={styles.title}>Sign in to message</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          Sign in to message
+        </Text>
         <Pressable
           style={styles.button}
           onPress={() => router.push("/(auth)/login")}
@@ -164,7 +193,7 @@ export default function MessagesInboxScreen() {
     );
   }
 
-  if (loading) {
+  if (phase === "loading" && !refreshing) {
     return (
       <View style={styles.center}>
         <ActivityIndicator
@@ -175,33 +204,15 @@ export default function MessagesInboxScreen() {
     );
   }
 
-  if (error && conversations.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.error} accessibilityRole="alert">
-          {error}
-        </Text>
-        <Pressable
-          style={styles.button}
-          onPress={() => void load()}
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading conversations"
-        >
-          <Text style={styles.buttonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
-      {error ? (
+      {error && phase === "ready" ? (
         <Text style={styles.banner} accessibilityRole="alert">
           {error}
         </Text>
       ) : null}
       <FlatList
-        data={conversations}
+        data={phase === "ready" ? conversations : []}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl
@@ -211,54 +222,44 @@ export default function MessagesInboxScreen() {
             colors={[colors.accentCyan]}
           />
         }
+        contentContainerStyle={
+          phase !== "ready" ? styles.listFill : undefined
+        }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptyBody}>
-              Direct messages with people you follow will show up here. Groups,
-              attachments, and calls are not available yet.
-            </Text>
-          </View>
+          phase === "unavailable" ? (
+            <MessengerStatePanel
+              variant="unavailable"
+              title="Messages unavailable"
+              body={
+                error ??
+                "The messenger backend is not available in this environment yet."
+              }
+              onRetry={() => void load()}
+              busy={refreshing}
+            />
+          ) : phase === "error" ? (
+            <MessengerStatePanel
+              variant="error"
+              title="Couldn’t load messages"
+              body={error ?? "Unable to load conversations."}
+              onRetry={() => void load()}
+              busy={refreshing}
+            />
+          ) : phase === "empty" ? (
+            <MessengerStatePanel
+              variant="empty"
+              title="No conversations yet"
+              body="Direct messages will show up here. Groups, attachments, and calls are not available yet."
+              onRetry={() => void load()}
+              busy={refreshing}
+            />
+          ) : null
         }
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() => router.push(`/messages/${item.id}` as never)}
-            accessibilityRole="button"
-            accessibilityLabel={`Conversation with ${item.peerName}${
-              item.unreadCount > 0 ? `, ${item.unreadCount} unread` : ""
-            }`}
-            accessibilityHint="Opens the message thread"
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{item.peerInitials}</Text>
-            </View>
-            <View style={styles.meta}>
-              <View style={styles.topLine}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {item.peerName}
-                </Text>
-                <Text style={styles.time}>
-                  {formatMessageTime(item.lastMessageAt)}
-                </Text>
-              </View>
-              <Text style={styles.preview} numberOfLines={1}>
-                {item.isTyping
-                  ? "Typing…"
-                  : item.lastMessagePreview || "No messages yet"}
-              </Text>
-            </View>
-            {item.unreadCount > 0 ? (
-              <View
-                style={styles.badge}
-                accessibilityLabel={`${item.unreadCount} unread`}
-              >
-                <Text style={styles.badgeText}>
-                  {item.unreadCount > 99 ? "99+" : item.unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
+          <ConversationListItem
+            conversation={item}
+            onPress={onOpenConversation}
+          />
         )}
       />
     </View>
@@ -275,8 +276,8 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 12,
   },
+  listFill: { flexGrow: 1 },
   title: { color: colors.text, fontSize: 20, fontWeight: "700" },
-  error: { color: colors.danger, textAlign: "center" },
   banner: {
     color: colors.danger,
     paddingHorizontal: 16,
@@ -291,49 +292,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonText: { color: colors.bg, fontWeight: "700" },
-  empty: { padding: 32, alignItems: "center", gap: 8 },
-  emptyTitle: { color: colors.text, fontWeight: "700", fontSize: 16 },
-  emptyBody: {
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 72,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { color: colors.text, fontWeight: "700" },
-  meta: { flex: 1, gap: 4 },
-  topLine: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  name: { color: colors.text, fontWeight: "700", flex: 1 },
-  time: { color: colors.textSubtle, fontSize: 12 },
-  preview: { color: colors.textMuted, fontSize: 14 },
-  badge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.accentViolet,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-  },
-  badgeText: { color: colors.text, fontSize: 11, fontWeight: "700" },
 });

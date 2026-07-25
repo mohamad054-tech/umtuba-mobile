@@ -1,6 +1,8 @@
 import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 
 import { getErrorMessage } from "@/src/contracts/validation";
+import { isMessengerBackendMissing } from "@/src/lib/messenger/backend";
+import { parseConversation } from "@/src/lib/messenger/conversationParse";
 import {
   decodeMessagesCursor,
   encodeMessagesCursor,
@@ -13,14 +15,18 @@ import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_PAGE_SIZE,
   TYPING_ACTIVE_MS,
-  initialsFromName,
   type Conversation,
   type Message,
 } from "@/src/lib/messenger/types";
 
 export type ActionResult<T> =
   | ({ ok: true } & T)
-  | { ok: false; message: string; requiresAuth?: boolean };
+  | {
+      ok: false;
+      message: string;
+      requiresAuth?: boolean;
+      unavailable?: boolean;
+    };
 
 type ParticipantJoinRow = {
   conversation_id: string;
@@ -47,16 +53,27 @@ function displayNameFromProfile(
         avatar_initial?: string | null;
         avatar_url?: string | null;
       }
-    | undefined,
-  fallback: string
-): string {
-  if (!profile) return fallback;
+    | undefined
+): string | null {
+  if (!profile) return null;
   return (
     profile.display_name?.trim() ||
     profile.full_name?.trim() ||
-    profile.username ||
-    fallback
+    profile.username?.trim() ||
+    null
   );
+}
+
+function actionError(
+  error: unknown,
+  fallback: string
+): { ok: false; message: string; unavailable?: boolean } {
+  const message = getErrorMessage(error, fallback);
+  return {
+    ok: false,
+    message,
+    unavailable: isMessengerBackendMissing(message),
+  };
 }
 
 async function loadProfilesByIds(
@@ -149,13 +166,10 @@ export async function listConversationsForUser(
 
   if (error) {
     console.error("listConversationsForUser failed:", error);
-    return {
-      ok: false,
-      message: getErrorMessage(
-        error,
-        "Unable to load conversations. Please try again."
-      ),
-    };
+    return actionError(
+      error,
+      "Unable to load conversations. Please try again."
+    );
   }
 
   const rows = ((data ?? []) as unknown as ParticipantJoinRow[]).filter(
@@ -174,13 +188,10 @@ export async function listConversationsForUser(
 
   if (peerError) {
     console.error("Unable to load conversation peers:", peerError);
-    return {
-      ok: false,
-      message: getErrorMessage(
-        peerError,
-        "Unable to load conversations. Please try again."
-      ),
-    };
+    return actionError(
+      peerError,
+      "Unable to load conversations. Please try again."
+    );
   }
 
   const peers = (peerRows ?? []) as Array<{
@@ -220,22 +231,25 @@ export async function listConversationsForUser(
     .map((row): Conversation | null => {
       const conversation = row.conversations;
       if (!conversation) return null;
-      const peerId = peerByConversation.get(row.conversation_id) ?? "";
+      const peerId = peerByConversation.get(row.conversation_id);
+      if (!peerId) return null;
       const profile = profiles.get(peerId);
-      const peerName = displayNameFromProfile(profile, "UMTUBA User");
+      const peerName = displayNameFromProfile(profile);
 
-      return {
+      return parseConversation({
         id: conversation.id,
         peerId,
         peerName,
-        peerInitials: profile?.avatar_initial || initialsFromName(peerName),
-        unreadCount: row.unread_count ?? 0,
+        peerUsername: profile?.username,
+        peerAvatarUrl: profile?.avatar_url,
+        peerAvatarInitial: profile?.avatar_initial,
+        unreadCount: row.unread_count,
         isTyping: typingByConversation.get(conversation.id) ?? false,
-        lastMessagePreview: conversation.last_message_preview || "",
+        lastMessagePreview: conversation.last_message_preview,
         lastMessageAt: conversation.last_message_at,
-        peerLastReadAt:
-          peerLastReadByConversation.get(conversation.id) ?? null,
-      };
+        peerLastReadAt: peerLastReadByConversation.get(conversation.id),
+        muted: row.is_muted === true,
+      });
     })
     .filter((item): item is Conversation => item !== null)
     .sort((a, b) => {
@@ -274,13 +288,7 @@ export async function listMessagesForConversation(
 
   if (error) {
     console.error("listMessagesForConversation failed:", error);
-    return {
-      ok: false,
-      message: getErrorMessage(
-        error,
-        "Unable to load messages. Please try again."
-      ),
-    };
+    return actionError(error, "Unable to load messages. Please try again.");
   }
 
   const rows = (data ?? []) as MessengerMessageRow[];
@@ -531,18 +539,13 @@ export async function assertConversationMembership(
     .maybeSingle();
 
   if (error) {
-    return {
-      ok: false,
-      message: getErrorMessage(
-        error,
-        "Unable to open this conversation."
-      ),
-    };
+    return actionError(error, "Unable to open this conversation.");
   }
   if (!data) {
     return {
       ok: false,
       message: "This conversation is unavailable or you do not have access.",
+      unavailable: true,
     };
   }
   return { ok: true };
