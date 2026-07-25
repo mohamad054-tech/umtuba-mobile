@@ -32,10 +32,17 @@ import {
 } from "@/src/lib/social/interactions";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
+  DEFAULT_WATCH_AUTO_NEXT,
   DEFAULT_WATCH_MUTED,
+  DEFAULT_WATCH_VOLUME,
+  loadWatchAutoNextPreference,
   loadWatchMutedPreference,
+  loadWatchVolumePreference,
   mergeWatchVideos,
+  resolveNextWatchIndex,
+  saveWatchAutoNextPreference,
   saveWatchMutedPreference,
+  saveWatchVolumePreference,
   shouldLoadPlayer,
   watchItemKey,
   type AppLifecycleState,
@@ -65,6 +72,8 @@ export default function WatchScreen() {
   const [cursor, setCursor] = useState<WatchFeedCursor | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
+  const [volume, setVolume] = useState(DEFAULT_WATCH_VOLUME);
+  const [autoNext, setAutoNext] = useState(DEFAULT_WATCH_AUTO_NEXT);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -100,8 +109,15 @@ export default function WatchScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadWatchMutedPreference().then((value) => {
-      if (!cancelled) setMuted(value);
+    void Promise.all([
+      loadWatchMutedPreference(),
+      loadWatchVolumePreference(),
+      loadWatchAutoNextPreference(),
+    ]).then(([nextMuted, nextVolume, nextAutoNext]) => {
+      if (cancelled) return;
+      setMuted(nextMuted);
+      setVolume(nextVolume);
+      setAutoNext(nextAutoNext);
     });
     return () => {
       cancelled = true;
@@ -254,6 +270,36 @@ export default function WatchScreen() {
     });
   }, []);
 
+  const onVolumeChange = useCallback((next: number) => {
+    setVolume(next);
+    void saveWatchVolumePreference(next);
+  }, []);
+
+  const onToggleAutoNext = useCallback(() => {
+    setAutoNext((value) => {
+      const next = !value;
+      void saveWatchAutoNextPreference(next);
+      return next;
+    });
+  }, []);
+
+  const onActiveEnded = useCallback(() => {
+    const nextIndex = resolveNextWatchIndex({
+      autoNext,
+      activeIndex: activeIndexRef.current,
+      itemCount: videosLengthRef.current,
+    });
+    if (nextIndex == null) {
+      return;
+    }
+    try {
+      listRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setActiveIndex(nextIndex);
+    } catch {
+      // FlatList may not have measured yet; ignore safely.
+    }
+  }, [autoNext]);
+
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
     if (!video.postId) return null;
     const result = await refreshPlaybackUrl(getSupabase(), video.postId);
@@ -280,9 +326,15 @@ export default function WatchScreen() {
         isActive={index === activeIndex}
         shouldLoadPlayer={shouldLoadPlayer(index, activeIndex)}
         muted={muted}
+        volume={volume}
+        autoNext={autoNext}
+        isLastItem={index >= videos.length - 1}
         appState={appState}
         screenFocused={screenFocused}
         onToggleMute={onToggleMute}
+        onVolumeChange={onVolumeChange}
+        onToggleAutoNext={onToggleAutoNext}
+        onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
         onToggleSave={() => void onToggleSave(item)}
         onOpenProfile={() => {
@@ -300,16 +352,22 @@ export default function WatchScreen() {
     [
       activeIndex,
       appState,
+      autoNext,
       insets.bottom,
       insets.top,
       muted,
+      onActiveEnded,
+      onToggleAutoNext,
       onToggleLike,
       onToggleMute,
       onToggleSave,
+      onVolumeChange,
       pageHeight,
       refreshSrcFor,
       router,
       screenFocused,
+      videos.length,
+      volume,
     ]
   );
 

@@ -1,28 +1,40 @@
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  clampWatchVolume,
+  formatPlaybackClock,
+  resolveAutoNextButtonText,
+  resolveEffectiveAudio,
   resolveMuteButtonText,
   resolveMuteLabel,
   resolvePlayPauseFeedbackLabel,
   resolveProgressRatio,
+  resolveSeekTime,
   sanitizePlaybackError,
+  shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldPlayWithUserPause,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
-import { applyPlaybackIntent } from "@/src/lib/watch/playerSession";
+import {
+  applyPlaybackIntent,
+  applySeekTime,
+} from "@/src/lib/watch/playerSession";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -34,9 +46,17 @@ export type WatchVideoCardProps = {
   /** Mount native player only for current + adjacent cards. */
   shouldLoadPlayer: boolean;
   muted: boolean;
+  /** In-app VideoPlayer.volume 0–1. */
+  volume: number;
+  autoNext: boolean;
+  /** Last feed item — loop safely when auto-next cannot advance. */
+  isLastItem: boolean;
   appState: AppLifecycleState;
   screenFocused: boolean;
   onToggleMute: () => void;
+  onVolumeChange: (volume: number) => void;
+  onToggleAutoNext: () => void;
+  onEnded?: () => void;
   onToggleLike: () => void;
   onToggleSave: () => void;
   onOpenProfile?: () => void;
@@ -46,23 +66,133 @@ export type WatchVideoCardProps = {
   bottomInset?: number;
 };
 
+type TimelineState = {
+  currentTime: number;
+  duration: number;
+  ratio: number;
+};
+
 type PlayerPaneProps = {
   src: string;
   isActive: boolean;
   shouldPlay: boolean;
   muted: boolean;
-  progressRatio: number;
-  onProgress: (ratio: number) => void;
+  volume: number;
+  loop: boolean;
+  seekRequest: { token: number; ratio: number } | null;
+  onTimeline: (state: TimelineState) => void;
+  onEnded?: () => void;
   onRefreshSrc?: () => Promise<string | null>;
 };
+
+type ScrubBarProps = {
+  ratio: number;
+  accessibilityLabel: string;
+  onSeekRatio: (ratio: number) => void;
+  trackColor?: string;
+  fillColor?: string;
+  /** Larger hit target for timeline seeking. */
+  tall?: boolean;
+};
+
+function ScrubBar({
+  ratio,
+  accessibilityLabel,
+  onSeekRatio,
+  trackColor = "rgba(255,255,255,0.28)",
+  fillColor = colors.accentCyan,
+  tall = false,
+}: ScrubBarProps) {
+  const widthRef = useRef(1);
+  const scrubbingRef = useRef(false);
+  const [localRatio, setLocalRatio] = useState(ratio);
+
+  useEffect(() => {
+    if (!scrubbingRef.current) {
+      setLocalRatio(ratio);
+    }
+  }, [ratio]);
+
+  const ratioFromEvent = useCallback((event: GestureResponderEvent) => {
+    const x = event.nativeEvent.locationX;
+    const width = widthRef.current || 1;
+    return Math.min(1, Math.max(0, x / width));
+  }, []);
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: (event) => {
+          scrubbingRef.current = true;
+          const next = ratioFromEvent(event);
+          setLocalRatio(next);
+        },
+        onPanResponderMove: (event) => {
+          const next = ratioFromEvent(event);
+          setLocalRatio(next);
+        },
+        onPanResponderRelease: (event) => {
+          const next = ratioFromEvent(event);
+          setLocalRatio(next);
+          onSeekRatio(next);
+          scrubbingRef.current = false;
+        },
+        onPanResponderTerminate: () => {
+          scrubbingRef.current = false;
+        },
+      }),
+    [onSeekRatio, ratioFromEvent]
+  );
+
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    widthRef.current = Math.max(1, event.nativeEvent.layout.width);
+  }, []);
+
+  return (
+    <View
+      style={[styles.scrubHit, tall && styles.scrubHitTall]}
+      onLayout={onLayout}
+      accessibilityRole="adjustable"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityValue={{
+        min: 0,
+        max: 100,
+        now: Math.round(localRatio * 100),
+      }}
+      {...panResponder.panHandlers}
+    >
+      <View style={[styles.scrubTrack, { backgroundColor: trackColor }]}>
+        <View
+          style={[
+            styles.scrubFill,
+            { width: `${localRatio * 100}%`, backgroundColor: fillColor },
+          ]}
+        />
+        <View
+          style={[
+            styles.scrubThumb,
+            tall && styles.scrubThumbTall,
+            { left: `${localRatio * 100}%` },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
 
 function WatchPlayerPane({
   src,
   isActive,
   shouldPlay,
   muted,
-  progressRatio,
-  onProgress,
+  volume,
+  loop,
+  seekRequest,
+  onTimeline,
+  onEnded,
   onRefreshSrc,
 }: PlayerPaneProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
@@ -71,10 +201,12 @@ function WatchPlayerPane({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const lastSeekToken = useRef<number | null>(null);
 
   const player = useVideoPlayer(src, (p) => {
-    p.loop = true;
+    p.loop = loop;
     p.muted = muted;
+    p.volume = volume;
     p.audioMixingMode = "auto";
     p.staysActiveInBackground = false;
     p.showNowPlayingNotification = false;
@@ -102,23 +234,44 @@ function WatchPlayerPane({
   });
 
   useEventListener(player, "timeUpdate", ({ currentTime }) => {
-    onProgress(resolveProgressRatio(currentTime, player.duration));
+    const duration = player.duration;
+    onTimeline({
+      currentTime,
+      duration: Number.isFinite(duration) ? duration : 0,
+      ratio: resolveProgressRatio(currentTime, duration),
+    });
+  });
+
+  useEventListener(player, "playToEnd", () => {
+    if (!isActive || loop) return;
+    onEnded?.();
   });
 
   useEffect(() => {
     applyPlaybackIntent(player, {
       shouldPlay,
       muted,
+      volume,
+      loop,
       resetPosition: !isActive,
     });
     if (!isActive) {
-      onProgress(0);
+      onTimeline({ currentTime: 0, duration: 0, ratio: 0 });
     }
-  }, [player, shouldPlay, muted, isActive, retryToken, onProgress]);
+  }, [player, shouldPlay, muted, volume, loop, isActive, retryToken, onTimeline]);
 
   useEffect(() => {
-    player.muted = muted;
-  }, [player, muted]);
+    if (!seekRequest) return;
+    if (lastSeekToken.current === seekRequest.token) return;
+    lastSeekToken.current = seekRequest.token;
+    const duration = player.duration;
+    applySeekTime(player, resolveSeekTime(seekRequest.ratio, duration));
+    onTimeline({
+      currentTime: player.currentTime,
+      duration: Number.isFinite(duration) ? duration : 0,
+      ratio: resolveProgressRatio(player.currentTime, duration),
+    });
+  }, [seekRequest, player, onTimeline]);
 
   const onRetry = useCallback(async () => {
     setRefreshing(true);
@@ -161,16 +314,6 @@ function WatchPlayerPane({
         importantForAccessibility="no-hide-descendants"
       />
 
-      <View
-        style={styles.progressTrack}
-        pointerEvents="none"
-        accessibilityElementsHidden
-      >
-        <View
-          style={[styles.progressFill, { width: `${progressRatio * 100}%` }]}
-        />
-      </View>
-
       {(status === "loading" || refreshing) && (
         <View style={styles.centerOverlay} pointerEvents="none">
           <ActivityIndicator
@@ -208,9 +351,15 @@ function WatchVideoCardComponent({
   isActive,
   shouldLoadPlayer: loadPlayer,
   muted,
+  volume,
+  autoNext,
+  isLastItem,
   appState,
   screenFocused,
   onToggleMute,
+  onVolumeChange,
+  onToggleAutoNext,
+  onEnded,
   onToggleLike,
   onToggleSave,
   onOpenProfile,
@@ -220,9 +369,18 @@ function WatchVideoCardComponent({
   bottomInset = 0,
 }: WatchVideoCardProps) {
   const [userPaused, setUserPaused] = useState(false);
-  const [progressRatio, setProgressRatio] = useState(0);
+  const [timeline, setTimeline] = useState<TimelineState>({
+    currentTime: 0,
+    duration: 0,
+    ratio: 0,
+  });
+  const [seekRequest, setSeekRequest] = useState<{
+    token: number;
+    ratio: number;
+  } | null>(null);
   const [feedback, setFeedback] = useState<"play" | "pause" | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekTokenRef = useRef(0);
 
   const feedShouldPlay = shouldPlayVideo({
     isActive,
@@ -236,11 +394,15 @@ function WatchVideoCardComponent({
     isActive,
   });
 
+  const loop = shouldLoopCurrentVideo({ autoNext, isLastItem });
+  const audio = resolveEffectiveAudio({ isActive, muted, volume });
+
   useEffect(() => {
     if (!isActive) {
       setUserPaused(false);
       setFeedback(null);
-      setProgressRatio(0);
+      setTimeline({ currentTime: 0, duration: 0, ratio: 0 });
+      setSeekRequest(null);
     }
   }, [isActive]);
 
@@ -272,18 +434,39 @@ function WatchVideoCardComponent({
     });
   }, [feedShouldPlay, isActive, showFeedback]);
 
-  const onProgress = useCallback((ratio: number) => {
-    setProgressRatio(ratio);
+  const onTimeline = useCallback((state: TimelineState) => {
+    setTimeline(state);
   }, []);
+
+  const onSeekRatio = useCallback((ratio: number) => {
+    seekTokenRef.current += 1;
+    setSeekRequest({ token: seekTokenRef.current, ratio });
+    setTimeline((prev) => ({
+      ...prev,
+      ratio,
+      currentTime: resolveSeekTime(ratio, prev.duration),
+    }));
+  }, []);
+
+  const onVolumeSeek = useCallback(
+    (ratio: number) => {
+      onVolumeChange(clampWatchVolume(ratio));
+    },
+    [onVolumeChange]
+  );
 
   const a11ySummary = [
     video.author.username,
     video.caption || video.title,
     muted ? "Muted" : "Sound on",
+    `Volume ${Math.round(volume * 100)} percent`,
+    autoNext ? "Auto-next on" : "Auto-next off",
     userPaused ? "Paused" : isActive ? "Now playing" : "Paused",
   ]
     .filter(Boolean)
     .join(". ");
+
+  const timelineBottom = Math.max(12, bottomInset + 10);
 
   return (
     <View
@@ -296,9 +479,12 @@ function WatchVideoCardComponent({
           src={video.src}
           isActive={isActive}
           shouldPlay={shouldPlay}
-          muted={muted}
-          progressRatio={isActive ? progressRatio : 0}
-          onProgress={onProgress}
+          muted={audio.muted}
+          volume={audio.volume}
+          loop={loop}
+          seekRequest={isActive ? seekRequest : null}
+          onTimeline={onTimeline}
+          onEnded={onEnded}
           onRefreshSrc={onRefreshSrc}
         />
       ) : (
@@ -312,9 +498,7 @@ function WatchVideoCardComponent({
           style={styles.tapLayer}
           onPress={onTogglePlayPause}
           accessibilityRole="button"
-          accessibilityLabel={
-            userPaused ? "Play video" : "Pause video"
-          }
+          accessibilityLabel={userPaused ? "Play video" : "Pause video"}
           accessibilityHint="Toggles play and pause"
         />
 
@@ -333,17 +517,50 @@ function WatchVideoCardComponent({
           </View>
         ) : null}
 
-        <Pressable
-          style={[styles.muteBtn, { top: Math.max(16, topInset + 8) }]}
-          onPress={onToggleMute}
-          accessibilityRole="button"
-          accessibilityLabel={resolveMuteLabel(muted)}
-          accessibilityState={{ selected: muted }}
+        <View
+          style={[styles.topControls, { top: Math.max(16, topInset + 8) }]}
+          pointerEvents="box-none"
         >
-          <Text style={styles.muteText}>{resolveMuteButtonText(muted)}</Text>
-        </Pressable>
+          <Pressable
+            style={[styles.chipBtn, autoNext && styles.chipBtnOn]}
+            onPress={onToggleAutoNext}
+            accessibilityRole="switch"
+            accessibilityLabel="Auto-next"
+            accessibilityState={{ checked: autoNext }}
+          >
+            <Text style={styles.chipText}>
+              {resolveAutoNextButtonText(autoNext)}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.chipBtn, muted && styles.chipBtnMuted]}
+            onPress={onToggleMute}
+            accessibilityRole="button"
+            accessibilityLabel={resolveMuteLabel(muted)}
+            accessibilityState={{ selected: muted }}
+          >
+            <Text style={styles.chipText}>{resolveMuteButtonText(muted)}</Text>
+          </Pressable>
+        </View>
 
-        <View style={[styles.meta, { marginBottom: Math.max(8, bottomInset) }]}>
+        <View
+          style={[styles.volumeBlock, { top: Math.max(72, topInset + 64) }]}
+          pointerEvents="box-none"
+        >
+          <Text style={styles.volumeLabel}>
+            Volume {Math.round(volume * 100)}%
+          </Text>
+          <ScrubBar
+            ratio={volume}
+            accessibilityLabel="In-app volume"
+            onSeekRatio={onVolumeSeek}
+          />
+        </View>
+
+        <View
+          style={[styles.meta, { marginBottom: timelineBottom + 36 }]}
+          pointerEvents="box-none"
+        >
           <Pressable
             onPress={onOpenProfile}
             disabled={!onOpenProfile}
@@ -361,7 +578,7 @@ function WatchVideoCardComponent({
           </Text>
         </View>
 
-        <View style={[styles.rail, { bottom: 80 + bottomInset }]}>
+        <View style={[styles.rail, { bottom: timelineBottom + 52 }]}>
           <Pressable
             style={styles.action}
             onPress={onToggleLike}
@@ -407,6 +624,32 @@ function WatchVideoCardComponent({
             <Text style={styles.actionCount}>{video.stats.shares}</Text>
           </Pressable>
         </View>
+
+        {/*
+          Timeline lives in the overlay (not under VideoView siblings).
+          V1's 3px bar sat inside the player layer at bottom:0 and was covered /
+          clipped by the overlay + tab/safe-area on Android.
+        */}
+        <View
+          style={[styles.timeline, { bottom: timelineBottom }]}
+          collapsable={false}
+          pointerEvents="box-none"
+        >
+          <View style={styles.timelineTimes}>
+            <Text style={styles.timeText}>
+              {formatPlaybackClock(timeline.currentTime)}
+            </Text>
+            <Text style={styles.timeText}>
+              {formatPlaybackClock(timeline.duration)}
+            </Text>
+          </View>
+          <ScrubBar
+            ratio={isActive ? timeline.ratio : 0}
+            accessibilityLabel="Seek timeline"
+            onSeekRatio={onSeekRatio}
+            tall
+          />
+        </View>
       </View>
     </View>
   );
@@ -429,18 +672,6 @@ const styles = StyleSheet.create({
   placeholder: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.surface,
-  },
-  progressTrack: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 3,
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: colors.accentCyan,
   },
   centerOverlay: {
     ...StyleSheet.absoluteFill,
@@ -473,7 +704,9 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: "flex-end",
-    padding: 16,
+    paddingHorizontal: 16,
+    zIndex: 4,
+    elevation: 4,
   },
   tapLayer: {
     ...StyleSheet.absoluteFill,
@@ -491,6 +724,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
     gap: 4,
+    zIndex: 6,
   },
   feedbackIcon: {
     color: colors.text,
@@ -502,30 +736,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  muteBtn: {
+  topControls: {
     position: "absolute",
     right: 16,
-    paddingHorizontal: 14,
+    flexDirection: "row",
+    gap: 8,
+    zIndex: 6,
+  },
+  chipBtn: {
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    minHeight: 48,
-    minWidth: 88,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: colors.overlay,
     borderWidth: 1,
     borderColor: colors.border,
-    zIndex: 2,
   },
-  muteText: {
+  chipBtnOn: {
+    borderColor: colors.accentCyan,
+  },
+  chipBtnMuted: {
+    borderColor: colors.danger,
+  },
+  chipText: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
+  },
+  volumeBlock: {
+    position: "absolute",
+    right: 16,
+    width: 148,
+    gap: 6,
+    zIndex: 6,
+  },
+  volumeLabel: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "right",
   },
   meta: {
     maxWidth: "72%",
-    marginBottom: 8,
-    zIndex: 2,
+    zIndex: 5,
   },
   username: {
     color: colors.text,
@@ -541,10 +796,9 @@ const styles = StyleSheet.create({
   rail: {
     position: "absolute",
     right: 12,
-    bottom: 80,
     alignItems: "center",
     gap: 18,
-    zIndex: 2,
+    zIndex: 5,
   },
   action: {
     alignItems: "center",
@@ -566,5 +820,62 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     marginTop: 2,
+  },
+  timeline: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 8,
+    elevation: 8,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  timelineTimes: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  timeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "700",
+    textShadowColor: "rgba(0,0,0,0.65)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  scrubHit: {
+    justifyContent: "center",
+    minHeight: 28,
+    paddingVertical: 8,
+  },
+  scrubHitTall: {
+    minHeight: 36,
+    paddingVertical: 10,
+  },
+  scrubTrack: {
+    height: 4,
+    borderRadius: 999,
+    overflow: "visible",
+    justifyContent: "center",
+  },
+  scrubFill: {
+    height: 4,
+    borderRadius: 999,
+  },
+  scrubThumb: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginLeft: -6,
+    backgroundColor: colors.text,
+    borderWidth: 1,
+    borderColor: colors.accentCyan,
+  },
+  scrubThumbTall: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginLeft: -7,
   },
 });
