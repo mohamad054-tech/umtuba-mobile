@@ -16,15 +16,18 @@ import {
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  canSeekWithDuration,
   clampWatchVolume,
   formatPlaybackClock,
+  quantizeWatchVolume,
   resolveAutoNextButtonText,
   resolveEffectiveAudio,
   resolveMuteButtonText,
   resolveMuteLabel,
   resolvePlayPauseFeedbackLabel,
   resolveProgressRatio,
-  resolveSeekTime,
+  resolveScrubRatioFromPageX,
+  resolveSeekTimeOrNull,
   sanitizePlaybackError,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
@@ -39,6 +42,7 @@ import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
 const TIME_UPDATE_INTERVAL_SEC = 0.25;
+const SCRUB_CATCHUP_EPSILON = 0.02;
 
 export type WatchVideoCardProps = {
   video: WatchVideo;
@@ -56,6 +60,8 @@ export type WatchVideoCardProps = {
   onToggleMute: () => void;
   onVolumeChange: (volume: number) => void;
   onToggleAutoNext: () => void;
+  /** Disable parent FlatList scrolling while scrubbing seek/volume. */
+  onScrubGestureChange?: (active: boolean) => void;
   onEnded?: () => void;
   onToggleLike: () => void;
   onToggleSave: () => void;
@@ -89,21 +95,27 @@ type ScrubBarProps = {
   ratio: number;
   accessibilityLabel: string;
   onSeekRatio: (ratio: number) => void;
+  onGestureActiveChange?: (active: boolean) => void;
   trackColor?: string;
   fillColor?: string;
   /** Larger hit target for timeline seeking. */
   tall?: boolean;
+  /** Extra-wide volume control. */
+  wide?: boolean;
 };
 
 function ScrubBar({
   ratio,
   accessibilityLabel,
   onSeekRatio,
+  onGestureActiveChange,
   trackColor = "rgba(255,255,255,0.28)",
   fillColor = colors.accentCyan,
   tall = false,
+  wide = false,
 }: ScrubBarProps) {
-  const widthRef = useRef(1);
+  const trackRef = useRef<View>(null);
+  const frameRef = useRef({ x: 0, width: 1 });
   const scrubbingRef = useRef(false);
   const [localRatio, setLocalRatio] = useState(ratio);
 
@@ -113,48 +125,92 @@ function ScrubBar({
     }
   }, [ratio]);
 
-  const ratioFromEvent = useCallback((event: GestureResponderEvent) => {
-    const x = event.nativeEvent.locationX;
-    const width = widthRef.current || 1;
-    return Math.min(1, Math.max(0, x / width));
+  const measureTrack = useCallback((after?: () => void) => {
+    trackRef.current?.measureInWindow((x, _y, width) => {
+      frameRef.current = {
+        x,
+        width: Math.max(1, width),
+      };
+      after?.();
+    });
   }, []);
+
+  const ratioFromPageX = useCallback((pageX: number) => {
+    const { x, width } = frameRef.current;
+    return resolveScrubRatioFromPageX(pageX, x, width);
+  }, []);
+
+  const applyFromEvent = useCallback(
+    (event: GestureResponderEvent, emit: boolean) => {
+      const next = ratioFromPageX(event.nativeEvent.pageX);
+      setLocalRatio(next);
+      if (emit) {
+        onSeekRatio(next);
+      }
+    },
+    [onSeekRatio, ratioFromPageX]
+  );
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
         onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: (event) => {
           scrubbingRef.current = true;
-          const next = ratioFromEvent(event);
-          setLocalRatio(next);
+          onGestureActiveChange?.(true);
+          const pageX = event.nativeEvent.pageX;
+          measureTrack(() => {
+            const next = ratioFromPageX(pageX);
+            setLocalRatio(next);
+            onSeekRatio(next);
+          });
+          // Optimistic update with last measured frame if callback is delayed.
+          applyFromEvent(event, true);
         },
         onPanResponderMove: (event) => {
-          const next = ratioFromEvent(event);
-          setLocalRatio(next);
+          applyFromEvent(event, true);
         },
         onPanResponderRelease: (event) => {
-          const next = ratioFromEvent(event);
-          setLocalRatio(next);
-          onSeekRatio(next);
+          applyFromEvent(event, true);
           scrubbingRef.current = false;
+          onGestureActiveChange?.(false);
         },
         onPanResponderTerminate: () => {
           scrubbingRef.current = false;
+          onGestureActiveChange?.(false);
         },
       }),
-    [onSeekRatio, ratioFromEvent]
+    [
+      applyFromEvent,
+      measureTrack,
+      onGestureActiveChange,
+      onSeekRatio,
+      ratioFromPageX,
+    ]
   );
 
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    widthRef.current = Math.max(1, event.nativeEvent.layout.width);
-  }, []);
+  const onLayout = useCallback(
+    (_event: LayoutChangeEvent) => {
+      measureTrack();
+    },
+    [measureTrack]
+  );
 
   return (
     <View
-      style={[styles.scrubHit, tall && styles.scrubHitTall]}
+      ref={trackRef}
+      style={[
+        styles.scrubHit,
+        tall && styles.scrubHitTall,
+        wide && styles.scrubHitWide,
+      ]}
       onLayout={onLayout}
+      collapsable={false}
       accessibilityRole="adjustable"
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{
@@ -265,11 +321,15 @@ function WatchPlayerPane({
     if (lastSeekToken.current === seekRequest.token) return;
     lastSeekToken.current = seekRequest.token;
     const duration = player.duration;
-    applySeekTime(player, resolveSeekTime(seekRequest.ratio, duration));
+    const seconds = resolveSeekTimeOrNull(seekRequest.ratio, duration);
+    if (seconds == null) {
+      return;
+    }
+    applySeekTime(player, seconds);
     onTimeline({
-      currentTime: player.currentTime,
+      currentTime: seconds,
       duration: Number.isFinite(duration) ? duration : 0,
-      ratio: resolveProgressRatio(player.currentTime, duration),
+      ratio: seekRequest.ratio,
     });
   }, [seekRequest, player, onTimeline]);
 
@@ -359,6 +419,7 @@ function WatchVideoCardComponent({
   onToggleMute,
   onVolumeChange,
   onToggleAutoNext,
+  onScrubGestureChange,
   onEnded,
   onToggleLike,
   onToggleSave,
@@ -381,6 +442,7 @@ function WatchVideoCardComponent({
   const [feedback, setFeedback] = useState<"play" | "pause" | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekTokenRef = useRef(0);
+  const scrubTargetRatioRef = useRef<number | null>(null);
 
   const feedShouldPlay = shouldPlayVideo({
     isActive,
@@ -435,24 +497,58 @@ function WatchVideoCardComponent({
   }, [feedShouldPlay, isActive, showFeedback]);
 
   const onTimeline = useCallback((state: TimelineState) => {
+    const target = scrubTargetRatioRef.current;
+    if (target != null) {
+      if (Math.abs(state.ratio - target) > SCRUB_CATCHUP_EPSILON) {
+        setTimeline((prev) => ({
+          ...prev,
+          duration: state.duration || prev.duration,
+          currentTime:
+            canSeekWithDuration(state.duration || prev.duration)
+              ? target * (state.duration || prev.duration)
+              : prev.currentTime,
+          ratio: target,
+        }));
+        return;
+      }
+      scrubTargetRatioRef.current = null;
+    }
     setTimeline(state);
   }, []);
 
-  const onSeekRatio = useCallback((ratio: number) => {
-    seekTokenRef.current += 1;
-    setSeekRequest({ token: seekTokenRef.current, ratio });
-    setTimeline((prev) => ({
-      ...prev,
-      ratio,
-      currentTime: resolveSeekTime(ratio, prev.duration),
-    }));
-  }, []);
+  const onSeekRatio = useCallback(
+    (ratio: number) => {
+      if (!canSeekWithDuration(timeline.duration)) {
+        return;
+      }
+      scrubTargetRatioRef.current = ratio;
+      seekTokenRef.current += 1;
+      setSeekRequest({ token: seekTokenRef.current, ratio });
+      setTimeline((prev) => ({
+        ...prev,
+        ratio,
+        currentTime:
+          resolveSeekTimeOrNull(ratio, prev.duration) ?? prev.currentTime,
+      }));
+    },
+    [timeline.duration]
+  );
 
   const onVolumeSeek = useCallback(
     (ratio: number) => {
-      onVolumeChange(clampWatchVolume(ratio));
+      onVolumeChange(quantizeWatchVolume(clampWatchVolume(ratio)));
     },
     [onVolumeChange]
+  );
+
+  const onScrubActive = useCallback(
+    (active: boolean) => {
+      onScrubGestureChange?.(active);
+      if (!active) {
+        // Keep local scrub target briefly until timeUpdate catches up.
+      }
+    },
+    [onScrubGestureChange]
   );
 
   const a11ySummary = [
@@ -554,6 +650,9 @@ function WatchVideoCardComponent({
             ratio={volume}
             accessibilityLabel="In-app volume"
             onSeekRatio={onVolumeSeek}
+            onGestureActiveChange={onScrubActive}
+            tall
+            wide
           />
         </View>
 
@@ -647,6 +746,7 @@ function WatchVideoCardComponent({
             ratio={isActive ? timeline.ratio : 0}
             accessibilityLabel="Seek timeline"
             onSeekRatio={onSeekRatio}
+            onGestureActiveChange={onScrubActive}
             tall
           />
         </View>
@@ -768,14 +868,14 @@ const styles = StyleSheet.create({
   volumeBlock: {
     position: "absolute",
     right: 16,
-    width: 148,
-    gap: 6,
+    width: 240,
+    gap: 8,
     zIndex: 6,
   },
   volumeLabel: {
     color: colors.text,
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
     textAlign: "right",
   },
   meta: {
@@ -845,37 +945,41 @@ const styles = StyleSheet.create({
   },
   scrubHit: {
     justifyContent: "center",
-    minHeight: 28,
-    paddingVertical: 8,
+    minHeight: 36,
+    paddingVertical: 12,
   },
   scrubHitTall: {
-    minHeight: 36,
-    paddingVertical: 10,
+    minHeight: 48,
+    paddingVertical: 14,
+  },
+  scrubHitWide: {
+    minHeight: 52,
+    paddingVertical: 16,
   },
   scrubTrack: {
-    height: 4,
+    height: 5,
     borderRadius: 999,
     overflow: "visible",
     justifyContent: "center",
   },
   scrubFill: {
-    height: 4,
+    height: 5,
     borderRadius: 999,
   },
   scrubThumb: {
     position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginLeft: -6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginLeft: -7,
     backgroundColor: colors.text,
     borderWidth: 1,
     borderColor: colors.accentCyan,
   },
   scrubThumbTall: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginLeft: -7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginLeft: -8,
   },
 });

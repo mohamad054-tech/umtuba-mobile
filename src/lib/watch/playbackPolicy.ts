@@ -134,17 +134,30 @@ export function clampWatchVolume(volume: number): number {
   return Math.min(1, Math.max(0, volume));
 }
 
+/** Discrete in-app volume steps (5%). */
+export const WATCH_VOLUME_STEP = 0.05;
+
+export function quantizeWatchVolume(
+  volume: number,
+  step: number = WATCH_VOLUME_STEP
+): number {
+  const clamped = clampWatchVolume(volume);
+  if (!Number.isFinite(step) || step <= 0) return clamped;
+  const quantized = Math.round(clamped / step) * step;
+  return clampWatchVolume(Number(quantized.toFixed(2)));
+}
+
 export function parseWatchVolumePreference(
   raw: string | null | undefined
 ): number {
   if (raw == null || raw === "") return DEFAULT_WATCH_VOLUME;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_WATCH_VOLUME;
-  return clampWatchVolume(parsed);
+  return quantizeWatchVolume(parsed);
 }
 
 export function serializeWatchVolumePreference(volume: number): string {
-  return String(clampWatchVolume(volume));
+  return String(quantizeWatchVolume(volume));
 }
 
 export async function loadWatchVolumePreference(): Promise<number> {
@@ -232,6 +245,53 @@ export function resolveNextWatchIndex(input: {
   return next;
 }
 
+/** Pixel offset for FlatList scrollToOffset (index * measured item height). */
+export function resolveWatchScrollOffset(
+  index: number,
+  itemHeight: number
+): number | null {
+  if (!Number.isFinite(index) || index < 0) return null;
+  if (!Number.isFinite(itemHeight) || itemHeight <= 0) return null;
+  return index * itemHeight;
+}
+
+/**
+ * While a programmatic auto-next scroll is in flight, ignore viewability
+ * updates that would snap activeIndex back to the previous item.
+ */
+export function shouldAcceptViewableIndexUpdate(input: {
+  nowMs: number;
+  lockUntilMs: number;
+}): boolean {
+  if (!Number.isFinite(input.nowMs) || !Number.isFinite(input.lockUntilMs)) {
+    return true;
+  }
+  return input.nowMs >= input.lockUntilMs;
+}
+
+/** Clamp a unit scrub ratio to 0..1. */
+export function clampUnitRatio(ratio: number): number {
+  if (!Number.isFinite(ratio)) return 0;
+  return Math.min(1, Math.max(0, ratio));
+}
+
+/**
+ * Stable scrub math for Android: pageX relative to measureInWindow track origin.
+ */
+export function resolveScrubRatioFromPageX(
+  pageX: number,
+  trackX: number,
+  trackWidth: number
+): number {
+  if (!Number.isFinite(pageX) || !Number.isFinite(trackX)) return 0;
+  if (!Number.isFinite(trackWidth) || trackWidth <= 0) return 0;
+  return clampUnitRatio((pageX - trackX) / trackWidth);
+}
+
+export function canSeekWithDuration(duration: number): boolean {
+  return Number.isFinite(duration) && duration > 0;
+}
+
 /** Clamp playback progress for the timeline (0–1). */
 export function resolveProgressRatio(
   currentTime: number,
@@ -248,9 +308,17 @@ export function resolveProgressRatio(
 }
 
 export function resolveSeekTime(ratio: number, duration: number): number {
-  if (!Number.isFinite(duration) || duration <= 0) return 0;
-  const clamped = Math.min(1, Math.max(0, ratio));
-  return clamped * duration;
+  if (!canSeekWithDuration(duration)) return 0;
+  return clampUnitRatio(ratio) * duration;
+}
+
+/** Seek seconds when duration is ready; otherwise null (ignore seek). */
+export function resolveSeekTimeOrNull(
+  ratio: number,
+  duration: number
+): number | null {
+  if (!canSeekWithDuration(duration)) return null;
+  return resolveSeekTime(ratio, duration);
 }
 
 /** mm:ss (or h:mm:ss for long clips). */

@@ -5,12 +5,15 @@ import {
   DEFAULT_WATCH_AUTO_NEXT,
   DEFAULT_WATCH_MUTED,
   DEFAULT_WATCH_VOLUME,
+  canSeekWithDuration,
+  clampUnitRatio,
   formatPlaybackClock,
   isLikelyExpiredPlaybackUrl,
   mergeWatchVideos,
   parseWatchAutoNextPreference,
   parseWatchMutedPreference,
   parseWatchVolumePreference,
+  quantizeWatchVolume,
   resolveAutoNextButtonText,
   resolveEffectiveAudio,
   resolveMuteButtonText,
@@ -18,11 +21,15 @@ import {
   resolveNextWatchIndex,
   resolvePlayPauseFeedbackLabel,
   resolveProgressRatio,
+  resolveScrubRatioFromPageX,
   resolveSeekTime,
+  resolveSeekTimeOrNull,
+  resolveWatchScrollOffset,
   sanitizePlaybackError,
   serializeWatchAutoNextPreference,
   serializeWatchMutedPreference,
   serializeWatchVolumePreference,
+  shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
@@ -170,11 +177,24 @@ describe("watch volume preference", () => {
     expect(parseWatchVolumePreference(null)).toBe(1);
   });
 
-  it("clamps and serializes volume", () => {
-    expect(parseWatchVolumePreference("0.42")).toBe(0.42);
-    expect(parseWatchVolumePreference("2")).toBe(1);
-    expect(parseWatchVolumePreference("-1")).toBe(0);
+  it("clamps, quantizes to 5%, and serializes volume", () => {
+    expect(quantizeWatchVolume(0.42)).toBe(0.4);
+    expect(quantizeWatchVolume(0.44)).toBe(0.45);
+    expect(quantizeWatchVolume(2)).toBe(1);
+    expect(quantizeWatchVolume(-1)).toBe(0);
+    expect(parseWatchVolumePreference("0.42")).toBe(0.4);
     expect(serializeWatchVolumePreference(0.5)).toBe("0.5");
+  });
+});
+
+describe("scrub pageX ratio math", () => {
+  it("clamps and maps pageX against measured track window", () => {
+    expect(clampUnitRatio(1.4)).toBe(1);
+    expect(clampUnitRatio(-0.2)).toBe(0);
+    expect(resolveScrubRatioFromPageX(150, 100, 200)).toBe(0.25);
+    expect(resolveScrubRatioFromPageX(50, 100, 200)).toBe(0);
+    expect(resolveScrubRatioFromPageX(400, 100, 200)).toBe(1);
+    expect(resolveScrubRatioFromPageX(150, 100, 0)).toBe(0);
   });
 });
 
@@ -228,6 +248,28 @@ describe("auto-next preference and end-of-clip policy", () => {
     ).toBeNull();
   });
 
+  it("computes scroll offsets from measured item height", () => {
+    expect(resolveWatchScrollOffset(2, 800)).toBe(1600);
+    expect(resolveWatchScrollOffset(0, 800)).toBe(0);
+    expect(resolveWatchScrollOffset(1, 0)).toBeNull();
+    expect(resolveWatchScrollOffset(-1, 800)).toBeNull();
+  });
+
+  it("locks viewability updates during programmatic advance", () => {
+    expect(
+      shouldAcceptViewableIndexUpdate({
+        nowMs: 1000,
+        lockUntilMs: 1500,
+      })
+    ).toBe(false);
+    expect(
+      shouldAcceptViewableIndexUpdate({
+        nowMs: 1500,
+        lockUntilMs: 1500,
+      })
+    ).toBe(true);
+  });
+
   it("labels auto-next control", () => {
     expect(resolveAutoNextButtonText(true)).toBe("Auto-next on");
     expect(resolveAutoNextButtonText(false)).toBe("Auto-next off");
@@ -242,6 +284,14 @@ describe("progress and play/pause helpers", () => {
     expect(resolveProgressRatio(1, 0)).toBe(0);
     expect(resolveSeekTime(0.25, 40)).toBe(10);
     expect(resolveSeekTime(2, 40)).toBe(40);
+  });
+
+  it("ignores seek when duration is not ready", () => {
+    expect(canSeekWithDuration(0)).toBe(false);
+    expect(canSeekWithDuration(-1)).toBe(false);
+    expect(canSeekWithDuration(12)).toBe(true);
+    expect(resolveSeekTimeOrNull(0.5, 0)).toBeNull();
+    expect(resolveSeekTimeOrNull(0.5, 20)).toBe(10);
   });
 
   it("formats playback clock", () => {

@@ -66,10 +66,10 @@ describe("applyPlaybackIntent", () => {
 
   it("seeks to a clamped time", () => {
     const session = createPlayerSession();
-    applySeekTime(session.player, 4.5);
+    expect(applySeekTime(session.player, 4.5)).toBe(true);
     expect(session.player.currentTime).toBe(4.5);
-    applySeekTime(session.player, Number.NaN);
-    expect(session.player.currentTime).toBe(0);
+    expect(applySeekTime(session.player, Number.NaN)).toBe(false);
+    expect(session.player.currentTime).toBe(4.5);
   });
 
   it("release cleans up and blocks further play", () => {

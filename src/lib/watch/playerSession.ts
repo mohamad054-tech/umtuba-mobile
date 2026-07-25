@@ -41,12 +41,12 @@ export function applyPlaybackIntent(
   }
 }
 
-export function applySeekTime(player: PlayerLike, seconds: number): void {
+export function applySeekTime(player: PlayerLike, seconds: number): boolean {
   if (!Number.isFinite(seconds) || seconds < 0) {
-    player.currentTime = 0;
-    return;
+    return false;
   }
   player.currentTime = seconds;
+  return true;
 }
 
 /** Mark a session cleaned up (mirrors unmount release expectations). */

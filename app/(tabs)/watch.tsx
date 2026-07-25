@@ -39,10 +39,13 @@ import {
   loadWatchMutedPreference,
   loadWatchVolumePreference,
   mergeWatchVideos,
+  quantizeWatchVolume,
   resolveNextWatchIndex,
+  resolveWatchScrollOffset,
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
+  shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
   watchItemKey,
   type AppLifecycleState,
@@ -50,6 +53,7 @@ import {
 import { colors } from "@/src/theme/colors";
 
 const { height: WINDOW_HEIGHT } = Dimensions.get("window");
+const PROGRAMMATIC_ADVANCE_LOCK_MS = 750;
 
 function toLifecycleState(state: AppStateStatus): AppLifecycleState {
   if (state === "active" || state === "background" || state === "inactive") {
@@ -83,13 +87,19 @@ export default function WatchScreen() {
   const [appState, setAppState] = useState<AppLifecycleState>(
     toLifecycleState(AppState.currentState)
   );
+  const [itemHeight, setItemHeight] = useState(WINDOW_HEIGHT);
+  const [listScrollEnabled, setListScrollEnabled] = useState(true);
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
   const activeIndexRef = useRef(0);
   const videosLengthRef = useRef(0);
+  const itemHeightRef = useRef(WINDOW_HEIGHT);
+  const programmaticAdvanceUntilRef = useRef(0);
 
-  const pageHeight = WINDOW_HEIGHT;
+  useEffect(() => {
+    itemHeightRef.current = itemHeight;
+  }, [itemHeight]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,8 +149,14 @@ export default function WatchScreen() {
       if (!screenFocused) return false;
       if (activeIndexRef.current > 0) {
         const prev = activeIndexRef.current - 1;
-        listRef.current?.scrollToIndex({ index: prev, animated: true });
-        setActiveIndex(prev);
+        const offset = resolveWatchScrollOffset(prev, itemHeightRef.current);
+        if (offset != null) {
+          programmaticAdvanceUntilRef.current =
+            Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
+          listRef.current?.scrollToOffset({ offset, animated: true });
+          activeIndexRef.current = prev;
+          setActiveIndex(prev);
+        }
         return true;
       }
       return false;
@@ -208,7 +224,17 @@ export default function WatchScreen() {
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const first = viewableItems.find((item) => item.isViewable && item.index != null);
+      if (
+        !shouldAcceptViewableIndexUpdate({
+          nowMs: Date.now(),
+          lockUntilMs: programmaticAdvanceUntilRef.current,
+        })
+      ) {
+        return;
+      }
+      const first = viewableItems.find(
+        (item) => item.isViewable && item.index != null
+      );
       if (first?.index != null) {
         setActiveIndex(first.index);
       }
@@ -271,8 +297,9 @@ export default function WatchScreen() {
   }, []);
 
   const onVolumeChange = useCallback((next: number) => {
-    setVolume(next);
-    void saveWatchVolumePreference(next);
+    const quantized = quantizeWatchVolume(next);
+    setVolume(quantized);
+    void saveWatchVolumePreference(quantized);
   }, []);
 
   const onToggleAutoNext = useCallback(() => {
@@ -281,6 +308,55 @@ export default function WatchScreen() {
       void saveWatchAutoNextPreference(next);
       return next;
     });
+  }, []);
+
+  const onScrubGestureChange = useCallback((active: boolean) => {
+    setListScrollEnabled(!active);
+  }, []);
+
+  const scrollToWatchIndex = useCallback((nextIndex: number, attempt = 0) => {
+    const height = itemHeightRef.current;
+    const offset = resolveWatchScrollOffset(nextIndex, height);
+    if (offset == null) {
+      console.warn("Watch auto-next: invalid scroll offset", {
+        nextIndex,
+        height,
+      });
+      return;
+    }
+
+    programmaticAdvanceUntilRef.current =
+      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
+    activeIndexRef.current = nextIndex;
+    setActiveIndex(nextIndex);
+
+    const run = () => {
+      listRef.current?.scrollToOffset({
+        offset,
+        animated: attempt === 0,
+      });
+    };
+
+    try {
+      run();
+    } catch (err) {
+      console.warn("Watch auto-next scroll failed:", err);
+      if (attempt < 3) {
+        setTimeout(() => scrollToWatchIndex(nextIndex, attempt + 1), 80 * (attempt + 1));
+      }
+      return;
+    }
+
+    if (attempt < 2) {
+      setTimeout(() => {
+        try {
+          listRef.current?.scrollToOffset({ offset, animated: false });
+        } catch (err) {
+          console.warn("Watch auto-next scroll retry failed:", err);
+          scrollToWatchIndex(nextIndex, attempt + 1);
+        }
+      }, 120);
+    }
   }, []);
 
   const onActiveEnded = useCallback(() => {
@@ -292,13 +368,8 @@ export default function WatchScreen() {
     if (nextIndex == null) {
       return;
     }
-    try {
-      listRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      setActiveIndex(nextIndex);
-    } catch {
-      // FlatList may not have measured yet; ignore safely.
-    }
-  }, [autoNext]);
+    scrollToWatchIndex(nextIndex);
+  }, [autoNext, scrollToWatchIndex]);
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
     if (!video.postId) return null;
@@ -310,11 +381,11 @@ export default function WatchScreen() {
 
   const getItemLayout = useCallback(
     (_: ArrayLike<WatchVideo> | null | undefined, index: number) => ({
-      length: pageHeight,
-      offset: pageHeight * index,
+      length: itemHeight,
+      offset: itemHeight * index,
       index,
     }),
-    [pageHeight]
+    [itemHeight]
   );
 
   const keyExtractor = useCallback((item: WatchVideo) => watchItemKey(item), []);
@@ -334,6 +405,7 @@ export default function WatchScreen() {
         onToggleMute={onToggleMute}
         onVolumeChange={onVolumeChange}
         onToggleAutoNext={onToggleAutoNext}
+        onScrubGestureChange={onScrubGestureChange}
         onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
         onToggleSave={() => void onToggleSave(item)}
@@ -344,7 +416,7 @@ export default function WatchScreen() {
           }
         }}
         onRefreshSrc={() => refreshSrcFor(item)}
-        style={{ height: pageHeight }}
+        style={{ height: itemHeight }}
         topInset={insets.top + 44}
         bottomInset={insets.bottom}
       />
@@ -355,14 +427,15 @@ export default function WatchScreen() {
       autoNext,
       insets.bottom,
       insets.top,
+      itemHeight,
       muted,
       onActiveEnded,
+      onScrubGestureChange,
       onToggleAutoNext,
       onToggleLike,
       onToggleMute,
       onToggleSave,
       onVolumeChange,
-      pageHeight,
       refreshSrcFor,
       router,
       screenFocused,
@@ -465,12 +538,19 @@ export default function WatchScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         pagingEnabled
+        scrollEnabled={listScrollEnabled}
         showsVerticalScrollIndicator={false}
-        snapToInterval={pageHeight}
+        snapToInterval={itemHeight}
         snapToAlignment="start"
         disableIntervalMomentum
         decelerationRate="fast"
         getItemLayout={getItemLayout}
+        onLayout={(event) => {
+          const nextHeight = event.nativeEvent.layout.height;
+          if (Number.isFinite(nextHeight) && nextHeight > 0) {
+            setItemHeight(nextHeight);
+          }
+        }}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         onViewableItemsChanged={onViewableItemsChanged}
@@ -489,10 +569,15 @@ export default function WatchScreen() {
         }
         ListFooterComponent={listFooter}
         onScrollToIndexFailed={(info) => {
+          const offset = resolveWatchScrollOffset(
+            info.index,
+            itemHeightRef.current
+          );
+          if (offset == null) return;
           setTimeout(() => {
-            listRef.current?.scrollToIndex({
-              index: info.index,
-              animated: true,
+            listRef.current?.scrollToOffset({
+              offset,
+              animated: false,
             });
           }, 100);
         }}
