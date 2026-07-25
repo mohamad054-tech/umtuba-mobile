@@ -2,12 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  DEFAULT_WATCH_MUTED,
   isLikelyExpiredPlaybackUrl,
   mergeWatchVideos,
+  parseWatchMutedPreference,
+  resolveMuteButtonText,
   resolveMuteLabel,
+  resolvePlayPauseFeedbackLabel,
+  resolveProgressRatio,
   sanitizePlaybackError,
+  serializeWatchMutedPreference,
   shouldLoadPlayer,
   shouldPlayVideo,
+  shouldPlayWithUserPause,
   watchItemKey,
 } from "./playbackPolicy";
 
@@ -127,6 +134,61 @@ describe("resolveMuteLabel", () => {
   it("reflects mute state", () => {
     expect(resolveMuteLabel(true)).toBe("Unmute video");
     expect(resolveMuteLabel(false)).toBe("Mute video");
+  });
+});
+
+describe("watch mute preference", () => {
+  it("defaults to unmuted when unset", () => {
+    expect(DEFAULT_WATCH_MUTED).toBe(false);
+    expect(parseWatchMutedPreference(null)).toBe(false);
+    expect(parseWatchMutedPreference(undefined)).toBe(false);
+  });
+
+  it("round-trips muted preference strings", () => {
+    expect(parseWatchMutedPreference("1")).toBe(true);
+    expect(parseWatchMutedPreference("0")).toBe(false);
+    expect(serializeWatchMutedPreference(true)).toBe("1");
+    expect(serializeWatchMutedPreference(false)).toBe("0");
+  });
+});
+
+describe("progress and play/pause helpers", () => {
+  it("clamps progress ratio", () => {
+    expect(resolveProgressRatio(5, 10)).toBe(0.5);
+    expect(resolveProgressRatio(-1, 10)).toBe(0);
+    expect(resolveProgressRatio(20, 10)).toBe(1);
+    expect(resolveProgressRatio(1, 0)).toBe(0);
+  });
+
+  it("combines feed autoplay with user pause", () => {
+    expect(
+      shouldPlayWithUserPause({
+        feedShouldPlay: true,
+        userPaused: false,
+        isActive: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldPlayWithUserPause({
+        feedShouldPlay: true,
+        userPaused: true,
+        isActive: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldPlayWithUserPause({
+        feedShouldPlay: true,
+        userPaused: true,
+        isActive: false,
+      })
+    ).toBe(false);
+  });
+
+  it("labels play/pause feedback", () => {
+    expect(resolvePlayPauseFeedbackLabel(true)).toBe("Paused");
+    expect(resolvePlayPauseFeedbackLabel(false)).toBe("Playing");
+    expect(resolveMuteButtonText(true)).toBe("Unmute");
+    expect(resolveMuteButtonText(false)).toBe("Mute");
   });
 });
 

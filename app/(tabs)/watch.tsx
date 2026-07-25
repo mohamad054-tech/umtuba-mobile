@@ -32,7 +32,10 @@ import {
 } from "@/src/lib/social/interactions";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
+  DEFAULT_WATCH_MUTED,
+  loadWatchMutedPreference,
   mergeWatchVideos,
+  saveWatchMutedPreference,
   shouldLoadPlayer,
   watchItemKey,
   type AppLifecycleState,
@@ -61,7 +64,7 @@ export default function WatchScreen() {
   const [videos, setVideos] = useState<WatchVideo[]>([]);
   const [cursor, setCursor] = useState<WatchFeedCursor | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -93,6 +96,16 @@ export default function WatchScreen() {
       setAppState(toLifecycleState(next));
     });
     return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadWatchMutedPreference().then((value) => {
+      if (!cancelled) setMuted(value);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -234,7 +247,11 @@ export default function WatchScreen() {
   );
 
   const onToggleMute = useCallback(() => {
-    setMuted((m) => !m);
+    setMuted((m) => {
+      const next = !m;
+      void saveWatchMutedPreference(next);
+      return next;
+    });
   }, []);
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {

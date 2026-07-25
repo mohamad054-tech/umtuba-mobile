@@ -1,6 +1,6 @@
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,13 +13,20 @@ import {
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  resolveMuteButtonText,
   resolveMuteLabel,
+  resolvePlayPauseFeedbackLabel,
+  resolveProgressRatio,
   sanitizePlaybackError,
   shouldPlayVideo,
+  shouldPlayWithUserPause,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
 import { applyPlaybackIntent } from "@/src/lib/watch/playerSession";
 import { colors } from "@/src/theme/colors";
+
+const PLAY_PAUSE_FEEDBACK_MS = 700;
+const TIME_UPDATE_INTERVAL_SEC = 0.25;
 
 export type WatchVideoCardProps = {
   video: WatchVideo;
@@ -44,6 +51,8 @@ type PlayerPaneProps = {
   isActive: boolean;
   shouldPlay: boolean;
   muted: boolean;
+  progressRatio: number;
+  onProgress: (ratio: number) => void;
   onRefreshSrc?: () => Promise<string | null>;
 };
 
@@ -52,6 +61,8 @@ function WatchPlayerPane({
   isActive,
   shouldPlay,
   muted,
+  progressRatio,
+  onProgress,
   onRefreshSrc,
 }: PlayerPaneProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
@@ -68,6 +79,7 @@ function WatchPlayerPane({
     p.staysActiveInBackground = false;
     p.showNowPlayingNotification = false;
     p.keepScreenOnWhilePlaying = true;
+    p.timeUpdateEventInterval = TIME_UPDATE_INTERVAL_SEC;
   });
 
   useEventListener(player, "statusChange", ({ status: next, error }) => {
@@ -89,13 +101,20 @@ function WatchPlayerPane({
     }
   });
 
+  useEventListener(player, "timeUpdate", ({ currentTime }) => {
+    onProgress(resolveProgressRatio(currentTime, player.duration));
+  });
+
   useEffect(() => {
     applyPlaybackIntent(player, {
       shouldPlay,
       muted,
       resetPosition: !isActive,
     });
-  }, [player, shouldPlay, muted, isActive, retryToken]);
+    if (!isActive) {
+      onProgress(0);
+    }
+  }, [player, shouldPlay, muted, isActive, retryToken, onProgress]);
 
   useEffect(() => {
     player.muted = muted;
@@ -141,6 +160,16 @@ function WatchPlayerPane({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
+
+      <View
+        style={styles.progressTrack}
+        pointerEvents="none"
+        accessibilityElementsHidden
+      >
+        <View
+          style={[styles.progressFill, { width: `${progressRatio * 100}%` }]}
+        />
+      </View>
 
       {(status === "loading" || refreshing) && (
         <View style={styles.centerOverlay} pointerEvents="none">
@@ -190,17 +219,68 @@ function WatchVideoCardComponent({
   topInset = 0,
   bottomInset = 0,
 }: WatchVideoCardProps) {
-  const shouldPlay = shouldPlayVideo({
+  const [userPaused, setUserPaused] = useState(false);
+  const [progressRatio, setProgressRatio] = useState(0);
+  const [feedback, setFeedback] = useState<"play" | "pause" | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const feedShouldPlay = shouldPlayVideo({
     isActive,
     appState,
     screenFocused,
   });
 
+  const shouldPlay = shouldPlayWithUserPause({
+    feedShouldPlay,
+    userPaused,
+    isActive,
+  });
+
+  useEffect(() => {
+    if (!isActive) {
+      setUserPaused(false);
+      setFeedback(null);
+      setProgressRatio(0);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimer.current) {
+        clearTimeout(feedbackTimer.current);
+      }
+    };
+  }, []);
+
+  const showFeedback = useCallback((kind: "play" | "pause") => {
+    setFeedback(kind);
+    if (feedbackTimer.current) {
+      clearTimeout(feedbackTimer.current);
+    }
+    feedbackTimer.current = setTimeout(() => {
+      setFeedback(null);
+      feedbackTimer.current = null;
+    }, PLAY_PAUSE_FEEDBACK_MS);
+  }, []);
+
+  const onTogglePlayPause = useCallback(() => {
+    if (!isActive || !feedShouldPlay) return;
+    setUserPaused((paused) => {
+      const next = !paused;
+      showFeedback(next ? "pause" : "play");
+      return next;
+    });
+  }, [feedShouldPlay, isActive, showFeedback]);
+
+  const onProgress = useCallback((ratio: number) => {
+    setProgressRatio(ratio);
+  }, []);
+
   const a11ySummary = [
     video.author.username,
     video.caption || video.title,
-    muted ? "Muted" : "Unmuted",
-    isActive ? "Now playing" : "Paused",
+    muted ? "Muted" : "Sound on",
+    userPaused ? "Paused" : isActive ? "Now playing" : "Paused",
   ]
     .filter(Boolean)
     .join(". ");
@@ -217,6 +297,8 @@ function WatchVideoCardComponent({
           isActive={isActive}
           shouldPlay={shouldPlay}
           muted={muted}
+          progressRatio={isActive ? progressRatio : 0}
+          onProgress={onProgress}
           onRefreshSrc={onRefreshSrc}
         />
       ) : (
@@ -227,13 +309,38 @@ function WatchVideoCardComponent({
 
       <View style={styles.overlay} pointerEvents="box-none">
         <Pressable
+          style={styles.tapLayer}
+          onPress={onTogglePlayPause}
+          accessibilityRole="button"
+          accessibilityLabel={
+            userPaused ? "Play video" : "Pause video"
+          }
+          accessibilityHint="Toggles play and pause"
+        />
+
+        {feedback ? (
+          <View
+            style={styles.feedbackBadge}
+            pointerEvents="none"
+            accessibilityElementsHidden
+          >
+            <Text style={styles.feedbackIcon}>
+              {feedback === "pause" ? "❚❚" : "▶"}
+            </Text>
+            <Text style={styles.feedbackText}>
+              {resolvePlayPauseFeedbackLabel(feedback === "pause")}
+            </Text>
+          </View>
+        ) : null}
+
+        <Pressable
           style={[styles.muteBtn, { top: Math.max(16, topInset + 8) }]}
           onPress={onToggleMute}
           accessibilityRole="button"
           accessibilityLabel={resolveMuteLabel(muted)}
           accessibilityState={{ selected: muted }}
         >
-          <Text style={styles.muteText}>{muted ? "Unmute" : "Mute"}</Text>
+          <Text style={styles.muteText}>{resolveMuteButtonText(muted)}</Text>
         </Pressable>
 
         <View style={[styles.meta, { marginBottom: Math.max(8, bottomInset) }]}>
@@ -323,6 +430,18 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.surface,
   },
+  progressTrack: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.accentCyan,
+  },
   centerOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
@@ -356,27 +475,57 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     padding: 16,
   },
+  tapLayer: {
+    ...StyleSheet.absoluteFill,
+  },
+  feedbackBadge: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "42%",
+    minWidth: 96,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(5,5,16,0.72)",
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    gap: 4,
+  },
+  feedbackIcon: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  feedbackText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "600",
+  },
   muteBtn: {
     position: "absolute",
     right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     minHeight: 48,
-    minWidth: 72,
+    minWidth: 88,
+    alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: colors.overlay,
     borderWidth: 1,
     borderColor: colors.border,
+    zIndex: 2,
   },
   muteText: {
     color: colors.text,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
   },
   meta: {
     maxWidth: "72%",
     marginBottom: 8,
+    zIndex: 2,
   },
   username: {
     color: colors.text,
@@ -395,6 +544,7 @@ const styles = StyleSheet.create({
     bottom: 80,
     alignItems: "center",
     gap: 18,
+    zIndex: 2,
   },
   action: {
     alignItems: "center",

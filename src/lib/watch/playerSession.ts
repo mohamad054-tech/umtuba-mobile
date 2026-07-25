@@ -40,7 +40,7 @@ export function createPlayerSession() {
   let released = false;
   const calls: string[] = [];
   const player: PlayerLike = {
-    muted: true,
+    muted: false,
     loop: false,
     currentTime: 0,
     play: () => {

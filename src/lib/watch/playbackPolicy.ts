@@ -1,7 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { getErrorMessage } from "@/src/contracts/validation";
 import type { WatchVideo } from "@/src/contracts/watch";
 
 export type AppLifecycleState = "active" | "background" | "inactive" | "unknown";
+
+/** Product default: Watch autoplay starts with audio on. */
+export const DEFAULT_WATCH_MUTED = false;
+
+export const WATCH_MUTE_STORAGE_KEY = "umtuba.watch.muted";
 
 /**
  * Only the active card may play, and only while the app is foregrounded
@@ -73,4 +80,71 @@ export function isLikelyExpiredPlaybackUrl(error: unknown): boolean {
 
 export function resolveMuteLabel(muted: boolean): string {
   return muted ? "Unmute video" : "Mute video";
+}
+
+/** Short visible mute control label. */
+export function resolveMuteButtonText(muted: boolean): string {
+  return muted ? "Unmute" : "Mute";
+}
+
+export function parseWatchMutedPreference(raw: string | null | undefined): boolean {
+  if (raw === "1" || raw === "true") return true;
+  if (raw === "0" || raw === "false") return false;
+  return DEFAULT_WATCH_MUTED;
+}
+
+export function serializeWatchMutedPreference(muted: boolean): string {
+  return muted ? "1" : "0";
+}
+
+export async function loadWatchMutedPreference(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(WATCH_MUTE_STORAGE_KEY);
+    return parseWatchMutedPreference(raw);
+  } catch {
+    return DEFAULT_WATCH_MUTED;
+  }
+}
+
+export async function saveWatchMutedPreference(muted: boolean): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      WATCH_MUTE_STORAGE_KEY,
+      serializeWatchMutedPreference(muted)
+    );
+  } catch {
+    // Preference persistence is best-effort.
+  }
+}
+
+/** Clamp playback progress for the thin feed indicator (0–1). */
+export function resolveProgressRatio(
+  currentTime: number,
+  duration: number
+): number {
+  if (
+    !Number.isFinite(currentTime) ||
+    !Number.isFinite(duration) ||
+    duration <= 0
+  ) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, currentTime / duration));
+}
+
+export function resolvePlayPauseFeedbackLabel(userPaused: boolean): string {
+  return userPaused ? "Paused" : "Playing";
+}
+
+/**
+ * Feed autoplay AND user tap-pause.
+ * When the card is inactive, user pause is ignored so the next active card autoplays.
+ */
+export function shouldPlayWithUserPause(input: {
+  feedShouldPlay: boolean;
+  userPaused: boolean;
+  isActive: boolean;
+}): boolean {
+  if (!input.isActive) return false;
+  return input.feedShouldPlay && !input.userPaused;
 }

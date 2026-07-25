@@ -42,13 +42,13 @@ describe("applyPlaybackIntent", () => {
       appState: "background",
       screenFocused: true,
     });
-    applyPlaybackIntent(session.player, { shouldPlay: play, muted: true });
+    applyPlaybackIntent(session.player, { shouldPlay: play, muted: false });
     expect(session.calls).toEqual(["pause"]);
   });
 
   it("release cleans up and blocks further play", () => {
     const session = createPlayerSession();
-    applyPlaybackIntent(session.player, { shouldPlay: true, muted: true });
+    applyPlaybackIntent(session.player, { shouldPlay: true, muted: false });
     session.release();
     expect(session.released).toBe(true);
     expect(session.calls).toContain("release");
