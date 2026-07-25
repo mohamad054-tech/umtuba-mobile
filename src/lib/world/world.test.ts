@@ -123,9 +123,11 @@ describe("world actions / destinations", () => {
     ).toMatchObject({ kind: "navigate", targetId: "x" });
     expect(parseWorldAction({ kind: "explode" })).toBeNull();
     expect(mapWorldDestination("/(tabs)/discover")).toBe("/(tabs)/discover");
-    expect(mapWorldDestination("/world")).toBe("/(tabs)/discover");
+    expect(mapWorldDestination("/world")).toBe("/world");
+    expect(mapWorldDestination("/(tabs)/world")).toBe("/world");
     expect(canOpenWorldDestination("https://evil.example/world")).toBe(false);
     expect(mapWorldDestination("https://umtuba.com/live")).toBe("/(tabs)/live");
+    expect(mapWorldDestination("https://umtuba.com/world")).toBe("/world");
   });
 });
 

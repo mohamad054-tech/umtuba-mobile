@@ -92,7 +92,7 @@ export function buildDiscoverHomeFromWatchVideos(
     unavailableSection(
       "world",
       "World",
-      "World / Globe discovery is not available yet."
+      "World experience is available. The owned map renderer is being prepared."
     ),
     unavailableSection(
       "people",

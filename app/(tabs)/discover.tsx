@@ -28,6 +28,7 @@ import {
   type DiscoverCategory,
   type DiscoverHomeModel,
 } from "@/src/lib/discover";
+import { discoverWorldEntryHref } from "@/src/lib/world/experience";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -108,6 +109,18 @@ export default function DiscoverScreen() {
 
   const onPlaceholderPress = (label: string, message: string) => {
     Alert.alert(label, message);
+  };
+
+  const onWorldPress = () => {
+    const href = discoverWorldEntryHref();
+    if (!href) {
+      Alert.alert(
+        "World",
+        "World is not available through a safe route in this version."
+      );
+      return;
+    }
+    router.push(href as Href);
   };
 
   if (loading && !home) {
@@ -234,12 +247,7 @@ export default function DiscoverScreen() {
             <View style={styles.placeholders}>
               <DiscoverPlaceholderChip
                 label="World"
-                onPress={() =>
-                  onPlaceholderPress(
-                    "World",
-                    "World / Globe discovery is not available yet."
-                  )
-                }
+                onPress={onWorldPress}
               />
               <DiscoverPlaceholderChip
                 label="People"

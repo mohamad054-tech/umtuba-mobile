@@ -82,7 +82,8 @@ describe("platform entity / action parse", () => {
 describe("platform destinations", () => {
   it("allowlists official routes only", () => {
     expect(mapPlatformDestination("/(tabs)/messages")).toBe("/(tabs)/messages");
-    expect(mapPlatformDestination("/world")).toBe("/(tabs)/discover");
+    expect(mapPlatformDestination("/world")).toBe("/world");
+    expect(mapPlatformDestination("/(tabs)/world")).toBe("/world");
     expect(
       canOpenPlatformDestination("https://umtuba.com/rewards")
     ).toBe(true);

@@ -187,6 +187,7 @@ export default function RootLayout() {
                 options={{ title: "Notifications" }}
               />
               <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
+              <Stack.Screen name="world" options={{ title: "World" }} />
               <Stack.Screen name="settings" options={{ title: "Settings" }} />
               <Stack.Screen
                 name="change-password"

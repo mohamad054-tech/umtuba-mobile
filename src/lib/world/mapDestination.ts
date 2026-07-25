@@ -54,9 +54,9 @@ function mapWorldPath(pathWithQuery: string): string | null {
   if (pathOnly === "/notifications") {
     return "/notifications";
   }
-  // Reserved future World route — maps to Discover until a World screen exists.
+  // World experience screen (stack). Tab alias remaps to the same surface.
   if (pathOnly === "/world" || pathOnly === "/(tabs)/world") {
-    return "/(tabs)/discover";
+    return "/world";
   }
 
   const profile = pathOnly.match(/^\/profile\/([^/]+)$/i);

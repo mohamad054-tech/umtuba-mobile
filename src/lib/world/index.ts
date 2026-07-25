@@ -36,6 +36,26 @@ export {
   isWorldFoundationConfigured,
 } from "@/src/lib/world/foundation";
 export {
+  applyWorldCategoryFilter,
+  buildWorldCameraControls,
+  buildWorldExperienceViewState,
+  buildWorldLayerControls,
+  createDefaultWorldUiSelection,
+  discoverWorldEntryHref,
+  parseWorldExperienceCategorySelection,
+  selectWorldEntity,
+  toggleWorldCategorySelection,
+  WORLD_ATTRIBUTION_FALLBACK,
+  WORLD_RENDERER_PREPARING_MESSAGE,
+  WORLD_SCREEN_HREF,
+  type WorldCameraControlId,
+  type WorldCameraControlState,
+  type WorldExperiencePhase,
+  type WorldExperienceViewState,
+  type WorldLayerControlState,
+  type WorldUiSelectionState,
+} from "@/src/lib/world/experience";
+export {
   parseWorldLayer,
   parseWorldLayerKind,
   parseWorldOverlay,

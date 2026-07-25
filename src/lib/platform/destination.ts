@@ -75,7 +75,7 @@ function mapPlatformPath(pathWithQuery: string): string | null {
     return "/settings";
   }
   if (pathOnly === "/world" || pathOnly === "/(tabs)/world") {
-    return "/(tabs)/discover";
+    return "/world";
   }
 
   const profile = pathOnly.match(/^\/profile\/([^/]+)$/i);
