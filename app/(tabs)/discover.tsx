@@ -1,35 +1,71 @@
-import { Link } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter, type Href } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { WatchVideo } from "@/src/contracts/watch";
-import { getErrorMessage } from "@/src/contracts/validation";
-import { fetchWatchFeedPage } from "@/src/lib/feed/watchFeed";
+import { DiscoverCard } from "@/components/discover/DiscoverCard";
+import { DiscoverSearchBar } from "@/components/discover/DiscoverSearchBar";
+import {
+  DiscoverPlaceholderChip,
+  DiscoverSection,
+} from "@/components/discover/DiscoverSection";
+import {
+  filterDiscoverCards,
+  loadDiscoverHome,
+  mapDiscoverCategoryHref,
+  resolveDiscoverSearchPhase,
+  type DiscoverCardModel,
+  type DiscoverCategory,
+  type DiscoverHomeModel,
+} from "@/src/lib/discover";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function DiscoverScreen() {
-  const [videos, setVideos] = useState<WatchVideo[]>([]);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [home, setHome] = useState<DiscoverHomeModel | null>(null);
+  const [cards, setCards] = useState<DiscoverCardModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [query, setQuery] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
     setError(null);
+    setUnavailable(false);
     try {
-      const page = await fetchWatchFeedPage(getSupabase(), { limit: 12 });
-      setVideos(page.videos);
+      const result = await loadDiscoverHome(getSupabase(), { limit: 16 });
+      if (!result.ok) {
+        setHome(null);
+        setCards([]);
+        setError(result.message);
+        setUnavailable(Boolean(result.unavailable));
+        return;
+      }
+      setHome(result.home);
+      setCards(result.cards);
     } catch (err) {
-      setError(getErrorMessage(err, "Unable to load."));
+      setHome(null);
+      setCards([]);
+      setError(
+        err instanceof Error ? err.message : "Unable to load Discover."
+      );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -37,55 +73,196 @@ export default function DiscoverScreen() {
     void load();
   }, [load]);
 
-  if (loading) {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load({ silent: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
+  const searchResults = useMemo(
+    () => filterDiscoverCards(cards, query),
+    [cards, query]
+  );
+
+  const searchPhase = resolveDiscoverSearchPhase({
+    query,
+    loading: loading && Boolean(query.trim()),
+    error: query.trim() ? error : null,
+    resultCount: searchResults.length,
+  });
+
+  const onCategoryPress = (category: DiscoverCategory) => {
+    const href = mapDiscoverCategoryHref(category.id);
+    if (!href) {
+      Alert.alert(
+        category.label,
+        "This category is not available in this version."
+      );
+      return;
+    }
+    router.push(href as Href);
+  };
+
+  const onPlaceholderPress = (label: string, message: string) => {
+    Alert.alert(label, message);
+  };
+
+  if (loading && !home) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accentCyan} />
+      <View
+        style={styles.center}
+        accessibilityLabel="Loading Discover"
+        accessibilityRole="progressbar"
+      >
+        <ActivityIndicator color={colors.accentCyan} size="large" />
+        <Text style={styles.muted}>Loading Discover…</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error && !home) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
-        <Pressable onPress={() => void load()}>
-          <Text style={styles.retry}>Retry</Text>
+        <Text style={styles.emptyTitle} accessibilityRole="header">
+          {unavailable ? "Discover unavailable" : "Couldn’t load Discover"}
+        </Text>
+        <Text style={styles.muted} accessibilityRole="alert">
+          {error}
+        </Text>
+        <Pressable
+          style={styles.retryBtn}
+          onPress={() => void load()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading Discover"
+        >
+          <Text style={styles.retryText}>Retry</Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  if (searchPhase !== "idle") {
+    return (
+      <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <DiscoverSearchBar value={query} onChangeText={setQuery} />
+        {searchPhase === "loading" ? (
+          <View style={styles.centerFlex}>
+            <ActivityIndicator color={colors.accentCyan} />
+          </View>
+        ) : null}
+        {searchPhase === "error" ? (
+          <View style={styles.centerFlex}>
+            <Text style={styles.muted} accessibilityRole="alert">
+              {error}
+            </Text>
+          </View>
+        ) : null}
+        {searchPhase === "empty" ? (
+          <View style={styles.centerFlex}>
+            <Text style={styles.emptyTitle}>No results</Text>
+            <Text style={styles.muted}>
+              No loaded Discover items match “{query.trim()}”.
+            </Text>
+          </View>
+        ) : null}
+        {searchPhase === "results" ? (
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.searchList}
+            renderItem={({ item }) => (
+              <View style={styles.searchRow}>
+                <DiscoverCard item={item} compact />
+              </View>
+            )}
+          />
+        ) : null}
       </View>
     );
   }
 
   return (
     <View style={styles.root}>
-      <Text style={styles.note}>
-        Simple feed list — grid Discover UI arrives in Phase 2.
-      </Text>
-      <FlatList
-        data={videos}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No videos to discover yet.</Text>
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 28),
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor={colors.accentCyan}
+          />
         }
-        renderItem={({ item }) => (
-          <Link
-            href={
-              item.postId
-                ? `/(tabs)/watch?post=${item.postId}`
-                : "/(tabs)/watch"
-            }
-            asChild
-          >
-            <Pressable style={styles.row}>
-              <Text style={styles.username}>{item.author.username}</Text>
-              <Text style={styles.caption} numberOfLines={2}>
-                {item.caption || item.title}
-              </Text>
+      >
+        <DiscoverSearchBar value={query} onChangeText={setQuery} />
+
+        <Text style={styles.sectionLabel} accessibilityRole="header">
+          Categories
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categories}
+        >
+          {(home?.categories ?? []).map((category) => (
+            <Pressable
+              key={category.id}
+              style={styles.categoryChip}
+              onPress={() => onCategoryPress(category)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${category.label}`}
+            >
+              <Text style={styles.categoryText}>{category.label}</Text>
             </Pressable>
-          </Link>
-        )}
-      />
+          ))}
+        </ScrollView>
+
+        {home ? (
+          <>
+            <DiscoverSection section={home.trending} />
+            <DiscoverSection section={home.latest} />
+            <DiscoverSection section={home.recommended} />
+
+            <Text style={styles.sectionLabel} accessibilityRole="header">
+              More
+            </Text>
+            <View style={styles.placeholders}>
+              <DiscoverPlaceholderChip
+                label="World"
+                onPress={() =>
+                  onPlaceholderPress(
+                    "World",
+                    "World / Globe discovery is not available yet."
+                  )
+                }
+              />
+              <DiscoverPlaceholderChip
+                label="People"
+                onPress={() =>
+                  onPlaceholderPress(
+                    "People",
+                    "People discovery is not available yet."
+                  )
+                }
+              />
+              <DiscoverPlaceholderChip
+                label="Hashtags"
+                onPress={() =>
+                  onPlaceholderPress(
+                    "Hashtags",
+                    "Hashtag discovery is not available yet."
+                  )
+                }
+              />
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -100,43 +277,75 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 24,
     gap: 12,
   },
-  note: {
-    color: colors.textSubtle,
-    fontSize: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  centerFlex: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  list: {
+  muted: {
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  retryBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  retryText: {
+    color: colors.accentCyan,
+    fontWeight: "700",
+  },
+  sectionLabel: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 10,
+    paddingHorizontal: 16,
+  },
+  categories: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 18,
+  },
+  categoryChip: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryText: {
+    color: colors.text,
+    fontWeight: "700",
+  },
+  placeholders: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  searchList: {
     paddingHorizontal: 16,
     paddingBottom: 24,
     gap: 10,
   },
-  row: {
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  searchRow: {
     marginBottom: 10,
   },
-  username: {
-    color: colors.accentCyan,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  caption: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  empty: {
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: 40,
-  },
-  error: { color: colors.danger },
-  retry: { color: colors.accentCyan, fontWeight: "700" },
 });
