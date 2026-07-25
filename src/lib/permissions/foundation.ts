@@ -1,5 +1,5 @@
 import { Camera } from "expo-camera";
-import * as MediaLibrary from "expo-media-library";
+import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
 
 export type PermissionKind =
@@ -65,8 +65,13 @@ export async function requestMicrophonePermission(): Promise<PermissionOutcome> 
   };
 }
 
+/**
+ * Aligns with expo-image-picker (Create gallery flow).
+ * On Android 13+, the system photo picker often works without a broad media grant;
+ * callers may still open the picker when granted is false on Android.
+ */
 export async function requestMediaLibraryPermission(): Promise<PermissionOutcome> {
-  const current = await MediaLibrary.getPermissionsAsync();
+  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
   if (current.granted) {
     return {
       kind: "mediaLibrary",
@@ -75,7 +80,7 @@ export async function requestMediaLibraryPermission(): Promise<PermissionOutcome
       explanation: EXPLANATIONS.mediaLibrary,
     };
   }
-  const result = await MediaLibrary.requestPermissionsAsync();
+  const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
   return {
     kind: "mediaLibrary",
     granted: result.granted,

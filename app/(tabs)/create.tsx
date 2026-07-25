@@ -343,6 +343,39 @@ export default function CreateScreen() {
             </Text>
           </Pressable>
 
+          {journey.error && !asset ? (
+            <View
+              style={styles.errorBox}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
+              <Text style={styles.errorTitle}>Could not use that video</Text>
+              <Text style={styles.errorText}>{journey.error}</Text>
+              <View style={styles.row}>
+                <Pressable
+                  style={styles.secondary}
+                  onPress={() => void onPick()}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose another video"
+                  accessibilityState={{ disabled: busy }}
+                >
+                  <Text style={styles.secondaryText}>Choose another</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.secondary}
+                  onPress={() =>
+                    setJourney((s) => ({ ...s, error: null, phase: "ready" }))
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss error"
+                >
+                  <Text style={styles.secondaryText}>Dismiss</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
           {asset ? (
             <View
               style={styles.card}
@@ -369,7 +402,11 @@ export default function CreateScreen() {
               </Pressable>
             </View>
           ) : (
-            <Text style={styles.empty}>No video selected yet.</Text>
+            <Text style={styles.empty}>
+              {journey.error
+                ? "No video selected — pick another clip to continue."
+                : "No video selected yet."}
+            </Text>
           )}
 
           <Text style={styles.label}>Caption</Text>
@@ -479,8 +516,9 @@ export default function CreateScreen() {
             </View>
           ) : null}
 
-          {journey.error ? (
+          {journey.error && asset ? (
             <View style={styles.errorBox} accessibilityRole="alert">
+              <Text style={styles.errorTitle}>Publish failed</Text>
               <Text style={styles.errorText}>{journey.error}</Text>
               <View style={styles.row}>
                 <Pressable
@@ -696,11 +734,16 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.danger,
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     gap: 10,
+  },
+  errorTitle: {
+    color: colors.danger,
+    fontWeight: "700",
+    fontSize: 15,
   },
   errorText: {
     color: colors.danger,

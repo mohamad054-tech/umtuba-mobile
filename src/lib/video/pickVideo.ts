@@ -1,6 +1,9 @@
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import { Platform } from "react-native";
 
 import {
+  isAllowedVideoMimeType,
   resolveVideoMimeType,
   validateVideoDuration,
   validateVideoFile,
@@ -25,24 +28,118 @@ export type PickVideoResult =
 
 function fileNameFromUri(uri: string, mimeType: string): string {
   const last = uri.split("/").pop() || uri.split("\\").pop() || "video";
-  const cleaned = last.split("?")[0] || "video";
-  if (cleaned.includes(".")) return cleaned;
-  const ext =
-    mimeType === "video/webm"
-      ? "webm"
-      : mimeType === "video/quicktime"
-        ? "mov"
-        : "mp4";
-  return `${cleaned}.${ext}`;
+  const cleaned = decodeURIComponent(last.split("?")[0] || "video");
+  if (cleaned.includes(".") && !/^\d+$/.test(cleaned.split(".")[0] || "")) {
+    return cleaned;
+  }
+  // Android content:// URIs often end in a numeric document id with no extension.
+  if (!cleaned.includes(".") || /^\d+$/.test(cleaned)) {
+    const ext =
+      mimeType === "video/webm"
+        ? "webm"
+        : mimeType === "video/quicktime"
+          ? "mov"
+          : "mp4";
+    return `video.${ext}`;
+  }
+  return cleaned;
+}
+
+/**
+ * Prefer picker MIME + filename; for Android content:// videos with empty MIME
+ * and no extension, default to video/mp4 (gallery was opened for videos only).
+ * Explicit non-video / unsupported video/* types are left for validateVideoFile.
+ */
+export function inferPickedVideoMimeType(input: {
+  mimeType?: string | null;
+  fileName?: string | null;
+  uri: string;
+}): string {
+  const fromMeta = resolveVideoMimeType(input.mimeType, input.fileName);
+  if (isAllowedVideoMimeType(fromMeta)) {
+    return fromMeta;
+  }
+
+  const trimmed = (input.mimeType || "").trim().toLowerCase();
+  if (trimmed.startsWith("video/") && trimmed.length > "video/".length) {
+    return trimmed;
+  }
+  if (
+    trimmed &&
+    trimmed !== "application/octet-stream" &&
+    !trimmed.startsWith("video/")
+  ) {
+    return trimmed;
+  }
+
+  const name = (input.fileName || "").trim();
+  const uri = input.uri.trim().toLowerCase();
+  const extensionlessName = !name || !name.includes(".") || /^\d+$/.test(name);
+  const contentUri = uri.startsWith("content://");
+
+  if (
+    !trimmed ||
+    trimmed === "application/octet-stream" ||
+    contentUri ||
+    extensionlessName
+  ) {
+    const synthetic = name.includes(".") ? name : `${name || "video"}.mp4`;
+    const inferred = resolveVideoMimeType(null, synthetic);
+    return isAllowedVideoMimeType(inferred) ? inferred : "video/mp4";
+  }
+
+  return fromMeta;
+}
+
+/**
+ * Use picker-reported size when present; otherwise probe via FileSystem
+ * (supports content:// on Android) and fetch(blob) as a last resort.
+ * Does not reject solely because ImagePicker omitted fileSize.
+ */
+export async function resolvePickedVideoByteSize(input: {
+  uri: string;
+  reportedSize?: number | null;
+}): Promise<number | null> {
+  const reported = input.reportedSize;
+  if (typeof reported === "number" && Number.isFinite(reported) && reported > 0) {
+    return Math.round(reported);
+  }
+
+  try {
+    const info = await FileSystem.getInfoAsync(input.uri);
+    if (
+      info.exists &&
+      typeof info.size === "number" &&
+      Number.isFinite(info.size) &&
+      info.size > 0
+    ) {
+      return Math.round(info.size);
+    }
+  } catch {
+    // Fall through to fetch probe.
+  }
+
+  try {
+    const response = await fetch(input.uri);
+    const blob = await response.blob();
+    if (typeof blob.size === "number" && Number.isFinite(blob.size) && blob.size > 0) {
+      return Math.round(blob.size);
+    }
+  } catch {
+    // Unable to probe size.
+  }
+
+  return null;
 }
 
 /**
  * Native media-library picker for Create (iOS and Android).
  * Requests library permission first, then opens the system video picker.
+ * Android 13+ system photo picker may work without a broad media grant.
  */
 export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
   const permission = await requestMediaLibraryPermission();
-  if (!permission.granted) {
+  if (!permission.granted && Platform.OS !== "android") {
     return {
       ok: false,
       cancelled: false,
@@ -72,26 +169,29 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
     };
   }
 
-  const fileName = fileNameFromUri(
-    asset.fileName || uri,
-    asset.mimeType || ""
-  );
-  const byteSize =
-    typeof asset.fileSize === "number" && Number.isFinite(asset.fileSize)
-      ? asset.fileSize
-      : 0;
+  const mimeType = inferPickedVideoMimeType({
+    mimeType: asset.mimeType,
+    fileName: asset.fileName,
+    uri,
+  });
+  const fileName = fileNameFromUri(asset.fileName || uri, mimeType);
 
-  if (byteSize <= 0) {
+  const byteSize = await resolvePickedVideoByteSize({
+    uri,
+    reportedSize: asset.fileSize,
+  });
+
+  if (byteSize == null) {
     return {
       ok: false,
       cancelled: false,
       message:
-        "Could not determine the video file size. Try another clip or re-export the file.",
+        "Could not determine the video file size after selection. Try another clip or re-export the file.",
     };
   }
 
   const fileCheck = validateVideoFile({
-    mimeType: asset.mimeType || "",
+    mimeType,
     byteSize,
     fileName,
   });
