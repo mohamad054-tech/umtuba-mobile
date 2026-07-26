@@ -87,6 +87,42 @@ export const WORLD_ATTRIBUTION_FALLBACK =
 export const WORLD_RENDERER_PREPARING_MESSAGE =
   "The owned World map renderer is being prepared. No map imagery or locations are shown yet.";
 
+/** Brief yield so Retry can paint a loading/preparing cycle on device. */
+export const WORLD_RETRY_YIELD_MS = 180;
+
+export type WorldInitializationResult =
+  | { ok: true; snapshot: WorldFoundationSnapshot }
+  | { ok: false; message: string };
+
+/**
+ * Re-run World foundation initialization.
+ * Always performs work (including a short yield) so Retry is never a silent no-op,
+ * even when the result remains unavailable without a data source.
+ */
+export async function runWorldInitialization(options?: {
+  yieldMs?: number;
+}): Promise<WorldInitializationResult> {
+  const yieldMs =
+    typeof options?.yieldMs === "number" && options.yieldMs >= 0
+      ? options.yieldMs
+      : WORLD_RETRY_YIELD_MS;
+
+  if (yieldMs > 0) {
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, yieldMs);
+    });
+  }
+
+  try {
+    return { ok: true, snapshot: getWorldFoundationSnapshot() };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Unable to load World.",
+    };
+  }
+}
+
 export function createDefaultWorldUiSelection(): WorldUiSelectionState {
   return {
     selectedCategories: [],

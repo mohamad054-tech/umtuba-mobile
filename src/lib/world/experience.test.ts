@@ -16,6 +16,7 @@ import {
   WORLD_ATTRIBUTION_FALLBACK,
   WORLD_RENDERER_PREPARING_MESSAGE,
   WORLD_SCREEN_HREF,
+  runWorldInitialization,
 } from "@/src/lib/world";
 
 describe("world experience entry / destinations", () => {
@@ -106,5 +107,21 @@ describe("world experience view state", () => {
       buildWorldExperienceViewState({ attribution: "  Custom credit  " })
         .attribution
     ).toBe("Custom credit");
+  });
+
+  it("retry re-runs initialization even when still unavailable", async () => {
+    const first = await runWorldInitialization({ yieldMs: 0 });
+    const second = await runWorldInitialization({ yieldMs: 0 });
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (first.ok && second.ok) {
+      expect(first.snapshot.status).toBe("unavailable");
+      expect(second.snapshot.status).toBe("unavailable");
+      expect(first.snapshot.layers).toEqual([]);
+      expect(second.snapshot.layers).toEqual([]);
+    }
+    const loading = buildWorldExperienceViewState({ loading: true });
+    expect(loading.phase).toBe("loading");
+    expect(loading.message).toMatch(/Loading World/i);
   });
 });

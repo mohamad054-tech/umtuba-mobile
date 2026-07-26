@@ -6,11 +6,11 @@ import { WorldExperienceShell } from "@/components/world/WorldExperienceShell";
 import {
   buildWorldExperienceViewState,
   createDefaultWorldUiSelection,
+  runWorldInitialization,
   toggleWorldCategorySelection,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";
 import {
-  getWorldFoundationSnapshot,
   type WorldCategoryId,
   type WorldFoundationSnapshot,
 } from "@/src/lib/world";
@@ -26,30 +26,29 @@ export default function WorldScreen() {
   const [selection, setSelection] = useState<WorldUiSelectionState>(
     createDefaultWorldUiSelection
   );
+  const [attempt, setAttempt] = useState(0);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
-    try {
-      const next = getWorldFoundationSnapshot();
-      setSnapshot(next);
+    setAttempt((n) => n + 1);
+    const result = await runWorldInitialization();
+    if (!result.ok) {
+      setSnapshot(null);
+      setErrorMessage(result.message);
+    } else {
+      setSnapshot(result.snapshot);
       setSelection((prev) => ({
         ...prev,
         selectedEntityId: null,
         detailsOpen: false,
       }));
-    } catch (err) {
-      setSnapshot(null);
-      setErrorMessage(
-        err instanceof Error ? err.message : "Unable to load World."
-      );
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const view = useMemo(
@@ -60,7 +59,7 @@ export default function WorldScreen() {
         loading,
         errorMessage,
       }),
-    [snapshot, selection, loading, errorMessage]
+    [snapshot, selection, loading, errorMessage, attempt]
   );
 
   const onToggleLayer = useCallback(
@@ -76,6 +75,10 @@ export default function WorldScreen() {
     },
     []
   );
+
+  const onRetry = useCallback(() => {
+    void load();
+  }, [load]);
 
   if (view.phase === "loading") {
     return (
@@ -94,7 +97,7 @@ export default function WorldScreen() {
     <WorldExperienceShell
       view={view}
       bottomInset={insets.bottom}
-      onRetry={load}
+      onRetry={onRetry}
       onToggleLayer={onToggleLayer}
       onToggleFilters={() =>
         setSelection((prev) => ({
