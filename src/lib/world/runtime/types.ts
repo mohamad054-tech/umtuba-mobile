@@ -3,6 +3,7 @@
  * No map SDK / tiles / vendor engines.
  */
 
+import type { WorldDataPipeline } from "@/src/lib/world/dataPipeline";
 import type { MapSourceRegistry } from "@/src/lib/world/mapSource";
 import type { WorldPlaceProvider } from "@/src/lib/world/places";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
@@ -55,8 +56,14 @@ export type WorldRuntimeControllerOptions = {
   /** Preferred map source id; falls back to first available. */
   mapSourceId?: string | null;
   /**
-   * Place provider — Runtime loads places into PlaceRegistry.
-   * Defaults to DemoPlaceProvider (dev). Pass `null` for unbound fail-closed.
+   * Unified World data pipeline — Runtime loads all domain data exclusively via this.
+   * Defaults to createDefaultWorldDataPipeline(). Pass `null` for empty fail-closed pipeline.
+   */
+  dataPipeline?: WorldDataPipeline | null;
+  /**
+   * Legacy Places injection — adapted into the data pipeline when `dataPipeline` is omitted.
+   * Pass `null` for unbound places (other demo kinds still bind empty).
+   * Ignored when `dataPipeline` is provided explicitly.
    */
   placeProvider?: WorldPlaceProvider | null;
 };

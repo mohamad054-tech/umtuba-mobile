@@ -16,22 +16,24 @@ import {
   type WorldMapSource,
 } from "@/src/lib/world/mapSource";
 import {
+  createDefaultWorldDataPipeline,
+  createEmptyWorldDataPipeline,
+  type WorldDataBundle,
+  type WorldDataPipeline,
+} from "@/src/lib/world/dataPipeline";
+import {
   buildPlaceLayerControls,
   buildWorldPlaceSheetState,
-  createDemoPlaceProvider,
   createPlaceRegistry,
-  createUnboundPlaceProvider,
   createWorldPlacesLayerDefinition,
   defaultSelectedPlaceLayers,
   filterMarkersByPlaceLayers,
-  isWorldPlaceProviderAvailable,
   togglePlaceLayerSelection,
   WORLD_PLACES_LAYER_ID,
   worldPlacesToEntities,
   worldPlacesToMarkers,
   type PlaceRegistry,
   type WorldPlaceLayerId,
-  type WorldPlaceProvider,
 } from "@/src/lib/world/places";
 import {
   createMapLibreRendererAdapter,
@@ -118,14 +120,15 @@ function mergePlacesIntoSnapshot(
  * Sole runtime authority for UM World operational state + renderer slot.
  * Screen UI must consume this controller — not invent parallel load/render logic.
  * Map style selection is exclusively via MapSourceRegistry → WorldMapSource.
- * Places load exclusively via WorldPlaceProvider → PlaceRegistry → Renderer.
+ * Domain data loads exclusively via WorldDataPipeline → registries / Renderer.
  */
 export class WorldRuntimeController {
   private dataSource: WorldDataSource;
+  private dataPipeline: WorldDataPipeline;
+  private lastDataBundle: WorldDataBundle | null = null;
   private renderer: WorldRendererAdapter;
   private mapSourceRegistry: MapSourceRegistry;
   private mapSource: WorldMapSource | null;
-  private placeProvider: WorldPlaceProvider;
   private placeRegistry: PlaceRegistry;
   private yieldMs: number;
   private state: WorldRuntimeState;
@@ -144,14 +147,17 @@ export class WorldRuntimeController {
     );
     const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
 
-    if (options?.placeProvider === null) {
-      this.placeProvider = createUnboundPlaceProvider();
+    if (options?.dataPipeline === null) {
+      this.dataPipeline = createEmptyWorldDataPipeline();
+    } else if (options?.dataPipeline) {
+      this.dataPipeline = options.dataPipeline;
     } else {
-      this.placeProvider =
-        options?.placeProvider ?? createDemoPlaceProvider();
+      this.dataPipeline = createDefaultWorldDataPipeline({
+        placeProvider: options?.placeProvider,
+      });
     }
     this.placeRegistry = createPlaceRegistry();
-    const placeProviderBound = isWorldPlaceProviderAvailable(this.placeProvider);
+    const placeProviderBound = this.dataPipeline.isKindAvailable("places");
 
     if (options?.renderer !== undefined) {
       this.renderer = options.renderer ?? createNullRendererAdapter();
@@ -199,6 +205,16 @@ export class WorldRuntimeController {
     return this.placeRegistry;
   }
 
+  /** Data pipeline (Runtime / tests) — UI must not import providers. */
+  getDataPipeline(): WorldDataPipeline {
+    return this.dataPipeline;
+  }
+
+  /** Last pipeline bundle (Runtime / tests). */
+  getLastDataBundle(): WorldDataBundle | null {
+    return this.lastDataBundle;
+  }
+
   getSelection(): WorldUiSelectionState {
     return {
       ...this.selection,
@@ -217,7 +233,7 @@ export class WorldRuntimeController {
       isWorldMapSourceAvailable(this.mapSource) && this.mapSource
         ? this.mapSource.getAttribution()
         : undefined;
-    const placesBound = isWorldPlaceProviderAvailable(this.placeProvider);
+    const placesBound = this.dataPipeline.isKindAvailable("places");
     const rawSnapshot = runtime.snapshot ?? undefined;
     const snapshot = rawSnapshot
       ? mergePlacesIntoSnapshot(rawSnapshot, placesBound)
@@ -483,7 +499,7 @@ export class WorldRuntimeController {
 
   private syncPlacesToRenderer(): void {
     if (!isMapLibreRendererAdapter(this.renderer)) return;
-    const placesBound = isWorldPlaceProviderAvailable(this.placeProvider);
+    const placesBound = this.dataPipeline.isKindAvailable("places");
     if (!placesBound) {
       this.renderer.setPlaceMarkers([]);
       this.renderer.getLayerAdapter().setLayerVisibility(WORLD_PLACES_LAYER_ID, false);
@@ -507,14 +523,16 @@ export class WorldRuntimeController {
 
   private async loadPlaces(): Promise<void> {
     this.placeRegistry.clear();
-    if (!isWorldPlaceProviderAvailable(this.placeProvider)) {
+    if (!this.dataPipeline.isKindAvailable("places")) {
+      this.lastDataBundle = await this.dataPipeline.loadAll();
       this.syncPlacesToRenderer();
       return;
     }
     try {
-      const places = await this.placeProvider.listPlaces();
+      const bundle = await this.dataPipeline.loadAll();
+      this.lastDataBundle = bundle;
       const accepted = this.placeRegistry.registerAll(
-        Array.isArray(places) ? places : []
+        Array.isArray(bundle.places) ? bundle.places : []
       );
       if (accepted > 0) {
         if (!this.selection.selectedCategories.includes(WORLD_PLACES_LAYER_ID)) {
@@ -538,6 +556,7 @@ export class WorldRuntimeController {
       }
     } catch {
       this.placeRegistry.clear();
+      this.lastDataBundle = null;
     }
     this.syncPlacesToRenderer();
   }
@@ -546,7 +565,7 @@ export class WorldRuntimeController {
     const token = ++this.runToken;
     const dataBound = isWorldDataSourceBound(this.dataSource);
     const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
-    const placeProviderBound = isWorldPlaceProviderAvailable(this.placeProvider);
+    const placeProviderBound = this.dataPipeline.isKindAvailable("places");
     const rendererBound = isRendererAdapterBound(this.renderer);
 
     this.state = {
@@ -633,7 +652,7 @@ export class WorldRuntimeController {
 
   private setPhase(phase: WorldRuntimePhase): void {
     const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
-    const placeProviderBound = isWorldPlaceProviderAvailable(this.placeProvider);
+    const placeProviderBound = this.dataPipeline.isKindAvailable("places");
     if (!canTransitionWorldRuntimePhase(this.state.phase, phase)) {
       if (phase === "loading" || phase === "preparing") {
         this.state = {
