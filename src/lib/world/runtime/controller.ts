@@ -3,13 +3,16 @@ import {
   createDefaultWorldUiSelection,
   toggleWorldCategorySelection,
   WORLD_RETRY_YIELD_MS,
+  type WorldCameraControlId,
   type WorldExperienceViewState,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world/types";
 import {
   createNullRendererAdapter,
+  isMapLibreRendererAdapter,
   isRendererAdapterBound,
+  MAPLIBRE_DEV_ATTRIBUTION,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
 import {
@@ -95,12 +98,16 @@ export class WorldRuntimeController {
     const runtime = this.state;
     const loading =
       runtime.phase === "preparing" || runtime.phase === "loading";
+    const attribution = isMapLibreRendererAdapter(this.renderer)
+      ? MAPLIBRE_DEV_ATTRIBUTION
+      : undefined;
     const base = buildWorldExperienceViewState({
       snapshot: runtime.snapshot ?? undefined,
       selection: this.selection,
       loading,
       errorMessage: runtime.phase === "error" ? runtime.errorMessage : null,
       rendererAdapter: this.renderer,
+      attribution,
     });
 
     if (runtime.phase === "preparing") {
@@ -166,7 +173,40 @@ export class WorldRuntimeController {
     this.setPhase(
       this.state.phase === "preparing" ? "preparing" : "loading"
     );
+    // Remount clears MapLibre style failures without UI talking to the SDK.
+    try {
+      this.renderer.mount();
+    } catch {
+      // Fail-closed.
+    }
     await this.runLoadCycle();
+  }
+
+  /**
+   * Camera gestures from UI — always routed through Runtime → CameraAdapter.
+   * Returns false when the renderer rejects the request (fail-closed).
+   */
+  applyCameraControl(id: WorldCameraControlId): boolean {
+    const camera = this.renderer.getCameraAdapter();
+    let ok = false;
+    switch (id) {
+      case "zoom_in":
+        ok = camera.zoomIn();
+        break;
+      case "zoom_out":
+        ok = camera.zoomOut();
+        break;
+      case "recenter":
+        ok = camera.recenter();
+        break;
+      case "reset_orientation":
+        ok = camera.resetOrientation();
+        break;
+      default:
+        ok = false;
+    }
+    if (ok) this.emit();
+    return ok;
   }
 
   toggleLayer(categoryId: WorldCategoryId, enabled: boolean): void {

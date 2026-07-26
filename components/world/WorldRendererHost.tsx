@@ -1,11 +1,13 @@
+import { useEffect, useReducer, type ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import {
   WORLD_ATTRIBUTION_FALLBACK,
   WORLD_RENDERER_PREPARING_MESSAGE,
 } from "@/src/lib/world/experience";
+import { WorldRendererSurface } from "@/src/lib/world/renderer/WorldRendererSurface";
 import {
-  createNullRendererAdapter,
+  isMapLibreRendererAdapter,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
@@ -18,44 +20,71 @@ type WorldRendererHostProps = {
 
 /**
  * User-facing renderer host.
- * Only displays adapter status from Runtime — no map SDK access.
+ * Renders engine surface via renderer facade only — no direct MapLibre imports.
  */
 export function WorldRendererHost({
   adapter,
   preparingMessage = WORLD_RENDERER_PREPARING_MESSAGE,
 }: WorldRendererHostProps) {
+  const [, bump] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    if (!isMapLibreRendererAdapter(adapter)) return;
+    return adapter.subscribe(() => {
+      bump();
+    });
+  }, [adapter]);
+
   const bound = adapter.isBound();
+  const loadError = isMapLibreRendererAdapter(adapter)
+    ? adapter.getLoadError()
+    : null;
+  const styleReady = isMapLibreRendererAdapter(adapter)
+    ? adapter.isStyleReady()
+    : false;
   const caps = adapter.getCapabilities();
+  const showOverlay = !bound || Boolean(loadError) || (bound && !styleReady);
 
   return (
     <View
       style={styles.canvas}
       accessibilityRole="image"
       accessibilityLabel={
-        bound
-          ? "World map renderer"
-          : "World map renderer unavailable. Owned World renderer is being prepared."
+        loadError
+          ? `World map error. ${loadError}`
+          : bound && styleReady
+            ? "World map renderer"
+            : "World map renderer unavailable. Owned World renderer is being prepared."
       }
-      accessibilityState={{ disabled: !bound }}
+      accessibilityState={{ disabled: !bound || Boolean(loadError) }}
     >
-      <View style={styles.plane} accessible={false} />
-      <View style={styles.overlay} accessibilityRole="summary">
-        <Text style={styles.kicker}>Owned World</Text>
-        <Text style={styles.title}>
-          {bound ? "Renderer ready" : "Renderer preparing"}
-        </Text>
-        <Text style={styles.body}>
-          {bound ? "A trusted World renderer is bound." : preparingMessage}
-        </Text>
-        <Text style={styles.meta} accessibilityLabel="Renderer family">
-          Family: {adapter.family}
-        </Text>
-        <Text style={styles.meta} accessibilityLabel="Renderer capabilities">
-          3D:{caps.supports3D ? "on" : "off"} Terrain:
-          {caps.supportsTerrain ? "on" : "off"} Offline:
-          {caps.supportsOffline ? "on" : "off"}
-        </Text>
-      </View>
+      <WorldRendererSurface adapter={adapter} />
+      {showOverlay ? (
+        <View style={styles.overlay} accessibilityRole="summary">
+          <Text style={styles.kicker}>Owned World</Text>
+          <Text style={styles.title}>
+            {loadError
+              ? "Renderer unavailable"
+              : bound
+                ? "Loading map…"
+                : "Renderer preparing"}
+          </Text>
+          <Text style={styles.body}>
+            {loadError ??
+              (bound
+                ? "Connecting to development map tiles…"
+                : preparingMessage)}
+          </Text>
+          <Text style={styles.meta} accessibilityLabel="Renderer family">
+            Family: {adapter.family}
+          </Text>
+          <Text style={styles.meta} accessibilityLabel="Renderer capabilities">
+            3D:{caps.supports3D ? "on" : "off"} Terrain:
+            {caps.supportsTerrain ? "on" : "off"} Offline:
+            {caps.supportsOffline ? "on" : "off"}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -64,7 +93,7 @@ export function WorldAttribution({
   text = WORLD_ATTRIBUTION_FALLBACK,
 }: {
   text?: string;
-}) {
+}): ReactElement {
   return (
     <View
       style={styles.attribution}
@@ -76,11 +105,6 @@ export function WorldAttribution({
   );
 }
 
-/** Default host adapter when none is passed — fail-closed null renderer. */
-export function defaultWorldRendererHostAdapter(): WorldRendererAdapter {
-  return createNullRendererAdapter();
-}
-
 const styles = StyleSheet.create({
   canvas: {
     flex: 1,
@@ -90,10 +114,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-  },
-  plane: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "#07071A",
   },
   overlay: {
     ...StyleSheet.absoluteFill,

@@ -38,6 +38,9 @@ export default function WorldScreen() {
       onRetry={() => {
         void controller.retry();
       }}
+      onCameraControl={(id) => {
+        controller.applyCameraControl(id);
+      }}
       onToggleLayer={(categoryId, enabled) => {
         controller.toggleLayer(categoryId, enabled);
       }}

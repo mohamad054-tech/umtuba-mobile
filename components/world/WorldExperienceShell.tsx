@@ -12,7 +12,10 @@ import {
   WorldRendererHost,
 } from "@/components/world/WorldRendererHost";
 import { WorldStatePanel } from "@/components/world/WorldStatePanel";
-import type { WorldExperienceViewState } from "@/src/lib/world/experience";
+import type {
+  WorldCameraControlId,
+  WorldExperienceViewState,
+} from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
@@ -22,6 +25,7 @@ type WorldExperienceShellProps = {
   renderer: WorldRendererAdapter;
   bottomInset?: number;
   onRetry?: () => void;
+  onCameraControl?: (id: WorldCameraControlId) => void;
   onToggleLayer?: (categoryId: WorldCategoryId, enabled: boolean) => void;
   onToggleFilters?: () => void;
   onToggleLayersPanel?: () => void;
@@ -44,6 +48,7 @@ export function WorldExperienceShell({
   renderer,
   bottomInset = 0,
   onRetry,
+  onCameraControl,
   onToggleLayer,
   onToggleFilters,
   onToggleLayersPanel,
@@ -83,7 +88,10 @@ export function WorldExperienceShell({
         <WorldRendererHost adapter={renderer} />
       </View>
 
-      <WorldCameraControls controls={view.cameraControls} />
+      <WorldCameraControls
+        controls={view.cameraControls}
+        onPress={onCameraControl}
+      />
 
       <View style={styles.toolbar}>
         <Pressable

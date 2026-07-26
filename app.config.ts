@@ -131,6 +131,7 @@ const config: ExpoConfig = {
         supportsPictureInPicture: false,
       },
     ],
+    "@maplibre/maplibre-react-native",
   ],
   experiments: {
     typedRoutes: true,

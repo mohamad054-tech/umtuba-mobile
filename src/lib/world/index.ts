@@ -85,11 +85,18 @@ export {
 } from "@/src/lib/world/runtime";
 export {
   createNullRendererAdapter,
+  createMapLibreRendererAdapter,
   defaultNullRendererCapabilities,
+  isMapLibreRendererAdapter,
   isRendererAdapterBound,
+  MAPLIBRE_DEFAULT_CAMERA,
+  MAPLIBRE_DEV_ATTRIBUTION,
+  MAPLIBRE_DEV_STYLE_URL,
+  MAPLIBRE_RENDERER_ID,
   toFoundationRendererCapability,
   type CameraAdapter,
   type LayerAdapter,
+  type MapLibreRendererAdapter,
   type ProjectionAdapter,
   type RendererCapabilities,
   type WorldRendererAdapter,
