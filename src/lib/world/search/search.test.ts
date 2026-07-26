@@ -18,11 +18,15 @@ describe("WorldSearchService", () => {
   async function demoDataset() {
     const places = await createDemoPlacesDataProvider().listPlaces();
     const education = await createDemoEducationDataProvider().listEducation();
+    const { createDemoUsersDataProvider } = await import("@/src/lib/world");
+    const users = await createDemoUsersDataProvider().listUsers();
     return buildWorldSearchDataset({
       placesAvailable: true,
       educationAvailable: true,
+      usersAvailable: true,
       places,
       education,
+      users,
     });
   }
 
@@ -63,28 +67,35 @@ describe("WorldSearchService", () => {
     ).toBe(true);
   });
 
-  it("searches across Places and Education", async () => {
+  it("searches across Places, Education, and Users", async () => {
     const dataset = await demoDataset();
     const hits = service.search("a", dataset);
     expect(hits.some((h) => h.sourceType === "places")).toBe(true);
     expect(hits.some((h) => h.sourceType === "education")).toBe(true);
+    expect(hits.some((h) => h.sourceType === "users")).toBe(true);
     for (const hit of hits) {
       expect(hit.id).toBeTruthy();
       expect(hit.title).toBeTruthy();
-      expect(hit.sourceType === "places" || hit.sourceType === "education").toBe(
-        true
-      );
+      expect(
+        hit.sourceType === "places" ||
+          hit.sourceType === "education" ||
+          hit.sourceType === "users"
+      ).toBe(true);
     }
   });
 
   it("fail-closes missing provider kinds without breaking others", async () => {
     const places = listDemoPlaces();
     const education = await createDemoEducationDataProvider().listEducation();
+    const { createDemoUsersDataProvider } = await import("@/src/lib/world");
+    const users = await createDemoUsersDataProvider().listUsers();
     const placesOnly = buildWorldSearchDataset({
       placesAvailable: true,
       educationAvailable: false,
+      usersAvailable: false,
       places,
       education,
+      users,
     });
     const hits = service.search("amman", placesOnly);
     expect(hits.every((h) => h.sourceType === "places")).toBe(true);
@@ -93,8 +104,10 @@ describe("WorldSearchService", () => {
     const eduOnly = buildWorldSearchDataset({
       placesAvailable: false,
       educationAvailable: true,
+      usersAvailable: false,
       places,
       education,
+      users,
     });
     const eduHits = service.search("university", eduOnly);
     expect(eduHits.every((h) => h.sourceType === "education")).toBe(true);
@@ -148,10 +161,11 @@ describe("Runtime search + selection", () => {
     expect(hits.length).toBeGreaterThan(0);
   });
 
-  it("pipeline-backed default search sees education + places", async () => {
+  it("pipeline-backed default search sees places, education, and users", async () => {
     const pipeline = createDefaultWorldDataPipeline();
     expect(pipeline.isKindAvailable("places")).toBe(true);
     expect(pipeline.isKindAvailable("education")).toBe(true);
+    expect(pipeline.isKindAvailable("users")).toBe(true);
     const controller = createWorldRuntimeController({
       yieldMs: 0,
       dataPipeline: pipeline,
@@ -160,5 +174,6 @@ describe("Runtime search + selection", () => {
     const hits = controller.searchWorld("a");
     expect(hits.some((h) => h.sourceType === "places")).toBe(true);
     expect(hits.some((h) => h.sourceType === "education")).toBe(true);
+    expect(hits.some((h) => h.sourceType === "users")).toBe(true);
   });
 });

@@ -1,4 +1,7 @@
-import type { WorldEducationRecord } from "@/src/lib/world/dataPipeline/types";
+import type {
+  WorldEducationRecord,
+  WorldUserRecord,
+} from "@/src/lib/world/dataPipeline/types";
 import {
   formatWorldEducationKindLabel,
 } from "@/src/lib/world/education/types";
@@ -64,6 +67,28 @@ function educationToResult(row: WorldEducationRecord): WorldSearchResult {
   };
 }
 
+function userToResult(row: WorldUserRecord): WorldSearchResult | null {
+  if (row.mapVisible !== true) return null;
+  const hasCoords =
+    typeof row.approximateLatitude === "number" &&
+    typeof row.approximateLongitude === "number" &&
+    Number.isFinite(row.approximateLatitude) &&
+    Number.isFinite(row.approximateLongitude);
+  return {
+    id: row.id,
+    title: row.displayName,
+    subtitle: `@${row.handle} · ${row.cityName}`,
+    kind: "User",
+    coordinates: hasCoords
+      ? {
+          latitude: row.approximateLatitude as number,
+          longitude: row.approximateLongitude as number,
+        }
+      : null,
+    sourceType: "users",
+  };
+}
+
 function matchPlace(place: WorldPlace, q: string): boolean {
   return (
     includesNormalized(place.name, q) ||
@@ -89,8 +114,17 @@ function matchEducation(row: WorldEducationRecord, q: string): boolean {
   );
 }
 
+function matchUser(row: WorldUserRecord, q: string): boolean {
+  if (row.mapVisible !== true) return false;
+  return (
+    includesNormalized(row.displayName ?? "", q) ||
+    includesNormalized(row.handle ?? "", q) ||
+    includesNormalized(`@${row.handle ?? ""}`, q)
+  );
+}
+
 /**
- * Pure search over Places + Education.
+ * Pure search over Places + Education + Users.
  * Dataset must come from WorldDataPipeline-backed Runtime registries.
  */
 export function createWorldSearchService(): WorldSearchService {
@@ -113,6 +147,7 @@ export function createWorldSearchService(): WorldSearchService {
         const education = Array.isArray(dataset?.education)
           ? dataset.education
           : [];
+        const users = Array.isArray(dataset?.users) ? dataset.users : [];
 
         const results: WorldSearchResult[] = [];
 
@@ -132,6 +167,15 @@ export function createWorldSearchService(): WorldSearchService {
           if (results.length >= limit) return results;
         }
 
+        for (const row of users) {
+          if (!row?.id) continue;
+          if (!matchUser(row, q)) continue;
+          const hit = userToResult(row);
+          if (!hit) continue;
+          results.push(hit);
+          if (results.length >= limit) return results;
+        }
+
         return results;
       } catch {
         return [];
@@ -147,8 +191,10 @@ export function createWorldSearchService(): WorldSearchService {
 export function buildWorldSearchDataset(options: {
   placesAvailable: boolean;
   educationAvailable: boolean;
+  usersAvailable: boolean;
   places: WorldPlace[];
   education: WorldEducationRecord[];
+  users: WorldUserRecord[];
 }): WorldSearchDataset {
   return {
     places: options.placesAvailable
@@ -159,6 +205,11 @@ export function buildWorldSearchDataset(options: {
     education: options.educationAvailable
       ? Array.isArray(options.education)
         ? options.education
+        : []
+      : [],
+    users: options.usersAvailable
+      ? Array.isArray(options.users)
+        ? options.users
         : []
       : [],
   };

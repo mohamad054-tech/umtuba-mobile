@@ -3,13 +3,13 @@
  * No external search APIs / MapLibre / UI imports.
  */
 
-export type WorldSearchSourceType = "places" | "education";
+export type WorldSearchSourceType = "places" | "education" | "users";
 
 export type WorldSearchResult = {
   id: string;
   title: string;
   subtitle: string;
-  /** Human-readable kind label (e.g. Capital, University). */
+  /** Human-readable kind label (e.g. Capital, University, User). */
   kind: string;
   coordinates: {
     latitude: number;
@@ -21,11 +21,12 @@ export type WorldSearchResult = {
 export type WorldSearchDataset = {
   places: import("@/src/lib/world/places").WorldPlace[];
   education: import("@/src/lib/world/dataPipeline").WorldEducationRecord[];
+  users: import("@/src/lib/world/dataPipeline").WorldUserRecord[];
 };
 
 export type WorldSearchService = {
   /**
-   * Search Places + Education rows from a Pipeline-backed dataset.
+   * Search Places + Education + Users from a Pipeline-backed dataset.
    * Empty / whitespace query → []. Fail-closed on bad input.
    */
   search(

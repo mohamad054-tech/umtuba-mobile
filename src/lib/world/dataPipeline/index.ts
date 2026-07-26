@@ -14,6 +14,7 @@ export type {
   WorldGameRecord,
   WorldPlacesData,
   WorldPlacesDataProvider,
+  WorldUserPresence,
   WorldUsersDataProvider,
   WorldUserRecord,
 } from "@/src/lib/world/dataPipeline/types";

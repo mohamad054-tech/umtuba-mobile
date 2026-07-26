@@ -174,6 +174,7 @@ export {
   type WorldGamesDataProvider,
   type WorldGameRecord,
   type WorldPlacesDataProvider,
+  type WorldUserPresence,
   type WorldUsersDataProvider,
   type WorldUserRecord,
 } from "@/src/lib/world/dataPipeline";
@@ -196,6 +197,29 @@ export {
   type WorldEducationSheetMetricId,
   type WorldEducationSheetState,
 } from "@/src/lib/world/education";
+export {
+  buildWorldUserSheetState,
+  createUsersRegistry,
+  createWorldUsersLayerDefinition,
+  formatWorldUserPresenceLabel,
+  isUserClusteringActiveAtZoom,
+  normalizeWorldUserRecord,
+  userDisplayInitial,
+  usersMarkersToGeoJSON,
+  USER_CLUSTER_MAX_ZOOM,
+  USER_FOCUS_ZOOM,
+  WORLD_USERS_LAYER_ID,
+  WORLD_USERS_LAYER_REF,
+  worldUsersToEntities,
+  worldUserToEntity,
+  worldUserToMarker,
+  worldUsersToMarkers,
+  type UsersRegistry,
+  type WorldUserMarker,
+  type WorldUserSheetAction,
+  type WorldUserSheetActionId,
+  type WorldUserSheetState,
+} from "@/src/lib/world/users";
 export {
   buildWorldSearchDataset,
   createWorldSearchService,

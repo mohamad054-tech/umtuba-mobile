@@ -8,6 +8,8 @@ import type { WorldCamera } from "@/src/lib/world/types";
 import type { WorldEducationMarker } from "@/src/lib/world/education";
 import type { WorldPlaceMarker } from "@/src/lib/world/places";
 import { PLACE_FOCUS_ZOOM } from "@/src/lib/world/places/placeUx";
+import type { WorldUserMarker } from "@/src/lib/world/users";
+import { USER_FOCUS_ZOOM } from "@/src/lib/world/users";
 import type {
   CameraAdapter,
   LayerAdapter,
@@ -32,6 +34,7 @@ export { MAPLIBRE_DEFAULT_CAMERA };
 
 export type PlacePressHandler = (placeId: string) => void;
 export type EducationPressHandler = (educationId: string) => void;
+export type UserPressHandler = (userId: string) => void;
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -64,6 +67,14 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   clearSelectedEducationMarker(): void;
   setEducationPressHandler(handler: EducationPressHandler | null): void;
   reportEducationPress(educationId: string): void;
+  /** Users markers — approximate public pins only. */
+  setUserMarkers(markers: WorldUserMarker[]): void;
+  getUserMarkers(): WorldUserMarker[];
+  getSelectedUserMarkerId(): string | null;
+  setSelectedUserMarkerId(userId: string | null): void;
+  clearSelectedUserMarker(): void;
+  setUserPressHandler(handler: UserPressHandler | null): void;
+  reportUserPress(userId: string): void;
   /** Programmatic camera focus (selection / cluster expand). */
   focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
@@ -98,6 +109,9 @@ export function createMapLibreRendererAdapter(options?: {
   let educationMarkers: WorldEducationMarker[] = [];
   let selectedEducationMarkerId: string | null = null;
   let educationPressHandler: EducationPressHandler | null = null;
+  let userMarkers: WorldUserMarker[] = [];
+  let selectedUserMarkerId: string | null = null;
+  let userPressHandler: UserPressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -338,6 +352,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (!marker) return;
       selectedPlaceMarkerId = placeId;
       selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
       // Focus camera on selection for professional UX.
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
@@ -387,6 +402,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (selectedEducationMarkerId === educationId) return;
       selectedEducationMarkerId = educationId;
       selectedPlaceMarkerId = null;
+      selectedUserMarkerId = null;
       bump();
     },
     clearSelectedEducationMarker(): void {
@@ -403,6 +419,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (!marker) return;
       selectedEducationMarkerId = educationId;
       selectedPlaceMarkerId = null;
+      selectedUserMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -418,6 +435,72 @@ export function createMapLibreRendererAdapter(options?: {
       bump();
       try {
         educationPressHandler?.(educationId);
+      } catch {
+        // Fail-closed.
+      }
+    },
+    setUserMarkers(markers: WorldUserMarker[]): void {
+      userMarkers = Array.isArray(markers)
+        ? markers.map((m) => ({ ...m }))
+        : [];
+      if (
+        selectedUserMarkerId &&
+        !userMarkers.some((m) => m.id === selectedUserMarkerId)
+      ) {
+        selectedUserMarkerId = null;
+      }
+      bump();
+    },
+    getUserMarkers(): WorldUserMarker[] {
+      return userMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedUserMarkerId(): string | null {
+      return selectedUserMarkerId;
+    },
+    setSelectedUserMarkerId(userId: string | null): void {
+      if (userId == null) {
+        if (selectedUserMarkerId == null) return;
+        selectedUserMarkerId = null;
+        bump();
+        return;
+      }
+      if (!userMarkers.some((m) => m.id === userId)) return;
+      if (selectedUserMarkerId === userId) return;
+      selectedUserMarkerId = userId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      bump();
+    },
+    clearSelectedUserMarker(): void {
+      if (selectedUserMarkerId == null) return;
+      selectedUserMarkerId = null;
+      bump();
+    },
+    setUserPressHandler(handler: UserPressHandler | null): void {
+      userPressHandler = handler;
+    },
+    reportUserPress(userId: string): void {
+      if (!userId || typeof userId !== "string") return;
+      const marker = userMarkers.find((m) => m.id === userId);
+      if (!marker) return;
+      selectedUserMarkerId = userId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, USER_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
+      bump();
+      try {
+        userPressHandler?.(userId);
       } catch {
         // Fail-closed.
       }

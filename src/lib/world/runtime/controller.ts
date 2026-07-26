@@ -31,6 +31,15 @@ import {
   type EducationRegistry,
 } from "@/src/lib/world/education";
 import {
+  buildWorldUserSheetState,
+  createUsersRegistry,
+  createWorldUsersLayerDefinition,
+  WORLD_USERS_LAYER_ID,
+  worldUsersToEntities,
+  worldUsersToMarkers,
+  type UsersRegistry,
+} from "@/src/lib/world/users";
+import {
   buildPlaceLayerControls,
   buildWorldPlaceSheetState,
   createPlaceRegistry,
@@ -146,6 +155,21 @@ function mergeEducationIntoSnapshot(
   };
 }
 
+function mergeUsersIntoSnapshot(
+  snapshot: WorldFoundationSnapshot,
+  usersBound: boolean
+): WorldFoundationSnapshot {
+  if (!usersBound) return snapshot;
+  const hasUsersLayer = snapshot.layers.some(
+    (layer) => layer.category === "users"
+  );
+  if (hasUsersLayer) return snapshot;
+  return {
+    ...snapshot,
+    layers: [...snapshot.layers, createWorldUsersLayerDefinition()],
+  };
+}
+
 /**
  * Sole runtime authority for UM World operational state + renderer slot.
  * Screen UI must consume this controller — not invent parallel load/render logic.
@@ -162,6 +186,7 @@ export class WorldRuntimeController {
   private mapSource: WorldMapSource | null;
   private placeRegistry: PlaceRegistry;
   private educationRegistry: EducationRegistry;
+  private usersRegistry: UsersRegistry;
   private yieldMs: number;
   private state: WorldRuntimeState;
   private selection: WorldUiSelectionState = createDefaultWorldUiSelection();
@@ -190,6 +215,7 @@ export class WorldRuntimeController {
     }
     this.placeRegistry = createPlaceRegistry();
     this.educationRegistry = createEducationRegistry();
+    this.usersRegistry = createUsersRegistry();
     this.searchService = createWorldSearchService();
     const placeProviderBound = this.dataPipeline.isKindAvailable("places");
 
@@ -254,6 +280,11 @@ export class WorldRuntimeController {
     return this.educationRegistry;
   }
 
+  /** Users registry (Runtime / tests). */
+  getUsersRegistry(): UsersRegistry {
+    return this.usersRegistry;
+  }
+
   /**
    * Unified World search — UI → Runtime → WorldSearchService over Pipeline-backed registries.
    * Empty query → []. Missing provider kinds are omitted (fail-closed).
@@ -263,8 +294,10 @@ export class WorldRuntimeController {
       const dataset = buildWorldSearchDataset({
         placesAvailable: this.dataPipeline.isKindAvailable("places"),
         educationAvailable: this.dataPipeline.isKindAvailable("education"),
+        usersAvailable: this.dataPipeline.isKindAvailable("users"),
         places: this.placeRegistry.list(),
         education: this.educationRegistry.list(),
+        users: this.usersRegistry.list(),
       });
       return this.searchService.search(query, dataset);
     } catch {
@@ -272,7 +305,7 @@ export class WorldRuntimeController {
     }
   }
 
-  /** Select a search hit — routes to Place or Education sheet + camera focus. */
+  /** Select a search hit — routes to Place, Education, or User sheet + camera focus. */
   selectSearchResult(result: WorldSearchResult): boolean {
     if (!result || typeof result.id !== "string") return false;
     if (result.sourceType === "places") {
@@ -280,6 +313,9 @@ export class WorldRuntimeController {
     }
     if (result.sourceType === "education") {
       return this.selectEducation(result.id);
+    }
+    if (result.sourceType === "users") {
+      return this.selectUser(result.id);
     }
     return false;
   }
@@ -304,6 +340,7 @@ export class WorldRuntimeController {
         : undefined;
     const placesBound = this.dataPipeline.isKindAvailable("places");
     const educationBound = this.dataPipeline.isKindAvailable("education");
+    const usersBound = this.dataPipeline.isKindAvailable("users");
     const rawSnapshot = runtime.snapshot ?? undefined;
     let snapshot = rawSnapshot
       ? mergePlacesIntoSnapshot(rawSnapshot, placesBound)
@@ -311,13 +348,19 @@ export class WorldRuntimeController {
     if (snapshot) {
       snapshot = mergeEducationIntoSnapshot(snapshot, educationBound);
     }
+    if (snapshot) {
+      snapshot = mergeUsersIntoSnapshot(snapshot, usersBound);
+    }
     const placeEntities = placesBound
       ? worldPlacesToEntities(this.placeRegistry.listCities())
       : [];
     const educationEntities = educationBound
       ? worldEducationToEntities(this.educationRegistry.listMappable())
       : [];
-    const entities = [...placeEntities, ...educationEntities];
+    const userEntities = usersBound
+      ? worldUsersToEntities(this.usersRegistry.listMappable())
+      : [];
+    const entities = [...placeEntities, ...educationEntities, ...userEntities];
     const placeLayers = buildPlaceLayerControls(
       this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers(),
       placesBound
@@ -340,6 +383,15 @@ export class WorldRuntimeController {
       selectedEducation,
       this.selection.educationSheetOpen === true && selectedEducation != null
     );
+    const selectedUser =
+      this.selection.selectedEntityId != null &&
+      this.selection.userSheetOpen === true
+        ? this.usersRegistry.get(this.selection.selectedEntityId)
+        : null;
+    const userSheet = buildWorldUserSheetState(
+      selectedUser,
+      this.selection.userSheetOpen === true && selectedUser != null
+    );
 
     const base = buildWorldExperienceViewState({
       snapshot,
@@ -352,6 +404,7 @@ export class WorldRuntimeController {
       placeLayers,
       placeSheet,
       educationSheet,
+      userSheet,
     });
 
     if (runtime.phase === "preparing") {
@@ -412,6 +465,7 @@ export class WorldRuntimeController {
       }
       this.bindPlacePressHandler();
       this.bindEducationPressHandler();
+      this.bindUserPressHandler();
     }
     await this.runLoadCycle();
   }
@@ -428,6 +482,7 @@ export class WorldRuntimeController {
     }
     this.bindPlacePressHandler();
     this.bindEducationPressHandler();
+    this.bindUserPressHandler();
     await this.runLoadCycle();
   }
 
@@ -478,10 +533,12 @@ export class WorldRuntimeController {
       ...selectWorldEntity(this.selection, place.id),
       placeSheetOpen: true,
       educationSheetOpen: false,
+      userSheetOpen: false,
     };
     this.syncPlacesToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedEducationMarker();
+      this.renderer.clearSelectedUserMarker();
       this.renderer.setSelectedPlaceMarkerId(place.id);
       this.renderer.focusPlaceAt(place.latitude, place.longitude);
     }
@@ -515,12 +572,56 @@ export class WorldRuntimeController {
       ...selectWorldEntity(this.selection, record.id),
       educationSheetOpen: true,
       placeSheetOpen: false,
+      userSheetOpen: false,
     };
     this.syncEducationToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedPlaceMarker();
+      this.renderer.clearSelectedUserMarker();
       this.renderer.setSelectedEducationMarkerId(record.id);
       this.renderer.focusPlaceAt(record.latitude, record.longitude);
+    }
+    this.emit();
+    return true;
+  }
+
+  /** Select a privacy-safe user pin — approximate coords only. */
+  selectUser(userId: string | null): boolean {
+    if (!userId) {
+      this.selection = {
+        ...selectWorldEntity(this.selection, null),
+        userSheetOpen: false,
+      };
+      if (isMapLibreRendererAdapter(this.renderer)) {
+        this.renderer.clearSelectedUserMarker();
+      }
+      this.syncUsersToRenderer();
+      this.emit();
+      return true;
+    }
+    const record = this.usersRegistry.get(userId);
+    if (!record || record.mapVisible !== true) return false;
+    if (
+      typeof record.approximateLatitude !== "number" ||
+      typeof record.approximateLongitude !== "number"
+    ) {
+      return false;
+    }
+    this.selection = {
+      ...selectWorldEntity(this.selection, record.id),
+      userSheetOpen: true,
+      placeSheetOpen: false,
+      educationSheetOpen: false,
+    };
+    this.syncUsersToRenderer();
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      this.renderer.clearSelectedPlaceMarker();
+      this.renderer.clearSelectedEducationMarker();
+      this.renderer.setSelectedUserMarkerId(record.id);
+      this.renderer.focusPlaceAt(
+        record.approximateLatitude,
+        record.approximateLongitude
+      );
     }
     this.emit();
     return true;
@@ -568,9 +669,12 @@ export class WorldRuntimeController {
       this.syncPlacesToRenderer();
     } else if (categoryId === "education") {
       this.syncEducationToRenderer();
+    } else if (categoryId === "users") {
+      this.syncUsersToRenderer();
     } else {
       this.syncPlacesToRenderer();
       this.syncEducationToRenderer();
+      this.syncUsersToRenderer();
     }
     this.emit();
   }
@@ -601,8 +705,12 @@ export class WorldRuntimeController {
     this.renderer
       .getLayerAdapter()
       .setLayerVisibility(WORLD_EDUCATION_LAYER_ID, false);
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_USERS_LAYER_ID, false);
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
+    this.syncUsersToRenderer();
     this.emit();
   }
 
@@ -621,13 +729,16 @@ export class WorldRuntimeController {
       detailsOpen: false,
       placeSheetOpen: false,
       educationSheetOpen: false,
+      userSheetOpen: false,
     };
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedPlaceMarker();
       this.renderer.clearSelectedEducationMarker();
+      this.renderer.clearSelectedUserMarker();
     }
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
+    this.syncUsersToRenderer();
     this.emit();
   }
 
@@ -642,6 +753,13 @@ export class WorldRuntimeController {
     if (!isMapLibreRendererAdapter(this.renderer)) return;
     this.renderer.setEducationPressHandler((educationId) => {
       this.selectEducation(educationId);
+    });
+  }
+
+  private bindUserPressHandler(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    this.renderer.setUserPressHandler((userId) => {
+      this.selectUser(userId);
     });
   }
 
@@ -692,9 +810,33 @@ export class WorldRuntimeController {
     );
   }
 
+  private syncUsersToRenderer(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    const usersBound = this.dataPipeline.isKindAvailable("users");
+    if (!usersBound) {
+      this.renderer.setUserMarkers([]);
+      this.renderer
+        .getLayerAdapter()
+        .setLayerVisibility(WORLD_USERS_LAYER_ID, false);
+      return;
+    }
+    const visible = this.selection.selectedCategories.includes(
+      WORLD_USERS_LAYER_ID
+    );
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_USERS_LAYER_ID, visible);
+    this.renderer.setUserMarkers(
+      visible
+        ? worldUsersToMarkers(this.usersRegistry.listMappable())
+        : []
+    );
+  }
+
   private async loadPlaces(): Promise<void> {
     this.placeRegistry.clear();
     this.educationRegistry.clear();
+    this.usersRegistry.clear();
     try {
       const bundle = await this.dataPipeline.loadAll();
       this.lastDataBundle = bundle;
@@ -742,13 +884,33 @@ export class WorldRuntimeController {
           };
         }
       }
+
+      if (this.dataPipeline.isKindAvailable("users")) {
+        const usersAccepted = this.usersRegistry.registerAll(
+          Array.isArray(bundle.users) ? bundle.users : []
+        );
+        if (
+          usersAccepted > 0 &&
+          !this.selection.selectedCategories.includes(WORLD_USERS_LAYER_ID)
+        ) {
+          this.selection = {
+            ...this.selection,
+            selectedCategories: [
+              ...this.selection.selectedCategories,
+              WORLD_USERS_LAYER_ID,
+            ],
+          };
+        }
+      }
     } catch {
       this.placeRegistry.clear();
       this.educationRegistry.clear();
+      this.usersRegistry.clear();
       this.lastDataBundle = null;
     }
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
+    this.syncUsersToRenderer();
   }
 
   private async runLoadCycle(): Promise<void> {
@@ -817,10 +979,12 @@ export class WorldRuntimeController {
         detailsOpen: false,
         placeSheetOpen: false,
         educationSheetOpen: false,
+        userSheetOpen: false,
       };
       if (isMapLibreRendererAdapter(this.renderer)) {
         this.renderer.clearSelectedPlaceMarker();
         this.renderer.clearSelectedEducationMarker();
+        this.renderer.clearSelectedUserMarker();
       }
       this.emit();
     } catch (err) {

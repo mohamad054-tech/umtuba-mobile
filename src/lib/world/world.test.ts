@@ -32,6 +32,7 @@ describe("world categories", () => {
       "future",
     ]);
     expect(listWorldCategories()).toEqual([
+      { id: "users", label: "Users", supported: true },
       { id: "cities", label: "Cities", supported: true },
       { id: "education", label: "Education", supported: true },
     ]);

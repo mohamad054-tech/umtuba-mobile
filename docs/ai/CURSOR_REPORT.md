@@ -1,19 +1,23 @@
-# CURSOR_REPORT — World Search & Discovery V1
+# CURSOR_REPORT — World Users Layer V1
 
 ## Summary
 
-Unified World search via `WorldSearchService` over Pipeline-backed Places + Education registries. UI search box → Runtime.searchWorld / selectSearchResult → camera focus + Place or Education bottom sheet. Fail-closed for empty query / missing providers. No external search APIs.
+Privacy-safe Users layer via World Data Pipeline: approximate city pins, no email/phone, mapVisible filter, clustering, independent layer toggle, search by display name/handle, bottom sheet with placeholder social actions. Cities/Education unaffected. Fail-closed when provider missing.
 
 ## Exact files changed
 
 ### New
-- `src/lib/world/search/*`
-- `components/world/WorldSearchBar.tsx`
+- `src/lib/world/users/*`
+- `src/lib/world/renderer/maplibre/MapLibreUsersLayer.tsx`
+- `components/world/WorldUserBottomSheet.tsx`
 
 ### Modified
-- `runtime/controller.ts` — searchWorld, selectSearchResult
-- `world/index.ts` — search exports
-- `WorldExperienceShell.tsx`, `app/world.tsx`
+- dataPipeline types/providers/tests
+- runtime/controller.ts
+- experience.ts, categories.ts, world/index.ts, world.test.ts
+- search types/service/tests
+- MapLibreRendererAdapter, MapLibreMapSurface
+- WorldExperienceShell, WorldSearchBar
 
 ## Migrations created
 
@@ -21,13 +25,14 @@ None.
 
 ## Security review
 
-- UI does not import providers or MapLibre.
-- No invented search hits; empty query → [].
-- Missing provider kinds omitted from dataset.
+- Approximate coords only (rounded); hidden users omitted.
+- No email/phone in public contract; handle email-shaped values rejected.
+- Social actions disabled placeholders.
+- UI does not import providers/MapLibre.
 
 ## Tests
 
-**PASS** (full suite including search tests)
+**PASS** (full suite)
 
 ## TypeScript
 
@@ -36,7 +41,3 @@ None.
 ## git diff --check
 
 PASS.
-
-## Open issues
-
-- Search panel dismisses on clear/select; results capped (maxHeight ~220).

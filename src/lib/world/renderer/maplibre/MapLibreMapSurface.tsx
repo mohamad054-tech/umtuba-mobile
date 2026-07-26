@@ -11,6 +11,7 @@ import {
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
 import { MapLibreEducationLayer } from "@/src/lib/world/renderer/maplibre/MapLibreEducationLayer";
 import { MapLibrePlacesLayer } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesLayer";
+import { MapLibreUsersLayer } from "@/src/lib/world/renderer/maplibre/MapLibreUsersLayer";
 
 type MapLibreMapSurfaceProps = {
   adapter: MapLibreRendererAdapter;
@@ -110,6 +111,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
         />
         <MapLibrePlacesLayer adapter={adapter} />
         <MapLibreEducationLayer adapter={adapter} />
+        <MapLibreUsersLayer adapter={adapter} />
       </Map>
     </View>
   );

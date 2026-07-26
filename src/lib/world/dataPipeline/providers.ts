@@ -82,6 +82,74 @@ const DEMO_EDUCATION_RECORDS: WorldEducationRecord[] = [
   },
 ];
 
+/**
+ * Development-only public demo users.
+ * Coordinates are city-level approximate pins — not precise locations.
+ * No email / phone / real identity data. Hidden user tests privacy filter.
+ */
+const DEMO_USER_RECORDS: WorldUserRecord[] = [
+  {
+    id: "user-demo-layla",
+    displayName: "Layla",
+    handle: "layla",
+    cityName: "Amman",
+    approximateLatitude: 31.96,
+    approximateLongitude: 35.92,
+    mapVisible: true,
+    presence: "online",
+  },
+  {
+    id: "user-demo-omar",
+    displayName: "Omar",
+    handle: "omar_h",
+    cityName: "Amman",
+    approximateLatitude: 31.94,
+    approximateLongitude: 35.89,
+    mapVisible: true,
+    presence: "active_recently",
+  },
+  {
+    id: "user-demo-sara",
+    displayName: "Sara",
+    handle: "sara.k",
+    cityName: "Cairo",
+    approximateLatitude: 30.05,
+    approximateLongitude: 31.24,
+    mapVisible: true,
+    presence: "online",
+  },
+  {
+    id: "user-demo-noura",
+    displayName: "Noura",
+    handle: "noura",
+    cityName: "Dubai",
+    approximateLatitude: 25.21,
+    approximateLongitude: 55.28,
+    mapVisible: true,
+    presence: null,
+  },
+  {
+    id: "user-demo-yousef",
+    displayName: "Yousef",
+    handle: "yousef",
+    cityName: "Riyadh",
+    approximateLatitude: 24.72,
+    approximateLongitude: 46.68,
+    mapVisible: true,
+    presence: "active_recently",
+  },
+  {
+    id: "user-demo-hidden",
+    displayName: "Hidden",
+    handle: "hidden_user",
+    cityName: "Amman",
+    approximateLatitude: 31.95,
+    approximateLongitude: 35.91,
+    mapVisible: false,
+    presence: "online",
+  },
+];
+
 /** Adapt Places foundation provider into the unified data-pipeline contract. */
 export function adaptPlaceProvider(
   placeProvider: WorldPlaceProvider
@@ -114,7 +182,7 @@ export function createDemoUsersDataProvider(): WorldUsersDataProvider {
     kind: "users",
     isAvailable: () => true,
     async listUsers(): Promise<WorldUserRecord[]> {
-      return [];
+      return DEMO_USER_RECORDS.map((row) => ({ ...row }));
     },
   };
 }

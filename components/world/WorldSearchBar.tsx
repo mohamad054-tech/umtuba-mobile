@@ -46,7 +46,7 @@ export function WorldSearchBar({
           value={query}
           onChangeText={onChangeQuery}
           onFocus={() => setFocused(true)}
-          placeholder="Search cities and education"
+          placeholder="Search cities, education, users"
           placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           autoCorrect={false}
@@ -105,7 +105,11 @@ export function WorldSearchBar({
                     </Text>
                   </View>
                   <Text style={styles.resultBadge}>
-                    {result.sourceType === "places" ? "Place" : "Education"}
+                    {result.sourceType === "places"
+                      ? "Place"
+                      : result.sourceType === "education"
+                        ? "Education"
+                        : "User"}
                   </Text>
                 </Pressable>
               ))}

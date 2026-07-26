@@ -25,12 +25,23 @@ export const WORLD_DATA_KINDS: readonly WorldDataKind[] = [
 /** Place rows reuse the Places foundation contract. */
 export type WorldPlacesData = WorldPlace;
 
-/** User presence / profile pins — empty until a real provider binds. */
+/** User presence pins — approximate city-level only; never precise GPS. */
+export type WorldUserPresence = "online" | "active_recently" | null;
+
 export type WorldUserRecord = {
   id: string;
   displayName: string;
-  latitude: number | null;
-  longitude: number | null;
+  handle: string;
+  cityName: string;
+  /**
+   * Approximate public pin (city-level fuzz).
+   * Never a precise home / device GPS coordinate.
+   */
+  approximateLatitude: number | null;
+  approximateLongitude: number | null;
+  /** When false, user is omitted from map, search, and sheets (privacy). */
+  mapVisible: boolean;
+  presence: WorldUserPresence;
 };
 
 /** Education nodes — provider-backed learning places on the World map. */
