@@ -26,6 +26,7 @@ import type {
 } from "@/src/lib/world/types";
 
 export type WorldExperiencePhase =
+  | "preparing"
   | "loading"
   | "unavailable"
   | "error"

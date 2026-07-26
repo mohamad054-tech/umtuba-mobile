@@ -1,94 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WorldExperienceShell } from "@/components/world/WorldExperienceShell";
-import {
-  buildWorldExperienceViewState,
-  createDefaultWorldUiSelection,
-  runWorldInitialization,
-  toggleWorldCategorySelection,
-  type WorldUiSelectionState,
-} from "@/src/lib/world/experience";
-import {
-  type WorldCategoryId,
-  type WorldFoundationSnapshot,
-} from "@/src/lib/world";
+import { useWorldRuntime } from "@/src/lib/world/runtime";
 import { colors } from "@/src/theme/colors";
 
+/**
+ * World screen — UI only. All operational state lives in WorldRuntimeController.
+ */
 export default function WorldScreen() {
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<WorldFoundationSnapshot | null>(
-    null
-  );
-  const [selection, setSelection] = useState<WorldUiSelectionState>(
-    createDefaultWorldUiSelection
-  );
-  const [attempt, setAttempt] = useState(0);
+  const { controller } = useWorldRuntime();
+  const view = controller.getViewState();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErrorMessage(null);
-    setAttempt((n) => n + 1);
-    const result = await runWorldInitialization();
-    if (!result.ok) {
-      setSnapshot(null);
-      setErrorMessage(result.message);
-    } else {
-      setSnapshot(result.snapshot);
-      setSelection((prev) => ({
-        ...prev,
-        selectedEntityId: null,
-        detailsOpen: false,
-      }));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const view = useMemo(
-    () =>
-      buildWorldExperienceViewState({
-        snapshot: snapshot ?? undefined,
-        selection,
-        loading,
-        errorMessage,
-      }),
-    [snapshot, selection, loading, errorMessage, attempt]
-  );
-
-  const onToggleLayer = useCallback(
-    (categoryId: WorldCategoryId, enabled: boolean) => {
-      setSelection((prev) => ({
-        ...prev,
-        selectedCategories: toggleWorldCategorySelection(
-          prev.selectedCategories,
-          categoryId,
-          enabled
-        ),
-      }));
-    },
-    []
-  );
-
-  const onRetry = useCallback(() => {
-    void load();
-  }, [load]);
-
-  if (view.phase === "loading") {
+  if (view.phase === "preparing" || view.phase === "loading") {
     return (
       <View
         style={styles.center}
-        accessibilityLabel="Loading World"
+        accessibilityLabel={
+          view.phase === "preparing" ? "Preparing World" : "Loading World"
+        }
         accessibilityRole="progressbar"
       >
         <ActivityIndicator color={colors.accentCyan} size="large" />
-        <Text style={styles.muted}>Loading World…</Text>
+        <Text style={styles.muted}>{view.message}</Text>
       </View>
     );
   }
@@ -97,39 +32,27 @@ export default function WorldScreen() {
     <WorldExperienceShell
       view={view}
       bottomInset={insets.bottom}
-      onRetry={onRetry}
-      onToggleLayer={onToggleLayer}
-      onToggleFilters={() =>
-        setSelection((prev) => ({
-          ...prev,
-          filterPanelOpen: !prev.filterPanelOpen,
-        }))
-      }
-      onToggleLayersPanel={() =>
-        setSelection((prev) => ({
-          ...prev,
-          layersPanelOpen: !prev.layersPanelOpen,
-        }))
-      }
-      onClearFilters={() =>
-        setSelection((prev) => ({
-          ...prev,
-          selectedCategories: [],
-        }))
-      }
-      onCloseFilters={() =>
-        setSelection((prev) => ({
-          ...prev,
-          filterPanelOpen: false,
-        }))
-      }
-      onCloseDetails={() =>
-        setSelection((prev) => ({
-          ...prev,
-          selectedEntityId: null,
-          detailsOpen: false,
-        }))
-      }
+      onRetry={() => {
+        void controller.retry();
+      }}
+      onToggleLayer={(categoryId, enabled) => {
+        controller.toggleLayer(categoryId, enabled);
+      }}
+      onToggleFilters={() => {
+        controller.toggleFiltersPanel();
+      }}
+      onToggleLayersPanel={() => {
+        controller.toggleLayersPanel();
+      }}
+      onClearFilters={() => {
+        controller.clearFilters();
+      }}
+      onCloseFilters={() => {
+        controller.closeFilters();
+      }}
+      onCloseDetails={() => {
+        controller.closeDetails();
+      }}
     />
   );
 }

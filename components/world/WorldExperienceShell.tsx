@@ -30,6 +30,7 @@ type WorldExperienceShellProps = {
 
 function statusLabel(view: WorldExperienceViewState): string {
   if (view.phase === "error") return "Error";
+  if (view.phase === "preparing") return "Preparing";
   if (view.phase === "loading") return "Loading";
   if (!view.rendererBound) return "Preparing";
   if (view.phase === "unavailable") return "Unavailable";

@@ -69,6 +69,21 @@ export {
   canOpenWorldDestination,
   mapWorldDestination,
 } from "@/src/lib/world/mapDestination";
+export {
+  canTransitionWorldRuntimePhase,
+  createMockWorldDataSource,
+  createUnboundWorldDataSource,
+  createWorldRuntimeController,
+  isWorldDataSourceBound,
+  resolveWorldRuntimePhaseAfterLoad,
+  useWorldRuntime,
+  worldRuntimePhaseMessage,
+  WorldRuntimeController,
+  type WorldDataSource,
+  type WorldRuntimeControllerOptions,
+  type WorldRuntimePhase,
+  type WorldRuntimeState,
+} from "@/src/lib/world/runtime";
 export type {
   WorldAction,
   WorldActionKind,
