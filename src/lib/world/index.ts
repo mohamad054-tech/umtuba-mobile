@@ -12,7 +12,6 @@ export {
   createDisabledWorldRendererAdapter,
   isWorldRendererBound,
   parseWorldRendererFamily,
-  type WorldRendererAdapter,
 } from "@/src/lib/world/adapter";
 export {
   isValidLatitude,
@@ -84,6 +83,17 @@ export {
   type WorldRuntimePhase,
   type WorldRuntimeState,
 } from "@/src/lib/world/runtime";
+export {
+  createNullRendererAdapter,
+  defaultNullRendererCapabilities,
+  isRendererAdapterBound,
+  toFoundationRendererCapability,
+  type CameraAdapter,
+  type LayerAdapter,
+  type ProjectionAdapter,
+  type RendererCapabilities,
+  type WorldRendererAdapter,
+} from "@/src/lib/world/renderer";
 export type {
   WorldAction,
   WorldActionKind,

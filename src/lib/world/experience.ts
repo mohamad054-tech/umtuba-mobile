@@ -17,6 +17,7 @@ import {
   isWorldFoundationConfigured,
 } from "@/src/lib/world/foundation";
 import { mapWorldDestination } from "@/src/lib/world/mapDestination";
+import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import type {
   WorldCategoryId,
   WorldEntity,
@@ -236,6 +237,7 @@ export function buildWorldExperienceViewState(options?: {
   loading?: boolean;
   errorMessage?: string | null;
   attribution?: string | null;
+  rendererAdapter?: WorldRendererAdapter | null;
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -245,7 +247,9 @@ export function buildWorldExperienceViewState(options?: {
       : null;
   const selection = options?.selection ?? createDefaultWorldUiSelection();
   const snapshot = options?.snapshot ?? getWorldFoundationSnapshot();
-  const rendererBound = isWorldRendererBound();
+  const rendererAdapter =
+    options?.rendererAdapter ?? createDisabledWorldRendererAdapter();
+  const rendererBound = isWorldRendererBound(rendererAdapter);
   const foundationConfigured = isWorldFoundationConfigured();
   const attribution =
     typeof options?.attribution === "string" &&
@@ -272,7 +276,7 @@ export function buildWorldExperienceViewState(options?: {
       layersPanelOpen: false,
       entities: [],
       attribution,
-      renderer: snapshot.renderer ?? createDisabledWorldRendererAdapter().capability,
+      renderer: snapshot.renderer ?? rendererAdapter.capability,
     };
   }
 
@@ -292,7 +296,7 @@ export function buildWorldExperienceViewState(options?: {
       layersPanelOpen: false,
       entities: [],
       attribution,
-      renderer: createDisabledWorldRendererAdapter().capability,
+      renderer: rendererAdapter.capability,
     };
   }
 
@@ -326,7 +330,7 @@ export function buildWorldExperienceViewState(options?: {
     layersPanelOpen: selection.layersPanelOpen,
     entities: [],
     attribution,
-    renderer: snapshot.renderer,
+    renderer: snapshot.renderer ?? rendererAdapter.capability,
   };
 }
 

@@ -8,6 +8,11 @@ import {
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world/types";
 import {
+  createNullRendererAdapter,
+  isRendererAdapterBound,
+  type WorldRendererAdapter,
+} from "@/src/lib/world/renderer";
+import {
   createUnboundWorldDataSource,
   isWorldDataSourceBound,
 } from "@/src/lib/world/runtime/dataSource";
@@ -25,7 +30,9 @@ import type {
 
 type Listener = () => void;
 
-function initialRuntimeState(): WorldRuntimeState {
+function initialRuntimeState(
+  rendererBound: boolean
+): WorldRuntimeState {
   return {
     phase: "preparing",
     message: worldRuntimePhaseMessage("preparing"),
@@ -33,17 +40,19 @@ function initialRuntimeState(): WorldRuntimeState {
     snapshot: null,
     attempt: 0,
     dataSourceBound: false,
+    rendererBound,
   };
 }
 
 /**
- * Sole runtime authority for UM World operational state.
- * Screen UI must consume this controller — not invent parallel load logic.
+ * Sole runtime authority for UM World operational state + renderer slot.
+ * Screen UI must consume this controller — not invent parallel load/render logic.
  */
 export class WorldRuntimeController {
   private dataSource: WorldDataSource;
+  private renderer: WorldRendererAdapter;
   private yieldMs: number;
-  private state: WorldRuntimeState = initialRuntimeState();
+  private state: WorldRuntimeState;
   private selection: WorldUiSelectionState = createDefaultWorldUiSelection();
   private listeners = new Set<Listener>();
   private runToken = 0;
@@ -51,10 +60,12 @@ export class WorldRuntimeController {
 
   constructor(options?: WorldRuntimeControllerOptions) {
     this.dataSource = options?.dataSource ?? createUnboundWorldDataSource();
+    this.renderer = options?.renderer ?? createNullRendererAdapter();
     this.yieldMs =
       typeof options?.yieldMs === "number" && options.yieldMs >= 0
         ? options.yieldMs
         : WORLD_RETRY_YIELD_MS;
+    this.state = initialRuntimeState(isRendererAdapterBound(this.renderer));
   }
 
   subscribe(listener: Listener): () => void {
@@ -68,8 +79,16 @@ export class WorldRuntimeController {
     return { ...this.state };
   }
 
+  /** Only access path for renderer — UI must not bind engines directly. */
+  getRendererAdapter(): WorldRendererAdapter {
+    return this.renderer;
+  }
+
   getSelection(): WorldUiSelectionState {
-    return { ...this.selection, selectedCategories: [...this.selection.selectedCategories] };
+    return {
+      ...this.selection,
+      selectedCategories: [...this.selection.selectedCategories],
+    };
   }
 
   getViewState(): WorldExperienceViewState {
@@ -80,8 +99,8 @@ export class WorldRuntimeController {
       snapshot: runtime.snapshot ?? undefined,
       selection: this.selection,
       loading,
-      errorMessage:
-        runtime.phase === "error" ? runtime.errorMessage : null,
+      errorMessage: runtime.phase === "error" ? runtime.errorMessage : null,
+      rendererAdapter: this.renderer,
     });
 
     if (runtime.phase === "preparing") {
@@ -89,6 +108,7 @@ export class WorldRuntimeController {
         ...base,
         phase: "preparing",
         message: worldRuntimePhaseMessage("preparing"),
+        rendererBound: runtime.rendererBound,
       };
     }
     if (runtime.phase === "loading") {
@@ -96,6 +116,7 @@ export class WorldRuntimeController {
         ...base,
         phase: "loading",
         message: worldRuntimePhaseMessage("loading"),
+        rendererBound: runtime.rendererBound,
       };
     }
     if (runtime.phase === "ready") {
@@ -103,6 +124,7 @@ export class WorldRuntimeController {
         ...base,
         phase: "ready",
         message: worldRuntimePhaseMessage("ready", runtime.snapshot?.message),
+        rendererBound: runtime.rendererBound,
       };
     }
     if (runtime.phase === "error") {
@@ -111,6 +133,7 @@ export class WorldRuntimeController {
         phase: "error",
         errorMessage: runtime.errorMessage,
         message: worldRuntimePhaseMessage("error"),
+        rendererBound: runtime.rendererBound,
       };
     }
     return {
@@ -120,6 +143,7 @@ export class WorldRuntimeController {
         "unavailable",
         runtime.snapshot?.message ?? base.message
       ),
+      rendererBound: runtime.rendererBound,
     };
   }
 
@@ -128,6 +152,11 @@ export class WorldRuntimeController {
     if (!this.started) {
       this.started = true;
       this.setPhase("preparing");
+      try {
+        this.renderer.mount();
+      } catch {
+        // Fail-closed: null/broken adapters must not crash Runtime.
+      }
     }
     await this.runLoadCycle();
   }
@@ -149,6 +178,12 @@ export class WorldRuntimeController {
         enabled
       ),
     };
+    // Layer visibility requests go through Runtime-owned renderer adapter only.
+    if (enabled) {
+      this.renderer.getLayerAdapter().setLayerVisibility(categoryId, true);
+    } else {
+      this.renderer.getLayerAdapter().setLayerVisibility(categoryId, false);
+    }
     this.emit();
   }
 
@@ -195,7 +230,8 @@ export class WorldRuntimeController {
 
   private async runLoadCycle(): Promise<void> {
     const token = ++this.runToken;
-    const bound = isWorldDataSourceBound(this.dataSource);
+    const dataBound = isWorldDataSourceBound(this.dataSource);
+    const rendererBound = isRendererAdapterBound(this.renderer);
 
     this.state = {
       ...this.state,
@@ -203,7 +239,8 @@ export class WorldRuntimeController {
       message: worldRuntimePhaseMessage("loading"),
       errorMessage: null,
       attempt: this.state.attempt + 1,
-      dataSourceBound: bound,
+      dataSourceBound: dataBound,
+      rendererBound,
     };
     this.emit();
 
@@ -219,7 +256,7 @@ export class WorldRuntimeController {
       if (token !== this.runToken) return;
 
       const phase = resolveWorldRuntimePhaseAfterLoad({
-        dataSourceBound: bound,
+        dataSourceBound: dataBound,
         snapshot,
         errorMessage: null,
       });
@@ -230,7 +267,8 @@ export class WorldRuntimeController {
         errorMessage: phase === "error" ? snapshot.message : null,
         snapshot,
         attempt: this.state.attempt,
-        dataSourceBound: bound,
+        dataSourceBound: dataBound,
+        rendererBound,
       };
       this.selection = {
         ...this.selection,
@@ -248,7 +286,8 @@ export class WorldRuntimeController {
         errorMessage: message,
         snapshot: null,
         attempt: this.state.attempt,
-        dataSourceBound: bound,
+        dataSourceBound: dataBound,
+        rendererBound,
       };
       this.emit();
     }
@@ -256,13 +295,13 @@ export class WorldRuntimeController {
 
   private setPhase(phase: WorldRuntimePhase): void {
     if (!canTransitionWorldRuntimePhase(this.state.phase, phase)) {
-      // Fail soft: still move to loading for retry paths.
       if (phase === "loading" || phase === "preparing") {
         this.state = {
           ...this.state,
           phase,
           message: worldRuntimePhaseMessage(phase),
           errorMessage: null,
+          rendererBound: isRendererAdapterBound(this.renderer),
         };
         this.emit();
       }
@@ -273,6 +312,7 @@ export class WorldRuntimeController {
       phase,
       message: worldRuntimePhaseMessage(phase),
       errorMessage: phase === "error" ? this.state.errorMessage : null,
+      rendererBound: isRendererAdapterBound(this.renderer),
     };
     this.emit();
   }

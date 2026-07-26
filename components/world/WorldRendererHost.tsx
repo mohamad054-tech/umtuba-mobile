@@ -5,29 +5,27 @@ import {
   WORLD_RENDERER_PREPARING_MESSAGE,
 } from "@/src/lib/world/experience";
 import {
-  createDisabledWorldRendererAdapter,
-  isWorldRendererBound,
+  createNullRendererAdapter,
   type WorldRendererAdapter,
-} from "@/src/lib/world";
+} from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
 
 type WorldRendererHostProps = {
-  adapter?: WorldRendererAdapter | null;
+  /** Must come from WorldRuntimeController — never a direct SDK. */
+  adapter: WorldRendererAdapter;
   preparingMessage?: string;
 };
 
 /**
  * User-facing renderer host.
- * Consumes the World renderer adapter contract; shows unavailable when unbound.
- * No map SDK references in UI copy.
+ * Only displays adapter status from Runtime — no map SDK access.
  */
 export function WorldRendererHost({
-  adapter = null,
+  adapter,
   preparingMessage = WORLD_RENDERER_PREPARING_MESSAGE,
 }: WorldRendererHostProps) {
-  const bound = isWorldRendererBound() && adapter != null;
-  const capability =
-    adapter?.capability ?? createDisabledWorldRendererAdapter().capability;
+  const bound = adapter.isBound();
+  const caps = adapter.getCapabilities();
 
   return (
     <View
@@ -47,12 +45,15 @@ export function WorldRendererHost({
           {bound ? "Renderer ready" : "Renderer preparing"}
         </Text>
         <Text style={styles.body}>
-          {bound
-            ? "A trusted World renderer is bound."
-            : preparingMessage}
+          {bound ? "A trusted World renderer is bound." : preparingMessage}
         </Text>
         <Text style={styles.meta} accessibilityLabel="Renderer family">
-          Family: {capability.family}
+          Family: {adapter.family}
+        </Text>
+        <Text style={styles.meta} accessibilityLabel="Renderer capabilities">
+          3D:{caps.supports3D ? "on" : "off"} Terrain:
+          {caps.supportsTerrain ? "on" : "off"} Offline:
+          {caps.supportsOffline ? "on" : "off"}
         </Text>
       </View>
     </View>
@@ -73,6 +74,11 @@ export function WorldAttribution({
       <Text style={styles.attributionText}>{text}</Text>
     </View>
   );
+}
+
+/** Default host adapter when none is passed — fail-closed null renderer. */
+export function defaultWorldRendererHostAdapter(): WorldRendererAdapter {
+  return createNullRendererAdapter();
 }
 
 const styles = StyleSheet.create({

@@ -6,12 +6,14 @@ import { useWorldRuntime } from "@/src/lib/world/runtime";
 import { colors } from "@/src/theme/colors";
 
 /**
- * World screen — UI only. All operational state lives in WorldRuntimeController.
+ * World screen — UI only.
+ * Runtime owns state + renderer adapter; no direct renderer/SDK access here.
  */
 export default function WorldScreen() {
   const insets = useSafeAreaInsets();
   const { controller } = useWorldRuntime();
   const view = controller.getViewState();
+  const renderer = controller.getRendererAdapter();
 
   if (view.phase === "preparing" || view.phase === "loading") {
     return (
@@ -31,6 +33,7 @@ export default function WorldScreen() {
   return (
     <WorldExperienceShell
       view={view}
+      renderer={renderer}
       bottomInset={insets.bottom}
       onRetry={() => {
         void controller.retry();

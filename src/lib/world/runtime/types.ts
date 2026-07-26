@@ -3,6 +3,7 @@
  * No map SDK / tiles / vendor engines.
  */
 
+import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import type { WorldFoundationSnapshot } from "@/src/lib/world/types";
 
 export type WorldRuntimePhase =
@@ -19,6 +20,7 @@ export type WorldRuntimeState = {
   snapshot: WorldFoundationSnapshot | null;
   attempt: number;
   dataSourceBound: boolean;
+  rendererBound: boolean;
 };
 
 /**
@@ -36,4 +38,9 @@ export type WorldRuntimeControllerOptions = {
   dataSource?: WorldDataSource | null;
   /** Yield before load so Retry paints preparing/loading. */
   yieldMs?: number;
+  /**
+   * Renderer adapter — Runtime is the only owner.
+   * Defaults to NullRendererAdapter (fail-closed, no map SDK).
+   */
+  renderer?: WorldRendererAdapter | null;
 };

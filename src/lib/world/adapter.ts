@@ -1,29 +1,20 @@
-import type {
-  WorldRendererCapability,
-  WorldRendererFamily,
-} from "@/src/lib/world/types";
-
 /**
- * Renderer-agnostic adapter slot.
- * Concrete engines bind later without leaking into the domain layer.
+ * Legacy slot API — delegates to Renderer Adapter Foundation.
+ * Prefer `@/src/lib/world/renderer` for new code.
  */
-export type WorldRendererAdapter = {
-  /** Stable opaque adapter id chosen by the app shell — not a vendor name. */
-  id: string;
-  capability: WorldRendererCapability;
-};
 
+import {
+  createNullRendererAdapter,
+  isRendererAdapterBound,
+  type WorldRendererAdapter,
+} from "@/src/lib/world/renderer";
+import type { WorldRendererFamily } from "@/src/lib/world/types";
+
+export type { WorldRendererAdapter } from "@/src/lib/world/renderer";
+
+/** @deprecated Prefer createNullRendererAdapter */
 export function createDisabledWorldRendererAdapter(): WorldRendererAdapter {
-  return {
-    id: "world-renderer-none",
-    capability: {
-      family: "none",
-      supportsOffline: false,
-      supportsTerrain: false,
-      supportsIndoor: false,
-      supportsNavigation: false,
-    },
-  };
+  return createNullRendererAdapter();
 }
 
 export function parseWorldRendererFamily(
@@ -44,8 +35,12 @@ export function parseWorldRendererFamily(
 
 /**
  * Whether a concrete World renderer is bound.
- * Foundation Core: always false — no SDK / no engine installed.
+ * Without an adapter argument: always false (no SDK installed globally).
+ * With an adapter: delegates to adapter.isBound().
  */
-export function isWorldRendererBound(): boolean {
-  return false;
+export function isWorldRendererBound(
+  adapter?: WorldRendererAdapter | null
+): boolean {
+  if (adapter === undefined) return false;
+  return isRendererAdapterBound(adapter);
 }

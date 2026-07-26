@@ -14,10 +14,12 @@ import {
 import { WorldStatePanel } from "@/components/world/WorldStatePanel";
 import type { WorldExperienceViewState } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
+import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
 
 type WorldExperienceShellProps = {
   view: WorldExperienceViewState;
+  renderer: WorldRendererAdapter;
   bottomInset?: number;
   onRetry?: () => void;
   onToggleLayer?: (categoryId: WorldCategoryId, enabled: boolean) => void;
@@ -39,6 +41,7 @@ function statusLabel(view: WorldExperienceViewState): string {
 
 export function WorldExperienceShell({
   view,
+  renderer,
   bottomInset = 0,
   onRetry,
   onToggleLayer,
@@ -77,7 +80,7 @@ export function WorldExperienceShell({
       <WorldHeader subtitle={view.message} statusLabel={statusLabel(view)} />
 
       <View style={styles.canvasWrap}>
-        <WorldRendererHost />
+        <WorldRendererHost adapter={renderer} />
       </View>
 
       <WorldCameraControls controls={view.cameraControls} />
