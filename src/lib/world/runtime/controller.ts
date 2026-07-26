@@ -22,6 +22,15 @@ import {
   type WorldDataPipeline,
 } from "@/src/lib/world/dataPipeline";
 import {
+  buildWorldEducationSheetState,
+  createEducationRegistry,
+  createWorldEducationLayerDefinition,
+  WORLD_EDUCATION_LAYER_ID,
+  worldEducationToEntities,
+  worldEducationToMarkers,
+  type EducationRegistry,
+} from "@/src/lib/world/education";
+import {
   buildPlaceLayerControls,
   buildWorldPlaceSheetState,
   createPlaceRegistry,
@@ -116,6 +125,21 @@ function mergePlacesIntoSnapshot(
   };
 }
 
+function mergeEducationIntoSnapshot(
+  snapshot: WorldFoundationSnapshot,
+  educationBound: boolean
+): WorldFoundationSnapshot {
+  if (!educationBound) return snapshot;
+  const hasEducationLayer = snapshot.layers.some(
+    (layer) => layer.category === "education"
+  );
+  if (hasEducationLayer) return snapshot;
+  return {
+    ...snapshot,
+    layers: [...snapshot.layers, createWorldEducationLayerDefinition()],
+  };
+}
+
 /**
  * Sole runtime authority for UM World operational state + renderer slot.
  * Screen UI must consume this controller — not invent parallel load/render logic.
@@ -130,6 +154,7 @@ export class WorldRuntimeController {
   private mapSourceRegistry: MapSourceRegistry;
   private mapSource: WorldMapSource | null;
   private placeRegistry: PlaceRegistry;
+  private educationRegistry: EducationRegistry;
   private yieldMs: number;
   private state: WorldRuntimeState;
   private selection: WorldUiSelectionState = createDefaultWorldUiSelection();
@@ -157,6 +182,7 @@ export class WorldRuntimeController {
       });
     }
     this.placeRegistry = createPlaceRegistry();
+    this.educationRegistry = createEducationRegistry();
     const placeProviderBound = this.dataPipeline.isKindAvailable("places");
 
     if (options?.renderer !== undefined) {
@@ -215,6 +241,11 @@ export class WorldRuntimeController {
     return this.lastDataBundle;
   }
 
+  /** Education registry (Runtime / tests). */
+  getEducationRegistry(): EducationRegistry {
+    return this.educationRegistry;
+  }
+
   getSelection(): WorldUiSelectionState {
     return {
       ...this.selection,
@@ -234,24 +265,42 @@ export class WorldRuntimeController {
         ? this.mapSource.getAttribution()
         : undefined;
     const placesBound = this.dataPipeline.isKindAvailable("places");
+    const educationBound = this.dataPipeline.isKindAvailable("education");
     const rawSnapshot = runtime.snapshot ?? undefined;
-    const snapshot = rawSnapshot
+    let snapshot = rawSnapshot
       ? mergePlacesIntoSnapshot(rawSnapshot, placesBound)
       : undefined;
-    const entities = placesBound
+    if (snapshot) {
+      snapshot = mergeEducationIntoSnapshot(snapshot, educationBound);
+    }
+    const placeEntities = placesBound
       ? worldPlacesToEntities(this.placeRegistry.listCities())
       : [];
+    const educationEntities = educationBound
+      ? worldEducationToEntities(this.educationRegistry.listMappable())
+      : [];
+    const entities = [...placeEntities, ...educationEntities];
     const placeLayers = buildPlaceLayerControls(
       this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers(),
       placesBound
     );
     const selectedPlace =
-      this.selection.selectedEntityId != null
+      this.selection.selectedEntityId != null &&
+      this.selection.placeSheetOpen === true
         ? this.placeRegistry.get(this.selection.selectedEntityId)
         : null;
     const placeSheet = buildWorldPlaceSheetState(
       selectedPlace,
       this.selection.placeSheetOpen === true && selectedPlace != null
+    );
+    const selectedEducation =
+      this.selection.selectedEntityId != null &&
+      this.selection.educationSheetOpen === true
+        ? this.educationRegistry.get(this.selection.selectedEntityId)
+        : null;
+    const educationSheet = buildWorldEducationSheetState(
+      selectedEducation,
+      this.selection.educationSheetOpen === true && selectedEducation != null
     );
 
     const base = buildWorldExperienceViewState({
@@ -264,6 +313,7 @@ export class WorldRuntimeController {
       entities,
       placeLayers,
       placeSheet,
+      educationSheet,
     });
 
     if (runtime.phase === "preparing") {
@@ -323,6 +373,7 @@ export class WorldRuntimeController {
         // Fail-closed: null/broken adapters must not crash Runtime.
       }
       this.bindPlacePressHandler();
+      this.bindEducationPressHandler();
     }
     await this.runLoadCycle();
   }
@@ -338,6 +389,7 @@ export class WorldRuntimeController {
       // Fail-closed.
     }
     this.bindPlacePressHandler();
+    this.bindEducationPressHandler();
     await this.runLoadCycle();
   }
 
@@ -387,11 +439,50 @@ export class WorldRuntimeController {
     this.selection = {
       ...selectWorldEntity(this.selection, place.id),
       placeSheetOpen: true,
+      educationSheetOpen: false,
     };
     this.syncPlacesToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
+      this.renderer.clearSelectedEducationMarker();
       this.renderer.setSelectedPlaceMarkerId(place.id);
       this.renderer.focusPlaceAt(place.latitude, place.longitude);
+    }
+    this.emit();
+    return true;
+  }
+
+  /** Select an education node — used by renderer education press via Runtime. */
+  selectEducation(educationId: string | null): boolean {
+    if (!educationId) {
+      this.selection = {
+        ...selectWorldEntity(this.selection, null),
+        educationSheetOpen: false,
+      };
+      if (isMapLibreRendererAdapter(this.renderer)) {
+        this.renderer.clearSelectedEducationMarker();
+      }
+      this.syncEducationToRenderer();
+      this.emit();
+      return true;
+    }
+    const record = this.educationRegistry.get(educationId);
+    if (!record) return false;
+    if (
+      typeof record.latitude !== "number" ||
+      typeof record.longitude !== "number"
+    ) {
+      return false;
+    }
+    this.selection = {
+      ...selectWorldEntity(this.selection, record.id),
+      educationSheetOpen: true,
+      placeSheetOpen: false,
+    };
+    this.syncEducationToRenderer();
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      this.renderer.clearSelectedPlaceMarker();
+      this.renderer.setSelectedEducationMarkerId(record.id);
+      this.renderer.focusPlaceAt(record.latitude, record.longitude);
     }
     this.emit();
     return true;
@@ -436,8 +527,13 @@ export class WorldRuntimeController {
           ? defaultSelectedPlaceLayers()
           : [],
       };
+      this.syncPlacesToRenderer();
+    } else if (categoryId === "education") {
+      this.syncEducationToRenderer();
+    } else {
+      this.syncPlacesToRenderer();
+      this.syncEducationToRenderer();
     }
-    this.syncPlacesToRenderer();
     this.emit();
   }
 
@@ -464,7 +560,11 @@ export class WorldRuntimeController {
       selectedPlaceLayers: [],
     };
     this.renderer.getLayerAdapter().setLayerVisibility(WORLD_PLACES_LAYER_ID, false);
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_EDUCATION_LAYER_ID, false);
     this.syncPlacesToRenderer();
+    this.syncEducationToRenderer();
     this.emit();
   }
 
@@ -482,11 +582,14 @@ export class WorldRuntimeController {
       selectedEntityId: null,
       detailsOpen: false,
       placeSheetOpen: false,
+      educationSheetOpen: false,
     };
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedPlaceMarker();
+      this.renderer.clearSelectedEducationMarker();
     }
     this.syncPlacesToRenderer();
+    this.syncEducationToRenderer();
     this.emit();
   }
 
@@ -494,6 +597,13 @@ export class WorldRuntimeController {
     if (!isMapLibreRendererAdapter(this.renderer)) return;
     this.renderer.setPlacePressHandler((placeId) => {
       this.selectPlace(placeId);
+    });
+  }
+
+  private bindEducationPressHandler(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    this.renderer.setEducationPressHandler((educationId) => {
+      this.selectEducation(educationId);
     });
   }
 
@@ -521,44 +631,86 @@ export class WorldRuntimeController {
     );
   }
 
-  private async loadPlaces(): Promise<void> {
-    this.placeRegistry.clear();
-    if (!this.dataPipeline.isKindAvailable("places")) {
-      this.lastDataBundle = await this.dataPipeline.loadAll();
-      this.syncPlacesToRenderer();
+  private syncEducationToRenderer(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    const educationBound = this.dataPipeline.isKindAvailable("education");
+    if (!educationBound) {
+      this.renderer.setEducationMarkers([]);
+      this.renderer
+        .getLayerAdapter()
+        .setLayerVisibility(WORLD_EDUCATION_LAYER_ID, false);
       return;
     }
+    const visible = this.selection.selectedCategories.includes(
+      WORLD_EDUCATION_LAYER_ID
+    );
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_EDUCATION_LAYER_ID, visible);
+    this.renderer.setEducationMarkers(
+      visible
+        ? worldEducationToMarkers(this.educationRegistry.listMappable())
+        : []
+    );
+  }
+
+  private async loadPlaces(): Promise<void> {
+    this.placeRegistry.clear();
+    this.educationRegistry.clear();
     try {
       const bundle = await this.dataPipeline.loadAll();
       this.lastDataBundle = bundle;
-      const accepted = this.placeRegistry.registerAll(
-        Array.isArray(bundle.places) ? bundle.places : []
-      );
-      if (accepted > 0) {
-        if (!this.selection.selectedCategories.includes(WORLD_PLACES_LAYER_ID)) {
+
+      if (this.dataPipeline.isKindAvailable("places")) {
+        const accepted = this.placeRegistry.registerAll(
+          Array.isArray(bundle.places) ? bundle.places : []
+        );
+        if (accepted > 0) {
+          if (!this.selection.selectedCategories.includes(WORLD_PLACES_LAYER_ID)) {
+            this.selection = {
+              ...this.selection,
+              selectedCategories: [
+                ...this.selection.selectedCategories,
+                WORLD_PLACES_LAYER_ID,
+              ],
+              selectedPlaceLayers: defaultSelectedPlaceLayers(),
+            };
+          } else if (
+            !this.selection.selectedPlaceLayers ||
+            this.selection.selectedPlaceLayers.length === 0
+          ) {
+            this.selection = {
+              ...this.selection,
+              selectedPlaceLayers: defaultSelectedPlaceLayers(),
+            };
+          }
+        }
+      }
+
+      if (this.dataPipeline.isKindAvailable("education")) {
+        const eduAccepted = this.educationRegistry.registerAll(
+          Array.isArray(bundle.education) ? bundle.education : []
+        );
+        if (
+          eduAccepted > 0 &&
+          !this.selection.selectedCategories.includes(WORLD_EDUCATION_LAYER_ID)
+        ) {
           this.selection = {
             ...this.selection,
             selectedCategories: [
               ...this.selection.selectedCategories,
-              WORLD_PLACES_LAYER_ID,
+              WORLD_EDUCATION_LAYER_ID,
             ],
-            selectedPlaceLayers: defaultSelectedPlaceLayers(),
-          };
-        } else if (
-          !this.selection.selectedPlaceLayers ||
-          this.selection.selectedPlaceLayers.length === 0
-        ) {
-          this.selection = {
-            ...this.selection,
-            selectedPlaceLayers: defaultSelectedPlaceLayers(),
           };
         }
       }
     } catch {
       this.placeRegistry.clear();
+      this.educationRegistry.clear();
       this.lastDataBundle = null;
     }
     this.syncPlacesToRenderer();
+    this.syncEducationToRenderer();
   }
 
   private async runLoadCycle(): Promise<void> {
@@ -626,9 +778,11 @@ export class WorldRuntimeController {
         selectedEntityId: null,
         detailsOpen: false,
         placeSheetOpen: false,
+        educationSheetOpen: false,
       };
       if (isMapLibreRendererAdapter(this.renderer)) {
         this.renderer.clearSelectedPlaceMarker();
+        this.renderer.clearSelectedEducationMarker();
       }
       this.emit();
     } catch (err) {

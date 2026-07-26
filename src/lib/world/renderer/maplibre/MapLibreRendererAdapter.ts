@@ -5,6 +5,7 @@
  */
 
 import type { WorldCamera } from "@/src/lib/world/types";
+import type { WorldEducationMarker } from "@/src/lib/world/education";
 import type { WorldPlaceMarker } from "@/src/lib/world/places";
 import { PLACE_FOCUS_ZOOM } from "@/src/lib/world/places/placeUx";
 import type {
@@ -30,6 +31,7 @@ export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 export { MAPLIBRE_DEFAULT_CAMERA };
 
 export type PlacePressHandler = (placeId: string) => void;
+export type EducationPressHandler = (educationId: string) => void;
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -54,6 +56,14 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   clearSelectedPlaceMarker(): void;
   setPlacePressHandler(handler: PlacePressHandler | null): void;
   reportPlacePress(placeId: string): void;
+  /** Education markers — separate from places. */
+  setEducationMarkers(markers: WorldEducationMarker[]): void;
+  getEducationMarkers(): WorldEducationMarker[];
+  getSelectedEducationMarkerId(): string | null;
+  setSelectedEducationMarkerId(educationId: string | null): void;
+  clearSelectedEducationMarker(): void;
+  setEducationPressHandler(handler: EducationPressHandler | null): void;
+  reportEducationPress(educationId: string): void;
   /** Programmatic camera focus (selection / cluster expand). */
   focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
@@ -85,6 +95,9 @@ export function createMapLibreRendererAdapter(options?: {
   let placeMarkers: WorldPlaceMarker[] = [];
   let selectedPlaceMarkerId: string | null = null;
   let placePressHandler: PlacePressHandler | null = null;
+  let educationMarkers: WorldEducationMarker[] = [];
+  let selectedEducationMarkerId: string | null = null;
+  let educationPressHandler: EducationPressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -324,6 +337,7 @@ export function createMapLibreRendererAdapter(options?: {
       const marker = placeMarkers.find((m) => m.id === placeId);
       if (!marker) return;
       selectedPlaceMarkerId = placeId;
+      selectedEducationMarkerId = null;
       // Focus camera on selection for professional UX.
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
@@ -342,6 +356,70 @@ export function createMapLibreRendererAdapter(options?: {
         placePressHandler?.(placeId);
       } catch {
         // Fail-closed: place press must not crash the map surface.
+      }
+    },
+    setEducationMarkers(markers: WorldEducationMarker[]): void {
+      educationMarkers = Array.isArray(markers)
+        ? markers.map((m) => ({ ...m }))
+        : [];
+      if (
+        selectedEducationMarkerId &&
+        !educationMarkers.some((m) => m.id === selectedEducationMarkerId)
+      ) {
+        selectedEducationMarkerId = null;
+      }
+      bump();
+    },
+    getEducationMarkers(): WorldEducationMarker[] {
+      return educationMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedEducationMarkerId(): string | null {
+      return selectedEducationMarkerId;
+    },
+    setSelectedEducationMarkerId(educationId: string | null): void {
+      if (educationId == null) {
+        if (selectedEducationMarkerId == null) return;
+        selectedEducationMarkerId = null;
+        bump();
+        return;
+      }
+      if (!educationMarkers.some((m) => m.id === educationId)) return;
+      if (selectedEducationMarkerId === educationId) return;
+      selectedEducationMarkerId = educationId;
+      selectedPlaceMarkerId = null;
+      bump();
+    },
+    clearSelectedEducationMarker(): void {
+      if (selectedEducationMarkerId == null) return;
+      selectedEducationMarkerId = null;
+      bump();
+    },
+    setEducationPressHandler(handler: EducationPressHandler | null): void {
+      educationPressHandler = handler;
+    },
+    reportEducationPress(educationId: string): void {
+      if (!educationId || typeof educationId !== "string") return;
+      const marker = educationMarkers.find((m) => m.id === educationId);
+      if (!marker) return;
+      selectedEducationMarkerId = educationId;
+      selectedPlaceMarkerId = null;
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, PLACE_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
+      bump();
+      try {
+        educationPressHandler?.(educationId);
+      } catch {
+        // Fail-closed.
       }
     },
     focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean {

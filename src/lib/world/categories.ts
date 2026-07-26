@@ -10,7 +10,7 @@ export type WorldCategoryDefinition = {
 const CATEGORY_CATALOG: WorldCategoryDefinition[] = [
   { id: "users", label: "Users", supported: false },
   { id: "cities", label: "Cities", supported: true },
-  { id: "education", label: "Education", supported: false },
+  { id: "education", label: "Education", supported: true },
   { id: "games", label: "Games", supported: false },
   { id: "events", label: "Events", supported: false },
   { id: "businesses", label: "Businesses", supported: false },

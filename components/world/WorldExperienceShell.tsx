@@ -6,6 +6,7 @@ import {
   WorldLayerSelector,
 } from "@/components/world/WorldControls";
 import { WorldHeader } from "@/components/world/WorldHeader";
+import { WorldEducationBottomSheet } from "@/components/world/WorldEducationBottomSheet";
 import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
 import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
 import {
@@ -88,6 +89,11 @@ export function WorldExperienceShell({
         <WorldRendererHost adapter={renderer} />
         <WorldPlaceBottomSheet
           sheet={view.placeSheet}
+          bottomInset={bottomInset}
+          onClose={onCloseDetails}
+        />
+        <WorldEducationBottomSheet
+          sheet={view.educationSheet}
           bottomInset={bottomInset}
           onClose={onCloseDetails}
         />

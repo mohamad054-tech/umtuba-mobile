@@ -33,6 +33,7 @@ describe("world categories", () => {
     ]);
     expect(listWorldCategories()).toEqual([
       { id: "cities", label: "Cities", supported: true },
+      { id: "education", label: "Education", supported: true },
     ]);
     expect(parseWorldCategoryId("events")).toBe("events");
     expect(parseWorldCategoryId("planets")).toBeNull();

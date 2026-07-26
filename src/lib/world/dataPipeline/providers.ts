@@ -30,6 +30,58 @@ export const DEMO_COMMERCE_DATA_PROVIDER_ID =
 export const DEMO_EVENTS_DATA_PROVIDER_ID =
   "world-data-provider-events-demo" as const;
 
+/** Development-only education pins — not production campus data. */
+const DEMO_EDUCATION_RECORDS: WorldEducationRecord[] = [
+  {
+    id: "edu-university-jordan",
+    name: "University of Jordan",
+    educationType: "university",
+    cityName: "Amman",
+    latitude: 32.0153,
+    longitude: 35.8685,
+  },
+  {
+    id: "edu-cairo-university",
+    name: "Cairo University",
+    educationType: "university",
+    cityName: "Cairo",
+    latitude: 30.0274,
+    longitude: 31.2089,
+  },
+  {
+    id: "edu-ksu-riyadh",
+    name: "King Saud University",
+    educationType: "university",
+    cityName: "Riyadh",
+    latitude: 24.7236,
+    longitude: 46.6245,
+  },
+  {
+    id: "edu-amman-intl-school",
+    name: "Amman International School",
+    educationType: "school",
+    cityName: "Amman",
+    latitude: 31.962,
+    longitude: 35.877,
+  },
+  {
+    id: "edu-dubai-learning-hub",
+    name: "Dubai Learning Hub",
+    educationType: "learning_center",
+    cityName: "Dubai",
+    latitude: 25.1972,
+    longitude: 55.2744,
+  },
+  {
+    id: "edu-british-council-amman",
+    name: "British Council Amman",
+    educationType: "learning_center",
+    cityName: "Amman",
+    latitude: 31.953,
+    longitude: 35.91,
+  },
+];
+
 /** Adapt Places foundation provider into the unified data-pipeline contract. */
 export function adaptPlaceProvider(
   placeProvider: WorldPlaceProvider
@@ -84,7 +136,7 @@ export function createDemoEducationDataProvider(): WorldEducationDataProvider {
     kind: "education",
     isAvailable: () => true,
     async listEducation(): Promise<WorldEducationRecord[]> {
-      return [];
+      return DEMO_EDUCATION_RECORDS.map((row) => ({ ...row }));
     },
   };
 }

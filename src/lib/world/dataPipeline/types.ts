@@ -33,10 +33,19 @@ export type WorldUserRecord = {
   longitude: number | null;
 };
 
-/** Education nodes — empty until a real provider binds. */
+/** Education nodes — provider-backed learning places on the World map. */
+export type WorldEducationKind =
+  | "university"
+  | "school"
+  | "learning_center";
+
 export type WorldEducationRecord = {
   id: string;
-  title: string;
+  name: string;
+  /** @deprecated Prefer `name` — kept for pipeline compatibility during transition. */
+  title?: string;
+  educationType: WorldEducationKind;
+  cityName: string;
   latitude: number | null;
   longitude: number | null;
 };

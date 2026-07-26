@@ -63,6 +63,7 @@ export type WorldUiSelectionState = {
   /** Places UX sub-layers: Capitals / Major / Minor. */
   selectedPlaceLayers: import("@/src/lib/world/places").WorldPlaceLayerId[];
   placeSheetOpen: boolean;
+  educationSheetOpen: boolean;
 };
 
 export type WorldPlaceLayerControlState = {
@@ -88,6 +89,7 @@ export type WorldExperienceViewState = {
   filterPanelOpen: boolean;
   layersPanelOpen: boolean;
   placeSheet: import("@/src/lib/world/places").WorldPlaceSheetState | null;
+  educationSheet: import("@/src/lib/world/education").WorldEducationSheetState | null;
   /** Trusted entities from Runtime (e.g. Places). */
   entities: WorldEntity[];
   attribution: string;
@@ -151,6 +153,7 @@ export function createDefaultWorldUiSelection(): WorldUiSelectionState {
       "cities_minor",
     ],
     placeSheetOpen: false,
+    educationSheetOpen: false,
   };
 }
 
@@ -261,6 +264,7 @@ export function buildWorldExperienceViewState(options?: {
   entities?: WorldEntity[];
   placeLayers?: WorldPlaceLayerControlState[];
   placeSheet?: import("@/src/lib/world/places").WorldPlaceSheetState | null;
+  educationSheet?: import("@/src/lib/world/education").WorldEducationSheetState | null;
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -284,6 +288,7 @@ export function buildWorldExperienceViewState(options?: {
     ? options.placeLayers
     : [];
   const placeSheet = options?.placeSheet ?? null;
+  const educationSheet = options?.educationSheet ?? null;
 
   if (loading) {
     return {
@@ -304,6 +309,7 @@ export function buildWorldExperienceViewState(options?: {
       filterPanelOpen: false,
       layersPanelOpen: false,
       placeSheet: null,
+      educationSheet: null,
       entities: [],
       attribution,
       renderer: snapshot.renderer ?? rendererAdapter.capability,
@@ -326,6 +332,7 @@ export function buildWorldExperienceViewState(options?: {
       filterPanelOpen: false,
       layersPanelOpen: false,
       placeSheet: null,
+      educationSheet: null,
       entities: [],
       attribution,
       renderer: rendererAdapter.capability,
@@ -362,6 +369,7 @@ export function buildWorldExperienceViewState(options?: {
     filterPanelOpen: selection.filterPanelOpen,
     layersPanelOpen: selection.layersPanelOpen,
     placeSheet,
+    educationSheet,
     entities,
     attribution,
     renderer: snapshot.renderer ?? rendererAdapter.capability,

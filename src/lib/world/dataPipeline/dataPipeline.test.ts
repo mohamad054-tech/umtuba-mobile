@@ -45,7 +45,7 @@ describe("WorldDataRegistry", () => {
 });
 
 describe("WorldDataPipeline provider resolution", () => {
-  it("resolves demo places and empty sibling kinds", async () => {
+  it("resolves demo places and education with empty sibling kinds", async () => {
     const pipeline = createDefaultWorldDataPipeline();
     for (const kind of WORLD_DATA_KINDS) {
       expect(pipeline.hasProvider(kind)).toBe(true);
@@ -54,7 +54,7 @@ describe("WorldDataPipeline provider resolution", () => {
     const places = await pipeline.loadPlaces();
     expect(places.length).toBeGreaterThan(0);
     expect(await pipeline.loadUsers()).toEqual([]);
-    expect(await pipeline.loadEducation()).toEqual([]);
+    expect((await pipeline.loadEducation()).length).toBeGreaterThan(0);
     expect(await pipeline.loadGames()).toEqual([]);
     expect(await pipeline.loadCommerce()).toEqual([]);
     expect(await pipeline.loadEvents()).toEqual([]);
@@ -130,7 +130,7 @@ describe("WorldDataPipeline missing provider fail-closed", () => {
 });
 
 describe("Runtime integration via WorldDataPipeline", () => {
-  it("loads places only through the pipeline and keeps empty kinds", async () => {
+  it("loads places and education through the pipeline and keeps other kinds empty", async () => {
     const controller = createWorldRuntimeController({ yieldMs: 0 });
     await controller.start();
     expect(controller.getRuntimeState().placeProviderBound).toBe(true);
@@ -140,7 +140,7 @@ describe("Runtime integration via WorldDataPipeline", () => {
     expect(bundle).not.toBeNull();
     expect(bundle!.places.length).toBeGreaterThan(0);
     expect(bundle!.users).toEqual([]);
-    expect(bundle!.education).toEqual([]);
+    expect(bundle!.education.length).toBeGreaterThan(0);
     expect(bundle!.games).toEqual([]);
     expect(bundle!.commerce).toEqual([]);
     expect(bundle!.events).toEqual([]);

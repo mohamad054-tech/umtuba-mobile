@@ -167,6 +167,7 @@ export {
   type WorldDataProvider,
   type WorldDataRegistry,
   type WorldEducationDataProvider,
+  type WorldEducationKind,
   type WorldEducationRecord,
   type WorldEventsDataProvider,
   type WorldEventRecord,
@@ -176,6 +177,25 @@ export {
   type WorldUsersDataProvider,
   type WorldUserRecord,
 } from "@/src/lib/world/dataPipeline";
+export {
+  buildWorldEducationSheetState,
+  createEducationRegistry,
+  createWorldEducationLayerDefinition,
+  educationMarkersToGeoJSON,
+  formatWorldEducationKindLabel,
+  normalizeWorldEducationRecord,
+  WORLD_EDUCATION_LAYER_ID,
+  WORLD_EDUCATION_LAYER_REF,
+  worldEducationToEntities,
+  worldEducationToEntity,
+  worldEducationToMarker,
+  worldEducationToMarkers,
+  type EducationRegistry,
+  type WorldEducationMarker,
+  type WorldEducationSheetMetric,
+  type WorldEducationSheetMetricId,
+  type WorldEducationSheetState,
+} from "@/src/lib/world/education";
 export {
   createDemoPlaceProvider,
   createPlaceRegistry,

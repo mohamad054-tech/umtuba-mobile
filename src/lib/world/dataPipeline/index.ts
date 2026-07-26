@@ -6,6 +6,7 @@ export type {
   WorldDataProvider,
   WorldDataProviderBase,
   WorldEducationDataProvider,
+  WorldEducationKind,
   WorldEducationRecord,
   WorldEventsDataProvider,
   WorldEventRecord,
