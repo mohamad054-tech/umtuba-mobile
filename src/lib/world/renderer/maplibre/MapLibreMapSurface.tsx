@@ -9,7 +9,7 @@ import {
   MAPLIBRE_DEFAULT_CAMERA,
 } from "@/src/lib/world/renderer/maplibre/cameraNavigation";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
-import { MapLibrePlacesMarkers } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesMarkers";
+import { MapLibrePlacesLayer } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesLayer";
 
 type MapLibreMapSurfaceProps = {
   adapter: MapLibreRendererAdapter;
@@ -18,7 +18,6 @@ type MapLibreMapSurfaceProps = {
 /**
  * Internal MapLibre surface — must only be imported from the renderer package.
  * World UI must not import @maplibre/* directly.
- * Gestures (pan / pinch / double-tap zoom) update session camera via the adapter.
  */
 export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
   const [, bump] = useReducer((n: number) => n + 1, 0);
@@ -33,8 +32,6 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
     });
   }, [adapter]);
 
-  // Only re-apply Camera when adapter revision bumps (zoom/recenter/etc).
-  // Gesture-driven sync must not rewrite Camera props (avoids pan fight).
   const programmaticCamera = useMemo(() => {
     return adapter.getSessionCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the intentional trigger
@@ -42,14 +39,13 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
 
   const center = useMemo(
     () =>
-      [
-        programmaticCamera.longitude,
-        programmaticCamera.latitude,
-      ] as [number, number],
+      [programmaticCamera.longitude, programmaticCamera.latitude] as [
+        number,
+        number,
+      ],
     [programmaticCamera]
   );
 
-  // Fail-closed: no style from Map Source → no MapLibre Map mount.
   if (!styleUrl) {
     return <View style={styles.fill} />;
   }
@@ -80,7 +76,6 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
         onRegionIsChanging={(event) => {
           const payload = event.nativeEvent;
           if (!payload?.center || typeof payload.zoom !== "number") return;
-          // Persist mid-gesture so session camera stays current without fighting gestures.
           adapter.syncCameraFromMap({
             longitude: payload.center[0],
             latitude: payload.center[1],
@@ -112,7 +107,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
           duration={MAPLIBRE_CAMERA_ANIMATION_MS}
           easing="ease"
         />
-        <MapLibrePlacesMarkers adapter={adapter} />
+        <MapLibrePlacesLayer adapter={adapter} />
       </Map>
     </View>
   );

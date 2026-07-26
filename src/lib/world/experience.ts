@@ -60,6 +60,17 @@ export type WorldUiSelectionState = {
   detailsOpen: boolean;
   filterPanelOpen: boolean;
   layersPanelOpen: boolean;
+  /** Places UX sub-layers: Capitals / Major / Minor. */
+  selectedPlaceLayers: import("@/src/lib/world/places").WorldPlaceLayerId[];
+  placeSheetOpen: boolean;
+};
+
+export type WorldPlaceLayerControlState = {
+  layerId: import("@/src/lib/world/places").WorldPlaceLayerId;
+  label: string;
+  enabled: boolean;
+  active: boolean;
+  reason: string | null;
 };
 
 export type WorldExperienceViewState = {
@@ -69,13 +80,15 @@ export type WorldExperienceViewState = {
   rendererBound: boolean;
   foundationConfigured: boolean;
   layers: WorldLayerControlState[];
+  placeLayers: WorldPlaceLayerControlState[];
   cameraControls: WorldCameraControlState[];
   filter: WorldFilter;
   selectedEntityId: string | null;
   detailsOpen: boolean;
   filterPanelOpen: boolean;
   layersPanelOpen: boolean;
-  /** Always empty until a trusted World data source is bound. */
+  placeSheet: import("@/src/lib/world/places").WorldPlaceSheetState | null;
+  /** Trusted entities from Runtime (e.g. Places). */
   entities: WorldEntity[];
   attribution: string;
   renderer: WorldRendererCapability;
@@ -132,6 +145,12 @@ export function createDefaultWorldUiSelection(): WorldUiSelectionState {
     detailsOpen: false,
     filterPanelOpen: false,
     layersPanelOpen: false,
+    selectedPlaceLayers: [
+      "cities_capitals",
+      "cities_major",
+      "cities_minor",
+    ],
+    placeSheetOpen: false,
   };
 }
 
@@ -240,6 +259,8 @@ export function buildWorldExperienceViewState(options?: {
   rendererAdapter?: WorldRendererAdapter | null;
   /** Trusted entities from Runtime (e.g. Places) — never invented in UI. */
   entities?: WorldEntity[];
+  placeLayers?: WorldPlaceLayerControlState[];
+  placeSheet?: import("@/src/lib/world/places").WorldPlaceSheetState | null;
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -259,6 +280,10 @@ export function buildWorldExperienceViewState(options?: {
       ? options.attribution.trim()
       : WORLD_ATTRIBUTION_FALLBACK;
   const entities = Array.isArray(options?.entities) ? options.entities : [];
+  const placeLayers = Array.isArray(options?.placeLayers)
+    ? options.placeLayers
+    : [];
+  const placeSheet = options?.placeSheet ?? null;
 
   if (loading) {
     return {
@@ -268,6 +293,7 @@ export function buildWorldExperienceViewState(options?: {
       rendererBound,
       foundationConfigured,
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
+      placeLayers,
       cameraControls: buildWorldCameraControls(rendererBound),
       filter: applyWorldCategoryFilter(
         snapshot.filter ?? emptyWorldFilter(),
@@ -277,6 +303,7 @@ export function buildWorldExperienceViewState(options?: {
       detailsOpen: false,
       filterPanelOpen: false,
       layersPanelOpen: false,
+      placeSheet: null,
       entities: [],
       attribution,
       renderer: snapshot.renderer ?? rendererAdapter.capability,
@@ -291,12 +318,14 @@ export function buildWorldExperienceViewState(options?: {
       rendererBound,
       foundationConfigured,
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
+      placeLayers,
       cameraControls: buildWorldCameraControls(false),
       filter: emptyWorldFilter(),
       selectedEntityId: null,
       detailsOpen: false,
       filterPanelOpen: false,
       layersPanelOpen: false,
+      placeSheet: null,
       entities: [],
       attribution,
       renderer: rendererAdapter.capability,
@@ -322,6 +351,7 @@ export function buildWorldExperienceViewState(options?: {
     rendererBound,
     foundationConfigured,
     layers,
+    placeLayers,
     cameraControls: buildWorldCameraControls(rendererBound),
     filter: applyWorldCategoryFilter(
       snapshot.filter ?? emptyWorldFilter(),
@@ -331,6 +361,7 @@ export function buildWorldExperienceViewState(options?: {
     detailsOpen: selection.detailsOpen && selection.selectedEntityId != null,
     filterPanelOpen: selection.filterPanelOpen,
     layersPanelOpen: selection.layersPanelOpen,
+    placeSheet,
     entities,
     attribution,
     renderer: snapshot.renderer ?? rendererAdapter.capability,

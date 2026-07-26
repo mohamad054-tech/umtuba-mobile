@@ -4,7 +4,7 @@ export const DEMO_PLACE_PROVIDER_ID = "world-place-provider-demo" as const;
 
 /**
  * Development-only demo cities — not production geo data.
- * Small fixed set for MapLibre Places layer foundation.
+ * Includes Capitals / Major / Minor tiers for Places UX layers.
  */
 const DEMO_PLACES: WorldPlace[] = [
   {
@@ -16,6 +16,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: null,
     latitude: 31.7683,
     longitude: 35.2137,
+    cityTier: "capital",
   },
   {
     id: "place-amman",
@@ -26,6 +27,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: null,
     latitude: 31.9539,
     longitude: 35.9106,
+    cityTier: "capital",
   },
   {
     id: "place-dubai",
@@ -36,6 +38,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: "Dubai",
     latitude: 25.2048,
     longitude: 55.2708,
+    cityTier: "major",
   },
   {
     id: "place-riyadh",
@@ -46,6 +49,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: null,
     latitude: 24.7136,
     longitude: 46.6753,
+    cityTier: "capital",
   },
   {
     id: "place-cairo",
@@ -56,6 +60,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: null,
     latitude: 30.0444,
     longitude: 31.2357,
+    cityTier: "capital",
   },
   {
     id: "place-london",
@@ -66,6 +71,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: "England",
     latitude: 51.5074,
     longitude: -0.1278,
+    cityTier: "capital",
   },
   {
     id: "place-tokyo",
@@ -76,6 +82,7 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: null,
     latitude: 35.6762,
     longitude: 139.6503,
+    cityTier: "capital",
   },
   {
     id: "place-new-york",
@@ -86,6 +93,40 @@ const DEMO_PLACES: WorldPlace[] = [
     stateName: "New York",
     latitude: 40.7128,
     longitude: -74.006,
+    cityTier: "major",
+  },
+  {
+    id: "place-aqaba",
+    kind: "city",
+    name: "Aqaba",
+    countryName: "Jordan",
+    countryCode: "JO",
+    stateName: null,
+    latitude: 29.5319,
+    longitude: 35.0063,
+    cityTier: "minor",
+  },
+  {
+    id: "place-irbid",
+    kind: "city",
+    name: "Irbid",
+    countryName: "Jordan",
+    countryCode: "JO",
+    stateName: null,
+    latitude: 32.5556,
+    longitude: 35.85,
+    cityTier: "minor",
+  },
+  {
+    id: "place-alexandria",
+    kind: "city",
+    name: "Alexandria",
+    countryName: "Egypt",
+    countryCode: "EG",
+    stateName: null,
+    latitude: 31.2001,
+    longitude: 29.9187,
+    cityTier: "minor",
   },
 ];
 

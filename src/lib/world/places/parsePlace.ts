@@ -2,7 +2,11 @@ import {
   isValidLatitude,
   isValidLongitude,
 } from "@/src/lib/world/camera";
-import type { WorldPlace, WorldPlaceKind } from "@/src/lib/world/places/types";
+import type {
+  WorldPlace,
+  WorldPlaceCityTier,
+  WorldPlaceKind,
+} from "@/src/lib/world/places/types";
 
 const PLACE_KINDS = new Set<WorldPlaceKind>([
   "country",
@@ -10,6 +14,8 @@ const PLACE_KINDS = new Set<WorldPlaceKind>([
   "city",
   "capital",
 ]);
+
+const CITY_TIERS = new Set<WorldPlaceCityTier>(["capital", "major", "minor"]);
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -23,6 +29,12 @@ export function parseWorldPlaceKind(
   if (!raw || typeof raw !== "string") return null;
   const key = raw.trim().toLowerCase() as WorldPlaceKind;
   return PLACE_KINDS.has(key) ? key : null;
+}
+
+function parseCityTier(raw: unknown): WorldPlaceCityTier | null {
+  if (typeof raw !== "string") return null;
+  const key = raw.trim().toLowerCase() as WorldPlaceCityTier;
+  return CITY_TIERS.has(key) ? key : null;
 }
 
 /**
@@ -52,9 +64,11 @@ export function parseWorldPlace(raw: unknown): WorldPlace | null {
     name,
     countryName,
     countryCode: cleanText(r.countryCode) ?? cleanText(r.country_code),
-    stateName: cleanText(r.stateName) ?? cleanText(r.state) ?? cleanText(r.province),
+    stateName:
+      cleanText(r.stateName) ?? cleanText(r.state) ?? cleanText(r.province),
     latitude: r.latitude,
     longitude: r.longitude,
+    cityTier: parseCityTier(r.cityTier ?? r.city_tier ?? r.tier),
   };
 }
 

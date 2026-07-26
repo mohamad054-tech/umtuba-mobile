@@ -2,11 +2,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { WorldCameraControls } from "@/components/world/WorldCameraControls";
 import {
-  WorldDetailsPanel,
   WorldFilterPanel,
   WorldLayerSelector,
 } from "@/components/world/WorldControls";
 import { WorldHeader } from "@/components/world/WorldHeader";
+import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
+import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
 import {
   WorldAttribution,
   WorldRendererHost,
@@ -17,6 +18,7 @@ import type {
   WorldExperienceViewState,
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
+import type { WorldPlaceLayerId } from "@/src/lib/world/places";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
 
@@ -27,6 +29,7 @@ type WorldExperienceShellProps = {
   onRetry?: () => void;
   onCameraControl?: (id: WorldCameraControlId) => void;
   onToggleLayer?: (categoryId: WorldCategoryId, enabled: boolean) => void;
+  onTogglePlaceLayer?: (layerId: WorldPlaceLayerId) => void;
   onToggleFilters?: () => void;
   onToggleLayersPanel?: () => void;
   onClearFilters?: () => void;
@@ -50,6 +53,7 @@ export function WorldExperienceShell({
   onRetry,
   onCameraControl,
   onToggleLayer,
+  onTogglePlaceLayer,
   onToggleFilters,
   onToggleLayersPanel,
   onClearFilters,
@@ -73,10 +77,6 @@ export function WorldExperienceShell({
     );
   }
 
-  const selectedEntity = view.entities.find(
-    (entity) => entity.id === view.selectedEntityId
-  );
-
   return (
     <View
       style={[styles.root, { paddingBottom: Math.max(bottomInset, 8) }]}
@@ -86,6 +86,11 @@ export function WorldExperienceShell({
 
       <View style={styles.canvasWrap}>
         <WorldRendererHost adapter={renderer} />
+        <WorldPlaceBottomSheet
+          sheet={view.placeSheet}
+          bottomInset={bottomInset}
+          onClose={onCloseDetails}
+        />
       </View>
 
       <WorldCameraControls
@@ -129,7 +134,13 @@ export function WorldExperienceShell({
       </View>
 
       {view.layersPanelOpen ? (
-        <WorldLayerSelector layers={view.layers} onToggle={onToggleLayer} />
+        <>
+          <WorldPlaceLayerSelector
+            layers={view.placeLayers}
+            onToggle={onTogglePlaceLayer}
+          />
+          <WorldLayerSelector layers={view.layers} onToggle={onToggleLayer} />
+        </>
       ) : null}
 
       <WorldFilterPanel
@@ -138,13 +149,6 @@ export function WorldExperienceShell({
         layers={view.layers}
         onClose={onCloseFilters}
         onClear={onClearFilters}
-      />
-
-      <WorldDetailsPanel
-        open={view.detailsOpen}
-        entityTitle={selectedEntity?.title ?? null}
-        entitySubtitle={selectedEntity?.subtitle ?? null}
-        onClose={onCloseDetails}
       />
 
       <WorldAttribution text={view.attribution} />
@@ -161,6 +165,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     minHeight: 240,
+    position: "relative",
   },
   toolbar: {
     flexDirection: "row",

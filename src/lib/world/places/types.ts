@@ -4,6 +4,8 @@
 
 export type WorldPlaceKind = "country" | "state" | "city" | "capital";
 
+export type WorldPlaceCityTier = "capital" | "major" | "minor";
+
 /**
  * A named place with coordinates.
  * Coordinates are only present when a trusted provider supplies them.
@@ -17,6 +19,11 @@ export type WorldPlace = {
   stateName: string | null;
   latitude: number;
   longitude: number;
+  /**
+   * Display tier for Places UX layers (Capitals / Major / Minor).
+   * When omitted, derived from `kind` (capital → capital, city → major).
+   */
+  cityTier?: WorldPlaceCityTier | null;
 };
 
 /**

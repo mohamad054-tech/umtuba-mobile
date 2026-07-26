@@ -16,15 +16,21 @@ import {
   type WorldMapSource,
 } from "@/src/lib/world/mapSource";
 import {
+  buildPlaceLayerControls,
+  buildWorldPlaceSheetState,
   createDemoPlaceProvider,
   createPlaceRegistry,
   createUnboundPlaceProvider,
   createWorldPlacesLayerDefinition,
+  defaultSelectedPlaceLayers,
+  filterMarkersByPlaceLayers,
   isWorldPlaceProviderAvailable,
+  togglePlaceLayerSelection,
   WORLD_PLACES_LAYER_ID,
   worldPlacesToEntities,
   worldPlacesToMarkers,
   type PlaceRegistry,
+  type WorldPlaceLayerId,
   type WorldPlaceProvider,
 } from "@/src/lib/world/places";
 import {
@@ -197,6 +203,9 @@ export class WorldRuntimeController {
     return {
       ...this.selection,
       selectedCategories: [...this.selection.selectedCategories],
+      selectedPlaceLayers: [
+        ...(this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers()),
+      ],
     };
   }
 
@@ -216,6 +225,18 @@ export class WorldRuntimeController {
     const entities = placesBound
       ? worldPlacesToEntities(this.placeRegistry.listCities())
       : [];
+    const placeLayers = buildPlaceLayerControls(
+      this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers(),
+      placesBound
+    );
+    const selectedPlace =
+      this.selection.selectedEntityId != null
+        ? this.placeRegistry.get(this.selection.selectedEntityId)
+        : null;
+    const placeSheet = buildWorldPlaceSheetState(
+      selectedPlace,
+      this.selection.placeSheetOpen === true && selectedPlace != null
+    );
 
     const base = buildWorldExperienceViewState({
       snapshot,
@@ -225,6 +246,8 @@ export class WorldRuntimeController {
       rendererAdapter: this.renderer,
       attribution,
       entities,
+      placeLayers,
+      placeSheet,
     });
 
     if (runtime.phase === "preparing") {
@@ -332,18 +355,51 @@ export class WorldRuntimeController {
   /** Select a place/entity — used by renderer place press via Runtime handler. */
   selectPlace(placeId: string | null): boolean {
     if (!placeId) {
-      this.selection = selectWorldEntity(this.selection, null);
+      this.selection = {
+        ...selectWorldEntity(this.selection, null),
+        placeSheetOpen: false,
+      };
       if (isMapLibreRendererAdapter(this.renderer)) {
         this.renderer.clearSelectedPlaceMarker();
       }
+      this.syncPlacesToRenderer();
       this.emit();
       return true;
     }
     const place = this.placeRegistry.get(placeId);
     if (!place) return false;
-    this.selection = selectWorldEntity(this.selection, place.id);
+    this.selection = {
+      ...selectWorldEntity(this.selection, place.id),
+      placeSheetOpen: true,
+    };
+    this.syncPlacesToRenderer();
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      this.renderer.setSelectedPlaceMarkerId(place.id);
+      this.renderer.focusPlaceAt(place.latitude, place.longitude);
+    }
     this.emit();
     return true;
+  }
+
+  togglePlaceLayer(layerId: WorldPlaceLayerId): void {
+    const current =
+      this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers();
+    this.selection = {
+      ...this.selection,
+      selectedPlaceLayers: togglePlaceLayerSelection(current, layerId),
+    };
+    // Keep cities category in sync when any place sub-layer is active.
+    const anyActive = this.selection.selectedPlaceLayers.length > 0;
+    const cats = this.selection.selectedCategories.filter((c) => c !== "cities");
+    this.selection = {
+      ...this.selection,
+      selectedCategories: anyActive ? [...cats, "cities"] : cats,
+    };
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_PLACES_LAYER_ID, anyActive);
+    this.syncPlacesToRenderer();
+    this.emit();
   }
 
   toggleLayer(categoryId: WorldCategoryId, enabled: boolean): void {
@@ -357,6 +413,14 @@ export class WorldRuntimeController {
     };
     const visible = this.selection.selectedCategories.includes(categoryId);
     this.renderer.getLayerAdapter().setLayerVisibility(categoryId, visible);
+    if (categoryId === "cities") {
+      this.selection = {
+        ...this.selection,
+        selectedPlaceLayers: visible
+          ? defaultSelectedPlaceLayers()
+          : [],
+      };
+    }
     this.syncPlacesToRenderer();
     this.emit();
   }
@@ -381,6 +445,7 @@ export class WorldRuntimeController {
     this.selection = {
       ...this.selection,
       selectedCategories: [],
+      selectedPlaceLayers: [],
     };
     this.renderer.getLayerAdapter().setLayerVisibility(WORLD_PLACES_LAYER_ID, false);
     this.syncPlacesToRenderer();
@@ -400,10 +465,12 @@ export class WorldRuntimeController {
       ...this.selection,
       selectedEntityId: null,
       detailsOpen: false,
+      placeSheetOpen: false,
     };
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedPlaceMarker();
     }
+    this.syncPlacesToRenderer();
     this.emit();
   }
 
@@ -422,15 +489,18 @@ export class WorldRuntimeController {
       this.renderer.getLayerAdapter().setLayerVisibility(WORLD_PLACES_LAYER_ID, false);
       return;
     }
-    const citiesVisible = this.selection.selectedCategories.includes(
-      WORLD_PLACES_LAYER_ID
-    );
+    const activeLayers =
+      this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers();
+    const citiesVisible =
+      activeLayers.length > 0 &&
+      this.selection.selectedCategories.includes(WORLD_PLACES_LAYER_ID);
     this.renderer
       .getLayerAdapter()
       .setLayerVisibility(WORLD_PLACES_LAYER_ID, citiesVisible);
+    const allMarkers = worldPlacesToMarkers(this.placeRegistry.listCities());
     this.renderer.setPlaceMarkers(
       citiesVisible
-        ? worldPlacesToMarkers(this.placeRegistry.listCities())
+        ? filterMarkersByPlaceLayers(allMarkers, activeLayers)
         : []
     );
   }
@@ -447,7 +517,6 @@ export class WorldRuntimeController {
         Array.isArray(places) ? places : []
       );
       if (accepted > 0) {
-        // Default: Cities layer visible when places exist.
         if (!this.selection.selectedCategories.includes(WORLD_PLACES_LAYER_ID)) {
           this.selection = {
             ...this.selection,
@@ -455,6 +524,15 @@ export class WorldRuntimeController {
               ...this.selection.selectedCategories,
               WORLD_PLACES_LAYER_ID,
             ],
+            selectedPlaceLayers: defaultSelectedPlaceLayers(),
+          };
+        } else if (
+          !this.selection.selectedPlaceLayers ||
+          this.selection.selectedPlaceLayers.length === 0
+        ) {
+          this.selection = {
+            ...this.selection,
+            selectedPlaceLayers: defaultSelectedPlaceLayers(),
           };
         }
       }
@@ -528,6 +606,7 @@ export class WorldRuntimeController {
         ...this.selection,
         selectedEntityId: null,
         detailsOpen: false,
+        placeSheetOpen: false,
       };
       if (isMapLibreRendererAdapter(this.renderer)) {
         this.renderer.clearSelectedPlaceMarker();

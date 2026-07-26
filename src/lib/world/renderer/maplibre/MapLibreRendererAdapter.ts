@@ -6,6 +6,7 @@
 
 import type { WorldCamera } from "@/src/lib/world/types";
 import type { WorldPlaceMarker } from "@/src/lib/world/places";
+import { PLACE_FOCUS_ZOOM } from "@/src/lib/world/places/placeUx";
 import type {
   CameraAdapter,
   LayerAdapter,
@@ -49,9 +50,12 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   setPlaceMarkers(markers: WorldPlaceMarker[]): void;
   getPlaceMarkers(): WorldPlaceMarker[];
   getSelectedPlaceMarkerId(): string | null;
+  setSelectedPlaceMarkerId(placeId: string | null): void;
   clearSelectedPlaceMarker(): void;
   setPlacePressHandler(handler: PlacePressHandler | null): void;
   reportPlacePress(placeId: string): void;
+  /** Programmatic camera focus (selection / cluster expand). */
+  focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
 
 /**
@@ -295,6 +299,18 @@ export function createMapLibreRendererAdapter(options?: {
     getSelectedPlaceMarkerId(): string | null {
       return selectedPlaceMarkerId;
     },
+    setSelectedPlaceMarkerId(placeId: string | null): void {
+      if (placeId == null) {
+        if (selectedPlaceMarkerId == null) return;
+        selectedPlaceMarkerId = null;
+        bump();
+        return;
+      }
+      if (!placeMarkers.some((m) => m.id === placeId)) return;
+      if (selectedPlaceMarkerId === placeId) return;
+      selectedPlaceMarkerId = placeId;
+      bump();
+    },
     clearSelectedPlaceMarker(): void {
       if (selectedPlaceMarkerId == null) return;
       selectedPlaceMarkerId = null;
@@ -305,14 +321,46 @@ export function createMapLibreRendererAdapter(options?: {
     },
     reportPlacePress(placeId: string): void {
       if (!placeId || typeof placeId !== "string") return;
-      if (!placeMarkers.some((m) => m.id === placeId)) return;
+      const marker = placeMarkers.find((m) => m.id === placeId);
+      if (!marker) return;
       selectedPlaceMarkerId = placeId;
+      // Focus camera on selection for professional UX.
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, PLACE_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
       bump();
       try {
         placePressHandler?.(placeId);
       } catch {
         // Fail-closed: place press must not crash the map surface.
       }
+    },
+    focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean {
+      if (!canNavigate()) return false;
+      sessionCamera = normalizeMapLibreCamera(
+        {
+          latitude,
+          longitude,
+          zoom:
+            typeof zoom === "number"
+              ? zoom
+              : Math.max(sessionCamera.zoom, PLACE_FOCUS_ZOOM),
+          bearing: sessionCamera.bearing,
+          pitch: sessionCamera.pitch,
+        },
+        sessionCamera
+      );
+      bump();
+      return true;
     },
   };
 

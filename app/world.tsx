@@ -44,6 +44,9 @@ export default function WorldScreen() {
       onToggleLayer={(categoryId, enabled) => {
         controller.toggleLayer(categoryId, enabled);
       }}
+      onTogglePlaceLayer={(layerId) => {
+        controller.togglePlaceLayer(layerId);
+      }}
       onToggleFilters={() => {
         controller.toggleFiltersPanel();
       }}
