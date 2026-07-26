@@ -22,6 +22,7 @@ export {
   resolveDiscoverSearchPhase,
   type DiscoverSearchPhase,
 } from "@/src/lib/discover/search";
+export { shouldShowDiscoverWorldEntry } from "@/src/lib/discover/worldEntry";
 export type {
   DiscoverCardModel,
   DiscoverCategory,

@@ -11,8 +11,10 @@ import {
   mapDiscoverCategoryHref,
   mapDiscoverDestination,
   resolveDiscoverSearchPhase,
+  shouldShowDiscoverWorldEntry,
   watchPostDestination,
 } from "@/src/lib/discover";
+import { discoverWorldEntryHref } from "@/src/lib/world/experience";
 
 function video(partial: Partial<WatchVideo> & Pick<WatchVideo, "id">): WatchVideo {
   return {
@@ -134,6 +136,30 @@ describe("buildDiscoverHomeFromWatchVideos", () => {
     expect(home.latest.items).toHaveLength(2);
     expect(home.trending.status).toBe("ready");
     expect(home.trending.items[0]?.id).toBe("post-2");
+  });
+});
+
+describe("discover World entry independence", () => {
+  it("shows World entry regardless of home null/loaded/search", () => {
+    expect(shouldShowDiscoverWorldEntry({ home: null })).toBe(true);
+    expect(
+      shouldShowDiscoverWorldEntry({
+        home: buildDiscoverHomeFromWatchVideos([]),
+      })
+    ).toBe(true);
+    expect(
+      shouldShowDiscoverWorldEntry({
+        home: null,
+        searchPhase: "empty",
+      })
+    ).toBe(true);
+    expect(
+      shouldShowDiscoverWorldEntry({
+        home: null,
+        searchPhase: "results",
+      })
+    ).toBe(true);
+    expect(discoverWorldEntryHref()).toBe("/world");
   });
 });
 

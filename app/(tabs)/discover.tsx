@@ -24,6 +24,7 @@ import {
   loadDiscoverHome,
   mapDiscoverCategoryHref,
   resolveDiscoverSearchPhase,
+  shouldShowDiscoverWorldEntry,
   type DiscoverCardModel,
   type DiscoverCategory,
   type DiscoverHomeModel,
@@ -31,6 +32,31 @@ import {
 import { discoverWorldEntryHref } from "@/src/lib/world/experience";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
+
+function DiscoverMoreSection({
+  onWorldPress,
+  onPeoplePress,
+  onHashtagsPress,
+}: {
+  onWorldPress: () => void;
+  onPeoplePress: () => void;
+  onHashtagsPress: () => void;
+}) {
+  if (!shouldShowDiscoverWorldEntry()) return null;
+
+  return (
+    <>
+      <Text style={styles.sectionLabel} accessibilityRole="header">
+        More
+      </Text>
+      <View style={styles.placeholders}>
+        <DiscoverPlaceholderChip label="World" onPress={onWorldPress} />
+        <DiscoverPlaceholderChip label="People" onPress={onPeoplePress} />
+        <DiscoverPlaceholderChip label="Hashtags" onPress={onHashtagsPress} />
+      </View>
+    </>
+  );
+}
 
 export default function DiscoverScreen() {
   const router = useRouter();
@@ -123,36 +149,61 @@ export default function DiscoverScreen() {
     router.push(href as Href);
   };
 
+  const moreSection = (
+    <DiscoverMoreSection
+      onWorldPress={onWorldPress}
+      onPeoplePress={() =>
+        onPlaceholderPress("People", "People discovery is not available yet.")
+      }
+      onHashtagsPress={() =>
+        onPlaceholderPress(
+          "Hashtags",
+          "Hashtag discovery is not available yet."
+        )
+      }
+    />
+  );
+
   if (loading && !home) {
     return (
       <View
-        style={styles.center}
-        accessibilityLabel="Loading Discover"
-        accessibilityRole="progressbar"
+        style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}
       >
-        <ActivityIndicator color={colors.accentCyan} size="large" />
-        <Text style={styles.muted}>Loading Discover…</Text>
+        <View
+          style={styles.centerFlex}
+          accessibilityLabel="Loading Discover"
+          accessibilityRole="progressbar"
+        >
+          <ActivityIndicator color={colors.accentCyan} size="large" />
+          <Text style={styles.muted}>Loading Discover…</Text>
+        </View>
+        {moreSection}
       </View>
     );
   }
 
   if (error && !home) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyTitle} accessibilityRole="header">
-          {unavailable ? "Discover unavailable" : "Couldn’t load Discover"}
-        </Text>
-        <Text style={styles.muted} accessibilityRole="alert">
-          {error}
-        </Text>
-        <Pressable
-          style={styles.retryBtn}
-          onPress={() => void load()}
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading Discover"
-        >
-          <Text style={styles.retryText}>Retry</Text>
-        </Pressable>
+      <View
+        style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}
+      >
+        <View style={styles.centerFlex}>
+          <Text style={styles.emptyTitle} accessibilityRole="header">
+            {unavailable ? "Discover unavailable" : "Couldn’t load Discover"}
+          </Text>
+          <Text style={styles.muted} accessibilityRole="alert">
+            {error}
+          </Text>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => void load()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading Discover"
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        </View>
+        {moreSection}
       </View>
     );
   }
@@ -191,8 +242,11 @@ export default function DiscoverScreen() {
                 <DiscoverCard item={item} compact />
               </View>
             )}
+            ListFooterComponent={moreSection}
           />
-        ) : null}
+        ) : (
+          moreSection
+        )}
       </View>
     );
   }
@@ -240,36 +294,10 @@ export default function DiscoverScreen() {
             <DiscoverSection section={home.trending} />
             <DiscoverSection section={home.latest} />
             <DiscoverSection section={home.recommended} />
-
-            <Text style={styles.sectionLabel} accessibilityRole="header">
-              More
-            </Text>
-            <View style={styles.placeholders}>
-              <DiscoverPlaceholderChip
-                label="World"
-                onPress={onWorldPress}
-              />
-              <DiscoverPlaceholderChip
-                label="People"
-                onPress={() =>
-                  onPlaceholderPress(
-                    "People",
-                    "People discovery is not available yet."
-                  )
-                }
-              />
-              <DiscoverPlaceholderChip
-                label="Hashtags"
-                onPress={() =>
-                  onPlaceholderPress(
-                    "Hashtags",
-                    "Hashtag discovery is not available yet."
-                  )
-                }
-              />
-            </View>
           </>
         ) : null}
+
+        {moreSection}
       </ScrollView>
     </View>
   );
