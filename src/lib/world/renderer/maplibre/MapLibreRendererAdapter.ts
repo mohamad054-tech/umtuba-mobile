@@ -1,6 +1,7 @@
 /**
  * MapLibre World Renderer — display adapter only.
  * Style URLs must be injected by Runtime from WorldMapSource (never hardcoded here).
+ * Camera navigation is operational via CameraAdapter (Runtime-owned).
  */
 
 import type { WorldCamera } from "@/src/lib/world/types";
@@ -12,16 +13,19 @@ import type {
   WorldRendererAdapter,
 } from "@/src/lib/world/renderer/types";
 import { toFoundationRendererCapability } from "@/src/lib/world/renderer/types";
+import {
+  clampMapLibreZoom,
+  createDefaultMapLibreCamera,
+  getMapLibreZoomLimits,
+  MAPLIBRE_CAMERA_ZOOM_STEP,
+  MAPLIBRE_DEFAULT_CAMERA,
+  normalizeMapLibreCamera,
+  type MapLibreZoomLimits,
+} from "@/src/lib/world/renderer/maplibre/cameraNavigation";
 
 export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
-export const MAPLIBRE_DEFAULT_CAMERA: WorldCamera = {
-  latitude: 20,
-  longitude: 0,
-  zoom: 1.8,
-  bearing: 0,
-  pitch: 0,
-};
+export { MAPLIBRE_DEFAULT_CAMERA };
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -29,6 +33,9 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   getCameraRevision(): number;
   /** Bumps on each mount so Retry can remount the native Map surface. */
   getMountGeneration(): number;
+  /** Session camera (last center/zoom) — survives remount within the adapter. */
+  getSessionCamera(): WorldCamera;
+  getZoomLimits(): MapLibreZoomLimits;
   subscribe(listener: () => void): () => void;
   syncCameraFromMap(camera: Partial<WorldCamera>): void;
   reportStyleLoaded(): void;
@@ -36,11 +43,6 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   getLoadError(): string | null;
   isStyleReady(): boolean;
 };
-
-function clampZoom(zoom: number): number {
-  if (!Number.isFinite(zoom)) return MAPLIBRE_DEFAULT_CAMERA.zoom;
-  return Math.min(22, Math.max(0, zoom));
-}
 
 /**
  * @param options.styleUrl — Required style from WorldMapSource via Runtime.
@@ -53,9 +55,10 @@ export function createMapLibreRendererAdapter(options?: {
   const styleUrl =
     typeof options?.styleUrl === "string" ? options.styleUrl.trim() : "";
   const hasStyle = styleUrl.length > 0;
-  let camera: WorldCamera = {
-    ...(options?.initialCamera ?? MAPLIBRE_DEFAULT_CAMERA),
-  };
+  /** Session camera — last center/zoom for this World session. */
+  let sessionCamera: WorldCamera = normalizeMapLibreCamera(
+    options?.initialCamera ?? createDefaultMapLibreCamera()
+  );
   let mounted = false;
   let styleReady = false;
   let loadError: string | null = hasStyle
@@ -75,6 +78,9 @@ export function createMapLibreRendererAdapter(options?: {
     emit();
   };
 
+  const canNavigate = (): boolean =>
+    mounted && loadError == null && hasStyle;
+
   const caps: RendererCapabilities = {
     supports3D: true,
     supportsTerrain: false,
@@ -88,41 +94,53 @@ export function createMapLibreRendererAdapter(options?: {
   const cameraAdapter: CameraAdapter = {
     id: "world-camera-maplibre",
     getCamera(): WorldCamera | null {
-      return { ...camera };
+      if (!canNavigate()) return null;
+      return { ...sessionCamera };
     },
     setCamera(next: WorldCamera): boolean {
-      if (!mounted || loadError || !hasStyle) return false;
-      camera = {
-        latitude: next.latitude,
-        longitude: next.longitude,
-        zoom: clampZoom(next.zoom),
-        bearing: next.bearing,
-        pitch: next.pitch,
-      };
+      if (!canNavigate()) return false;
+      sessionCamera = normalizeMapLibreCamera(next, sessionCamera);
       bump();
       return true;
     },
     zoomIn(): boolean {
-      if (!mounted || loadError || !hasStyle) return false;
-      camera = { ...camera, zoom: clampZoom(camera.zoom + 1) };
+      if (!canNavigate()) return false;
+      const nextZoom = clampMapLibreZoom(
+        sessionCamera.zoom + MAPLIBRE_CAMERA_ZOOM_STEP
+      );
+      if (nextZoom === sessionCamera.zoom) return false;
+      sessionCamera = normalizeMapLibreCamera(
+        { ...sessionCamera, zoom: nextZoom },
+        sessionCamera
+      );
       bump();
       return true;
     },
     zoomOut(): boolean {
-      if (!mounted || loadError || !hasStyle) return false;
-      camera = { ...camera, zoom: clampZoom(camera.zoom - 1) };
+      if (!canNavigate()) return false;
+      const nextZoom = clampMapLibreZoom(
+        sessionCamera.zoom - MAPLIBRE_CAMERA_ZOOM_STEP
+      );
+      if (nextZoom === sessionCamera.zoom) return false;
+      sessionCamera = normalizeMapLibreCamera(
+        { ...sessionCamera, zoom: nextZoom },
+        sessionCamera
+      );
       bump();
       return true;
     },
     recenter(): boolean {
-      if (!mounted || loadError || !hasStyle) return false;
-      camera = { ...MAPLIBRE_DEFAULT_CAMERA };
+      if (!canNavigate()) return false;
+      sessionCamera = createDefaultMapLibreCamera();
       bump();
       return true;
     },
     resetOrientation(): boolean {
-      if (!mounted || loadError || !hasStyle) return false;
-      camera = { ...camera, bearing: 0, pitch: 0 };
+      if (!canNavigate()) return false;
+      sessionCamera = normalizeMapLibreCamera(
+        { ...sessionCamera, bearing: 0, pitch: 0 },
+        sessionCamera
+      );
       bump();
       return true;
     },
@@ -155,7 +173,6 @@ export function createMapLibreRendererAdapter(options?: {
 
   const projectionAdapter: ProjectionAdapter = {
     id: "world-projection-maplibre",
-    // Sync projection requires a live MapRef; fail-closed until engine wiring.
     project(): { x: number; y: number } | null {
       return null;
     },
@@ -191,6 +208,7 @@ export function createMapLibreRendererAdapter(options?: {
         loadError = "World map style is not configured.";
         styleReady = false;
       }
+      // Preserve sessionCamera across remount (Retry) — do not reset center/zoom.
       mountGeneration += 1;
       bump();
     },
@@ -209,6 +227,12 @@ export function createMapLibreRendererAdapter(options?: {
     getMountGeneration(): number {
       return mountGeneration;
     },
+    getSessionCamera(): WorldCamera {
+      return { ...sessionCamera };
+    },
+    getZoomLimits(): MapLibreZoomLimits {
+      return getMapLibreZoomLimits();
+    },
     subscribe(listener: () => void): () => void {
       listeners.add(listener);
       return () => {
@@ -216,27 +240,8 @@ export function createMapLibreRendererAdapter(options?: {
       };
     },
     syncCameraFromMap(partial: Partial<WorldCamera>): void {
-      camera = {
-        latitude:
-          typeof partial.latitude === "number"
-            ? partial.latitude
-            : camera.latitude,
-        longitude:
-          typeof partial.longitude === "number"
-            ? partial.longitude
-            : camera.longitude,
-        zoom:
-          typeof partial.zoom === "number"
-            ? clampZoom(partial.zoom)
-            : camera.zoom,
-        bearing:
-          typeof partial.bearing === "number"
-            ? partial.bearing
-            : camera.bearing,
-        pitch:
-          typeof partial.pitch === "number" ? partial.pitch : camera.pitch,
-      };
-      // Do not bump revision on map-driven sync to avoid camera feedback loops.
+      // Gesture-driven: persist last center/zoom for the session without bumping revision.
+      sessionCamera = normalizeMapLibreCamera(partial, sessionCamera);
       emit();
     },
     reportStyleLoaded(): void {

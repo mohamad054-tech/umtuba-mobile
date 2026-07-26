@@ -20,3 +20,13 @@ export {
   MAPLIBRE_RENDERER_ID,
   type MapLibreRendererAdapter,
 } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+export {
+  clampMapLibreZoom,
+  getMapLibreZoomLimits,
+  MAPLIBRE_CAMERA_ANIMATION_MS,
+  MAPLIBRE_CAMERA_MAX_ZOOM,
+  MAPLIBRE_CAMERA_MIN_ZOOM,
+  MAPLIBRE_CAMERA_ZOOM_STEP,
+  normalizeMapLibreCamera,
+  type MapLibreZoomLimits,
+} from "@/src/lib/world/renderer/maplibre/cameraNavigation";
