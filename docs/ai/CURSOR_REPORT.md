@@ -1,22 +1,19 @@
-# CURSOR_REPORT — World Education Layer V1
+# CURSOR_REPORT — World Search & Discovery V1
 
 ## Summary
 
-First real Education layer on UM World via World Data Pipeline. Demo Education Provider supplies University / School / Learning Center pins. Runtime loads via Pipeline → EducationRegistry → MapLibre education markers (violet, distinct from cyan cities). Independent layer toggle; bottom sheet shows name/type/city with null Programs/Students/Courses placeholders. Fail-closed when education provider missing.
+Unified World search via `WorldSearchService` over Pipeline-backed Places + Education registries. UI search box → Runtime.searchWorld / selectSearchResult → camera focus + Place or Education bottom sheet. Fail-closed for empty query / missing providers. No external search APIs.
 
 ## Exact files changed
 
 ### New
-- `src/lib/world/education/*` (types, registry, layer, sheet, tests)
-- `src/lib/world/renderer/maplibre/MapLibreEducationLayer.tsx`
-- `components/world/WorldEducationBottomSheet.tsx`
+- `src/lib/world/search/*`
+- `components/world/WorldSearchBar.tsx`
 
 ### Modified
-- `dataPipeline/types.ts`, `providers.ts`, `index.ts`, `dataPipeline.test.ts`
-- `runtime/controller.ts`
-- `experience.ts`, `categories.ts`, `world/index.ts`, `world.test.ts`
-- `MapLibreRendererAdapter.ts`, `MapLibreMapSurface.tsx`
-- `WorldExperienceShell.tsx`
+- `runtime/controller.ts` — searchWorld, selectSearchResult
+- `world/index.ts` — search exports
+- `WorldExperienceShell.tsx`, `app/world.tsx`
 
 ## Migrations created
 
@@ -24,21 +21,17 @@ None.
 
 ## Security review
 
-- Demo education only; no invented Programs/Students/Courses values.
 - UI does not import providers or MapLibre.
-- Missing education provider → empty markers; Cities continue.
+- No invented search hits; empty query → [].
+- Missing provider kinds omitted from dataset.
 
 ## Tests
 
-**265+/PASS** (full suite)
+**PASS** (full suite including search tests)
 
 ## TypeScript
 
 **PASS**
-
-## Build
-
-Not run.
 
 ## git diff --check
 
@@ -46,5 +39,4 @@ PASS.
 
 ## Open issues
 
-- Device APK recommended to verify violet education markers vs cyan cities.
-- Education markers are circle-based (violet) for MapLibre simplicity; not literal squares.
+- Search panel dismisses on clear/select; results capped (maxHeight ~220).

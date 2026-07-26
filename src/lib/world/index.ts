@@ -197,6 +197,15 @@ export {
   type WorldEducationSheetState,
 } from "@/src/lib/world/education";
 export {
+  buildWorldSearchDataset,
+  createWorldSearchService,
+  WORLD_SEARCH_DEFAULT_LIMIT,
+  type WorldSearchDataset,
+  type WorldSearchResult,
+  type WorldSearchService,
+  type WorldSearchSourceType,
+} from "@/src/lib/world/search";
+export {
   createDemoPlaceProvider,
   createPlaceRegistry,
   createUnboundPlaceProvider,

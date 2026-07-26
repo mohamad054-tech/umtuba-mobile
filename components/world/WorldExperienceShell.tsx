@@ -13,6 +13,7 @@ import {
   WorldAttribution,
   WorldRendererHost,
 } from "@/components/world/WorldRendererHost";
+import { WorldSearchBar } from "@/components/world/WorldSearchBar";
 import { WorldStatePanel } from "@/components/world/WorldStatePanel";
 import type {
   WorldCameraControlId,
@@ -20,6 +21,7 @@ import type {
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
 import type { WorldPlaceLayerId } from "@/src/lib/world/places";
+import type { WorldSearchResult } from "@/src/lib/world/search";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import { colors } from "@/src/theme/colors";
 
@@ -27,6 +29,10 @@ type WorldExperienceShellProps = {
   view: WorldExperienceViewState;
   renderer: WorldRendererAdapter;
   bottomInset?: number;
+  searchQuery?: string;
+  searchResults?: WorldSearchResult[];
+  onSearchQueryChange?: (query: string) => void;
+  onSelectSearchResult?: (result: WorldSearchResult) => void;
   onRetry?: () => void;
   onCameraControl?: (id: WorldCameraControlId) => void;
   onToggleLayer?: (categoryId: WorldCategoryId, enabled: boolean) => void;
@@ -51,6 +57,10 @@ export function WorldExperienceShell({
   view,
   renderer,
   bottomInset = 0,
+  searchQuery = "",
+  searchResults = [],
+  onSearchQueryChange,
+  onSelectSearchResult,
   onRetry,
   onCameraControl,
   onToggleLayer,
@@ -84,6 +94,16 @@ export function WorldExperienceShell({
       accessibilityLabel="World experience"
     >
       <WorldHeader subtitle={view.message} statusLabel={statusLabel(view)} />
+
+      {onSearchQueryChange && onSelectSearchResult ? (
+        <WorldSearchBar
+          query={searchQuery}
+          results={searchResults}
+          onChangeQuery={onSearchQueryChange}
+          onSelectResult={onSelectSearchResult}
+          onClear={() => onSearchQueryChange("")}
+        />
+      ) : null}
 
       <View style={styles.canvasWrap}>
         <WorldRendererHost adapter={renderer} />

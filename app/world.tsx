@@ -1,8 +1,10 @@
+import { useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WorldExperienceShell } from "@/components/world/WorldExperienceShell";
 import { useWorldRuntime } from "@/src/lib/world/runtime";
+import type { WorldSearchResult } from "@/src/lib/world/search";
 import { colors } from "@/src/theme/colors";
 
 /**
@@ -14,6 +16,12 @@ export default function WorldScreen() {
   const { controller } = useWorldRuntime();
   const view = controller.getViewState();
   const renderer = controller.getRendererAdapter();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const searchResults = useMemo(
+    () => controller.searchWorld(searchQuery),
+    [controller, searchQuery, view.entities]
+  );
 
   if (view.phase === "preparing" || view.phase === "loading") {
     return (
@@ -35,6 +43,13 @@ export default function WorldScreen() {
       view={view}
       renderer={renderer}
       bottomInset={insets.bottom}
+      searchQuery={searchQuery}
+      searchResults={searchResults}
+      onSearchQueryChange={setSearchQuery}
+      onSelectSearchResult={(result: WorldSearchResult) => {
+        const ok = controller.selectSearchResult(result);
+        if (ok) setSearchQuery("");
+      }}
       onRetry={() => {
         void controller.retry();
       }}

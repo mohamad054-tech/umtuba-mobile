@@ -45,6 +45,12 @@ import {
   type WorldPlaceLayerId,
 } from "@/src/lib/world/places";
 import {
+  buildWorldSearchDataset,
+  createWorldSearchService,
+  type WorldSearchResult,
+  type WorldSearchService,
+} from "@/src/lib/world/search";
+import {
   createMapLibreRendererAdapter,
   createNullRendererAdapter,
   isMapLibreRendererAdapter,
@@ -149,6 +155,7 @@ function mergeEducationIntoSnapshot(
 export class WorldRuntimeController {
   private dataSource: WorldDataSource;
   private dataPipeline: WorldDataPipeline;
+  private searchService: WorldSearchService;
   private lastDataBundle: WorldDataBundle | null = null;
   private renderer: WorldRendererAdapter;
   private mapSourceRegistry: MapSourceRegistry;
@@ -183,6 +190,7 @@ export class WorldRuntimeController {
     }
     this.placeRegistry = createPlaceRegistry();
     this.educationRegistry = createEducationRegistry();
+    this.searchService = createWorldSearchService();
     const placeProviderBound = this.dataPipeline.isKindAvailable("places");
 
     if (options?.renderer !== undefined) {
@@ -244,6 +252,36 @@ export class WorldRuntimeController {
   /** Education registry (Runtime / tests). */
   getEducationRegistry(): EducationRegistry {
     return this.educationRegistry;
+  }
+
+  /**
+   * Unified World search — UI → Runtime → WorldSearchService over Pipeline-backed registries.
+   * Empty query → []. Missing provider kinds are omitted (fail-closed).
+   */
+  searchWorld(query: string): WorldSearchResult[] {
+    try {
+      const dataset = buildWorldSearchDataset({
+        placesAvailable: this.dataPipeline.isKindAvailable("places"),
+        educationAvailable: this.dataPipeline.isKindAvailable("education"),
+        places: this.placeRegistry.list(),
+        education: this.educationRegistry.list(),
+      });
+      return this.searchService.search(query, dataset);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Select a search hit — routes to Place or Education sheet + camera focus. */
+  selectSearchResult(result: WorldSearchResult): boolean {
+    if (!result || typeof result.id !== "string") return false;
+    if (result.sourceType === "places") {
+      return this.selectPlace(result.id);
+    }
+    if (result.sourceType === "education") {
+      return this.selectEducation(result.id);
+    }
+    return false;
   }
 
   getSelection(): WorldUiSelectionState {
