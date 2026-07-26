@@ -4,6 +4,7 @@
  */
 
 import type { MapSourceRegistry } from "@/src/lib/world/mapSource";
+import type { WorldPlaceProvider } from "@/src/lib/world/places";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import type { WorldFoundationSnapshot } from "@/src/lib/world/types";
 
@@ -24,6 +25,8 @@ export type WorldRuntimeState = {
   rendererBound: boolean;
   /** True when Runtime resolved an available WorldMapSource. */
   mapSourceBound: boolean;
+  /** True when Runtime has an available WorldPlaceProvider. */
+  placeProviderBound: boolean;
 };
 
 /**
@@ -51,4 +54,9 @@ export type WorldRuntimeControllerOptions = {
   mapSourceRegistry?: MapSourceRegistry | null;
   /** Preferred map source id; falls back to first available. */
   mapSourceId?: string | null;
+  /**
+   * Place provider — Runtime loads places into PlaceRegistry.
+   * Defaults to DemoPlaceProvider (dev). Pass `null` for unbound fail-closed.
+   */
+  placeProvider?: WorldPlaceProvider | null;
 };

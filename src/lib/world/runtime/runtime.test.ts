@@ -109,7 +109,8 @@ describe("world runtime controller", () => {
     await controller.retry();
     expect(controller.getRuntimeState().attempt).toBe(before + 1);
     expect(controller.getRuntimeState().phase).toBe("unavailable");
-    expect(controller.getViewState().entities).toEqual([]);
+    // Demo places remain available even when World data source is unbound.
+    expect(controller.getViewState().entities.length).toBeGreaterThan(0);
   });
 
   it("reaches ready with a mock bound data source", async () => {

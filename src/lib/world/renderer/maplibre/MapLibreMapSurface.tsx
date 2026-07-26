@@ -9,6 +9,7 @@ import {
   MAPLIBRE_DEFAULT_CAMERA,
 } from "@/src/lib/world/renderer/maplibre/cameraNavigation";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import { MapLibrePlacesMarkers } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesMarkers";
 
 type MapLibreMapSurfaceProps = {
   adapter: MapLibreRendererAdapter;
@@ -111,6 +112,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
           duration={MAPLIBRE_CAMERA_ANIMATION_MS}
           easing="ease"
         />
+        <MapLibrePlacesMarkers adapter={adapter} />
       </Map>
     </View>
   );

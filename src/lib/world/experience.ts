@@ -238,6 +238,8 @@ export function buildWorldExperienceViewState(options?: {
   errorMessage?: string | null;
   attribution?: string | null;
   rendererAdapter?: WorldRendererAdapter | null;
+  /** Trusted entities from Runtime (e.g. Places) — never invented in UI. */
+  entities?: WorldEntity[];
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -256,6 +258,7 @@ export function buildWorldExperienceViewState(options?: {
     options.attribution.trim().length > 0
       ? options.attribution.trim()
       : WORLD_ATTRIBUTION_FALLBACK;
+  const entities = Array.isArray(options?.entities) ? options.entities : [];
 
   if (loading) {
     return {
@@ -328,7 +331,7 @@ export function buildWorldExperienceViewState(options?: {
     detailsOpen: selection.detailsOpen && selection.selectedEntityId != null,
     filterPanelOpen: selection.filterPanelOpen,
     layersPanelOpen: selection.layersPanelOpen,
-    entities: [],
+    entities,
     attribution,
     renderer: snapshot.renderer ?? rendererAdapter.capability,
   };

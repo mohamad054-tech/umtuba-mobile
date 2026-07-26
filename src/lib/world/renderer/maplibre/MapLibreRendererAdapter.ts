@@ -5,6 +5,7 @@
  */
 
 import type { WorldCamera } from "@/src/lib/world/types";
+import type { WorldPlaceMarker } from "@/src/lib/world/places";
 import type {
   CameraAdapter,
   LayerAdapter,
@@ -27,6 +28,8 @@ export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
 export { MAPLIBRE_DEFAULT_CAMERA };
 
+export type PlacePressHandler = (placeId: string) => void;
+
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
   getStyleUrl(): string;
@@ -42,6 +45,13 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   reportStyleFailed(message?: string): void;
   getLoadError(): string | null;
   isStyleReady(): boolean;
+  /** Places markers from Runtime — empty when provider unbound. */
+  setPlaceMarkers(markers: WorldPlaceMarker[]): void;
+  getPlaceMarkers(): WorldPlaceMarker[];
+  getSelectedPlaceMarkerId(): string | null;
+  clearSelectedPlaceMarker(): void;
+  setPlacePressHandler(handler: PlacePressHandler | null): void;
+  reportPlacePress(placeId: string): void;
 };
 
 /**
@@ -68,6 +78,9 @@ export function createMapLibreRendererAdapter(options?: {
   let mountGeneration = 0;
   const listeners = new Set<() => void>();
   const layerVisibility = new Map<string, boolean>();
+  let placeMarkers: WorldPlaceMarker[] = [];
+  let selectedPlaceMarkerId: string | null = null;
+  let placePressHandler: PlacePressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -263,6 +276,43 @@ export function createMapLibreRendererAdapter(options?: {
     },
     isStyleReady(): boolean {
       return styleReady && loadError == null && hasStyle;
+    },
+    setPlaceMarkers(markers: WorldPlaceMarker[]): void {
+      placeMarkers = Array.isArray(markers)
+        ? markers.map((m) => ({ ...m }))
+        : [];
+      if (
+        selectedPlaceMarkerId &&
+        !placeMarkers.some((m) => m.id === selectedPlaceMarkerId)
+      ) {
+        selectedPlaceMarkerId = null;
+      }
+      bump();
+    },
+    getPlaceMarkers(): WorldPlaceMarker[] {
+      return placeMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedPlaceMarkerId(): string | null {
+      return selectedPlaceMarkerId;
+    },
+    clearSelectedPlaceMarker(): void {
+      if (selectedPlaceMarkerId == null) return;
+      selectedPlaceMarkerId = null;
+      bump();
+    },
+    setPlacePressHandler(handler: PlacePressHandler | null): void {
+      placePressHandler = handler;
+    },
+    reportPlacePress(placeId: string): void {
+      if (!placeId || typeof placeId !== "string") return;
+      if (!placeMarkers.some((m) => m.id === placeId)) return;
+      selectedPlaceMarkerId = placeId;
+      bump();
+      try {
+        placePressHandler?.(placeId);
+      } catch {
+        // Fail-closed: place press must not crash the map surface.
+      }
     },
   };
 

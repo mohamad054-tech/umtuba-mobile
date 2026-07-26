@@ -31,7 +31,9 @@ describe("world categories", () => {
       "ai",
       "future",
     ]);
-    expect(listWorldCategories()).toEqual([]);
+    expect(listWorldCategories()).toEqual([
+      { id: "cities", label: "Cities", supported: true },
+    ]);
     expect(parseWorldCategoryId("events")).toBe("events");
     expect(parseWorldCategoryId("planets")).toBeNull();
   });
