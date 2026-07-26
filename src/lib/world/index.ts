@@ -90,8 +90,6 @@ export {
   isMapLibreRendererAdapter,
   isRendererAdapterBound,
   MAPLIBRE_DEFAULT_CAMERA,
-  MAPLIBRE_DEV_ATTRIBUTION,
-  MAPLIBRE_DEV_STYLE_URL,
   MAPLIBRE_RENDERER_ID,
   toFoundationRendererCapability,
   type CameraAdapter,
@@ -101,6 +99,24 @@ export {
   type RendererCapabilities,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
+export {
+  createDefaultMapSourceRegistry,
+  createDemoMapSource,
+  createMapSourceRegistry,
+  createSatelliteMapSource,
+  createStreetMapSource,
+  createTerrainMapSource,
+  DEMO_MAP_ATTRIBUTION,
+  DEMO_MAP_SOURCE_ID,
+  DEMO_MAP_STYLE_URL,
+  isWorldMapSourceAvailable,
+  SATELLITE_MAP_SOURCE_ID,
+  STREET_MAP_SOURCE_ID,
+  TERRAIN_MAP_SOURCE_ID,
+  type MapSourceRegistry,
+  type WorldMapSource,
+  type WorldMapSourceKind,
+} from "@/src/lib/world/mapSource";
 export type {
   WorldAction,
   WorldActionKind,

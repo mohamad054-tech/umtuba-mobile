@@ -43,6 +43,11 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
     [programmaticCamera]
   );
 
+  // Fail-closed: no style from Map Source → no MapLibre Map mount.
+  if (!styleUrl) {
+    return <View style={styles.fill} />;
+  }
+
   return (
     <View style={styles.fill} pointerEvents="box-none">
       <Map

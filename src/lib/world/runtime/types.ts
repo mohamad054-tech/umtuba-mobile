@@ -3,6 +3,7 @@
  * No map SDK / tiles / vendor engines.
  */
 
+import type { MapSourceRegistry } from "@/src/lib/world/mapSource";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import type { WorldFoundationSnapshot } from "@/src/lib/world/types";
 
@@ -21,6 +22,8 @@ export type WorldRuntimeState = {
   attempt: number;
   dataSourceBound: boolean;
   rendererBound: boolean;
+  /** True when Runtime resolved an available WorldMapSource. */
+  mapSourceBound: boolean;
 };
 
 /**
@@ -40,7 +43,12 @@ export type WorldRuntimeControllerOptions = {
   yieldMs?: number;
   /**
    * Renderer adapter — Runtime is the only owner.
-   * Defaults to NullRendererAdapter (fail-closed, no map SDK).
+   * When omitted, Runtime builds MapLibre from the resolved Map Source (or null).
+   * Pass `null` / explicit adapter to override (tests).
    */
   renderer?: WorldRendererAdapter | null;
+  /** Map source registry — Runtime selects exclusively from this. */
+  mapSourceRegistry?: MapSourceRegistry | null;
+  /** Preferred map source id; falls back to first available. */
+  mapSourceId?: string | null;
 };

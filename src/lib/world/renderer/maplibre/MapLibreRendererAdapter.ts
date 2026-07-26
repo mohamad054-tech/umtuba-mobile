@@ -1,6 +1,6 @@
 /**
- * MapLibre World Renderer — adapter logic only (no UI imports of MapLibre).
- * Dev tiles: MapLibre demotiles (not a paid/production provider).
+ * MapLibre World Renderer — display adapter only.
+ * Style URLs must be injected by Runtime from WorldMapSource (never hardcoded here).
  */
 
 import type { WorldCamera } from "@/src/lib/world/types";
@@ -15,14 +15,6 @@ import { toFoundationRendererCapability } from "@/src/lib/world/renderer/types";
 
 export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
-/** Development-only style — MapLibre demo tiles (no API key / paid vendor). */
-export const MAPLIBRE_DEV_STYLE_URL =
-  "https://demotiles.maplibre.org/style.json";
-
-/** Development-only attribution — not a production tile vendor claim. */
-export const MAPLIBRE_DEV_ATTRIBUTION =
-  "MapLibre demotiles (development only). Not a production map source.";
-
 export const MAPLIBRE_DEFAULT_CAMERA: WorldCamera = {
   latitude: 20,
   longitude: 0,
@@ -32,6 +24,7 @@ export const MAPLIBRE_DEFAULT_CAMERA: WorldCamera = {
 };
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
+  /** Bound style URL from Runtime / Map Source — empty when unbound. */
   getStyleUrl(): string;
   getCameraRevision(): number;
   /** Bumps on each mount so Retry can remount the native Map surface. */
@@ -49,17 +42,25 @@ function clampZoom(zoom: number): number {
   return Math.min(22, Math.max(0, zoom));
 }
 
+/**
+ * @param options.styleUrl — Required style from WorldMapSource via Runtime.
+ *   Empty / missing URL → fail-closed unbound adapter (no hardcoded demotiles).
+ */
 export function createMapLibreRendererAdapter(options?: {
-  styleUrl?: string;
+  styleUrl?: string | null;
   initialCamera?: WorldCamera;
 }): MapLibreRendererAdapter {
-  const styleUrl = options?.styleUrl?.trim() || MAPLIBRE_DEV_STYLE_URL;
+  const styleUrl =
+    typeof options?.styleUrl === "string" ? options.styleUrl.trim() : "";
+  const hasStyle = styleUrl.length > 0;
   let camera: WorldCamera = {
     ...(options?.initialCamera ?? MAPLIBRE_DEFAULT_CAMERA),
   };
   let mounted = false;
   let styleReady = false;
-  let loadError: string | null = null;
+  let loadError: string | null = hasStyle
+    ? null
+    : "World map style is not configured.";
   let revision = 0;
   let mountGeneration = 0;
   const listeners = new Set<() => void>();
@@ -90,7 +91,7 @@ export function createMapLibreRendererAdapter(options?: {
       return { ...camera };
     },
     setCamera(next: WorldCamera): boolean {
-      if (!mounted || loadError) return false;
+      if (!mounted || loadError || !hasStyle) return false;
       camera = {
         latitude: next.latitude,
         longitude: next.longitude,
@@ -102,25 +103,25 @@ export function createMapLibreRendererAdapter(options?: {
       return true;
     },
     zoomIn(): boolean {
-      if (!mounted || loadError) return false;
+      if (!mounted || loadError || !hasStyle) return false;
       camera = { ...camera, zoom: clampZoom(camera.zoom + 1) };
       bump();
       return true;
     },
     zoomOut(): boolean {
-      if (!mounted || loadError) return false;
+      if (!mounted || loadError || !hasStyle) return false;
       camera = { ...camera, zoom: clampZoom(camera.zoom - 1) };
       bump();
       return true;
     },
     recenter(): boolean {
-      if (!mounted || loadError) return false;
+      if (!mounted || loadError || !hasStyle) return false;
       camera = { ...MAPLIBRE_DEFAULT_CAMERA };
       bump();
       return true;
     },
     resetOrientation(): boolean {
-      if (!mounted || loadError) return false;
+      if (!mounted || loadError || !hasStyle) return false;
       camera = { ...camera, bearing: 0, pitch: 0 };
       bump();
       return true;
@@ -142,7 +143,7 @@ export function createMapLibreRendererAdapter(options?: {
       ];
     },
     setLayerVisibility(layerId: string, visible: boolean): boolean {
-      if (!mounted) return false;
+      if (!mounted || !hasStyle) return false;
       layerVisibility.set(layerId, visible);
       bump();
       return true;
@@ -167,7 +168,7 @@ export function createMapLibreRendererAdapter(options?: {
     id: MAPLIBRE_RENDERER_ID,
     family: "vector_2d",
     isBound(): boolean {
-      return mounted && loadError == null;
+      return mounted && loadError == null && hasStyle;
     },
     getCapabilities(): RendererCapabilities {
       return { ...caps };
@@ -183,8 +184,13 @@ export function createMapLibreRendererAdapter(options?: {
     },
     mount(): void {
       mounted = true;
-      loadError = null;
-      styleReady = false;
+      if (hasStyle) {
+        loadError = null;
+        styleReady = false;
+      } else {
+        loadError = "World map style is not configured.";
+        styleReady = false;
+      }
       mountGeneration += 1;
       bump();
     },
@@ -234,6 +240,7 @@ export function createMapLibreRendererAdapter(options?: {
       emit();
     },
     reportStyleLoaded(): void {
+      if (!hasStyle) return;
       styleReady = true;
       loadError = null;
       bump();
@@ -250,7 +257,7 @@ export function createMapLibreRendererAdapter(options?: {
       return loadError;
     },
     isStyleReady(): boolean {
-      return styleReady && loadError == null;
+      return styleReady && loadError == null && hasStyle;
     },
   };
 

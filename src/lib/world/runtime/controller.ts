@@ -9,10 +9,15 @@ import {
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world/types";
 import {
+  createDefaultMapSourceRegistry,
+  isWorldMapSourceAvailable,
+  type MapSourceRegistry,
+  type WorldMapSource,
+} from "@/src/lib/world/mapSource";
+import {
+  createMapLibreRendererAdapter,
   createNullRendererAdapter,
-  isMapLibreRendererAdapter,
   isRendererAdapterBound,
-  MAPLIBRE_DEV_ATTRIBUTION,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
 import {
@@ -33,8 +38,12 @@ import type {
 
 type Listener = () => void;
 
+const MAP_SOURCE_UNAVAILABLE_MESSAGE =
+  "World map source is unavailable. No map imagery can be shown.";
+
 function initialRuntimeState(
-  rendererBound: boolean
+  rendererBound: boolean,
+  mapSourceBound: boolean
 ): WorldRuntimeState {
   return {
     phase: "preparing",
@@ -44,16 +53,40 @@ function initialRuntimeState(
     attempt: 0,
     dataSourceBound: false,
     rendererBound,
+    mapSourceBound,
   };
+}
+
+function resolveMapSource(
+  registry: MapSourceRegistry,
+  preferredId?: string | null
+): WorldMapSource | null {
+  return registry.resolve(preferredId);
+}
+
+function createRendererFromMapSource(
+  mapSource: WorldMapSource | null
+): WorldRendererAdapter {
+  if (!isWorldMapSourceAvailable(mapSource)) {
+    return createNullRendererAdapter();
+  }
+  const styleUrl = mapSource!.getStyleUrl();
+  if (!styleUrl) {
+    return createNullRendererAdapter();
+  }
+  return createMapLibreRendererAdapter({ styleUrl });
 }
 
 /**
  * Sole runtime authority for UM World operational state + renderer slot.
  * Screen UI must consume this controller — not invent parallel load/render logic.
+ * Map style selection is exclusively via MapSourceRegistry → WorldMapSource.
  */
 export class WorldRuntimeController {
   private dataSource: WorldDataSource;
   private renderer: WorldRendererAdapter;
+  private mapSourceRegistry: MapSourceRegistry;
+  private mapSource: WorldMapSource | null;
   private yieldMs: number;
   private state: WorldRuntimeState;
   private selection: WorldUiSelectionState = createDefaultWorldUiSelection();
@@ -63,12 +96,28 @@ export class WorldRuntimeController {
 
   constructor(options?: WorldRuntimeControllerOptions) {
     this.dataSource = options?.dataSource ?? createUnboundWorldDataSource();
-    this.renderer = options?.renderer ?? createNullRendererAdapter();
+    this.mapSourceRegistry =
+      options?.mapSourceRegistry ?? createDefaultMapSourceRegistry();
+    this.mapSource = resolveMapSource(
+      this.mapSourceRegistry,
+      options?.mapSourceId
+    );
+    const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
+
+    if (options?.renderer !== undefined) {
+      this.renderer = options.renderer ?? createNullRendererAdapter();
+    } else {
+      this.renderer = createRendererFromMapSource(this.mapSource);
+    }
+
     this.yieldMs =
       typeof options?.yieldMs === "number" && options.yieldMs >= 0
         ? options.yieldMs
         : WORLD_RETRY_YIELD_MS;
-    this.state = initialRuntimeState(isRendererAdapterBound(this.renderer));
+    this.state = initialRuntimeState(
+      isRendererAdapterBound(this.renderer),
+      mapSourceBound
+    );
   }
 
   subscribe(listener: Listener): () => void {
@@ -87,6 +136,14 @@ export class WorldRuntimeController {
     return this.renderer;
   }
 
+  /**
+   * Selected map source (Runtime / tests).
+   * UI must not consume this — attribution flows through view state only.
+   */
+  getSelectedMapSource(): WorldMapSource | null {
+    return this.mapSource;
+  }
+
   getSelection(): WorldUiSelectionState {
     return {
       ...this.selection,
@@ -98,9 +155,10 @@ export class WorldRuntimeController {
     const runtime = this.state;
     const loading =
       runtime.phase === "preparing" || runtime.phase === "loading";
-    const attribution = isMapLibreRendererAdapter(this.renderer)
-      ? MAPLIBRE_DEV_ATTRIBUTION
-      : undefined;
+    const attribution =
+      isWorldMapSourceAvailable(this.mapSource) && this.mapSource
+        ? this.mapSource.getAttribution()
+        : undefined;
     const base = buildWorldExperienceViewState({
       snapshot: runtime.snapshot ?? undefined,
       selection: this.selection,
@@ -148,7 +206,9 @@ export class WorldRuntimeController {
       phase: "unavailable",
       message: worldRuntimePhaseMessage(
         "unavailable",
-        runtime.snapshot?.message ?? base.message
+        !runtime.mapSourceBound
+          ? MAP_SOURCE_UNAVAILABLE_MESSAGE
+          : (runtime.snapshot?.message ?? base.message)
       ),
       rendererBound: runtime.rendererBound,
     };
@@ -271,6 +331,7 @@ export class WorldRuntimeController {
   private async runLoadCycle(): Promise<void> {
     const token = ++this.runToken;
     const dataBound = isWorldDataSourceBound(this.dataSource);
+    const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
     const rendererBound = isRendererAdapterBound(this.renderer);
 
     this.state = {
@@ -281,6 +342,7 @@ export class WorldRuntimeController {
       attempt: this.state.attempt + 1,
       dataSourceBound: dataBound,
       rendererBound,
+      mapSourceBound,
     };
     this.emit();
 
@@ -295,20 +357,31 @@ export class WorldRuntimeController {
       const snapshot = await this.dataSource.loadSnapshot();
       if (token !== this.runToken) return;
 
-      const phase = resolveWorldRuntimePhaseAfterLoad({
+      let phase = resolveWorldRuntimePhaseAfterLoad({
         dataSourceBound: dataBound,
         snapshot,
         errorMessage: null,
       });
 
+      // Fail-closed: missing map source forces unavailable (no crash).
+      if (!mapSourceBound && phase !== "error") {
+        phase = "unavailable";
+      }
+
       this.state = {
         phase,
-        message: worldRuntimePhaseMessage(phase, snapshot.message),
+        message: worldRuntimePhaseMessage(
+          phase,
+          !mapSourceBound && phase === "unavailable"
+            ? MAP_SOURCE_UNAVAILABLE_MESSAGE
+            : snapshot.message
+        ),
         errorMessage: phase === "error" ? snapshot.message : null,
         snapshot,
         attempt: this.state.attempt,
         dataSourceBound: dataBound,
         rendererBound,
+        mapSourceBound,
       };
       this.selection = {
         ...this.selection,
@@ -328,12 +401,14 @@ export class WorldRuntimeController {
         attempt: this.state.attempt,
         dataSourceBound: dataBound,
         rendererBound,
+        mapSourceBound,
       };
       this.emit();
     }
   }
 
   private setPhase(phase: WorldRuntimePhase): void {
+    const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
     if (!canTransitionWorldRuntimePhase(this.state.phase, phase)) {
       if (phase === "loading" || phase === "preparing") {
         this.state = {
@@ -342,6 +417,7 @@ export class WorldRuntimeController {
           message: worldRuntimePhaseMessage(phase),
           errorMessage: null,
           rendererBound: isRendererAdapterBound(this.renderer),
+          mapSourceBound,
         };
         this.emit();
       }
@@ -353,6 +429,7 @@ export class WorldRuntimeController {
       message: worldRuntimePhaseMessage(phase),
       errorMessage: phase === "error" ? this.state.errorMessage : null,
       rendererBound: isRendererAdapterBound(this.renderer),
+      mapSourceBound,
     };
     this.emit();
   }

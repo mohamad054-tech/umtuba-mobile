@@ -5,10 +5,10 @@ import {
   createNullRendererAdapter,
   createWorldRuntimeController,
   defaultNullRendererCapabilities,
+  DEMO_MAP_STYLE_URL,
   isMapLibreRendererAdapter,
   isRendererAdapterBound,
   MAPLIBRE_DEFAULT_CAMERA,
-  MAPLIBRE_DEV_STYLE_URL,
   MAPLIBRE_RENDERER_ID,
 } from "@/src/lib/world";
 
@@ -44,12 +44,14 @@ describe("null renderer adapter", () => {
 });
 
 describe("MapLibre renderer adapter", () => {
-  it("implements World/Camera/Layer/Projection adapters with demotiles", () => {
-    const adapter = createMapLibreRendererAdapter();
+  it("implements World/Camera/Layer/Projection adapters with injected style", () => {
+    const adapter = createMapLibreRendererAdapter({
+      styleUrl: DEMO_MAP_STYLE_URL,
+    });
     expect(adapter.id).toBe(MAPLIBRE_RENDERER_ID);
     expect(adapter.family).toBe("vector_2d");
     expect(isMapLibreRendererAdapter(adapter)).toBe(true);
-    expect(adapter.getStyleUrl()).toBe(MAPLIBRE_DEV_STYLE_URL);
+    expect(adapter.getStyleUrl()).toBe(DEMO_MAP_STYLE_URL);
     expect(adapter.isBound()).toBe(false);
 
     adapter.mount();
@@ -80,8 +82,19 @@ describe("MapLibre renderer adapter", () => {
     expect(adapter.getProjectionAdapter().unproject(0, 0)).toBeNull();
   });
 
-  it("fail-closes on style failure and remounts cleanly for Retry", () => {
+  it("fail-closes without a style URL (no hardcoded tiles)", () => {
     const adapter = createMapLibreRendererAdapter();
+    expect(adapter.getStyleUrl()).toBe("");
+    adapter.mount();
+    expect(adapter.isBound()).toBe(false);
+    expect(adapter.getCameraAdapter().zoomIn()).toBe(false);
+    expect(adapter.getLoadError()).toMatch(/not configured/i);
+  });
+
+  it("fail-closes on style failure and remounts cleanly for Retry", () => {
+    const adapter = createMapLibreRendererAdapter({
+      styleUrl: DEMO_MAP_STYLE_URL,
+    });
     adapter.mount();
     expect(adapter.getMountGeneration()).toBe(1);
     adapter.reportStyleLoaded();
@@ -100,7 +113,9 @@ describe("MapLibre renderer adapter", () => {
   });
 
   it("syncs pan from map without bumping camera revision", () => {
-    const adapter = createMapLibreRendererAdapter();
+    const adapter = createMapLibreRendererAdapter({
+      styleUrl: DEMO_MAP_STYLE_URL,
+    });
     adapter.mount();
     const before = adapter.getCameraRevision();
     adapter.syncCameraFromMap({
@@ -113,11 +128,20 @@ describe("MapLibre renderer adapter", () => {
     expect(adapter.getCameraAdapter().getCamera()?.longitude).toBe(20);
     expect(adapter.getCameraAdapter().getCamera()?.zoom).toBe(4);
   });
+
+  it("does not embed demotiles URL in adapter module defaults", () => {
+    const adapter = createMapLibreRendererAdapter({ styleUrl: "https://example.test/style.json" });
+    expect(adapter.getStyleUrl()).toBe("https://example.test/style.json");
+    expect(adapter.getStyleUrl()).not.toContain("demotiles.maplibre.org");
+  });
 });
 
 describe("runtime + renderer integration", () => {
-  it("owns null renderer by default and keeps UI path fail-closed", async () => {
-    const controller = createWorldRuntimeController({ yieldMs: 0 });
+  it("owns null renderer when explicitly overridden", async () => {
+    const controller = createWorldRuntimeController({
+      yieldMs: 0,
+      renderer: null,
+    });
     const renderer = controller.getRendererAdapter();
     expect(renderer.isBound()).toBe(false);
     expect(controller.getRuntimeState().rendererBound).toBe(false);
@@ -131,7 +155,10 @@ describe("runtime + renderer integration", () => {
   });
 
   it("routes layer toggles through renderer layer adapter without crash", async () => {
-    const controller = createWorldRuntimeController({ yieldMs: 0 });
+    const controller = createWorldRuntimeController({
+      yieldMs: 0,
+      renderer: createNullRendererAdapter(),
+    });
     await controller.start();
     expect(() => controller.toggleLayer("events", true)).not.toThrow();
     expect(
@@ -139,16 +166,15 @@ describe("runtime + renderer integration", () => {
     ).toBe(false);
   });
 
-  it("binds MapLibre through Runtime and routes camera + retry", async () => {
-    const renderer = createMapLibreRendererAdapter();
-    const controller = createWorldRuntimeController({
-      yieldMs: 0,
-      renderer,
-    });
+  it("binds MapLibre through Runtime Map Source and routes camera + retry", async () => {
+    const controller = createWorldRuntimeController({ yieldMs: 0 });
+    const renderer = controller.getRendererAdapter();
+    expect(isMapLibreRendererAdapter(renderer)).toBe(true);
 
     await controller.start();
     expect(controller.getRendererAdapter().id).toBe(MAPLIBRE_RENDERER_ID);
     expect(controller.getRuntimeState().rendererBound).toBe(true);
+    expect(controller.getRuntimeState().mapSourceBound).toBe(true);
     expect(controller.getViewState().rendererBound).toBe(true);
     expect(controller.getViewState().cameraControls.every((c) => c.enabled)).toBe(
       true
@@ -167,6 +193,9 @@ describe("runtime + renderer integration", () => {
     controller.toggleLayer("games", true);
     expect(renderer.getLayerAdapter().isLayerVisible("games")).toBe(true);
 
+    if (!isMapLibreRendererAdapter(renderer)) {
+      throw new Error("expected MapLibre adapter");
+    }
     renderer.reportStyleFailed("offline");
     expect(controller.getRendererAdapter().isBound()).toBe(false);
     const genBefore = renderer.getMountGeneration();

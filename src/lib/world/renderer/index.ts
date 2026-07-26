@@ -17,8 +17,6 @@ export {
   createMapLibreRendererAdapter,
   isMapLibreRendererAdapter,
   MAPLIBRE_DEFAULT_CAMERA,
-  MAPLIBRE_DEV_ATTRIBUTION,
-  MAPLIBRE_DEV_STYLE_URL,
   MAPLIBRE_RENDERER_ID,
   type MapLibreRendererAdapter,
 } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
