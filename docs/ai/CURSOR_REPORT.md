@@ -1,27 +1,33 @@
-# Cursor Report — World Roads & Buildings Experience V1
+# Cursor Report — World Visual Quality & Performance V1
 
 ## Summary
 
-Added Roads & Buildings experience for World maps via Runtime preferences + MapSource-owned vector overlays + MapLibre renderer layers. UI never imports MapLibre. Preferences (`roadDetail`, `buildings`) apply without Runtime reinitialization and preserve camera, selection, layers, and map source. Fail-closed: unsupported 3D falls back to 2D/off; missing overlays stay Mercator basemap-only.
+Improved World map visual quality and rendering performance while preserving Runtime → Data Pipeline → Renderer → Map Sources architecture. Split camera vs surface revisions to reduce unnecessary re-renders; added GeoJSON layer caching, tier-based label visibility, cluster opacity transitions, zoom-bucket roads/buildings loading, light loading overlay on map source switch, memory cleanup on unmount, and in-process runtime metrics (no external telemetry). Fail-closed: overlay/source failures do not crash; camera and layer selection persist.
 
 ## Exact files changed
 
 ### New
-- `components/world/WorldMapExperienceSelector.tsx`
-- `src/lib/world/mapSource/experience.ts`
-- `src/lib/world/renderer/maplibre/roadsBuildings.ts`
-- `src/lib/world/renderer/maplibre/MapLibreRoadsBuildingsLayer.tsx`
-- `src/lib/world/renderer/roadsBuildings.test.ts`
+- `src/lib/world/runtime/metrics.ts`
+- `src/lib/world/renderer/maplibre/visualQuality.ts`
+- `src/lib/world/renderer/maplibre/layerCache.ts`
+- `src/lib/world/renderer/maplibre/useMapLibreLayerState.ts`
+- `src/lib/world/renderer/visualQuality.test.ts`
 
 ### Modified
-- `app/world.tsx`
-- `components/world/WorldExperienceShell.tsx`
-- `src/lib/world/experience.ts`
-- `src/lib/world/index.ts`
-- `src/lib/world/mapSource/{types,index,street,satellite,terrain}MapSource.ts`
-- `src/lib/world/renderer/{index,types via caps,null N/A,renderer.test}.ts`
-- `src/lib/world/renderer/maplibre/{MapLibreRendererAdapter,MapLibreMapSurface}.ts(x)`
+- `components/world/WorldRendererHost.tsx`
+- `src/lib/world/renderer/index.ts`
+- `src/lib/world/renderer/maplibre/MapLibreRendererAdapter.ts`
+- `src/lib/world/renderer/maplibre/MapLibreMapSurface.tsx`
+- `src/lib/world/renderer/maplibre/MapLibrePlacesLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreUsersLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreGamesLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreCommerceLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreEventsLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreEducationLayer.tsx`
+- `src/lib/world/renderer/maplibre/MapLibreRoadsBuildingsLayer.tsx`
+- `src/lib/world/renderer/maplibre/cameraNavigation.test.ts`
 - `src/lib/world/runtime/controller.ts`
+- `src/lib/world/runtime/index.ts`
 - `docs/ai/CURSOR_REPORT.md`
 
 ## Migrations created
@@ -31,12 +37,12 @@ None.
 ## Security review
 
 - No secrets / `.env` changes.
-- Tile URLs remain owned by MapSource (`experience.ts`); renderer receives overlay specs from Runtime only.
+- Metrics are in-process only; no external telemetry.
 - UI has no MapLibre / tile URL access.
 
 ## Tests
 
-**347/347 PASS** (42 files)
+**360/360 PASS** (43 files)
 
 ## TypeScript
 
@@ -56,6 +62,5 @@ Not run (EAS Build deferred per task note).
 
 ## Open issues
 
-- Streets basemap (OpenFreeMap liberty) already paints roads/2D buildings; road-detail overlays apply primarily on Satellite/Terrain; 3D buildings use vector overlay when supported.
-- Terrain source intentionally disables buildings 3D (`supportsBuildings3d: false`).
-- 3D is never auto-enabled (default buildings preference is `2d`).
+- Other marker setters (`setEducationMarkers`, etc.) still copy arrays without `assignMarkerArray` dedup (only `setPlaceMarkers` optimized).
+- `useMapLibreLayerState` hook created; layers mostly use `surfaceRevision` prop directly from MapSurface.

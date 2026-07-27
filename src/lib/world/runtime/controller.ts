@@ -110,6 +110,11 @@ import {
   isWorldDataSourceBound,
 } from "@/src/lib/world/runtime/dataSource";
 import {
+  createWorldRuntimeMetrics,
+  type WorldRuntimeMetrics,
+  type WorldRuntimeMetricsSnapshot,
+} from "@/src/lib/world/runtime/metrics";
+import {
   canTransitionWorldRuntimePhase,
   resolveWorldRuntimePhaseAfterLoad,
   worldRuntimePhaseMessage,
@@ -290,6 +295,7 @@ export class WorldRuntimeController {
   private roadDetail: WorldRoadDetail = "medium";
   private buildingsMode: WorldBuildingsMode = "2d";
   private rendererUnsubscribe: (() => void) | null = null;
+  private metrics: WorldRuntimeMetrics = createWorldRuntimeMetrics();
 
   constructor(options?: WorldRuntimeControllerOptions) {
     this.dataSource = options?.dataSource ?? createUnboundWorldDataSource();
@@ -373,6 +379,11 @@ export class WorldRuntimeController {
   /** Last pipeline bundle (Runtime / tests). */
   getLastDataBundle(): WorldDataBundle | null {
     return this.lastDataBundle;
+  }
+
+  /** In-process performance metrics — never sent externally. */
+  getMetrics(): WorldRuntimeMetricsSnapshot {
+    return this.metrics.getSnapshot();
   }
 
   /** Education registry (Runtime / tests). */
@@ -692,6 +703,7 @@ export class WorldRuntimeController {
 
   /** Begin runtime — preparing → loading → terminal phase. */
   async start(): Promise<void> {
+    this.metrics.markStart("world_open_ms");
     if (!this.started) {
       this.started = true;
       this.setPhase("preparing");
@@ -708,8 +720,10 @@ export class WorldRuntimeController {
       this.bindEventPressHandler();
       this.bindRendererSubscription();
       this.applyProjectionPolicy();
+      this.applyMapExperiencePolicy();
     }
     await this.runLoadCycle();
+    this.metrics.markEnd("world_open_ms");
   }
 
   /** Retry must go through the controller only. */
@@ -869,6 +883,8 @@ export class WorldRuntimeController {
 
     this.mapSource = next!;
 
+    this.metrics.markStart("map_source_switch_ms");
+
     if (isMapLibreRendererAdapter(this.renderer)) {
       if (!this.renderer.setStyleUrl(styleUrl)) {
         const demo = this.mapSourceRegistry.resolve(DEMO_MAP_SOURCE_ID);
@@ -897,6 +913,7 @@ export class WorldRuntimeController {
     }
 
     this.applyProjectionPolicy();
+    this.metrics.markEnd("map_source_switch_ms");
     this.state = {
       ...this.state,
       mapSourceBound: isWorldMapSourceAvailable(this.mapSource),
@@ -1558,12 +1575,14 @@ export class WorldRuntimeController {
   }
 
   private syncAllLayersToRenderer(): void {
+    const started = Date.now();
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
     this.syncUsersToRenderer();
     this.syncGamesToRenderer();
     this.syncCommerceToRenderer();
     this.syncEventsToRenderer();
+    this.metrics.record("layer_update_ms", Date.now() - started);
   }
 
   private async loadPlaces(): Promise<void> {

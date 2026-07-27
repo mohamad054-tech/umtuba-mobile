@@ -7,24 +7,34 @@ import {
 } from "@/src/lib/world/events";
 import { PLACE_LABEL_MIN_ZOOM } from "@/src/lib/world/places";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import {
+  getCachedGeoJSON,
+  markersSignature,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
 import { colors } from "@/src/theme/colors";
 
 type MapLibreEventsLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
 
-export function MapLibreEventsLayer({ adapter }: MapLibreEventsLayerProps) {
+const EVENTS_CACHE_KEY = "world-events";
+
+export function MapLibreEventsLayer({
+  adapter,
+  surfaceRevision,
+}: MapLibreEventsLayerProps) {
   const markers = adapter.getEventMarkers();
   const selectedId = adapter.getSelectedEventMarkerId();
-  const zoom = adapter.getSessionCamera().zoom;
 
-  const geojson = useMemo(
-    () => eventsMarkersToGeoJSON(markers, selectedId),
-    [markers, selectedId]
-  );
+  const geojson = useMemo(() => {
+    const signature = markersSignature(markers, selectedId);
+    return getCachedGeoJSON(EVENTS_CACHE_KEY, signature, () =>
+      eventsMarkersToGeoJSON(markers, selectedId)
+    );
+  }, [markers, selectedId, surfaceRevision]);
 
   if (markers.length === 0) return null;
-  const showLabels = zoom >= PLACE_LABEL_MIN_ZOOM;
 
   return (
     <GeoJSONSource
@@ -60,7 +70,15 @@ export function MapLibreEventsLayer({ adapter }: MapLibreEventsLayerProps) {
         filter={["has", "point_count"]}
         style={{
           circleColor: colors.accentAmber,
-          circleOpacity: 0.85,
+          circleOpacity: [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            EVENT_CLUSTER_MAX_ZOOM - 0.4,
+            0.7,
+            EVENT_CLUSTER_MAX_ZOOM + 0.5,
+            0.88,
+          ],
           circleStrokeWidth: 2,
           circleStrokeColor: colors.text,
           circleRadius: ["step", ["get", "point_count"], 14, 5, 17, 10, 20],
@@ -108,25 +126,24 @@ export function MapLibreEventsLayer({ adapter }: MapLibreEventsLayerProps) {
           ],
         }}
       />
-      {showLabels ? (
-        <Layer
-          id="world-events-labels"
-          type="symbol"
-          minzoom={PLACE_LABEL_MIN_ZOOM}
-          filter={["!", ["has", "point_count"]]}
-          style={{
-            textField: ["get", "eventName"],
-            textSize: 11,
-            textColor: colors.text,
-            textHaloColor: colors.bg,
-            textHaloWidth: 1.2,
-            textOffset: [0, 1.35],
-            textAnchor: "top",
-            textMaxWidth: 10,
-            textOptional: true,
-          }}
-        />
-      ) : null}
+      <Layer
+        id="world-events-labels"
+        type="symbol"
+        minzoom={PLACE_LABEL_MIN_ZOOM}
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          textField: ["get", "eventName"],
+          textSize: 11,
+          textColor: colors.text,
+          textHaloColor: colors.bg,
+          textHaloWidth: 1.2,
+          textOffset: [0, 1.35],
+          textAnchor: "top",
+          textMaxWidth: 10,
+          textOptional: true,
+          textAllowOverlap: false,
+        }}
+      />
     </GeoJSONSource>
   );
 }

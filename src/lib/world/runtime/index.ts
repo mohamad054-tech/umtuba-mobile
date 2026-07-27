@@ -15,6 +15,12 @@ export {
   worldRuntimePhaseMessage,
 } from "@/src/lib/world/runtime/stateMachine";
 export {
+  createWorldRuntimeMetrics,
+  type WorldRuntimeMetricKey,
+  type WorldRuntimeMetrics,
+  type WorldRuntimeMetricsSnapshot,
+} from "@/src/lib/world/runtime/metrics";
+export {
   createWorldRuntimeController,
   WorldRuntimeController,
 } from "@/src/lib/world/runtime/controller";

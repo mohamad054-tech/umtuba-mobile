@@ -27,7 +27,8 @@ type MapLibreMapSurfaceProps = {
  */
 export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
   const [, bump] = useReducer((n: number) => n + 1, 0);
-  const revision = adapter.getCameraRevision();
+  const cameraRevision = adapter.getCameraRevision();
+  const surfaceRevision = adapter.getSurfaceRevision();
   const mountGeneration = adapter.getMountGeneration();
   const styleUrl = adapter.getStyleUrl();
   const limits = adapter.getZoomLimits();
@@ -40,8 +41,8 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
 
   const programmaticCamera = useMemo(() => {
     return adapter.getSessionCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- revision is the intentional trigger
-  }, [adapter, revision, mountGeneration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cameraRevision triggers programmatic moves only
+  }, [adapter, cameraRevision, mountGeneration]);
 
   const center = useMemo(
     () =>
@@ -103,7 +104,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
         }}
       >
         <Camera
-          key={`cam-${revision}-${mountGeneration}`}
+          key={`cam-${cameraRevision}-${mountGeneration}`}
           center={center}
           zoom={programmaticCamera.zoom ?? MAPLIBRE_DEFAULT_CAMERA.zoom}
           bearing={programmaticCamera.bearing ?? 0}
@@ -113,13 +114,34 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
           duration={MAPLIBRE_CAMERA_ANIMATION_MS}
           easing="ease"
         />
-        <MapLibreRoadsBuildingsLayer adapter={adapter} />
-        <MapLibrePlacesLayer adapter={adapter} />
-        <MapLibreEducationLayer adapter={adapter} />
-        <MapLibreUsersLayer adapter={adapter} />
-        <MapLibreGamesLayer adapter={adapter} />
-        <MapLibreCommerceLayer adapter={adapter} />
-        <MapLibreEventsLayer adapter={adapter} />
+        <MapLibreRoadsBuildingsLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibrePlacesLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibreEducationLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibreUsersLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibreGamesLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibreCommerceLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
+        <MapLibreEventsLayer
+          adapter={adapter}
+          surfaceRevision={surfaceRevision}
+        />
       </Map>
     </View>
   );

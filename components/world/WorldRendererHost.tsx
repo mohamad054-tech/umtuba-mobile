@@ -1,5 +1,5 @@
 import { useEffect, useReducer, type ReactElement } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import {
   WORLD_ATTRIBUTION_FALLBACK,
@@ -42,8 +42,16 @@ export function WorldRendererHost({
   const styleReady = isMapLibreRendererAdapter(adapter)
     ? adapter.isStyleReady()
     : false;
+  const styleTransitioning = isMapLibreRendererAdapter(adapter)
+    ? adapter.isStyleTransitioning()
+    : false;
   const caps = adapter.getCapabilities();
-  const showOverlay = !bound || Boolean(loadError) || (bound && !styleReady);
+  const showOverlay =
+    !bound ||
+    Boolean(loadError) ||
+    (bound && !styleReady && !styleTransitioning);
+  const showSourceSwitchOverlay =
+    bound && !loadError && styleTransitioning;
 
   return (
     <View
@@ -59,6 +67,11 @@ export function WorldRendererHost({
       accessibilityState={{ disabled: !bound || Boolean(loadError) }}
     >
       <WorldRendererSurface adapter={adapter} />
+      {showSourceSwitchOverlay ? (
+        <View style={styles.switchOverlay} pointerEvents="none">
+          <ActivityIndicator color={colors.accentCyan} size="small" />
+        </View>
+      ) : null}
       {showOverlay ? (
         <View style={styles.overlay} accessibilityRole="summary">
           <Text style={styles.kicker}>Owned World</Text>
@@ -122,6 +135,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
     gap: 8,
+  },
+  switchOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(8,12,20,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   kicker: {
     color: colors.accentCyan,

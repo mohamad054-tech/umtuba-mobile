@@ -4,11 +4,18 @@ import { GeoJSONSource, Layer } from "@maplibre/maplibre-react-native";
 import { educationMarkersToGeoJSON } from "@/src/lib/world/education";
 import { PLACE_LABEL_MIN_ZOOM } from "@/src/lib/world/places";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import {
+  getCachedGeoJSON,
+  markersSignature,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
 import { colors } from "@/src/theme/colors";
 
 type MapLibreEducationLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
+
+const EDUCATION_CACHE_KEY = "world-education";
 
 /**
  * Education layer — violet square markers, visually distinct from cyan city circles.
@@ -16,21 +23,21 @@ type MapLibreEducationLayerProps = {
  */
 export function MapLibreEducationLayer({
   adapter,
+  surfaceRevision,
 }: MapLibreEducationLayerProps) {
   const markers = adapter.getEducationMarkers();
   const selectedId = adapter.getSelectedEducationMarkerId();
-  const zoom = adapter.getSessionCamera().zoom;
 
-  const geojson = useMemo(
-    () => educationMarkersToGeoJSON(markers, selectedId),
-    [markers, selectedId]
-  );
+  const geojson = useMemo(() => {
+    const signature = markersSignature(markers, selectedId);
+    return getCachedGeoJSON(EDUCATION_CACHE_KEY, signature, () =>
+      educationMarkersToGeoJSON(markers, selectedId)
+    );
+  }, [markers, selectedId, surfaceRevision]);
 
   if (markers.length === 0) {
     return null;
   }
-
-  const showLabels = zoom >= PLACE_LABEL_MIN_ZOOM;
 
   return (
     <GeoJSONSource
@@ -110,24 +117,23 @@ export function MapLibreEducationLayer({
           ],
         }}
       />
-      {showLabels ? (
-        <Layer
-          id="world-education-labels"
-          type="symbol"
-          minzoom={PLACE_LABEL_MIN_ZOOM}
-          style={{
-            textField: ["get", "name"],
-            textSize: 11,
-            textColor: colors.text,
-            textHaloColor: colors.bg,
-            textHaloWidth: 1.2,
-            textOffset: [0, 1.35],
-            textAnchor: "top",
-            textMaxWidth: 10,
-            textOptional: true,
-          }}
-        />
-      ) : null}
+      <Layer
+        id="world-education-labels"
+        type="symbol"
+        minzoom={PLACE_LABEL_MIN_ZOOM}
+        style={{
+          textField: ["get", "name"],
+          textSize: 11,
+          textColor: colors.text,
+          textHaloColor: colors.bg,
+          textHaloWidth: 1.2,
+          textOffset: [0, 1.35],
+          textAnchor: "top",
+          textMaxWidth: 10,
+          textOptional: true,
+          textAllowOverlap: false,
+        }}
+      />
     </GeoJSONSource>
   );
 }

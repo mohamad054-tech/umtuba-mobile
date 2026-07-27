@@ -46,6 +46,11 @@ import {
   type WorldBuildingsMode,
   type WorldRoadDetail,
 } from "@/src/lib/world/renderer/maplibre/roadsBuildings";
+import {
+  clearLayerCache,
+  markersUnchanged,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
+import { resolveClusterExpandZoom } from "@/src/lib/world/renderer/maplibre/visualQuality";
 
 export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
@@ -88,6 +93,10 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   getBuildingsMode(): WorldBuildingsMode;
   getEffectiveBuildingsMode(): WorldBuildingsMode;
   getCameraRevision(): number;
+  /** Layer / marker / style changes — does not remount Camera. */
+  getSurfaceRevision(): number;
+  /** True while a map style swap is in flight (Satellite / Terrain / Streets). */
+  isStyleTransitioning(): boolean;
   /** Bumps on each mount so Retry can remount the native Map surface. */
   getMountGeneration(): number;
   /** Session camera (last center/zoom) — survives remount within the adapter. */
@@ -168,7 +177,9 @@ export function createMapLibreRendererAdapter(options?: {
   let loadError: string | null = hasStyle
     ? null
     : "World map style is not configured.";
-  let revision = 0;
+  let cameraRevision = 0;
+  let surfaceRevision = 0;
+  let styleTransitioning = false;
   let mountGeneration = 0;
   const listeners = new Set<() => void>();
   const layerVisibility = new Map<string, boolean>();
@@ -203,9 +214,32 @@ export function createMapLibreRendererAdapter(options?: {
     for (const listener of listeners) listener();
   };
 
-  const bump = () => {
-    revision += 1;
+  const bumpSurface = () => {
+    surfaceRevision += 1;
     emit();
+  };
+
+  const bumpCamera = () => {
+    cameraRevision += 1;
+    emit();
+  };
+
+  const bumpAll = () => {
+    surfaceRevision += 1;
+    cameraRevision += 1;
+    emit();
+  };
+
+  const assignMarkerArray = <T extends { id: string }>(
+    target: T[],
+    incoming: T[],
+    copy: (item: T) => T
+  ): boolean => {
+    const next = Array.isArray(incoming) ? incoming.map(copy) : [];
+    if (markersUnchanged(target, next)) return false;
+    target.length = 0;
+    target.push(...next);
+    return true;
   };
 
   const canNavigate = (): boolean =>
@@ -232,7 +266,7 @@ export function createMapLibreRendererAdapter(options?: {
     setCamera(next: WorldCamera): boolean {
       if (!canNavigate()) return false;
       sessionCamera = normalizeMapLibreCamera(next, sessionCamera);
-      bump();
+      bumpCamera();
       return true;
     },
     zoomIn(): boolean {
@@ -245,7 +279,7 @@ export function createMapLibreRendererAdapter(options?: {
         { ...sessionCamera, zoom: nextZoom },
         sessionCamera
       );
-      bump();
+      bumpCamera();
       return true;
     },
     zoomOut(): boolean {
@@ -258,13 +292,13 @@ export function createMapLibreRendererAdapter(options?: {
         { ...sessionCamera, zoom: nextZoom },
         sessionCamera
       );
-      bump();
+      bumpCamera();
       return true;
     },
     recenter(): boolean {
       if (!canNavigate()) return false;
       sessionCamera = createDefaultMapLibreCamera();
-      bump();
+      bumpCamera();
       return true;
     },
     resetOrientation(): boolean {
@@ -273,7 +307,7 @@ export function createMapLibreRendererAdapter(options?: {
         { ...sessionCamera, bearing: 0, pitch: 0 },
         sessionCamera
       );
-      bump();
+      bumpCamera();
       return true;
     },
   };
@@ -295,7 +329,7 @@ export function createMapLibreRendererAdapter(options?: {
     setLayerVisibility(layerId: string, visible: boolean): boolean {
       if (!mounted || !hasStyle) return false;
       layerVisibility.set(layerId, visible);
-      bump();
+      bumpSurface();
       return true;
     },
     isLayerVisible(layerId: string): boolean {
@@ -314,11 +348,11 @@ export function createMapLibreRendererAdapter(options?: {
         if (mode === "globe" && !caps.supportsGlobe) return false;
         if (mode === "mercator") {
           projection = "mercator";
-          bump();
+          bumpSurface();
           return true;
         }
         projection = "globe";
-        bump();
+        bumpSurface();
         return true;
       } catch {
         return false;
@@ -361,12 +395,21 @@ export function createMapLibreRendererAdapter(options?: {
       }
       // Preserve sessionCamera across remount (Retry) — do not reset center/zoom.
       mountGeneration += 1;
-      bump();
+      bumpSurface();
     },
     unmount(): void {
       mounted = false;
       styleReady = false;
-      bump();
+      styleTransitioning = false;
+      placeMarkers = [];
+      educationMarkers = [];
+      userMarkers = [];
+      gameMarkers = [];
+      commerceMarkers = [];
+      eventMarkers = [];
+      layerVisibility.clear();
+      clearLayerCache();
+      bumpSurface();
     },
     capability: toFoundationRendererCapability("vector_2d", caps),
     getStyleUrl(): string {
@@ -379,6 +422,7 @@ export function createMapLibreRendererAdapter(options?: {
       styleUrl = trimmed;
       hasStyle = true;
       styleReady = false;
+      styleTransitioning = true;
       loadError = null;
       terrainStyleActive = isTerrainCapableStyleUrl(trimmed);
       if (!terrainStyleActive) {
@@ -386,7 +430,7 @@ export function createMapLibreRendererAdapter(options?: {
       }
       // Overlay / experience are re-injected by Runtime after style swap.
       mountGeneration += 1;
-      bump();
+      bumpSurface();
       return true;
     },
     isTerrainEnabled(): boolean {
@@ -402,12 +446,12 @@ export function createMapLibreRendererAdapter(options?: {
       if (enabled) {
         if (!mounted || !terrainStyleActive) return false;
         terrainEnabled = true;
-        bump();
+        bumpSurface();
         return true;
       }
       if (!terrainEnabled) return true;
       terrainEnabled = false;
-      bump();
+      bumpSurface();
       return true;
     },
     setVectorOverlay(spec: WorldVectorOverlaySpec | null): void {
@@ -417,7 +461,7 @@ export function createMapLibreRendererAdapter(options?: {
         spec.tiles.length === 0
       ) {
         vectorOverlay = null;
-        bump();
+        bumpSurface();
         return;
       }
       vectorOverlay = {
@@ -427,7 +471,7 @@ export function createMapLibreRendererAdapter(options?: {
         minzoom: spec.minzoom,
         maxzoom: spec.maxzoom,
       };
-      bump();
+      bumpSurface();
     },
     getVectorOverlay(): WorldVectorOverlaySpec | null {
       if (!vectorOverlay) return null;
@@ -440,7 +484,7 @@ export function createMapLibreRendererAdapter(options?: {
     },
     setBasemapExperience(experience: WorldMapSourceExperience): void {
       basemapExperience = experience ?? createEmptyMapSourceExperience();
-      bump();
+      bumpSurface();
     },
     getBasemapExperience(): WorldMapSourceExperience {
       return basemapExperience;
@@ -450,7 +494,7 @@ export function createMapLibreRendererAdapter(options?: {
         if (!isWorldRoadDetail(detail)) return false;
         if (roadDetail === detail) return true;
         roadDetail = detail;
-        bump();
+        bumpSurface();
         return true;
       } catch {
         return false;
@@ -464,7 +508,7 @@ export function createMapLibreRendererAdapter(options?: {
         if (!isWorldBuildingsMode(mode)) return false;
         if (buildingsMode === mode) return true;
         buildingsMode = mode;
-        bump();
+        bumpSurface();
         return true;
       } catch {
         return false;
@@ -483,7 +527,13 @@ export function createMapLibreRendererAdapter(options?: {
       });
     },
     getCameraRevision(): number {
-      return revision;
+      return cameraRevision;
+    },
+    getSurfaceRevision(): number {
+      return surfaceRevision;
+    },
+    isStyleTransitioning(): boolean {
+      return styleTransitioning;
     },
     getMountGeneration(): number {
       return mountGeneration;
@@ -509,15 +559,17 @@ export function createMapLibreRendererAdapter(options?: {
       if (!hasStyle) return;
       styleReady = true;
       loadError = null;
-      bump();
+      styleTransitioning = false;
+      bumpSurface();
     },
     reportStyleFailed(message?: string): void {
       styleReady = false;
+      styleTransitioning = false;
       loadError =
         typeof message === "string" && message.trim().length > 0
           ? message.trim()
           : "Unable to load World map style.";
-      bump();
+      bumpSurface();
     },
     getLoadError(): string | null {
       return loadError;
@@ -526,16 +578,20 @@ export function createMapLibreRendererAdapter(options?: {
       return styleReady && loadError == null && hasStyle;
     },
     setPlaceMarkers(markers: WorldPlaceMarker[]): void {
-      placeMarkers = Array.isArray(markers)
-        ? markers.map((m) => ({ ...m }))
-        : [];
+      const changed = assignMarkerArray(
+        placeMarkers,
+        markers,
+        (m) => ({ ...m })
+      );
       if (
         selectedPlaceMarkerId &&
         !placeMarkers.some((m) => m.id === selectedPlaceMarkerId)
       ) {
         selectedPlaceMarkerId = null;
+        bumpSurface();
+        return;
       }
-      bump();
+      if (changed) bumpSurface();
     },
     getPlaceMarkers(): WorldPlaceMarker[] {
       return placeMarkers.map((m) => ({ ...m }));
@@ -547,7 +603,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (placeId == null) {
         if (selectedPlaceMarkerId == null) return;
         selectedPlaceMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!placeMarkers.some((m) => m.id === placeId)) return;
@@ -558,12 +614,12 @@ export function createMapLibreRendererAdapter(options?: {
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedPlaceMarker(): void {
       if (selectedPlaceMarkerId == null) return;
       selectedPlaceMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setPlacePressHandler(handler: PlacePressHandler | null): void {
       placePressHandler = handler;
@@ -591,7 +647,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         placePressHandler?.(placeId);
       } catch {
@@ -608,7 +664,7 @@ export function createMapLibreRendererAdapter(options?: {
       ) {
         selectedEducationMarkerId = null;
       }
-      bump();
+      bumpSurface();
     },
     getEducationMarkers(): WorldEducationMarker[] {
       return educationMarkers.map((m) => ({ ...m }));
@@ -620,7 +676,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (educationId == null) {
         if (selectedEducationMarkerId == null) return;
         selectedEducationMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!educationMarkers.some((m) => m.id === educationId)) return;
@@ -631,12 +687,12 @@ export function createMapLibreRendererAdapter(options?: {
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedEducationMarker(): void {
       if (selectedEducationMarkerId == null) return;
       selectedEducationMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setEducationPressHandler(handler: EducationPressHandler | null): void {
       educationPressHandler = handler;
@@ -663,7 +719,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         educationPressHandler?.(educationId);
       } catch {
@@ -680,7 +736,7 @@ export function createMapLibreRendererAdapter(options?: {
       ) {
         selectedUserMarkerId = null;
       }
-      bump();
+      bumpSurface();
     },
     getUserMarkers(): WorldUserMarker[] {
       return userMarkers.map((m) => ({ ...m }));
@@ -692,7 +748,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (userId == null) {
         if (selectedUserMarkerId == null) return;
         selectedUserMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!userMarkers.some((m) => m.id === userId)) return;
@@ -703,12 +759,12 @@ export function createMapLibreRendererAdapter(options?: {
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedUserMarker(): void {
       if (selectedUserMarkerId == null) return;
       selectedUserMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setUserPressHandler(handler: UserPressHandler | null): void {
       userPressHandler = handler;
@@ -735,7 +791,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         userPressHandler?.(userId);
       } catch {
@@ -750,7 +806,7 @@ export function createMapLibreRendererAdapter(options?: {
       ) {
         selectedGameMarkerId = null;
       }
-      bump();
+      bumpSurface();
     },
     getGameMarkers(): WorldGameMarker[] {
       return gameMarkers.map((m) => ({ ...m }));
@@ -762,7 +818,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (gameId == null) {
         if (selectedGameMarkerId == null) return;
         selectedGameMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!gameMarkers.some((m) => m.id === gameId)) return;
@@ -773,12 +829,12 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedCommerceMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedGameMarker(): void {
       if (selectedGameMarkerId == null) return;
       selectedGameMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setGamePressHandler(handler: GamePressHandler | null): void {
       gamePressHandler = handler;
@@ -805,7 +861,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         gamePressHandler?.(gameId);
       } catch {
@@ -823,7 +879,7 @@ export function createMapLibreRendererAdapter(options?: {
         selectedCommerceMarkerId = null;
         selectedEventMarkerId = null;
       }
-      bump();
+      bumpSurface();
     },
     getCommerceMarkers(): WorldCommerceMarker[] {
       return commerceMarkers.map((m) => ({ ...m }));
@@ -836,7 +892,7 @@ export function createMapLibreRendererAdapter(options?: {
         if (selectedCommerceMarkerId == null) return;
         selectedCommerceMarkerId = null;
         selectedEventMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!commerceMarkers.some((m) => m.id === commerceId)) return;
@@ -847,13 +903,13 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedCommerceMarker(): void {
       if (selectedCommerceMarkerId == null) return;
       selectedCommerceMarkerId = null;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setCommercePressHandler(handler: CommercePressHandler | null): void {
       commercePressHandler = handler;
@@ -880,7 +936,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         commercePressHandler?.(commerceId);
       } catch {
@@ -897,7 +953,7 @@ export function createMapLibreRendererAdapter(options?: {
       ) {
         selectedEventMarkerId = null;
       }
-      bump();
+      bumpSurface();
     },
     getEventMarkers(): WorldEventMarker[] {
       return eventMarkers.map((m) => ({ ...m }));
@@ -909,7 +965,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (eventId == null) {
         if (selectedEventMarkerId == null) return;
         selectedEventMarkerId = null;
-        bump();
+        bumpSurface();
         return;
       }
       if (!eventMarkers.some((m) => m.id === eventId)) return;
@@ -920,12 +976,12 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
-      bump();
+      bumpSurface();
     },
     clearSelectedEventMarker(): void {
       if (selectedEventMarkerId == null) return;
       selectedEventMarkerId = null;
-      bump();
+      bumpSurface();
     },
     setEventPressHandler(handler: EventPressHandler | null): void {
       eventPressHandler = handler;
@@ -952,7 +1008,7 @@ export function createMapLibreRendererAdapter(options?: {
           sessionCamera
         );
       }
-      bump();
+      bumpAll();
       try {
         eventPressHandler?.(eventId);
       } catch {
@@ -961,20 +1017,23 @@ export function createMapLibreRendererAdapter(options?: {
     },
     focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean {
       if (!canNavigate()) return false;
+      const clusterMax =
+        typeof zoom === "number" ? zoom - 1.2 : PLACE_FOCUS_ZOOM - 1;
+      const targetZoom =
+        typeof zoom === "number"
+          ? resolveClusterExpandZoom(sessionCamera.zoom, clusterMax)
+          : Math.max(sessionCamera.zoom, PLACE_FOCUS_ZOOM);
       sessionCamera = normalizeMapLibreCamera(
         {
           latitude,
           longitude,
-          zoom:
-            typeof zoom === "number"
-              ? zoom
-              : Math.max(sessionCamera.zoom, PLACE_FOCUS_ZOOM),
+          zoom: targetZoom,
           bearing: sessionCamera.bearing,
           pitch: sessionCamera.pitch,
         },
         sessionCamera
       );
-      bump();
+      bumpCamera();
       return true;
     },
   };

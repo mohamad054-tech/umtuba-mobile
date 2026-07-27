@@ -60,6 +60,7 @@ describe("MapLibre session camera + navigation", () => {
       bearing: 12,
     });
     const revisionBefore = adapter.getCameraRevision();
+    const surfaceBefore = adapter.getSurfaceRevision();
     adapter.mount(); // Retry remount
     expect(adapter.getMountGeneration()).toBe(2);
     expect(adapter.getSessionCamera()).toMatchObject({
@@ -67,8 +68,9 @@ describe("MapLibre session camera + navigation", () => {
       longitude: 35.91,
       zoom: 8,
     });
-    // Remount bumps revision for Camera re-apply; session center/zoom preserved.
-    expect(adapter.getCameraRevision()).toBeGreaterThan(revisionBefore);
+    // Gesture sync must not remount Camera; remount bumps surface revision only.
+    expect(adapter.getCameraRevision()).toBe(revisionBefore);
+    expect(adapter.getSurfaceRevision()).toBeGreaterThan(surfaceBefore);
   });
 
   it("enforces zoom limits on CameraAdapter controls", () => {

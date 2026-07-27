@@ -4,6 +4,10 @@ import { GeoJSONSource, Layer } from "@maplibre/maplibre-react-native";
 import { PLACE_LABEL_MIN_ZOOM } from "@/src/lib/world/places";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
 import {
+  getCachedGeoJSON,
+  markersSignature,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
+import {
   USER_CLUSTER_MAX_ZOOM,
   usersMarkersToGeoJSON,
 } from "@/src/lib/world/users";
@@ -11,27 +15,28 @@ import { colors } from "@/src/theme/colors";
 
 type MapLibreUsersLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
 
-/**
- * Users layer — clustered green markers with initial labels.
- * Approximate pins only; renderer never invents coordinates.
- */
-export function MapLibreUsersLayer({ adapter }: MapLibreUsersLayerProps) {
+const USERS_CACHE_KEY = "world-users";
+
+export function MapLibreUsersLayer({
+  adapter,
+  surfaceRevision,
+}: MapLibreUsersLayerProps) {
   const markers = adapter.getUserMarkers();
   const selectedId = adapter.getSelectedUserMarkerId();
-  const zoom = adapter.getSessionCamera().zoom;
 
-  const geojson = useMemo(
-    () => usersMarkersToGeoJSON(markers, selectedId),
-    [markers, selectedId]
-  );
+  const geojson = useMemo(() => {
+    const signature = markersSignature(markers, selectedId);
+    return getCachedGeoJSON(USERS_CACHE_KEY, signature, () =>
+      usersMarkersToGeoJSON(markers, selectedId)
+    );
+  }, [markers, selectedId, surfaceRevision]);
 
   if (markers.length === 0) {
     return null;
   }
-
-  const showLabels = zoom >= PLACE_LABEL_MIN_ZOOM;
 
   return (
     <GeoJSONSource
@@ -72,10 +77,17 @@ export function MapLibreUsersLayer({ adapter }: MapLibreUsersLayerProps) {
         filter={["has", "point_count"]}
         style={{
           circleColor: colors.success,
-          circleOpacity: 0.82,
+          circleOpacity: [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            USER_CLUSTER_MAX_ZOOM - 0.4,
+            0.7,
+            USER_CLUSTER_MAX_ZOOM + 0.5,
+            0.88,
+          ],
           circleStrokeWidth: 2,
           circleStrokeColor: colors.bg,
-          // Soft-size clusters — avoid implying precise density.
           circleRadius: ["step", ["get", "point_count"], 14, 5, 17, 10, 20],
         }}
       />
@@ -134,25 +146,24 @@ export function MapLibreUsersLayer({ adapter }: MapLibreUsersLayerProps) {
           textIgnorePlacement: true,
         }}
       />
-      {showLabels ? (
-        <Layer
-          id="world-users-labels"
-          type="symbol"
-          minzoom={PLACE_LABEL_MIN_ZOOM}
-          filter={["!", ["has", "point_count"]]}
-          style={{
-            textField: ["get", "displayName"],
-            textSize: 11,
-            textColor: colors.text,
-            textHaloColor: colors.bg,
-            textHaloWidth: 1.2,
-            textOffset: [0, 1.4],
-            textAnchor: "top",
-            textMaxWidth: 8,
-            textOptional: true,
-          }}
-        />
-      ) : null}
+      <Layer
+        id="world-users-labels"
+        type="symbol"
+        minzoom={PLACE_LABEL_MIN_ZOOM}
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          textField: ["get", "displayName"],
+          textSize: 11,
+          textColor: colors.text,
+          textHaloColor: colors.bg,
+          textHaloWidth: 1.2,
+          textOffset: [0, 1.4],
+          textAnchor: "top",
+          textMaxWidth: 8,
+          textOptional: true,
+          textAllowOverlap: false,
+        }}
+      />
     </GeoJSONSource>
   );
 }

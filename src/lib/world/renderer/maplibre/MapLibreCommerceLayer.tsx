@@ -7,24 +7,34 @@ import {
 } from "@/src/lib/world/commerce";
 import { PLACE_LABEL_MIN_ZOOM } from "@/src/lib/world/places";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import {
+  getCachedGeoJSON,
+  markersSignature,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
 import { colors } from "@/src/theme/colors";
 
 type MapLibreCommerceLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
 
-export function MapLibreCommerceLayer({ adapter }: MapLibreCommerceLayerProps) {
+const COMMERCE_CACHE_KEY = "world-commerce";
+
+export function MapLibreCommerceLayer({
+  adapter,
+  surfaceRevision,
+}: MapLibreCommerceLayerProps) {
   const markers = adapter.getCommerceMarkers();
   const selectedId = adapter.getSelectedCommerceMarkerId();
-  const zoom = adapter.getSessionCamera().zoom;
 
-  const geojson = useMemo(
-    () => commerceMarkersToGeoJSON(markers, selectedId),
-    [markers, selectedId]
-  );
+  const geojson = useMemo(() => {
+    const signature = markersSignature(markers, selectedId);
+    return getCachedGeoJSON(COMMERCE_CACHE_KEY, signature, () =>
+      commerceMarkersToGeoJSON(markers, selectedId)
+    );
+  }, [markers, selectedId, surfaceRevision]);
 
   if (markers.length === 0) return null;
-  const showLabels = zoom >= PLACE_LABEL_MIN_ZOOM;
 
   return (
     <GeoJSONSource
@@ -60,7 +70,15 @@ export function MapLibreCommerceLayer({ adapter }: MapLibreCommerceLayerProps) {
         filter={["has", "point_count"]}
         style={{
           circleColor: colors.danger,
-          circleOpacity: 0.85,
+          circleOpacity: [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            COMMERCE_CLUSTER_MAX_ZOOM - 0.4,
+            0.7,
+            COMMERCE_CLUSTER_MAX_ZOOM + 0.5,
+            0.88,
+          ],
           circleStrokeWidth: 2,
           circleStrokeColor: colors.text,
           circleRadius: ["step", ["get", "point_count"], 14, 5, 17, 10, 20],
@@ -108,25 +126,24 @@ export function MapLibreCommerceLayer({ adapter }: MapLibreCommerceLayerProps) {
           ],
         }}
       />
-      {showLabels ? (
-        <Layer
-          id="world-commerce-labels"
-          type="symbol"
-          minzoom={PLACE_LABEL_MIN_ZOOM}
-          filter={["!", ["has", "point_count"]]}
-          style={{
-            textField: ["get", "name"],
-            textSize: 11,
-            textColor: colors.text,
-            textHaloColor: colors.bg,
-            textHaloWidth: 1.2,
-            textOffset: [0, 1.35],
-            textAnchor: "top",
-            textMaxWidth: 10,
-            textOptional: true,
-          }}
-        />
-      ) : null}
+      <Layer
+        id="world-commerce-labels"
+        type="symbol"
+        minzoom={PLACE_LABEL_MIN_ZOOM}
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          textField: ["get", "name"],
+          textSize: 11,
+          textColor: colors.text,
+          textHaloColor: colors.bg,
+          textHaloWidth: 1.2,
+          textOffset: [0, 1.35],
+          textAnchor: "top",
+          textMaxWidth: 10,
+          textOptional: true,
+          textAllowOverlap: false,
+        }}
+      />
     </GeoJSONSource>
   );
 }

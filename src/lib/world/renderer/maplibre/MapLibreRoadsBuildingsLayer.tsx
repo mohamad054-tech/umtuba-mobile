@@ -6,9 +6,12 @@ import {
   resolveBuildingsVisibility,
   resolveRoadClassVisibility,
 } from "@/src/lib/world/renderer/maplibre/roadsBuildings";
+import { useMapLibreLayerState } from "@/src/lib/world/renderer/maplibre/useMapLibreLayerState";
+import { resolveRoadsZoomBucket } from "@/src/lib/world/renderer/maplibre/visualQuality";
 
 type MapLibreRoadsBuildingsLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
 
 /**
@@ -17,8 +20,11 @@ type MapLibreRoadsBuildingsLayerProps = {
  */
 export function MapLibreRoadsBuildingsLayer({
   adapter,
+  surfaceRevision,
 }: MapLibreRoadsBuildingsLayerProps) {
   const overlay = adapter.getVectorOverlay();
+  const { zoomBucket } = useMapLibreLayerState(adapter);
+  const roadsZoom = resolveRoadsZoomBucket(zoomBucket);
   if (!overlay || !Array.isArray(overlay.tiles) || overlay.tiles.length === 0) {
     return null;
   }
@@ -27,7 +33,7 @@ export function MapLibreRoadsBuildingsLayer({
   const experience = adapter.getBasemapExperience();
   const roadDetail = adapter.getRoadDetail();
   const buildingsMode = adapter.getEffectiveBuildingsMode();
-  const zoom = adapter.getSessionCamera().zoom;
+  const zoom = roadsZoom;
   const roads = resolveRoadClassVisibility(roadDetail, zoom);
   const buildings = resolveBuildingsVisibility({
     preference: buildingsMode,

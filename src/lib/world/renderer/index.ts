@@ -53,3 +53,19 @@ export {
   type WorldRoadClass,
   type WorldRoadDetail,
 } from "@/src/lib/world/renderer/maplibre/roadsBuildings";
+export {
+  clearLayerCache,
+  getCachedGeoJSON,
+  markersSignature,
+  markersUnchanged,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
+export {
+  CLUSTER_EXPAND_ANIMATION_MS,
+  isPlaceLabelVisibleForTier,
+  PLACE_LABEL_MIN_ZOOM_BY_TIER,
+  resolveClusterExpandZoom,
+  resolveRoadsZoomBucket,
+  resolveWorldZoomBucket,
+  shouldRefreshForZoomBucket,
+  WORLD_ZOOM_BUCKET_STEP,
+} from "@/src/lib/world/renderer/maplibre/visualQuality";

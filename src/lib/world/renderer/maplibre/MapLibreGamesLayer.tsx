@@ -7,24 +7,34 @@ import {
 } from "@/src/lib/world/games";
 import { PLACE_LABEL_MIN_ZOOM } from "@/src/lib/world/places";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import {
+  getCachedGeoJSON,
+  markersSignature,
+} from "@/src/lib/world/renderer/maplibre/layerCache";
 import { colors } from "@/src/theme/colors";
 
 type MapLibreGamesLayerProps = {
   adapter: MapLibreRendererAdapter;
+  surfaceRevision: number;
 };
 
-export function MapLibreGamesLayer({ adapter }: MapLibreGamesLayerProps) {
+const GAMES_CACHE_KEY = "world-games";
+
+export function MapLibreGamesLayer({
+  adapter,
+  surfaceRevision,
+}: MapLibreGamesLayerProps) {
   const markers = adapter.getGameMarkers();
   const selectedId = adapter.getSelectedGameMarkerId();
-  const zoom = adapter.getSessionCamera().zoom;
 
-  const geojson = useMemo(
-    () => gamesMarkersToGeoJSON(markers, selectedId),
-    [markers, selectedId]
-  );
+  const geojson = useMemo(() => {
+    const signature = markersSignature(markers, selectedId);
+    return getCachedGeoJSON(GAMES_CACHE_KEY, signature, () =>
+      gamesMarkersToGeoJSON(markers, selectedId)
+    );
+  }, [markers, selectedId, surfaceRevision]);
 
   if (markers.length === 0) return null;
-  const showLabels = zoom >= PLACE_LABEL_MIN_ZOOM;
 
   return (
     <GeoJSONSource
@@ -60,7 +70,15 @@ export function MapLibreGamesLayer({ adapter }: MapLibreGamesLayerProps) {
         filter={["has", "point_count"]}
         style={{
           circleColor: colors.accentCyan,
-          circleOpacity: 0.85,
+          circleOpacity: [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            GAME_CLUSTER_MAX_ZOOM - 0.4,
+            0.7,
+            GAME_CLUSTER_MAX_ZOOM + 0.5,
+            0.88,
+          ],
           circleStrokeWidth: 2,
           circleStrokeColor: colors.accentViolet,
           circleRadius: ["step", ["get", "point_count"], 14, 5, 17, 10, 20],
@@ -108,25 +126,24 @@ export function MapLibreGamesLayer({ adapter }: MapLibreGamesLayerProps) {
           ],
         }}
       />
-      {showLabels ? (
-        <Layer
-          id="world-games-labels"
-          type="symbol"
-          minzoom={PLACE_LABEL_MIN_ZOOM}
-          filter={["!", ["has", "point_count"]]}
-          style={{
-            textField: ["get", "gameName"],
-            textSize: 11,
-            textColor: colors.text,
-            textHaloColor: colors.bg,
-            textHaloWidth: 1.2,
-            textOffset: [0, 1.35],
-            textAnchor: "top",
-            textMaxWidth: 10,
-            textOptional: true,
-          }}
-        />
-      ) : null}
+      <Layer
+        id="world-games-labels"
+        type="symbol"
+        minzoom={PLACE_LABEL_MIN_ZOOM}
+        filter={["!", ["has", "point_count"]]}
+        style={{
+          textField: ["get", "gameName"],
+          textSize: 11,
+          textColor: colors.text,
+          textHaloColor: colors.bg,
+          textHaloWidth: 1.2,
+          textOffset: [0, 1.35],
+          textAnchor: "top",
+          textMaxWidth: 10,
+          textOptional: true,
+          textAllowOverlap: false,
+        }}
+      />
     </GeoJSONSource>
   );
 }
