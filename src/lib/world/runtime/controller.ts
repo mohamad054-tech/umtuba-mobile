@@ -556,7 +556,10 @@ export class WorldRuntimeController {
 
     const switchableSources = this.mapSourceRegistry
       .list()
-      .filter((s) => s.kind === "street" || s.kind === "satellite")
+      .filter(
+        (s) =>
+          s.kind === "street" || s.kind === "satellite" || s.kind === "terrain"
+      )
       .map((s) => ({
         id: s.id,
         label: s.label,
@@ -715,6 +718,16 @@ export class WorldRuntimeController {
       return false;
     }
 
+    if (
+      next!.kind === "terrain" &&
+      !this.renderer.getCapabilities().supportsTerrain
+    ) {
+      next = this.mapSourceRegistry.resolve(DEMO_MAP_SOURCE_ID);
+      if (!isWorldMapSourceAvailable(next)) {
+        return false;
+      }
+    }
+
     if (this.mapSource?.id === next!.id) {
       return true;
     }
@@ -749,6 +762,11 @@ export class WorldRuntimeController {
       this.bindCommercePressHandler();
       this.bindEventPressHandler();
       this.syncAllLayersToRenderer();
+      if (next!.kind === "terrain") {
+        this.renderer.setTerrainEnabled(true);
+      } else {
+        this.renderer.setTerrainEnabled(false);
+      }
     }
 
     this.state = {
@@ -760,8 +778,10 @@ export class WorldRuntimeController {
     return true;
   }
 
-  /** Switch by map source kind — street or satellite only. */
-  setMapSourceKind(kind: Extract<WorldMapSourceKind, "street" | "satellite">): boolean {
+  /** Switch by map source kind — street, satellite, or terrain. */
+  setMapSourceKind(
+    kind: Extract<WorldMapSourceKind, "street" | "satellite" | "terrain">
+  ): boolean {
     const match = this.mapSourceRegistry.list().find((s) => s.kind === kind);
     if (!match) return false;
     return this.setMapSourceId(match.id);

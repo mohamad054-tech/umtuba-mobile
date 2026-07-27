@@ -58,7 +58,7 @@ export function createMapSourceRegistry(
   };
 }
 
-/** Default registry: Demo (active) + Street/Satellite/Terrain placeholders. */
+/** Default registry: Demo (active) + Street/Satellite/Terrain sources. */
 export function createDefaultMapSourceRegistry(): MapSourceRegistry {
   return createMapSourceRegistry([
     createDemoMapSource(),

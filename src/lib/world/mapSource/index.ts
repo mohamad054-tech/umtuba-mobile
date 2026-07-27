@@ -24,7 +24,10 @@ export {
 } from "@/src/lib/world/mapSource/satelliteMapSource";
 export {
   createTerrainMapSource,
+  createTerrainSourceProvider,
+  TERRAIN_MAP_ATTRIBUTION,
   TERRAIN_MAP_SOURCE_ID,
+  TERRAIN_MAP_STYLE_URL,
 } from "@/src/lib/world/mapSource/terrainMapSource";
 export {
   createDefaultMapSourceRegistry,

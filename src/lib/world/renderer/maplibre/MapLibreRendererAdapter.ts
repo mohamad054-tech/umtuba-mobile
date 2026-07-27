@@ -38,6 +38,16 @@ export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
 export { MAPLIBRE_DEFAULT_CAMERA };
 
+/** Detect terrain-capable inline or remote styles by known topo tile path. */
+export function isTerrainCapableStyleUrl(url: string): boolean {
+  const trimmed = typeof url === "string" ? url.trim() : "";
+  if (trimmed.length === 0) return false;
+  return (
+    trimmed.includes("World_Topo_Map") ||
+    trimmed.includes("UM World Terrain")
+  );
+}
+
 export type PlacePressHandler = (placeId: string) => void;
 export type EducationPressHandler = (educationId: string) => void;
 export type UserPressHandler = (userId: string) => void;
@@ -50,6 +60,10 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   getStyleUrl(): string;
   /** Swap style URL without resetting session camera — remounts map surface. */
   setStyleUrl(next: string): boolean;
+  /** True when terrain elevation/hillshade is soft-enabled on a terrain-capable style. */
+  isTerrainEnabled(): boolean;
+  /** Soft-enable terrain visualization — fail-closed when unsupported or not on terrain style. */
+  setTerrainEnabled(enabled: boolean): boolean;
   getCameraRevision(): number;
   /** Bumps on each mount so Retry can remount the native Map surface. */
   getMountGeneration(): number;
@@ -153,6 +167,8 @@ export function createMapLibreRendererAdapter(options?: {
   let eventMarkers: WorldEventMarker[] = [];
   let selectedEventMarkerId: string | null = null;
   let eventPressHandler: EventPressHandler | null = null;
+  let terrainEnabled = false;
+  let terrainStyleActive = isTerrainCapableStyleUrl(styleUrl);
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -168,10 +184,10 @@ export function createMapLibreRendererAdapter(options?: {
 
   const caps: RendererCapabilities = {
     supports3D: true,
-    supportsTerrain: false,
+    supportsTerrain: true,
     supportsOffline: false,
     supportsStreetLabels: true,
-    supportsSatellite: false,
+    supportsSatellite: true,
     supportsCustomLayers: true,
     supportsBuildings: false,
   };
@@ -314,7 +330,32 @@ export function createMapLibreRendererAdapter(options?: {
       hasStyle = true;
       styleReady = false;
       loadError = null;
+      terrainStyleActive = isTerrainCapableStyleUrl(trimmed);
+      if (!terrainStyleActive) {
+        terrainEnabled = false;
+      }
       mountGeneration += 1;
+      bump();
+      return true;
+    },
+    isTerrainEnabled(): boolean {
+      return (
+        caps.supportsTerrain &&
+        mounted &&
+        terrainStyleActive &&
+        terrainEnabled
+      );
+    },
+    setTerrainEnabled(enabled: boolean): boolean {
+      if (!caps.supportsTerrain) return false;
+      if (enabled) {
+        if (!mounted || !terrainStyleActive) return false;
+        terrainEnabled = true;
+        bump();
+        return true;
+      }
+      if (!terrainEnabled) return true;
+      terrainEnabled = false;
       bump();
       return true;
     },

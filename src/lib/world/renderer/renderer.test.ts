@@ -61,6 +61,8 @@ describe("MapLibre renderer adapter", () => {
 
     const caps = adapter.getCapabilities();
     expect(caps.supports3D).toBe(true);
+    expect(caps.supportsTerrain).toBe(true);
+    expect(caps.supportsSatellite).toBe(true);
     expect(caps.supportsStreetLabels).toBe(true);
     expect(caps.supportsOffline).toBe(false);
 
@@ -133,6 +135,41 @@ describe("MapLibre renderer adapter", () => {
     const adapter = createMapLibreRendererAdapter({ styleUrl: "https://example.test/style.json" });
     expect(adapter.getStyleUrl()).toBe("https://example.test/style.json");
     expect(adapter.getStyleUrl()).not.toContain("demotiles.maplibre.org");
+  });
+
+  it("terrain enable is fail-closed off non-terrain styles", () => {
+    const adapter = createMapLibreRendererAdapter({
+      styleUrl: DEMO_MAP_STYLE_URL,
+    });
+    adapter.mount();
+    expect(adapter.isTerrainEnabled()).toBe(false);
+    expect(adapter.setTerrainEnabled(true)).toBe(false);
+    expect(adapter.isTerrainEnabled()).toBe(false);
+  });
+
+  it("terrain enable succeeds on terrain-capable style when mounted", () => {
+    const topoStyle =
+      "data:application/json," +
+      encodeURIComponent(
+        JSON.stringify({
+          version: 8,
+          sources: {
+            esri: {
+              type: "raster",
+              tiles: [
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+              ],
+            },
+          },
+          layers: [{ id: "esri-terrain", type: "raster", source: "esri" }],
+        })
+      );
+    const adapter = createMapLibreRendererAdapter({ styleUrl: topoStyle });
+    adapter.mount();
+    expect(adapter.setTerrainEnabled(true)).toBe(true);
+    expect(adapter.isTerrainEnabled()).toBe(true);
+    expect(adapter.setStyleUrl(DEMO_MAP_STYLE_URL)).toBe(true);
+    expect(adapter.isTerrainEnabled()).toBe(false);
   });
 });
 

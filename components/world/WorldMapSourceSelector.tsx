@@ -9,7 +9,7 @@ type WorldMapSourceSelectorProps = {
 };
 
 /**
- * Streets / Satellite map source switcher — view-state only, no tile URLs.
+ * Streets / Satellite / Terrain map source switcher — view-state only, no tile URLs.
  */
 export function WorldMapSourceSelector({
   sources,

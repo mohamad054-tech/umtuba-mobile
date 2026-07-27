@@ -231,7 +231,7 @@ export function buildWorldLayerControls(
   });
 }
 
-/** Streets / Satellite switcher controls — UI never sees style URLs. */
+/** Streets / Satellite / Terrain switcher controls — UI never sees style URLs. */
 export function buildWorldMapSourceControls(
   sources: Array<{
     id: string;
