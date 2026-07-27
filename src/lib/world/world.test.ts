@@ -36,6 +36,7 @@ describe("world categories", () => {
       { id: "cities", label: "Cities", supported: true },
       { id: "education", label: "Education", supported: true },
       { id: "games", label: "Games", supported: true },
+      { id: "events", label: "Events", supported: true },
       { id: "businesses", label: "Businesses", supported: true },
     ]);
     expect(parseWorldCategoryId("events")).toBe("events");

@@ -10,6 +10,7 @@ export type {
   WorldEducationKind,
   WorldEducationRecord,
   WorldEventsDataProvider,
+  WorldEventKind,
   WorldEventRecord,
   WorldGamesDataProvider,
   WorldGameCategory,

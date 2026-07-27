@@ -58,6 +58,15 @@ import {
   type CommerceRegistry,
 } from "@/src/lib/world/commerce";
 import {
+  buildWorldEventSheetState,
+  createEventsRegistry,
+  createWorldEventsLayerDefinition,
+  WORLD_EVENTS_LAYER_ID,
+  worldEventsToEntities,
+  worldEventsToMarkers,
+  type EventsRegistry,
+} from "@/src/lib/world/events";
+import {
   buildPlaceLayerControls,
   buildWorldPlaceSheetState,
   createPlaceRegistry,
@@ -216,8 +225,20 @@ function mergeCommerceIntoSnapshot(
   };
 }
 
+function mergeEventsIntoSnapshot(
+  snapshot: WorldFoundationSnapshot,
+  eventsBound: boolean
+): WorldFoundationSnapshot {
+  if (!eventsBound) return snapshot;
+  const hasEventsLayer = snapshot.layers.some((layer) => layer.category === "events");
+  if (hasEventsLayer) return snapshot;
+  return {
+    ...snapshot,
+    layers: [...snapshot.layers, createWorldEventsLayerDefinition()],
+  };
+}
+
 /**
- * Sole runtime authority for UM World operational state + renderer slot.
  * Screen UI must consume this controller — not invent parallel load/render logic.
  * Map style selection is exclusively via MapSourceRegistry → WorldMapSource.
  * Domain data loads exclusively via WorldDataPipeline → registries / Renderer.
@@ -235,6 +256,7 @@ export class WorldRuntimeController {
   private usersRegistry: UsersRegistry;
   private gamesRegistry: GamesRegistry;
   private commerceRegistry: CommerceRegistry;
+  private eventsRegistry: EventsRegistry;
   private yieldMs: number;
   private state: WorldRuntimeState;
   private selection: WorldUiSelectionState = createDefaultWorldUiSelection();
@@ -266,6 +288,7 @@ export class WorldRuntimeController {
     this.usersRegistry = createUsersRegistry();
     this.gamesRegistry = createGamesRegistry();
     this.commerceRegistry = createCommerceRegistry();
+    this.eventsRegistry = createEventsRegistry();
     this.searchService = createWorldSearchService();
     const placeProviderBound = this.dataPipeline.isKindAvailable("places");
 
@@ -345,6 +368,11 @@ export class WorldRuntimeController {
     return this.commerceRegistry;
   }
 
+  /** Events registry (Runtime / tests). */
+  getEventsRegistry(): EventsRegistry {
+    return this.eventsRegistry;
+  }
+
   /**
    * Unified World search — UI → Runtime → WorldSearchService over Pipeline-backed registries.
    * Empty query → []. Missing provider kinds are omitted (fail-closed).
@@ -357,11 +385,13 @@ export class WorldRuntimeController {
         usersAvailable: this.dataPipeline.isKindAvailable("users"),
         gamesAvailable: this.dataPipeline.isKindAvailable("games"),
         commerceAvailable: this.dataPipeline.isKindAvailable("commerce"),
+        eventsAvailable: this.dataPipeline.isKindAvailable("events"),
         places: this.placeRegistry.list(),
         education: this.educationRegistry.list(),
         users: this.usersRegistry.list(),
         games: this.gamesRegistry.list(),
         commerce: this.commerceRegistry.list(),
+        events: this.eventsRegistry.list(),
       });
       return this.searchService.search(query, dataset);
     } catch {
@@ -386,6 +416,9 @@ export class WorldRuntimeController {
     }
     if (result.sourceType === "commerce") {
       return this.selectCommerce(result.id);
+    }
+    if (result.sourceType === "events") {
+      return this.selectEvent(result.id);
     }
     return false;
   }
@@ -413,6 +446,7 @@ export class WorldRuntimeController {
     const usersBound = this.dataPipeline.isKindAvailable("users");
     const gamesBound = this.dataPipeline.isKindAvailable("games");
     const commerceBound = this.dataPipeline.isKindAvailable("commerce");
+    const eventsBound = this.dataPipeline.isKindAvailable("events");
     const rawSnapshot = runtime.snapshot ?? undefined;
     let snapshot = rawSnapshot
       ? mergePlacesIntoSnapshot(rawSnapshot, placesBound)
@@ -429,6 +463,9 @@ export class WorldRuntimeController {
     if (snapshot) {
       snapshot = mergeCommerceIntoSnapshot(snapshot, commerceBound);
     }
+    if (snapshot) {
+      snapshot = mergeEventsIntoSnapshot(snapshot, eventsBound);
+    }
     const placeEntities = placesBound
       ? worldPlacesToEntities(this.placeRegistry.listCities())
       : [];
@@ -444,12 +481,16 @@ export class WorldRuntimeController {
     const commerceEntities = commerceBound
       ? worldCommerceToEntities(this.commerceRegistry.listMappable())
       : [];
+    const eventEntities = eventsBound
+      ? worldEventsToEntities(this.eventsRegistry.listMappable())
+      : [];
     const entities = [
       ...placeEntities,
       ...educationEntities,
       ...userEntities,
       ...gameEntities,
       ...commerceEntities,
+      ...eventEntities,
     ];
     const placeLayers = buildPlaceLayerControls(
       this.selection.selectedPlaceLayers ?? defaultSelectedPlaceLayers(),
@@ -500,6 +541,15 @@ export class WorldRuntimeController {
       selectedCommerce,
       this.selection.commerceSheetOpen === true && selectedCommerce != null
     );
+    const selectedEvent =
+      this.selection.selectedEntityId != null &&
+      this.selection.eventSheetOpen === true
+        ? this.eventsRegistry.get(this.selection.selectedEntityId)
+        : null;
+    const eventSheet = buildWorldEventSheetState(
+      selectedEvent,
+      this.selection.eventSheetOpen === true && selectedEvent != null
+    );
 
     const base = buildWorldExperienceViewState({
       snapshot,
@@ -515,6 +565,7 @@ export class WorldRuntimeController {
       userSheet,
       gameSheet,
       commerceSheet,
+      eventSheet,
     });
 
     if (runtime.phase === "preparing") {
@@ -578,6 +629,7 @@ export class WorldRuntimeController {
       this.bindUserPressHandler();
       this.bindGamePressHandler();
       this.bindCommercePressHandler();
+      this.bindEventPressHandler();
     }
     await this.runLoadCycle();
   }
@@ -597,6 +649,7 @@ export class WorldRuntimeController {
     this.bindUserPressHandler();
     this.bindGamePressHandler();
     this.bindCommercePressHandler();
+    this.bindEventPressHandler();
     await this.runLoadCycle();
   }
 
@@ -650,6 +703,7 @@ export class WorldRuntimeController {
       userSheetOpen: false,
       gameSheetOpen: false,
       commerceSheetOpen: false,
+      eventSheetOpen: false,
     };
     this.syncPlacesToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
@@ -657,6 +711,7 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedUserMarker();
       this.renderer.clearSelectedGameMarker();
       this.renderer.clearSelectedCommerceMarker();
+      this.renderer.clearSelectedEventMarker();
       this.renderer.setSelectedPlaceMarkerId(place.id);
       this.renderer.focusPlaceAt(place.latitude, place.longitude);
     }
@@ -693,6 +748,7 @@ export class WorldRuntimeController {
       userSheetOpen: false,
       gameSheetOpen: false,
       commerceSheetOpen: false,
+      eventSheetOpen: false,
     };
     this.syncEducationToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
@@ -700,6 +756,7 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedUserMarker();
       this.renderer.clearSelectedGameMarker();
       this.renderer.clearSelectedCommerceMarker();
+      this.renderer.clearSelectedEventMarker();
       this.renderer.setSelectedEducationMarkerId(record.id);
       this.renderer.focusPlaceAt(record.latitude, record.longitude);
     }
@@ -736,6 +793,7 @@ export class WorldRuntimeController {
       educationSheetOpen: false,
       gameSheetOpen: false,
       commerceSheetOpen: false,
+      eventSheetOpen: false,
     };
     this.syncUsersToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
@@ -743,6 +801,7 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedEducationMarker();
       this.renderer.clearSelectedGameMarker();
       this.renderer.clearSelectedCommerceMarker();
+      this.renderer.clearSelectedEventMarker();
       this.renderer.setSelectedUserMarkerId(record.id);
       this.renderer.focusPlaceAt(
         record.approximateLatitude,
@@ -778,6 +837,7 @@ export class WorldRuntimeController {
       educationSheetOpen: false,
       userSheetOpen: false,
       commerceSheetOpen: false,
+      eventSheetOpen: false,
     };
     this.syncGamesToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
@@ -785,6 +845,7 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedEducationMarker();
       this.renderer.clearSelectedUserMarker();
       this.renderer.clearSelectedCommerceMarker();
+      this.renderer.clearSelectedEventMarker();
       this.renderer.setSelectedGameMarkerId(record.id);
       this.renderer.focusPlaceAt(record.latitude, record.longitude);
     }
@@ -817,6 +878,7 @@ export class WorldRuntimeController {
       educationSheetOpen: false,
       userSheetOpen: false,
       gameSheetOpen: false,
+      eventSheetOpen: false,
     };
     this.syncCommerceToRenderer();
     if (isMapLibreRendererAdapter(this.renderer)) {
@@ -824,7 +886,49 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedEducationMarker();
       this.renderer.clearSelectedUserMarker();
       this.renderer.clearSelectedGameMarker();
+      this.renderer.clearSelectedEventMarker();
       this.renderer.setSelectedCommerceMarkerId(record.id);
+      this.renderer.focusPlaceAt(record.latitude, record.longitude);
+    }
+    this.emit();
+    return true;
+  }
+
+  selectEvent(eventId: string | null): boolean {
+    if (!eventId) {
+      this.selection = {
+        ...selectWorldEntity(this.selection, null),
+        eventSheetOpen: false,
+      };
+      if (isMapLibreRendererAdapter(this.renderer)) {
+        this.renderer.clearSelectedEventMarker();
+      }
+      this.syncEventsToRenderer();
+      this.emit();
+      return true;
+    }
+    const record = this.eventsRegistry.get(eventId);
+    if (!record) return false;
+    if (typeof record.latitude !== "number" || typeof record.longitude !== "number") {
+      return false;
+    }
+    this.selection = {
+      ...selectWorldEntity(this.selection, record.id),
+      eventSheetOpen: true,
+      placeSheetOpen: false,
+      educationSheetOpen: false,
+      userSheetOpen: false,
+      gameSheetOpen: false,
+      commerceSheetOpen: false,
+    };
+    this.syncEventsToRenderer();
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      this.renderer.clearSelectedPlaceMarker();
+      this.renderer.clearSelectedEducationMarker();
+      this.renderer.clearSelectedUserMarker();
+      this.renderer.clearSelectedGameMarker();
+      this.renderer.clearSelectedCommerceMarker();
+      this.renderer.setSelectedEventMarkerId(record.id);
       this.renderer.focusPlaceAt(record.latitude, record.longitude);
     }
     this.emit();
@@ -879,12 +983,15 @@ export class WorldRuntimeController {
       this.syncGamesToRenderer();
     } else if (categoryId === "businesses") {
       this.syncCommerceToRenderer();
+    } else if (categoryId === "events") {
+      this.syncEventsToRenderer();
     } else {
       this.syncPlacesToRenderer();
       this.syncEducationToRenderer();
       this.syncUsersToRenderer();
       this.syncGamesToRenderer();
       this.syncCommerceToRenderer();
+      this.syncEventsToRenderer();
     }
     this.emit();
   }
@@ -924,11 +1031,15 @@ export class WorldRuntimeController {
     this.renderer
       .getLayerAdapter()
       .setLayerVisibility(WORLD_COMMERCE_LAYER_ID, false);
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_EVENTS_LAYER_ID, false);
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
     this.syncUsersToRenderer();
     this.syncGamesToRenderer();
     this.syncCommerceToRenderer();
+    this.syncEventsToRenderer();
     this.emit();
   }
 
@@ -950,6 +1061,7 @@ export class WorldRuntimeController {
       userSheetOpen: false,
       gameSheetOpen: false,
       commerceSheetOpen: false,
+      eventSheetOpen: false,
     };
     if (isMapLibreRendererAdapter(this.renderer)) {
       this.renderer.clearSelectedPlaceMarker();
@@ -957,12 +1069,14 @@ export class WorldRuntimeController {
       this.renderer.clearSelectedUserMarker();
       this.renderer.clearSelectedGameMarker();
       this.renderer.clearSelectedCommerceMarker();
+      this.renderer.clearSelectedEventMarker();
     }
     this.syncPlacesToRenderer();
     this.syncEducationToRenderer();
     this.syncUsersToRenderer();
     this.syncGamesToRenderer();
     this.syncCommerceToRenderer();
+    this.syncEventsToRenderer();
     this.emit();
   }
 
@@ -998,6 +1112,13 @@ export class WorldRuntimeController {
     if (!isMapLibreRendererAdapter(this.renderer)) return;
     this.renderer.setCommercePressHandler((commerceId) => {
       this.selectCommerce(commerceId);
+    });
+  }
+
+  private bindEventPressHandler(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    this.renderer.setEventPressHandler((eventId) => {
+      this.selectEvent(eventId);
     });
   }
 
@@ -1113,12 +1234,36 @@ export class WorldRuntimeController {
     );
   }
 
+  private syncEventsToRenderer(): void {
+    if (!isMapLibreRendererAdapter(this.renderer)) return;
+    const eventsBound = this.dataPipeline.isKindAvailable("events");
+    if (!eventsBound) {
+      this.renderer.setEventMarkers([]);
+      this.renderer
+        .getLayerAdapter()
+        .setLayerVisibility(WORLD_EVENTS_LAYER_ID, false);
+      return;
+    }
+    const visible = this.selection.selectedCategories.includes(
+      WORLD_EVENTS_LAYER_ID
+    );
+    this.renderer
+      .getLayerAdapter()
+      .setLayerVisibility(WORLD_EVENTS_LAYER_ID, visible);
+    this.renderer.setEventMarkers(
+      visible
+        ? worldEventsToMarkers(this.eventsRegistry.listMappable())
+        : []
+    );
+  }
+
   private async loadPlaces(): Promise<void> {
     this.placeRegistry.clear();
     this.educationRegistry.clear();
     this.usersRegistry.clear();
     this.gamesRegistry.clear();
     this.commerceRegistry.clear();
+    this.eventsRegistry.clear();
     try {
       const bundle = await this.dataPipeline.loadAll();
       this.lastDataBundle = bundle;
@@ -1218,12 +1363,30 @@ export class WorldRuntimeController {
           };
         }
       }
+      if (this.dataPipeline.isKindAvailable("events")) {
+        const eventsAccepted = this.eventsRegistry.registerAll(
+          Array.isArray(bundle.events) ? bundle.events : []
+        );
+        if (
+          eventsAccepted > 0 &&
+          !this.selection.selectedCategories.includes(WORLD_EVENTS_LAYER_ID)
+        ) {
+          this.selection = {
+            ...this.selection,
+            selectedCategories: [
+              ...this.selection.selectedCategories,
+              WORLD_EVENTS_LAYER_ID,
+            ],
+          };
+        }
+      }
     } catch {
       this.placeRegistry.clear();
       this.educationRegistry.clear();
       this.usersRegistry.clear();
       this.gamesRegistry.clear();
       this.commerceRegistry.clear();
+      this.eventsRegistry.clear();
       this.lastDataBundle = null;
     }
     this.syncPlacesToRenderer();
@@ -1231,6 +1394,7 @@ export class WorldRuntimeController {
     this.syncUsersToRenderer();
     this.syncGamesToRenderer();
     this.syncCommerceToRenderer();
+    this.syncEventsToRenderer();
   }
 
   private async runLoadCycle(): Promise<void> {
@@ -1302,6 +1466,7 @@ export class WorldRuntimeController {
         userSheetOpen: false,
         gameSheetOpen: false,
         commerceSheetOpen: false,
+        eventSheetOpen: false,
       };
       if (isMapLibreRendererAdapter(this.renderer)) {
         this.renderer.clearSelectedPlaceMarker();
@@ -1309,6 +1474,7 @@ export class WorldRuntimeController {
         this.renderer.clearSelectedUserMarker();
         this.renderer.clearSelectedGameMarker();
         this.renderer.clearSelectedCommerceMarker();
+        this.renderer.clearSelectedEventMarker();
       }
       this.emit();
     } catch (err) {

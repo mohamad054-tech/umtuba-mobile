@@ -67,6 +67,7 @@ export type WorldUiSelectionState = {
   userSheetOpen: boolean;
   gameSheetOpen: boolean;
   commerceSheetOpen: boolean;
+  eventSheetOpen: boolean;
 };
 
 export type WorldPlaceLayerControlState = {
@@ -96,6 +97,7 @@ export type WorldExperienceViewState = {
   userSheet: import("@/src/lib/world/users").WorldUserSheetState | null;
   gameSheet: import("@/src/lib/world/games").WorldGameSheetState | null;
   commerceSheet: import("@/src/lib/world/commerce").WorldCommerceSheetState | null;
+  eventSheet: import("@/src/lib/world/events").WorldEventSheetState | null;
   /** Trusted entities from Runtime (e.g. Places). */
   entities: WorldEntity[];
   attribution: string;
@@ -163,6 +165,7 @@ export function createDefaultWorldUiSelection(): WorldUiSelectionState {
     userSheetOpen: false,
     gameSheetOpen: false,
     commerceSheetOpen: false,
+    eventSheetOpen: false,
   };
 }
 
@@ -277,6 +280,7 @@ export function buildWorldExperienceViewState(options?: {
   userSheet?: import("@/src/lib/world/users").WorldUserSheetState | null;
   gameSheet?: import("@/src/lib/world/games").WorldGameSheetState | null;
   commerceSheet?: import("@/src/lib/world/commerce").WorldCommerceSheetState | null;
+  eventSheet?: import("@/src/lib/world/events").WorldEventSheetState | null;
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -304,6 +308,7 @@ export function buildWorldExperienceViewState(options?: {
   const userSheet = options?.userSheet ?? null;
   const gameSheet = options?.gameSheet ?? null;
   const commerceSheet = options?.commerceSheet ?? null;
+  const eventSheet = options?.eventSheet ?? null;
 
   if (loading) {
     return {
@@ -328,6 +333,7 @@ export function buildWorldExperienceViewState(options?: {
       userSheet: null,
       gameSheet: null,
       commerceSheet: null,
+      eventSheet: null,
       entities: [],
       attribution,
       renderer: snapshot.renderer ?? rendererAdapter.capability,
@@ -354,6 +360,7 @@ export function buildWorldExperienceViewState(options?: {
       userSheet: null,
       gameSheet: null,
       commerceSheet: null,
+      eventSheet: null,
       entities: [],
       attribution,
       renderer: rendererAdapter.capability,
@@ -394,6 +401,7 @@ export function buildWorldExperienceViewState(options?: {
     userSheet,
     gameSheet,
     commerceSheet,
+    eventSheet,
     entities,
     attribution,
     renderer: snapshot.renderer ?? rendererAdapter.capability,

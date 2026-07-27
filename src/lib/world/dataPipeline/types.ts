@@ -103,10 +103,22 @@ export type WorldCommerceRecord = {
   published: boolean;
 };
 
-/** Event nodes — empty until a real provider binds. */
+export type WorldEventKind =
+  | "conference"
+  | "workshop"
+  | "meetup"
+  | "festival"
+  | "tournament"
+  | "live_event";
+
+/** Event nodes — provider-backed map points. */
 export type WorldEventRecord = {
   id: string;
-  title: string;
+  eventName: string;
+  /** @deprecated Prefer `eventName` — kept for pipeline compatibility during transition. */
+  title?: string;
+  eventType: WorldEventKind;
+  cityName: string;
   latitude: number | null;
   longitude: number | null;
 };

@@ -8,6 +8,7 @@ export const colors = {
   textSubtle: "rgba(255,255,255,0.35)",
   accentViolet: "#8b5cf6",
   accentCyan: "#22d3ee",
+  accentAmber: "#fbbf24",
   border: "rgba(255,255,255,0.10)",
   borderStrong: "rgba(255,255,255,0.18)",
   danger: "#f87171",

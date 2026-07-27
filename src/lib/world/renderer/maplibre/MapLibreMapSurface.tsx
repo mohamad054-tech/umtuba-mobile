@@ -11,6 +11,7 @@ import {
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
 import { MapLibreCommerceLayer } from "@/src/lib/world/renderer/maplibre/MapLibreCommerceLayer";
 import { MapLibreEducationLayer } from "@/src/lib/world/renderer/maplibre/MapLibreEducationLayer";
+import { MapLibreEventsLayer } from "@/src/lib/world/renderer/maplibre/MapLibreEventsLayer";
 import { MapLibreGamesLayer } from "@/src/lib/world/renderer/maplibre/MapLibreGamesLayer";
 import { MapLibrePlacesLayer } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesLayer";
 import { MapLibreUsersLayer } from "@/src/lib/world/renderer/maplibre/MapLibreUsersLayer";
@@ -116,6 +117,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
         <MapLibreUsersLayer adapter={adapter} />
         <MapLibreGamesLayer adapter={adapter} />
         <MapLibreCommerceLayer adapter={adapter} />
+        <MapLibreEventsLayer adapter={adapter} />
       </Map>
     </View>
   );

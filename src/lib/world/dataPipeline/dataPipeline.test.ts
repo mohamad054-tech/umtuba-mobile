@@ -57,12 +57,13 @@ describe("WorldDataPipeline provider resolution", () => {
     expect((await pipeline.loadEducation()).length).toBeGreaterThan(0);
     expect((await pipeline.loadGames()).length).toBeGreaterThan(0);
     expect((await pipeline.loadCommerce()).length).toBeGreaterThan(0);
-    expect(await pipeline.loadEvents()).toEqual([]);
+    expect((await pipeline.loadEvents()).length).toBeGreaterThan(0);
     const bundle = await pipeline.loadAll();
     expect(bundle.places.length).toBe(places.length);
     expect(bundle.users.length).toBeGreaterThan(0);
     expect(bundle.games.length).toBeGreaterThan(0);
     expect(bundle.commerce.length).toBeGreaterThan(0);
+    expect(bundle.events.length).toBeGreaterThan(0);
   });
 
   it("adapts Places foundation provider into the pipeline", async () => {
@@ -132,7 +133,7 @@ describe("WorldDataPipeline missing provider fail-closed", () => {
 });
 
 describe("Runtime integration via WorldDataPipeline", () => {
-  it("loads places, users, education, games, and commerce through the pipeline and keeps events empty", async () => {
+  it("loads places, users, education, games, commerce, and events through the pipeline", async () => {
     const controller = createWorldRuntimeController({ yieldMs: 0 });
     await controller.start();
     expect(controller.getRuntimeState().placeProviderBound).toBe(true);
@@ -145,7 +146,8 @@ describe("Runtime integration via WorldDataPipeline", () => {
     expect(bundle!.education.length).toBeGreaterThan(0);
     expect(bundle!.games.length).toBeGreaterThan(0);
     expect(bundle!.commerce.length).toBeGreaterThan(0);
-    expect(bundle!.events).toEqual([]);
+    expect(bundle!.events.length).toBeGreaterThan(0);
+    expect(controller.getEventsRegistry().size()).toBeGreaterThan(0);
   });
 
   it("fail-closes places when placeProvider is null without breaking runtime", async () => {

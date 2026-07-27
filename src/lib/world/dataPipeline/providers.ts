@@ -326,6 +326,58 @@ const DEMO_COMMERCE_RECORDS: WorldCommerceRecord[] = [
   },
 ];
 
+/** Development-only demo events layer records — approximate public coords only. */
+const DEMO_EVENT_RECORDS: WorldEventRecord[] = [
+  {
+    id: "event-conference-amman",
+    eventName: "Amman Tech Conference",
+    eventType: "conference",
+    cityName: "Amman",
+    latitude: 31.953,
+    longitude: 35.91,
+  },
+  {
+    id: "event-workshop-cairo",
+    eventName: "Cairo Design Workshop",
+    eventType: "workshop",
+    cityName: "Cairo",
+    latitude: 30.044,
+    longitude: 31.235,
+  },
+  {
+    id: "event-meetup-riyadh",
+    eventName: "Riyadh Developer Meetup",
+    eventType: "meetup",
+    cityName: "Riyadh",
+    latitude: 24.713,
+    longitude: 46.675,
+  },
+  {
+    id: "event-festival-dubai",
+    eventName: "Dubai Arts Festival",
+    eventType: "festival",
+    cityName: "Dubai",
+    latitude: 25.204,
+    longitude: 55.271,
+  },
+  {
+    id: "event-tournament-amman",
+    eventName: "Amman Chess Tournament",
+    eventType: "tournament",
+    cityName: "Amman",
+    latitude: 31.949,
+    longitude: 35.928,
+  },
+  {
+    id: "event-live-cairo",
+    eventName: "Nile Live Showcase",
+    eventType: "live_event",
+    cityName: "Cairo",
+    latitude: 30.05,
+    longitude: 31.24,
+  },
+];
+
 export function createDemoGamesDataProvider(): WorldGamesDataProvider {
   return {
     id: DEMO_GAMES_DATA_PROVIDER_ID,
@@ -376,7 +428,7 @@ export function createDemoEventsDataProvider(): WorldEventsDataProvider {
     kind: "events",
     isAvailable: () => true,
     async listEvents(): Promise<WorldEventRecord[]> {
-      return [];
+      return DEMO_EVENT_RECORDS.map((row) => ({ ...row }));
     },
   };
 }

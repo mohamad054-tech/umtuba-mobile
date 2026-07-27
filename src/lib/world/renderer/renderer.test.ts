@@ -200,6 +200,11 @@ describe("runtime + renderer integration", () => {
     controller.toggleLayer("businesses", true);
     expect(renderer.getLayerAdapter().isLayerVisible("businesses")).toBe(true);
 
+    controller.toggleLayer("events", true);
+    expect(renderer.getLayerAdapter().isLayerVisible("events")).toBe(false);
+    controller.toggleLayer("events", true);
+    expect(renderer.getLayerAdapter().isLayerVisible("events")).toBe(true);
+
     if (!isMapLibreRendererAdapter(renderer)) {
       throw new Error("expected MapLibre adapter");
     }

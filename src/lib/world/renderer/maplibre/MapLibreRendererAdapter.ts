@@ -7,6 +7,8 @@
 import type { WorldCamera } from "@/src/lib/world/types";
 import type { WorldCommerceMarker } from "@/src/lib/world/commerce";
 import { COMMERCE_FOCUS_ZOOM } from "@/src/lib/world/commerce";
+import type { WorldEventMarker } from "@/src/lib/world/events";
+import { EVENT_FOCUS_ZOOM } from "@/src/lib/world/events";
 import type { WorldEducationMarker } from "@/src/lib/world/education";
 import type { WorldGameMarker } from "@/src/lib/world/games";
 import { GAME_FOCUS_ZOOM } from "@/src/lib/world/games";
@@ -41,6 +43,7 @@ export type EducationPressHandler = (educationId: string) => void;
 export type UserPressHandler = (userId: string) => void;
 export type GamePressHandler = (gameId: string) => void;
 export type CommercePressHandler = (commerceId: string) => void;
+export type EventPressHandler = (eventId: string) => void;
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -95,6 +98,13 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   clearSelectedCommerceMarker(): void;
   setCommercePressHandler(handler: CommercePressHandler | null): void;
   reportCommercePress(commerceId: string): void;
+  setEventMarkers(markers: WorldEventMarker[]): void;
+  getEventMarkers(): WorldEventMarker[];
+  getSelectedEventMarkerId(): string | null;
+  setSelectedEventMarkerId(eventId: string | null): void;
+  clearSelectedEventMarker(): void;
+  setEventPressHandler(handler: EventPressHandler | null): void;
+  reportEventPress(eventId: string): void;
   /** Programmatic camera focus (selection / cluster expand). */
   focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
@@ -138,6 +148,9 @@ export function createMapLibreRendererAdapter(options?: {
   let commerceMarkers: WorldCommerceMarker[] = [];
   let selectedCommerceMarkerId: string | null = null;
   let commercePressHandler: CommercePressHandler | null = null;
+  let eventMarkers: WorldEventMarker[] = [];
+  let selectedEventMarkerId: string | null = null;
+  let eventPressHandler: EventPressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -366,6 +379,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     clearSelectedPlaceMarker(): void {
@@ -385,6 +399,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       // Focus camera on selection for professional UX.
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
@@ -437,6 +452,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     clearSelectedEducationMarker(): void {
@@ -456,6 +472,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -507,6 +524,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     clearSelectedUserMarker(): void {
@@ -526,6 +544,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedGameMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -575,6 +594,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     clearSelectedGameMarker(): void {
@@ -594,6 +614,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -622,6 +643,7 @@ export function createMapLibreRendererAdapter(options?: {
         !commerceMarkers.some((m) => m.id === selectedCommerceMarkerId)
       ) {
         selectedCommerceMarkerId = null;
+        selectedEventMarkerId = null;
       }
       bump();
     },
@@ -635,6 +657,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (commerceId == null) {
         if (selectedCommerceMarkerId == null) return;
         selectedCommerceMarkerId = null;
+        selectedEventMarkerId = null;
         bump();
         return;
       }
@@ -645,11 +668,13 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     clearSelectedCommerceMarker(): void {
       if (selectedCommerceMarkerId == null) return;
       selectedCommerceMarkerId = null;
+      selectedEventMarkerId = null;
       bump();
     },
     setCommercePressHandler(handler: CommercePressHandler | null): void {
@@ -664,6 +689,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
+      selectedEventMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -679,6 +705,78 @@ export function createMapLibreRendererAdapter(options?: {
       bump();
       try {
         commercePressHandler?.(commerceId);
+      } catch {
+        // Fail-closed.
+      }
+    },
+    setEventMarkers(markers: WorldEventMarker[]): void {
+      eventMarkers = Array.isArray(markers)
+        ? markers.map((m) => ({ ...m }))
+        : [];
+      if (
+        selectedEventMarkerId &&
+        !eventMarkers.some((m) => m.id === selectedEventMarkerId)
+      ) {
+        selectedEventMarkerId = null;
+      }
+      bump();
+    },
+    getEventMarkers(): WorldEventMarker[] {
+      return eventMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedEventMarkerId(): string | null {
+      return selectedEventMarkerId;
+    },
+    setSelectedEventMarkerId(eventId: string | null): void {
+      if (eventId == null) {
+        if (selectedEventMarkerId == null) return;
+        selectedEventMarkerId = null;
+        bump();
+        return;
+      }
+      if (!eventMarkers.some((m) => m.id === eventId)) return;
+      if (selectedEventMarkerId === eventId) return;
+      selectedEventMarkerId = eventId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
+      bump();
+    },
+    clearSelectedEventMarker(): void {
+      if (selectedEventMarkerId == null) return;
+      selectedEventMarkerId = null;
+      bump();
+    },
+    setEventPressHandler(handler: EventPressHandler | null): void {
+      eventPressHandler = handler;
+    },
+    reportEventPress(eventId: string): void {
+      if (!eventId || typeof eventId !== "string") return;
+      const marker = eventMarkers.find((m) => m.id === eventId);
+      if (!marker) return;
+      selectedEventMarkerId = eventId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, EVENT_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
+      bump();
+      try {
+        eventPressHandler?.(eventId);
       } catch {
         // Fail-closed.
       }

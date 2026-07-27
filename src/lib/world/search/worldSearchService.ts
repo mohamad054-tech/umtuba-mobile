@@ -1,10 +1,12 @@
 import type {
   WorldCommerceRecord,
   WorldEducationRecord,
+  WorldEventRecord,
   WorldGameRecord,
   WorldUserRecord,
 } from "@/src/lib/world/dataPipeline/types";
 import { formatWorldCommerceKindLabel } from "@/src/lib/world/commerce";
+import { formatWorldEventKindLabel } from "@/src/lib/world/events";
 import {
   formatWorldEducationKindLabel,
 } from "@/src/lib/world/education/types";
@@ -182,8 +184,34 @@ function matchCommerce(row: WorldCommerceRecord, q: string): boolean {
   );
 }
 
+function eventToResult(row: WorldEventRecord): WorldSearchResult {
+  const hasCoords =
+    typeof row.latitude === "number" &&
+    typeof row.longitude === "number" &&
+    Number.isFinite(row.latitude) &&
+    Number.isFinite(row.longitude);
+  return {
+    id: row.id,
+    title: row.eventName,
+    subtitle: `${formatWorldEventKindLabel(row.eventType)} · ${row.cityName}`,
+    kind: "Event",
+    coordinates: hasCoords
+      ? { latitude: row.latitude as number, longitude: row.longitude as number }
+      : null,
+    sourceType: "events",
+  };
+}
+
+function matchEvent(row: WorldEventRecord, q: string): boolean {
+  return (
+    includesNormalized(row.eventName ?? "", q) ||
+    includesNormalized(row.cityName ?? "", q) ||
+    includesNormalized(formatWorldEventKindLabel(row.eventType), q)
+  );
+}
+
 /**
- * Pure search over Places + Education + Users + Games + Commerce.
+ * Pure search over Places + Education + Users + Games + Commerce + Events.
  * Dataset must come from WorldDataPipeline-backed Runtime registries.
  */
 export function createWorldSearchService(): WorldSearchService {
@@ -211,6 +239,7 @@ export function createWorldSearchService(): WorldSearchService {
         const commerce = Array.isArray(dataset?.commerce)
           ? dataset.commerce
           : [];
+        const events = Array.isArray(dataset?.events) ? dataset.events : [];
 
         const results: WorldSearchResult[] = [];
 
@@ -257,6 +286,15 @@ export function createWorldSearchService(): WorldSearchService {
           if (results.length >= limit) return results;
         }
 
+        for (const row of events) {
+          if (!row?.id) continue;
+          if (!matchEvent(row, q)) continue;
+          const hit = eventToResult(row);
+          if (!hit.title) continue;
+          results.push(hit);
+          if (results.length >= limit) return results;
+        }
+
         return results;
       } catch {
         return [];
@@ -275,11 +313,13 @@ export function buildWorldSearchDataset(options: {
   usersAvailable: boolean;
   gamesAvailable: boolean;
   commerceAvailable: boolean;
+  eventsAvailable: boolean;
   places: WorldPlace[];
   education: WorldEducationRecord[];
   users: WorldUserRecord[];
   games: WorldGameRecord[];
   commerce: WorldCommerceRecord[];
+  events: WorldEventRecord[];
 }): WorldSearchDataset {
   return {
     places: options.placesAvailable
@@ -305,6 +345,11 @@ export function buildWorldSearchDataset(options: {
     commerce: options.commerceAvailable
       ? Array.isArray(options.commerce)
         ? options.commerce
+        : []
+      : [],
+    events: options.eventsAvailable
+      ? Array.isArray(options.events)
+        ? options.events
         : []
       : [],
   };

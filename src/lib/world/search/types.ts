@@ -8,7 +8,8 @@ export type WorldSearchSourceType =
   | "education"
   | "users"
   | "games"
-  | "commerce";
+  | "commerce"
+  | "events";
 
 export type WorldSearchResult = {
   id: string;
@@ -29,6 +30,7 @@ export type WorldSearchDataset = {
   users: import("@/src/lib/world/dataPipeline").WorldUserRecord[];
   games: import("@/src/lib/world/dataPipeline").WorldGameRecord[];
   commerce: import("@/src/lib/world/dataPipeline").WorldCommerceRecord[];
+  events: import("@/src/lib/world/dataPipeline").WorldEventRecord[];
 };
 
 export type WorldSearchService = {

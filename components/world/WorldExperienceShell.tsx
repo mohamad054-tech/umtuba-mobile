@@ -7,6 +7,7 @@ import {
 } from "@/components/world/WorldControls";
 import { WorldHeader } from "@/components/world/WorldHeader";
 import { WorldCommerceBottomSheet } from "@/components/world/WorldCommerceBottomSheet";
+import { WorldEventBottomSheet } from "@/components/world/WorldEventBottomSheet";
 import { WorldEducationBottomSheet } from "@/components/world/WorldEducationBottomSheet";
 import { WorldGameBottomSheet } from "@/components/world/WorldGameBottomSheet";
 import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
@@ -132,6 +133,11 @@ export function WorldExperienceShell({
         />
         <WorldCommerceBottomSheet
           sheet={view.commerceSheet}
+          bottomInset={bottomInset}
+          onClose={onCloseDetails}
+        />
+        <WorldEventBottomSheet
+          sheet={view.eventSheet}
           bottomInset={bottomInset}
           onClose={onCloseDetails}
         />
