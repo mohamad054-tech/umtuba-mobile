@@ -256,6 +256,76 @@ export function createUnboundEducationDataProvider(): WorldEducationDataProvider
   };
 }
 
+/** Development-only demo commerce layer records — approximate public coords only. */
+const DEMO_COMMERCE_RECORDS: WorldCommerceRecord[] = [
+  {
+    id: "commerce-store-amman",
+    name: "Rainbow Market Store",
+    commerceType: "store",
+    cityName: "Amman",
+    brandName: "Rainbow Market",
+    latitude: 31.955,
+    longitude: 35.928,
+    mapVisible: true,
+    published: true,
+  },
+  {
+    id: "commerce-restaurant-cairo",
+    name: "Nile Corner Restaurant",
+    commerceType: "restaurant",
+    cityName: "Cairo",
+    brandName: "Nile Corner",
+    latitude: 30.044,
+    longitude: 31.235,
+    mapVisible: true,
+    published: true,
+  },
+  {
+    id: "commerce-market-riyadh",
+    name: "Souq Al-Thumairi",
+    commerceType: "market",
+    cityName: "Riyadh",
+    brandName: null,
+    latitude: 24.713,
+    longitude: 46.675,
+    mapVisible: true,
+    published: true,
+  },
+  {
+    id: "commerce-service-dubai",
+    name: "Marina Tech Service",
+    commerceType: "service",
+    cityName: "Dubai",
+    brandName: "Marina Tech",
+    latitude: 25.198,
+    longitude: 55.279,
+    mapVisible: true,
+    published: true,
+  },
+  {
+    id: "commerce-seller-hub-amman",
+    name: "Amman Seller Hub",
+    commerceType: "seller_hub",
+    cityName: "Amman",
+    brandName: "UM Sellers",
+    latitude: 31.948,
+    longitude: 35.905,
+    mapVisible: true,
+    published: true,
+  },
+  {
+    id: "commerce-hidden-draft",
+    name: "Draft Commerce Node",
+    commerceType: "store",
+    cityName: "Amman",
+    brandName: null,
+    latitude: 31.95,
+    longitude: 35.91,
+    mapVisible: false,
+    published: false,
+  },
+];
+
 export function createDemoGamesDataProvider(): WorldGamesDataProvider {
   return {
     id: DEMO_GAMES_DATA_PROVIDER_ID,
@@ -284,7 +354,7 @@ export function createDemoCommerceDataProvider(): WorldCommerceDataProvider {
     kind: "commerce",
     isAvailable: () => true,
     async listCommerce(): Promise<WorldCommerceRecord[]> {
-      return [];
+      return DEMO_COMMERCE_RECORDS.map((row) => ({ ...row }));
     },
   };
 }

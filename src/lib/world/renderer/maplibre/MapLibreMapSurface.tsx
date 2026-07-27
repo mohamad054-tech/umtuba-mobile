@@ -9,6 +9,7 @@ import {
   MAPLIBRE_DEFAULT_CAMERA,
 } from "@/src/lib/world/renderer/maplibre/cameraNavigation";
 import type { MapLibreRendererAdapter } from "@/src/lib/world/renderer/maplibre/MapLibreRendererAdapter";
+import { MapLibreCommerceLayer } from "@/src/lib/world/renderer/maplibre/MapLibreCommerceLayer";
 import { MapLibreEducationLayer } from "@/src/lib/world/renderer/maplibre/MapLibreEducationLayer";
 import { MapLibreGamesLayer } from "@/src/lib/world/renderer/maplibre/MapLibreGamesLayer";
 import { MapLibrePlacesLayer } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesLayer";
@@ -114,6 +115,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
         <MapLibreEducationLayer adapter={adapter} />
         <MapLibreUsersLayer adapter={adapter} />
         <MapLibreGamesLayer adapter={adapter} />
+        <MapLibreCommerceLayer adapter={adapter} />
       </Map>
     </View>
   );

@@ -5,6 +5,8 @@
  */
 
 import type { WorldCamera } from "@/src/lib/world/types";
+import type { WorldCommerceMarker } from "@/src/lib/world/commerce";
+import { COMMERCE_FOCUS_ZOOM } from "@/src/lib/world/commerce";
 import type { WorldEducationMarker } from "@/src/lib/world/education";
 import type { WorldGameMarker } from "@/src/lib/world/games";
 import { GAME_FOCUS_ZOOM } from "@/src/lib/world/games";
@@ -38,6 +40,7 @@ export type PlacePressHandler = (placeId: string) => void;
 export type EducationPressHandler = (educationId: string) => void;
 export type UserPressHandler = (userId: string) => void;
 export type GamePressHandler = (gameId: string) => void;
+export type CommercePressHandler = (commerceId: string) => void;
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -85,6 +88,13 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   clearSelectedGameMarker(): void;
   setGamePressHandler(handler: GamePressHandler | null): void;
   reportGamePress(gameId: string): void;
+  setCommerceMarkers(markers: WorldCommerceMarker[]): void;
+  getCommerceMarkers(): WorldCommerceMarker[];
+  getSelectedCommerceMarkerId(): string | null;
+  setSelectedCommerceMarkerId(commerceId: string | null): void;
+  clearSelectedCommerceMarker(): void;
+  setCommercePressHandler(handler: CommercePressHandler | null): void;
+  reportCommercePress(commerceId: string): void;
   /** Programmatic camera focus (selection / cluster expand). */
   focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
@@ -125,6 +135,9 @@ export function createMapLibreRendererAdapter(options?: {
   let gameMarkers: WorldGameMarker[] = [];
   let selectedGameMarkerId: string | null = null;
   let gamePressHandler: GamePressHandler | null = null;
+  let commerceMarkers: WorldCommerceMarker[] = [];
+  let selectedCommerceMarkerId: string | null = null;
+  let commercePressHandler: CommercePressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -352,6 +365,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       bump();
     },
     clearSelectedPlaceMarker(): void {
@@ -370,6 +384,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       // Focus camera on selection for professional UX.
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
@@ -421,6 +436,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedPlaceMarkerId = null;
       selectedUserMarkerId = null;
       selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       bump();
     },
     clearSelectedEducationMarker(): void {
@@ -438,6 +454,8 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = educationId;
       selectedPlaceMarkerId = null;
       selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -488,6 +506,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedPlaceMarkerId = null;
       selectedEducationMarkerId = null;
       selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       bump();
     },
     clearSelectedUserMarker(): void {
@@ -505,6 +524,8 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = userId;
       selectedPlaceMarkerId = null;
       selectedEducationMarkerId = null;
+      selectedGameMarkerId = null;
+      selectedCommerceMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -553,6 +574,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedPlaceMarkerId = null;
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
+      selectedCommerceMarkerId = null;
       bump();
     },
     clearSelectedGameMarker(): void {
@@ -571,6 +593,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedPlaceMarkerId = null;
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
+      selectedCommerceMarkerId = null;
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
           {
@@ -586,6 +609,76 @@ export function createMapLibreRendererAdapter(options?: {
       bump();
       try {
         gamePressHandler?.(gameId);
+      } catch {
+        // Fail-closed.
+      }
+    },
+    setCommerceMarkers(markers: WorldCommerceMarker[]): void {
+      commerceMarkers = Array.isArray(markers)
+        ? markers.map((m) => ({ ...m }))
+        : [];
+      if (
+        selectedCommerceMarkerId &&
+        !commerceMarkers.some((m) => m.id === selectedCommerceMarkerId)
+      ) {
+        selectedCommerceMarkerId = null;
+      }
+      bump();
+    },
+    getCommerceMarkers(): WorldCommerceMarker[] {
+      return commerceMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedCommerceMarkerId(): string | null {
+      return selectedCommerceMarkerId;
+    },
+    setSelectedCommerceMarkerId(commerceId: string | null): void {
+      if (commerceId == null) {
+        if (selectedCommerceMarkerId == null) return;
+        selectedCommerceMarkerId = null;
+        bump();
+        return;
+      }
+      if (!commerceMarkers.some((m) => m.id === commerceId)) return;
+      if (selectedCommerceMarkerId === commerceId) return;
+      selectedCommerceMarkerId = commerceId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
+      bump();
+    },
+    clearSelectedCommerceMarker(): void {
+      if (selectedCommerceMarkerId == null) return;
+      selectedCommerceMarkerId = null;
+      bump();
+    },
+    setCommercePressHandler(handler: CommercePressHandler | null): void {
+      commercePressHandler = handler;
+    },
+    reportCommercePress(commerceId: string): void {
+      if (!commerceId || typeof commerceId !== "string") return;
+      const marker = commerceMarkers.find((m) => m.id === commerceId);
+      if (!marker) return;
+      selectedCommerceMarkerId = commerceId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, COMMERCE_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
+      bump();
+      try {
+        commercePressHandler?.(commerceId);
       } catch {
         // Fail-closed.
       }

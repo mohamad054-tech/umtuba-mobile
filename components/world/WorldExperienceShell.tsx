@@ -6,6 +6,7 @@ import {
   WorldLayerSelector,
 } from "@/components/world/WorldControls";
 import { WorldHeader } from "@/components/world/WorldHeader";
+import { WorldCommerceBottomSheet } from "@/components/world/WorldCommerceBottomSheet";
 import { WorldEducationBottomSheet } from "@/components/world/WorldEducationBottomSheet";
 import { WorldGameBottomSheet } from "@/components/world/WorldGameBottomSheet";
 import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
@@ -126,6 +127,11 @@ export function WorldExperienceShell({
         />
         <WorldGameBottomSheet
           sheet={view.gameSheet}
+          bottomInset={bottomInset}
+          onClose={onCloseDetails}
+        />
+        <WorldCommerceBottomSheet
+          sheet={view.commerceSheet}
           bottomInset={bottomInset}
           onClose={onCloseDetails}
         />

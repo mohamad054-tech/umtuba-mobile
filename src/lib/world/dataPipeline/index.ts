@@ -1,5 +1,6 @@
 export type {
   WorldCommerceDataProvider,
+  WorldCommerceKind,
   WorldCommerceRecord,
   WorldDataBundle,
   WorldDataKind,

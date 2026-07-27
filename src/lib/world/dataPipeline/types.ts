@@ -79,12 +79,28 @@ export type WorldGameRecord = {
   longitude: number | null;
 };
 
-/** Commerce nodes — empty until a real provider binds. */
+export type WorldCommerceKind =
+  | "store"
+  | "restaurant"
+  | "market"
+  | "service"
+  | "seller_hub";
+
+/** Commerce nodes — provider-backed map points. */
 export type WorldCommerceRecord = {
   id: string;
-  title: string;
+  name: string;
+  /** @deprecated Prefer `name` — kept for pipeline compatibility during transition. */
+  title?: string;
+  commerceType: WorldCommerceKind;
+  cityName: string;
+  /** Public brand/seller display name when allowed; never private address/phone/email */
+  brandName: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** When false, omit from map/search/sheets */
+  mapVisible: boolean;
+  published: boolean;
 };
 
 /** Event nodes — empty until a real provider binds. */

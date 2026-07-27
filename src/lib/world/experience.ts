@@ -66,6 +66,7 @@ export type WorldUiSelectionState = {
   educationSheetOpen: boolean;
   userSheetOpen: boolean;
   gameSheetOpen: boolean;
+  commerceSheetOpen: boolean;
 };
 
 export type WorldPlaceLayerControlState = {
@@ -94,6 +95,7 @@ export type WorldExperienceViewState = {
   educationSheet: import("@/src/lib/world/education").WorldEducationSheetState | null;
   userSheet: import("@/src/lib/world/users").WorldUserSheetState | null;
   gameSheet: import("@/src/lib/world/games").WorldGameSheetState | null;
+  commerceSheet: import("@/src/lib/world/commerce").WorldCommerceSheetState | null;
   /** Trusted entities from Runtime (e.g. Places). */
   entities: WorldEntity[];
   attribution: string;
@@ -160,6 +162,7 @@ export function createDefaultWorldUiSelection(): WorldUiSelectionState {
     educationSheetOpen: false,
     userSheetOpen: false,
     gameSheetOpen: false,
+    commerceSheetOpen: false,
   };
 }
 
@@ -273,6 +276,7 @@ export function buildWorldExperienceViewState(options?: {
   educationSheet?: import("@/src/lib/world/education").WorldEducationSheetState | null;
   userSheet?: import("@/src/lib/world/users").WorldUserSheetState | null;
   gameSheet?: import("@/src/lib/world/games").WorldGameSheetState | null;
+  commerceSheet?: import("@/src/lib/world/commerce").WorldCommerceSheetState | null;
 }): WorldExperienceViewState {
   const loading = options?.loading === true;
   const errorMessage =
@@ -299,6 +303,7 @@ export function buildWorldExperienceViewState(options?: {
   const educationSheet = options?.educationSheet ?? null;
   const userSheet = options?.userSheet ?? null;
   const gameSheet = options?.gameSheet ?? null;
+  const commerceSheet = options?.commerceSheet ?? null;
 
   if (loading) {
     return {
@@ -322,6 +327,7 @@ export function buildWorldExperienceViewState(options?: {
       educationSheet: null,
       userSheet: null,
       gameSheet: null,
+      commerceSheet: null,
       entities: [],
       attribution,
       renderer: snapshot.renderer ?? rendererAdapter.capability,
@@ -347,6 +353,7 @@ export function buildWorldExperienceViewState(options?: {
       educationSheet: null,
       userSheet: null,
       gameSheet: null,
+      commerceSheet: null,
       entities: [],
       attribution,
       renderer: rendererAdapter.capability,
@@ -386,6 +393,7 @@ export function buildWorldExperienceViewState(options?: {
     educationSheet,
     userSheet,
     gameSheet,
+    commerceSheet,
     entities,
     attribution,
     renderer: snapshot.renderer ?? rendererAdapter.capability,

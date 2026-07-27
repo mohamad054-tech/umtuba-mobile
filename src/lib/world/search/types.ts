@@ -7,7 +7,8 @@ export type WorldSearchSourceType =
   | "places"
   | "education"
   | "users"
-  | "games";
+  | "games"
+  | "commerce";
 
 export type WorldSearchResult = {
   id: string;
@@ -27,6 +28,7 @@ export type WorldSearchDataset = {
   education: import("@/src/lib/world/dataPipeline").WorldEducationRecord[];
   users: import("@/src/lib/world/dataPipeline").WorldUserRecord[];
   games: import("@/src/lib/world/dataPipeline").WorldGameRecord[];
+  commerce: import("@/src/lib/world/dataPipeline").WorldCommerceRecord[];
 };
 
 export type WorldSearchService = {

@@ -1,8 +1,10 @@
 import type {
+  WorldCommerceRecord,
   WorldEducationRecord,
   WorldGameRecord,
   WorldUserRecord,
 } from "@/src/lib/world/dataPipeline/types";
+import { formatWorldCommerceKindLabel } from "@/src/lib/world/commerce";
 import {
   formatWorldEducationKindLabel,
 } from "@/src/lib/world/education/types";
@@ -109,6 +111,25 @@ function gameToResult(row: WorldGameRecord): WorldSearchResult {
   };
 }
 
+function commerceToResult(row: WorldCommerceRecord): WorldSearchResult {
+  const hasCoords =
+    typeof row.latitude === "number" &&
+    typeof row.longitude === "number" &&
+    Number.isFinite(row.latitude) &&
+    Number.isFinite(row.longitude);
+  const brandSuffix = row.brandName ? ` · ${row.brandName}` : "";
+  return {
+    id: row.id,
+    title: row.name,
+    subtitle: `${formatWorldCommerceKindLabel(row.commerceType)} · ${row.cityName}${brandSuffix}`,
+    kind: "Business",
+    coordinates: hasCoords
+      ? { latitude: row.latitude as number, longitude: row.longitude as number }
+      : null,
+    sourceType: "commerce",
+  };
+}
+
 function matchPlace(place: WorldPlace, q: string): boolean {
   return (
     includesNormalized(place.name, q) ||
@@ -151,8 +172,18 @@ function matchGame(row: WorldGameRecord, q: string): boolean {
   );
 }
 
+function matchCommerce(row: WorldCommerceRecord, q: string): boolean {
+  return (
+    includesNormalized(row.name ?? "", q) ||
+    includesNormalized(row.cityName ?? "", q) ||
+    includesNormalized(formatWorldCommerceKindLabel(row.commerceType), q) ||
+    (typeof row.brandName === "string" &&
+      includesNormalized(row.brandName, q))
+  );
+}
+
 /**
- * Pure search over Places + Education + Users + Games.
+ * Pure search over Places + Education + Users + Games + Commerce.
  * Dataset must come from WorldDataPipeline-backed Runtime registries.
  */
 export function createWorldSearchService(): WorldSearchService {
@@ -177,6 +208,9 @@ export function createWorldSearchService(): WorldSearchService {
           : [];
         const users = Array.isArray(dataset?.users) ? dataset.users : [];
         const games = Array.isArray(dataset?.games) ? dataset.games : [];
+        const commerce = Array.isArray(dataset?.commerce)
+          ? dataset.commerce
+          : [];
 
         const results: WorldSearchResult[] = [];
 
@@ -214,6 +248,15 @@ export function createWorldSearchService(): WorldSearchService {
           if (results.length >= limit) return results;
         }
 
+        for (const row of commerce) {
+          if (!row?.id) continue;
+          if (!matchCommerce(row, q)) continue;
+          const hit = commerceToResult(row);
+          if (!hit.title) continue;
+          results.push(hit);
+          if (results.length >= limit) return results;
+        }
+
         return results;
       } catch {
         return [];
@@ -231,10 +274,12 @@ export function buildWorldSearchDataset(options: {
   educationAvailable: boolean;
   usersAvailable: boolean;
   gamesAvailable: boolean;
+  commerceAvailable: boolean;
   places: WorldPlace[];
   education: WorldEducationRecord[];
   users: WorldUserRecord[];
   games: WorldGameRecord[];
+  commerce: WorldCommerceRecord[];
 }): WorldSearchDataset {
   return {
     places: options.placesAvailable
@@ -255,6 +300,11 @@ export function buildWorldSearchDataset(options: {
     games: options.gamesAvailable
       ? Array.isArray(options.games)
         ? options.games
+        : []
+      : [],
+    commerce: options.commerceAvailable
+      ? Array.isArray(options.commerce)
+        ? options.commerce
         : []
       : [],
   };

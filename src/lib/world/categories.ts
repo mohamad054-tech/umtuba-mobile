@@ -13,7 +13,7 @@ const CATEGORY_CATALOG: WorldCategoryDefinition[] = [
   { id: "education", label: "Education", supported: true },
   { id: "games", label: "Games", supported: true },
   { id: "events", label: "Events", supported: false },
-  { id: "businesses", label: "Businesses", supported: false },
+  { id: "businesses", label: "Businesses", supported: true },
   { id: "ai", label: "AI", supported: false },
   { id: "future", label: "Future", supported: false },
 ];
