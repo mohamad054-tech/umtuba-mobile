@@ -1,3 +1,4 @@
+import { createTerrainMapSourceExperience } from "@/src/lib/world/mapSource/experience";
 import type { WorldMapSource } from "@/src/lib/world/mapSource/types";
 
 export const TERRAIN_MAP_SOURCE_ID = "world-map-source-terrain" as const;
@@ -28,6 +29,7 @@ export const TERRAIN_MAP_STYLE_URL = `data:application/json,${encodeURIComponent
 )}`;
 
 export function createTerrainMapSource(): WorldMapSource {
+  const experience = createTerrainMapSourceExperience();
   return {
     id: TERRAIN_MAP_SOURCE_ID,
     kind: "terrain",
@@ -40,6 +42,9 @@ export function createTerrainMapSource(): WorldMapSource {
     },
     getAttribution(): string {
       return TERRAIN_MAP_ATTRIBUTION;
+    },
+    getExperience() {
+      return experience;
     },
   };
 }

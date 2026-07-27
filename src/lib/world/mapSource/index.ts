@@ -2,7 +2,24 @@ export type {
   WorldMapSource,
   WorldMapSourceKind,
 } from "@/src/lib/world/mapSource/types";
-export { isWorldMapSourceAvailable } from "@/src/lib/world/mapSource/types";
+export {
+  getMapSourceExperience,
+  isWorldMapSourceAvailable,
+} from "@/src/lib/world/mapSource/types";
+export type {
+  WorldMapSourceExperience,
+  WorldVectorOverlaySpec,
+} from "@/src/lib/world/mapSource/experience";
+export {
+  createDemoMapSourceExperience,
+  createEmptyMapSourceExperience,
+  createSatelliteMapSourceExperience,
+  createStreetMapSourceExperience,
+  createTerrainMapSourceExperience,
+  mapSourceExperienceForKind,
+  OPENFREEMAP_VECTOR_ATTRIBUTION,
+  OPENFREEMAP_VECTOR_TILES_URL,
+} from "@/src/lib/world/mapSource/experience";
 export {
   createDemoMapSource,
   DEMO_MAP_ATTRIBUTION,

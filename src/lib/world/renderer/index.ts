@@ -36,3 +36,20 @@ export {
   MERCATOR_AUTO_MIN_ZOOM,
   resolveAutoProjection,
 } from "@/src/lib/world/renderer/maplibre/projection";
+export {
+  BUILDINGS_2D_MIN_ZOOM,
+  BUILDINGS_3D_MIN_ZOOM,
+  isWorldBuildingsMode,
+  isWorldRoadDetail,
+  openMapTilesClassFilter,
+  resolveBuildingsVisibility,
+  resolveEffectiveBuildingsMode,
+  resolveRoadClassVisibility,
+  ROAD_CLASS_MIN_ZOOM,
+  ROAD_LABEL_MIN_ZOOM,
+  type BuildingsVisibility,
+  type RoadClassVisibility,
+  type WorldBuildingsMode,
+  type WorldRoadClass,
+  type WorldRoadDetail,
+} from "@/src/lib/world/renderer/maplibre/roadsBuildings";

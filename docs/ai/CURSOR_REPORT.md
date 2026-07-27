@@ -1,30 +1,28 @@
-# CURSOR_REPORT — World Globe Experience V1
+# Cursor Report — World Roads & Buildings Experience V1
 
 ## Summary
 
-Implemented World Globe Experience V1 with architecture-correct fail-closed projection handling. MapLibre Native does not support native globe projection yet (no `Map.projection`; MapLibre Native issue #3161), so V1 ships the full ProjectionAdapter + Runtime policy layer while staying on Mercator at runtime.
-
-- Extended `ProjectionAdapter` with `getProjection()` / `setProjection()` and `RendererCapabilities` with `supportsGlobe` / `supportsProjectionSwitch`.
-- MapLibre adapter: `supportsGlobe: false`, `supportsProjectionSwitch: true`; globe attempts return false without crash, camera/markers/layers/style preserved.
-- Runtime owns `projectionPreference` (`auto` | `globe` | `map`), applies zoom-based auto policy via `resolveAutoProjection` with hysteresis (4.2 / 5.0), subscribes to renderer camera sync for auto mode.
-- UI: `WorldProjectionSelector` Globe/Map chips wired through Runtime view state — no MapLibre imports in UI.
+Added Roads & Buildings experience for World maps via Runtime preferences + MapSource-owned vector overlays + MapLibre renderer layers. UI never imports MapLibre. Preferences (`roadDetail`, `buildings`) apply without Runtime reinitialization and preserve camera, selection, layers, and map source. Fail-closed: unsupported 3D falls back to 2D/off; missing overlays stay Mercator basemap-only.
 
 ## Exact files changed
 
+### New
+- `components/world/WorldMapExperienceSelector.tsx`
+- `src/lib/world/mapSource/experience.ts`
+- `src/lib/world/renderer/maplibre/roadsBuildings.ts`
+- `src/lib/world/renderer/maplibre/MapLibreRoadsBuildingsLayer.tsx`
+- `src/lib/world/renderer/roadsBuildings.test.ts`
+
+### Modified
 - `app/world.tsx`
 - `components/world/WorldExperienceShell.tsx`
-- `components/world/WorldProjectionSelector.tsx` (new)
-- `docs/ai/CURSOR_REPORT.md`
 - `src/lib/world/experience.ts`
 - `src/lib/world/index.ts`
-- `src/lib/world/renderer/globe.test.ts` (new)
-- `src/lib/world/renderer/index.ts`
-- `src/lib/world/renderer/maplibre/MapLibreRendererAdapter.ts`
-- `src/lib/world/renderer/maplibre/projection.ts` (new)
-- `src/lib/world/renderer/nullRenderer.ts`
-- `src/lib/world/renderer/renderer.test.ts`
-- `src/lib/world/renderer/types.ts`
+- `src/lib/world/mapSource/{types,index,street,satellite,terrain}MapSource.ts`
+- `src/lib/world/renderer/{index,types via caps,null N/A,renderer.test}.ts`
+- `src/lib/world/renderer/maplibre/{MapLibreRendererAdapter,MapLibreMapSurface}.ts(x)`
 - `src/lib/world/runtime/controller.ts`
+- `docs/ai/CURSOR_REPORT.md`
 
 ## Migrations created
 
@@ -32,47 +30,32 @@ None.
 
 ## Security review
 
-- UI never imports MapLibre; projection flows Runtime → ProjectionAdapter only.
-- Fail-closed: unsupported globe returns false, stays Mercator, no crash, no camera/selection/layer/map-source reset.
-- No WebView or alternate map engine added.
-- No secrets or tile URLs exposed through projection controls.
+- No secrets / `.env` changes.
+- Tile URLs remain owned by MapSource (`experience.ts`); renderer receives overlay specs from Runtime only.
+- UI has no MapLibre / tile URL access.
 
 ## Tests
 
-PASS (`npm test`) — **332/332** tests passed.
-
-New coverage in `globe.test.ts`:
-- `resolveAutoProjection` hysteresis unit tests
-- Null renderer caps: both globe flags false
-- MapLibre caps: `supportsProjectionSwitch: true`, `supportsGlobe: false`
-- MapLibre `setProjection("globe")` fail-closed; mercator succeeds; camera unchanged
-- `buildWorldProjectionControls` enabled/disabled logic
-- Runtime manual `setProjectionPreference` globe/map
-- Runtime auto zoom switching with globe-capable mock renderer (no reinit)
-- Fallback when globe unsupported keeps Mercator; Map chip active
-- Selection, registries, map source, data bundle preserved across preference switch
-- MapLibre runtime stays Mercator on globe preference
-
-Updated in `renderer.test.ts`:
-- New capability fields on null and MapLibre adapters
-- Projection adapter get/set tests on MapLibre
+**347/347 PASS** (42 files)
 
 ## TypeScript
 
-PASS (`npx tsc --noEmit`).
+**PASS** (`npx tsc --noEmit`)
 
 ## Build
 
-Not run (not required for this feature scope).
+Not run (EAS Build deferred per task note).
 
 ## git diff --check
 
-PASS.
+**PASS**
 
 ## git status --short
 
-Modified/added files listed above. Pre-existing untracked local files (`build.json*`, other `docs/ai/*.md` except this report) untouched.
+(see after commit)
 
 ## Open issues
 
-Native globe projection unavailable on MapLibre React Native v11 until MapLibre Native adds globe support (issue #3161). When available, enable `supportsGlobe: true` in MapLibre adapter and wire native projection API in `setProjection` — Runtime/UI/policy layer is ready.
+- Streets basemap (OpenFreeMap liberty) already paints roads/2D buildings; road-detail overlays apply primarily on Satellite/Terrain; 3D buildings use vector overlay when supported.
+- Terrain source intentionally disables buildings 3D (`supportsBuildings3d: false`).
+- 3D is never auto-enabled (default buildings preference is `2d`).

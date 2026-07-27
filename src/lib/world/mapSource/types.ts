@@ -3,6 +3,9 @@
  * Renderers must not hardcode tile URLs; Runtime resolves sources via Registry.
  */
 
+import type { WorldMapSourceExperience } from "@/src/lib/world/mapSource/experience";
+import { createEmptyMapSourceExperience } from "@/src/lib/world/mapSource/experience";
+
 export type WorldMapSourceKind =
   | "demo"
   | "street"
@@ -25,7 +28,25 @@ export type WorldMapSource = {
    */
   getStyleUrl(): string | null;
   getAttribution(): string;
+  /**
+   * Roads / buildings basemap experience for this source.
+   * Optional — defaults to empty (no overlays) when omitted.
+   */
+  getExperience?(): WorldMapSourceExperience;
 };
+
+export function getMapSourceExperience(
+  source: WorldMapSource | null | undefined
+): WorldMapSourceExperience {
+  if (!source) return createEmptyMapSourceExperience();
+  try {
+    const exp = source.getExperience?.();
+    if (exp) return exp;
+  } catch {
+    // Fail-closed.
+  }
+  return createEmptyMapSourceExperience();
+}
 
 export function isWorldMapSourceAvailable(
   source: WorldMapSource | null | undefined

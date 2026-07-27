@@ -14,6 +14,7 @@ import { MapLibreEducationLayer } from "@/src/lib/world/renderer/maplibre/MapLib
 import { MapLibreEventsLayer } from "@/src/lib/world/renderer/maplibre/MapLibreEventsLayer";
 import { MapLibreGamesLayer } from "@/src/lib/world/renderer/maplibre/MapLibreGamesLayer";
 import { MapLibrePlacesLayer } from "@/src/lib/world/renderer/maplibre/MapLibrePlacesLayer";
+import { MapLibreRoadsBuildingsLayer } from "@/src/lib/world/renderer/maplibre/MapLibreRoadsBuildingsLayer";
 import { MapLibreUsersLayer } from "@/src/lib/world/renderer/maplibre/MapLibreUsersLayer";
 
 type MapLibreMapSurfaceProps = {
@@ -112,6 +113,7 @@ export function MapLibreMapSurface({ adapter }: MapLibreMapSurfaceProps) {
           duration={MAPLIBRE_CAMERA_ANIMATION_MS}
           easing="ease"
         />
+        <MapLibreRoadsBuildingsLayer adapter={adapter} />
         <MapLibrePlacesLayer adapter={adapter} />
         <MapLibreEducationLayer adapter={adapter} />
         <MapLibreUsersLayer adapter={adapter} />

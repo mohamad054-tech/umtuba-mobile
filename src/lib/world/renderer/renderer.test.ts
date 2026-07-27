@@ -67,8 +67,8 @@ describe("MapLibre renderer adapter", () => {
     expect(caps.supportsSatellite).toBe(true);
     expect(caps.supportsStreetLabels).toBe(true);
     expect(caps.supportsOffline).toBe(false);
-
-    expect(caps.supportsOffline).toBe(false);
+    expect(caps.supportsCustomLayers).toBe(true);
+    expect(caps.supportsBuildings).toBe(true);
     expect(caps.supportsGlobe).toBe(false);
     expect(caps.supportsProjectionSwitch).toBe(true);
 

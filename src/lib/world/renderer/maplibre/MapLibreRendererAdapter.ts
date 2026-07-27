@@ -25,6 +25,11 @@ import type {
   WorldRendererAdapter,
 } from "@/src/lib/world/renderer/types";
 import { toFoundationRendererCapability } from "@/src/lib/world/renderer/types";
+import type {
+  WorldMapSourceExperience,
+  WorldVectorOverlaySpec,
+} from "@/src/lib/world/mapSource/experience";
+import { createEmptyMapSourceExperience } from "@/src/lib/world/mapSource/experience";
 import {
   clampMapLibreZoom,
   createDefaultMapLibreCamera,
@@ -34,6 +39,13 @@ import {
   normalizeMapLibreCamera,
   type MapLibreZoomLimits,
 } from "@/src/lib/world/renderer/maplibre/cameraNavigation";
+import {
+  isWorldBuildingsMode,
+  isWorldRoadDetail,
+  resolveEffectiveBuildingsMode,
+  type WorldBuildingsMode,
+  type WorldRoadDetail,
+} from "@/src/lib/world/renderer/maplibre/roadsBuildings";
 
 export const MAPLIBRE_RENDERER_ID = "world-renderer-maplibre" as const;
 
@@ -65,6 +77,16 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   isTerrainEnabled(): boolean;
   /** Soft-enable terrain visualization — fail-closed when unsupported or not on terrain style. */
   setTerrainEnabled(enabled: boolean): boolean;
+  /** Inject vector overlay from MapSource via Runtime — never hardcode tile URLs here. */
+  setVectorOverlay(spec: WorldVectorOverlaySpec | null): void;
+  getVectorOverlay(): WorldVectorOverlaySpec | null;
+  setBasemapExperience(experience: WorldMapSourceExperience): void;
+  getBasemapExperience(): WorldMapSourceExperience;
+  setRoadDetail(detail: WorldRoadDetail): boolean;
+  getRoadDetail(): WorldRoadDetail;
+  setBuildingsMode(mode: WorldBuildingsMode): boolean;
+  getBuildingsMode(): WorldBuildingsMode;
+  getEffectiveBuildingsMode(): WorldBuildingsMode;
   getCameraRevision(): number;
   /** Bumps on each mount so Retry can remount the native Map surface. */
   getMountGeneration(): number;
@@ -171,6 +193,11 @@ export function createMapLibreRendererAdapter(options?: {
   let terrainEnabled = false;
   let terrainStyleActive = isTerrainCapableStyleUrl(styleUrl);
   let projection: WorldMapProjection = "mercator";
+  let vectorOverlay: WorldVectorOverlaySpec | null = null;
+  let basemapExperience: WorldMapSourceExperience =
+    createEmptyMapSourceExperience();
+  let roadDetail: WorldRoadDetail = "medium";
+  let buildingsMode: WorldBuildingsMode = "2d";
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -191,7 +218,7 @@ export function createMapLibreRendererAdapter(options?: {
     supportsStreetLabels: true,
     supportsSatellite: true,
     supportsCustomLayers: true,
-    supportsBuildings: false,
+    supportsBuildings: true,
     supportsGlobe: false,
     supportsProjectionSwitch: true,
   };
@@ -357,6 +384,7 @@ export function createMapLibreRendererAdapter(options?: {
       if (!terrainStyleActive) {
         terrainEnabled = false;
       }
+      // Overlay / experience are re-injected by Runtime after style swap.
       mountGeneration += 1;
       bump();
       return true;
@@ -381,6 +409,78 @@ export function createMapLibreRendererAdapter(options?: {
       terrainEnabled = false;
       bump();
       return true;
+    },
+    setVectorOverlay(spec: WorldVectorOverlaySpec | null): void {
+      if (
+        spec == null ||
+        !Array.isArray(spec.tiles) ||
+        spec.tiles.length === 0
+      ) {
+        vectorOverlay = null;
+        bump();
+        return;
+      }
+      vectorOverlay = {
+        tiles: [...spec.tiles],
+        attribution:
+          typeof spec.attribution === "string" ? spec.attribution : "",
+        minzoom: spec.minzoom,
+        maxzoom: spec.maxzoom,
+      };
+      bump();
+    },
+    getVectorOverlay(): WorldVectorOverlaySpec | null {
+      if (!vectorOverlay) return null;
+      return {
+        tiles: [...vectorOverlay.tiles],
+        attribution: vectorOverlay.attribution,
+        minzoom: vectorOverlay.minzoom,
+        maxzoom: vectorOverlay.maxzoom,
+      };
+    },
+    setBasemapExperience(experience: WorldMapSourceExperience): void {
+      basemapExperience = experience ?? createEmptyMapSourceExperience();
+      bump();
+    },
+    getBasemapExperience(): WorldMapSourceExperience {
+      return basemapExperience;
+    },
+    setRoadDetail(detail: WorldRoadDetail): boolean {
+      try {
+        if (!isWorldRoadDetail(detail)) return false;
+        if (roadDetail === detail) return true;
+        roadDetail = detail;
+        bump();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    getRoadDetail(): WorldRoadDetail {
+      return roadDetail;
+    },
+    setBuildingsMode(mode: WorldBuildingsMode): boolean {
+      try {
+        if (!isWorldBuildingsMode(mode)) return false;
+        if (buildingsMode === mode) return true;
+        buildingsMode = mode;
+        bump();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    getBuildingsMode(): WorldBuildingsMode {
+      return buildingsMode;
+    },
+    getEffectiveBuildingsMode(): WorldBuildingsMode {
+      return resolveEffectiveBuildingsMode({
+        preference: buildingsMode,
+        rendererSupportsBuildings: caps.supportsBuildings,
+        rendererSupports3D: caps.supports3D,
+        sourceSupports2d: basemapExperience.supportsBuildings2d,
+        sourceSupports3d: basemapExperience.supportsBuildings3d,
+      });
     },
     getCameraRevision(): number {
       return revision;

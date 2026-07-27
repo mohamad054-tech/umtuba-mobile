@@ -23,12 +23,21 @@ import type {
   WorldMapProjection,
 } from "@/src/lib/world/renderer/types";
 import type {
+  WorldBuildingsMode,
+  WorldRoadDetail,
+} from "@/src/lib/world/renderer/maplibre/roadsBuildings";
+import type {
   WorldCategoryId,
   WorldEntity,
   WorldFilter,
   WorldFoundationSnapshot,
   WorldRendererCapability,
 } from "@/src/lib/world/types";
+
+export type {
+  WorldBuildingsMode,
+  WorldRoadDetail,
+} from "@/src/lib/world/renderer/maplibre/roadsBuildings";
 
 export type WorldExperiencePhase =
   | "preparing"
@@ -103,6 +112,22 @@ export type WorldProjectionControlState = {
   reason: string | null;
 };
 
+export type WorldRoadDetailControlState = {
+  id: WorldRoadDetail;
+  label: string;
+  active: boolean;
+  enabled: boolean;
+  reason: string | null;
+};
+
+export type WorldBuildingsControlState = {
+  id: WorldBuildingsMode;
+  label: string;
+  active: boolean;
+  enabled: boolean;
+  reason: string | null;
+};
+
 export type WorldExperienceViewState = {
   phase: WorldExperiencePhase;
   message: string;
@@ -115,6 +140,11 @@ export type WorldExperienceViewState = {
   projectionControls: WorldProjectionControlState[];
   activeProjection: WorldMapProjection;
   projectionPreference: WorldProjectionPreference;
+  roadDetailControls: WorldRoadDetailControlState[];
+  roadDetail: WorldRoadDetail;
+  buildingsControls: WorldBuildingsControlState[];
+  buildingsMode: WorldBuildingsMode;
+  effectiveBuildingsMode: WorldBuildingsMode;
   cameraControls: WorldCameraControlState[];
   filter: WorldFilter;
   selectedEntityId: string | null;
@@ -309,6 +339,75 @@ export function buildWorldProjectionControls(
   ];
 }
 
+/** Road detail chips — disabled when the active map source has no road experience. */
+export function buildWorldRoadDetailControls(
+  sourceSupportsRoadDetail: boolean,
+  active: WorldRoadDetail
+): WorldRoadDetailControlState[] {
+  const levels: Array<{ id: WorldRoadDetail; label: string }> = [
+    { id: "low", label: "Roads Low" },
+    { id: "medium", label: "Roads Med" },
+    { id: "high", label: "Roads High" },
+  ];
+  return levels.map((level) => ({
+    id: level.id,
+    label: level.label,
+    active: sourceSupportsRoadDetail && active === level.id,
+    enabled: sourceSupportsRoadDetail,
+    reason: sourceSupportsRoadDetail
+      ? null
+      : "Road detail is not available for this map source.",
+  }));
+}
+
+/** Buildings chips — 3D enabled only when renderer + source both support it. */
+export function buildWorldBuildingsControls(
+  options: {
+    supportsBuildings: boolean;
+    supports3D: boolean;
+    sourceSupports2d: boolean;
+    sourceSupports3d: boolean;
+  },
+  preference: WorldBuildingsMode,
+  effective: WorldBuildingsMode
+): WorldBuildingsControlState[] {
+  const offEnabled = true;
+  const twoDEnabled =
+    options.supportsBuildings === true && options.sourceSupports2d === true;
+  const threeDEnabled =
+    options.supportsBuildings === true &&
+    options.supports3D === true &&
+    options.sourceSupports3d === true;
+
+  return [
+    {
+      id: "off",
+      label: "Buildings Off",
+      active: effective === "off" || preference === "off",
+      enabled: offEnabled,
+      reason: null,
+    },
+    {
+      id: "2d",
+      label: "Buildings 2D",
+      active: preference === "2d" && twoDEnabled,
+      enabled: twoDEnabled,
+      reason: twoDEnabled
+        ? null
+        : "2D buildings are not available for this map source.",
+    },
+    {
+      id: "3d",
+      label: "Buildings 3D",
+      active: preference === "3d" && threeDEnabled,
+      enabled: threeDEnabled,
+      reason: threeDEnabled
+        ? null
+        : "3D buildings are not available on this device yet.",
+    },
+  ];
+}
+
 export function toggleWorldCategorySelection(
   current: WorldCategoryId[],
   categoryId: WorldCategoryId,
@@ -367,6 +466,11 @@ export function buildWorldExperienceViewState(options?: {
   projectionControls?: WorldProjectionControlState[];
   projectionPreference?: WorldProjectionPreference;
   activeProjection?: WorldMapProjection;
+  roadDetailControls?: WorldRoadDetailControlState[];
+  roadDetail?: WorldRoadDetail;
+  buildingsControls?: WorldBuildingsControlState[];
+  buildingsMode?: WorldBuildingsMode;
+  effectiveBuildingsMode?: WorldBuildingsMode;
   placeSheet?: import("@/src/lib/world/places").WorldPlaceSheetState | null;
   educationSheet?: import("@/src/lib/world/education").WorldEducationSheetState | null;
   userSheet?: import("@/src/lib/world/users").WorldUserSheetState | null;
@@ -410,6 +514,15 @@ export function buildWorldExperienceViewState(options?: {
         projectionPreference,
         activeProjection
       );
+  const roadDetail = options?.roadDetail ?? "medium";
+  const roadDetailControls = Array.isArray(options?.roadDetailControls)
+    ? options.roadDetailControls
+    : [];
+  const buildingsMode = options?.buildingsMode ?? "2d";
+  const effectiveBuildingsMode = options?.effectiveBuildingsMode ?? "off";
+  const buildingsControls = Array.isArray(options?.buildingsControls)
+    ? options.buildingsControls
+    : [];
   const placeSheet = options?.placeSheet ?? null;
   const educationSheet = options?.educationSheet ?? null;
   const userSheet = options?.userSheet ?? null;
@@ -430,6 +543,11 @@ export function buildWorldExperienceViewState(options?: {
       projectionControls,
       activeProjection,
       projectionPreference,
+      roadDetailControls,
+      roadDetail,
+      buildingsControls,
+      buildingsMode,
+      effectiveBuildingsMode,
       cameraControls: buildWorldCameraControls(rendererBound),
       filter: applyWorldCategoryFilter(
         snapshot.filter ?? emptyWorldFilter(),
@@ -464,6 +582,11 @@ export function buildWorldExperienceViewState(options?: {
       projectionControls,
       activeProjection,
       projectionPreference,
+      roadDetailControls,
+      roadDetail,
+      buildingsControls,
+      buildingsMode,
+      effectiveBuildingsMode,
       cameraControls: buildWorldCameraControls(false),
       filter: emptyWorldFilter(),
       selectedEntityId: null,
@@ -506,6 +629,11 @@ export function buildWorldExperienceViewState(options?: {
     projectionControls,
     activeProjection,
     projectionPreference,
+    roadDetailControls,
+    roadDetail,
+    buildingsControls,
+    buildingsMode,
+    effectiveBuildingsMode,
     cameraControls: buildWorldCameraControls(rendererBound),
     filter: applyWorldCategoryFilter(
       snapshot.filter ?? emptyWorldFilter(),

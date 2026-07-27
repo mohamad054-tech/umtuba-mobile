@@ -1,20 +1,25 @@
 import {
+  buildWorldBuildingsControls,
   buildWorldExperienceViewState,
   buildWorldMapSourceControls,
   buildWorldProjectionControls,
+  buildWorldRoadDetailControls,
   createDefaultWorldUiSelection,
   selectWorldEntity,
   toggleWorldCategorySelection,
   WORLD_RETRY_YIELD_MS,
+  type WorldBuildingsMode,
   type WorldCameraControlId,
   type WorldExperienceViewState,
   type WorldProjectionPreference,
+  type WorldRoadDetail,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId, WorldFoundationSnapshot } from "@/src/lib/world/types";
 import {
   createDefaultMapSourceRegistry,
   DEMO_MAP_SOURCE_ID,
+  getMapSourceExperience,
   isWorldMapSourceAvailable,
   type MapSourceRegistry,
   type WorldMapSource,
@@ -282,6 +287,8 @@ export class WorldRuntimeController {
   private started = false;
   private projectionPreference: WorldProjectionPreference = "auto";
   private applyingProjectionPolicy = false;
+  private roadDetail: WorldRoadDetail = "medium";
+  private buildingsMode: WorldBuildingsMode = "2d";
   private rendererUnsubscribe: (() => void) | null = null;
 
   constructor(options?: WorldRuntimeControllerOptions) {
@@ -594,6 +601,22 @@ export class WorldRuntimeController {
       this.projectionPreference,
       activeProjection
     );
+    const caps = this.renderer.getCapabilities();
+    const experience = getMapSourceExperience(this.mapSource);
+    const roadDetailControls = buildWorldRoadDetailControls(
+      experience.supportsRoadDetail,
+      this.roadDetail
+    );
+    const buildingsControls = buildWorldBuildingsControls(
+      {
+        supportsBuildings: caps.supportsBuildings,
+        supports3D: caps.supports3D,
+        sourceSupports2d: experience.supportsBuildings2d,
+        sourceSupports3d: experience.supportsBuildings3d,
+      },
+      this.buildingsMode,
+      this.getEffectiveBuildingsMode()
+    );
 
     const base = buildWorldExperienceViewState({
       snapshot,
@@ -614,6 +637,11 @@ export class WorldRuntimeController {
       projectionControls,
       projectionPreference: this.projectionPreference,
       activeProjection,
+      roadDetailControls,
+      roadDetail: this.roadDetail,
+      buildingsControls,
+      buildingsMode: this.buildingsMode,
+      effectiveBuildingsMode: this.getEffectiveBuildingsMode(),
     });
 
     if (runtime.phase === "preparing") {
@@ -702,6 +730,7 @@ export class WorldRuntimeController {
     this.bindEventPressHandler();
     this.bindRendererSubscription();
     this.applyProjectionPolicy();
+    this.applyMapExperiencePolicy();
     await this.runLoadCycle();
   }
 
@@ -720,6 +749,47 @@ export class WorldRuntimeController {
 
   getActiveProjection(): WorldMapProjection {
     return this.renderer.getProjectionAdapter().getProjection();
+  }
+
+  /**
+   * Road detail preference — does not reinit Runtime.
+   * Preserves camera, selection, layers, map source.
+   */
+  setRoadDetail(detail: WorldRoadDetail): boolean {
+    if (detail !== "low" && detail !== "medium" && detail !== "high") {
+      return false;
+    }
+    this.roadDetail = detail;
+    this.applyMapExperiencePolicy();
+    this.emit();
+    return true;
+  }
+
+  getRoadDetail(): WorldRoadDetail {
+    return this.roadDetail;
+  }
+
+  /**
+   * Buildings preference — fail-closed effective mode via renderer.
+   * Does not reinit Runtime.
+   */
+  setBuildingsMode(mode: WorldBuildingsMode): boolean {
+    if (mode !== "off" && mode !== "2d" && mode !== "3d") return false;
+    this.buildingsMode = mode;
+    this.applyMapExperiencePolicy();
+    this.emit();
+    return true;
+  }
+
+  getBuildingsMode(): WorldBuildingsMode {
+    return this.buildingsMode;
+  }
+
+  getEffectiveBuildingsMode(): WorldBuildingsMode {
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      return this.renderer.getEffectiveBuildingsMode();
+    }
+    return "off";
   }
 
   /** Optional hook when camera changes outside CameraAdapter (tests / future). */
@@ -823,6 +893,7 @@ export class WorldRuntimeController {
       } else {
         this.renderer.setTerrainEnabled(false);
       }
+      this.applyMapExperiencePolicy();
     }
 
     this.applyProjectionPolicy();
@@ -1332,6 +1403,22 @@ export class WorldRuntimeController {
       // Fail-closed: projection policy must not crash Runtime.
     } finally {
       this.applyingProjectionPolicy = false;
+    }
+  }
+
+  /**
+   * Inject MapSource overlay + apply road/buildings prefs without Runtime reinit.
+   */
+  private applyMapExperiencePolicy(): void {
+    try {
+      if (!isMapLibreRendererAdapter(this.renderer)) return;
+      const experience = getMapSourceExperience(this.mapSource);
+      this.renderer.setBasemapExperience(experience);
+      this.renderer.setVectorOverlay(experience.getVectorOverlay());
+      this.renderer.setRoadDetail(this.roadDetail);
+      this.renderer.setBuildingsMode(this.buildingsMode);
+    } catch {
+      // Fail-closed: roads/buildings policy must not crash Runtime.
     }
   }
 

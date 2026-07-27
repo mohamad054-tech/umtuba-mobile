@@ -83,6 +83,12 @@ export default function WorldScreen() {
       onSelectProjection={(id) => {
         controller.setProjectionPreference(id === "globe" ? "globe" : "map");
       }}
+      onSelectRoadDetail={(id) => {
+        controller.setRoadDetail(id);
+      }}
+      onSelectBuildings={(id) => {
+        controller.setBuildingsMode(id);
+      }}
     />
   );
 }

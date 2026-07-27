@@ -14,6 +14,7 @@ import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet"
 import { WorldUserBottomSheet } from "@/components/world/WorldUserBottomSheet";
 import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
 import { WorldMapSourceSelector } from "@/components/world/WorldMapSourceSelector";
+import { WorldMapExperienceSelector } from "@/components/world/WorldMapExperienceSelector";
 import { WorldProjectionSelector } from "@/components/world/WorldProjectionSelector";
 import {
   WorldAttribution,
@@ -22,8 +23,10 @@ import {
 import { WorldSearchBar } from "@/components/world/WorldSearchBar";
 import { WorldStatePanel } from "@/components/world/WorldStatePanel";
 import type {
+  WorldBuildingsMode,
   WorldCameraControlId,
   WorldExperienceViewState,
+  WorldRoadDetail,
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
 import type { WorldPlaceLayerId } from "@/src/lib/world/places";
@@ -47,6 +50,8 @@ type WorldExperienceShellProps = {
   onToggleLayersPanel?: () => void;
   onSelectMapSource?: (sourceId: string) => void;
   onSelectProjection?: (id: "globe" | "map") => void;
+  onSelectRoadDetail?: (id: WorldRoadDetail) => void;
+  onSelectBuildings?: (id: WorldBuildingsMode) => void;
   onClearFilters?: () => void;
   onCloseFilters?: () => void;
   onCloseDetails?: () => void;
@@ -77,6 +82,8 @@ export function WorldExperienceShell({
   onToggleLayersPanel,
   onSelectMapSource,
   onSelectProjection,
+  onSelectRoadDetail,
+  onSelectBuildings,
   onClearFilters,
   onCloseFilters,
   onCloseDetails,
@@ -162,6 +169,13 @@ export function WorldExperienceShell({
       <WorldProjectionSelector
         controls={view.projectionControls}
         onSelect={onSelectProjection}
+      />
+
+      <WorldMapExperienceSelector
+        roadControls={view.roadDetailControls}
+        buildingsControls={view.buildingsControls}
+        onSelectRoadDetail={onSelectRoadDetail}
+        onSelectBuildings={onSelectBuildings}
       />
 
       <View style={styles.toolbar}>

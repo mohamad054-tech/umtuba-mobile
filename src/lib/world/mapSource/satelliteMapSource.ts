@@ -1,3 +1,4 @@
+import { createSatelliteMapSourceExperience } from "@/src/lib/world/mapSource/experience";
 import type { WorldMapSource } from "@/src/lib/world/mapSource/types";
 
 export const SATELLITE_MAP_SOURCE_ID = "world-map-source-satellite" as const;
@@ -28,6 +29,7 @@ export const SATELLITE_MAP_STYLE_URL = `data:application/json,${encodeURICompone
 )}`;
 
 export function createSatelliteMapSource(): WorldMapSource {
+  const experience = createSatelliteMapSourceExperience();
   return {
     id: SATELLITE_MAP_SOURCE_ID,
     kind: "satellite",
@@ -40,6 +42,9 @@ export function createSatelliteMapSource(): WorldMapSource {
     },
     getAttribution(): string {
       return SATELLITE_MAP_ATTRIBUTION;
+    },
+    getExperience() {
+      return experience;
     },
   };
 }
