@@ -58,13 +58,16 @@ export function createMapSourceRegistry(
   };
 }
 
-/** Default registry: Demo (active) + Street/Satellite/Terrain sources. */
+/**
+ * Default registry: Streets first (product default), then Satellite/Terrain.
+ * Demo remains registered for fail-closed fallback only — not shown in product UI.
+ */
 export function createDefaultMapSourceRegistry(): MapSourceRegistry {
   return createMapSourceRegistry([
-    createDemoMapSource(),
     createStreetMapSource(),
     createSatelliteMapSource(),
     createTerrainMapSource(),
+    createDemoMapSource(),
   ]);
 }
 

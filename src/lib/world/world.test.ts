@@ -22,22 +22,22 @@ describe("world categories", () => {
   it("exposes expandable catalog and rejects unknown ids", () => {
     const all = listWorldCategories({ includeUnsupported: true });
     expect(all.map((c) => c.id)).toEqual([
-      "users",
       "cities",
       "education",
+      "users",
       "games",
-      "events",
       "businesses",
+      "events",
       "ai",
       "future",
     ]);
     expect(listWorldCategories()).toEqual([
-      { id: "users", label: "Users", supported: true },
-      { id: "cities", label: "Cities", supported: true },
+      { id: "cities", label: "Places", supported: true },
       { id: "education", label: "Education", supported: true },
+      { id: "users", label: "Users", supported: true },
       { id: "games", label: "Games", supported: true },
+      { id: "businesses", label: "Commerce", supported: true },
       { id: "events", label: "Events", supported: true },
-      { id: "businesses", label: "Businesses", supported: true },
     ]);
     expect(parseWorldCategoryId("events")).toBe("events");
     expect(parseWorldCategoryId("planets")).toBeNull();

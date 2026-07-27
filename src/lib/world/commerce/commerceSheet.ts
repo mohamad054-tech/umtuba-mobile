@@ -32,21 +32,6 @@ export type WorldCommerceSheetState = {
   actions: WorldCommerceSheetAction[];
 };
 
-const PLACEHOLDER_META: WorldCommerceSheetMeta[] = [
-  { id: "products", label: "Products", value: null, placeholder: "Coming soon" },
-  { id: "rating", label: "Rating", value: null, placeholder: "Coming soon" },
-  { id: "open_status", label: "Open status", value: null, placeholder: "Coming soon" },
-];
-
-const PLACEHOLDER_ACTIONS: WorldCommerceSheetAction[] = [
-  {
-    id: "open_store",
-    label: "Open Store",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldCommerceSheetState(
   record: WorldCommerceRecord | null,
   open: boolean
@@ -59,7 +44,7 @@ export function buildWorldCommerceSheetState(
     cityName: record.cityName,
     brandName: record.brandName,
     open: true,
-    meta: PLACEHOLDER_META.map((m) => ({ ...m })),
-    actions: PLACEHOLDER_ACTIONS.map((a) => ({ ...a })),
+    meta: [],
+    actions: [],
   };
 }

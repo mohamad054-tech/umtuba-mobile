@@ -40,10 +40,18 @@ describe("world experience view state", () => {
     );
   });
 
-  it("disables all layer controls when no data source is bound", () => {
+  it("disables supported layer controls when no data source is bound", () => {
     const snap = getWorldFoundationSnapshot();
     const layers = buildWorldLayerControls(snap, ["events"]);
-    expect(layers.length).toBe(8);
+    expect(layers.length).toBe(6);
+    expect(layers.map((l) => l.categoryId)).toEqual([
+      "cities",
+      "education",
+      "users",
+      "games",
+      "businesses",
+      "events",
+    ]);
     expect(layers.every((layer) => layer.enabled === false)).toBe(true);
     expect(layers.every((layer) => layer.active === false)).toBe(true);
     expect(layers.every((layer) => typeof layer.reason === "string")).toBe(

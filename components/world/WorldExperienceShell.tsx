@@ -1,10 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { WorldCameraControls } from "@/components/world/WorldCameraControls";
-import {
-  WorldFilterPanel,
-  WorldLayerSelector,
-} from "@/components/world/WorldControls";
+import { WorldLayerSelector } from "@/components/world/WorldControls";
 import { WorldHeader } from "@/components/world/WorldHeader";
 import { WorldCommerceBottomSheet } from "@/components/world/WorldCommerceBottomSheet";
 import { WorldEventBottomSheet } from "@/components/world/WorldEventBottomSheet";
@@ -13,8 +11,7 @@ import { WorldGameBottomSheet } from "@/components/world/WorldGameBottomSheet";
 import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
 import { WorldUserBottomSheet } from "@/components/world/WorldUserBottomSheet";
 import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
-import { WorldMapSourceSelector } from "@/components/world/WorldMapSourceSelector";
-import { WorldMapExperienceSelector } from "@/components/world/WorldMapExperienceSelector";
+import { WorldMapSettingsPanel } from "@/components/world/WorldMapSettingsPanel";
 import { WorldProjectionSelector } from "@/components/world/WorldProjectionSelector";
 import {
   WorldAttribution,
@@ -46,14 +43,10 @@ type WorldExperienceShellProps = {
   onCameraControl?: (id: WorldCameraControlId) => void;
   onToggleLayer?: (categoryId: WorldCategoryId, enabled: boolean) => void;
   onTogglePlaceLayer?: (layerId: WorldPlaceLayerId) => void;
-  onToggleFilters?: () => void;
-  onToggleLayersPanel?: () => void;
   onSelectMapSource?: (sourceId: string) => void;
   onSelectProjection?: (id: "globe" | "map") => void;
   onSelectRoadDetail?: (id: WorldRoadDetail) => void;
   onSelectBuildings?: (id: WorldBuildingsMode) => void;
-  onClearFilters?: () => void;
-  onCloseFilters?: () => void;
   onCloseDetails?: () => void;
 };
 
@@ -78,16 +71,19 @@ export function WorldExperienceShell({
   onCameraControl,
   onToggleLayer,
   onTogglePlaceLayer,
-  onToggleFilters,
-  onToggleLayersPanel,
   onSelectMapSource,
   onSelectProjection,
   onSelectRoadDetail,
   onSelectBuildings,
-  onClearFilters,
-  onCloseFilters,
   onCloseDetails,
 }: WorldExperienceShellProps) {
+  const [mapSettingsOpen, setMapSettingsOpen] = useState(false);
+  const citiesActive = view.layers.some(
+    (layer) => layer.categoryId === "cities" && layer.active
+  );
+  const showCompactHeader =
+    view.phase === "ready" && view.rendererBound === true;
+
   if (view.phase === "error") {
     return (
       <View style={[styles.root, { paddingBottom: bottomInset }]}>
@@ -110,7 +106,11 @@ export function WorldExperienceShell({
       style={[styles.root, { paddingBottom: Math.max(bottomInset, 8) }]}
       accessibilityLabel="World experience"
     >
-      <WorldHeader subtitle={view.message} statusLabel={statusLabel(view)} />
+      <WorldHeader
+        subtitle={showCompactHeader ? undefined : view.message}
+        statusLabel={statusLabel(view)}
+        compact={showCompactHeader}
+      />
 
       {onSearchQueryChange && onSelectSearchResult ? (
         <WorldSearchBar
@@ -124,6 +124,13 @@ export function WorldExperienceShell({
 
       <View style={styles.canvasWrap}>
         <WorldRendererHost adapter={renderer} />
+        <View style={styles.cameraOverlay} pointerEvents="box-none">
+          <WorldCameraControls
+            controls={view.cameraControls}
+            onPress={onCameraControl}
+            compact
+          />
+        </View>
         <WorldPlaceBottomSheet
           sheet={view.placeSheet}
           bottomInset={bottomInset}
@@ -156,79 +163,28 @@ export function WorldExperienceShell({
         />
       </View>
 
-      <WorldCameraControls
-        controls={view.cameraControls}
-        onPress={onCameraControl}
-      />
+      <WorldLayerSelector layers={view.layers} onToggle={onToggleLayer} />
+      {citiesActive ? (
+        <WorldPlaceLayerSelector
+          layers={view.placeLayers}
+          onToggle={onTogglePlaceLayer}
+        />
+      ) : null}
 
-      <WorldMapSourceSelector
+      <WorldMapSettingsPanel
+        open={mapSettingsOpen}
+        onToggle={() => setMapSettingsOpen((v) => !v)}
         sources={view.mapSources}
-        onSelect={onSelectMapSource}
+        roadControls={view.roadDetailControls}
+        buildingsControls={view.buildingsControls}
+        onSelectMapSource={onSelectMapSource}
+        onSelectRoadDetail={onSelectRoadDetail}
+        onSelectBuildings={onSelectBuildings}
       />
 
       <WorldProjectionSelector
         controls={view.projectionControls}
         onSelect={onSelectProjection}
-      />
-
-      <WorldMapExperienceSelector
-        roadControls={view.roadDetailControls}
-        buildingsControls={view.buildingsControls}
-        onSelectRoadDetail={onSelectRoadDetail}
-        onSelectBuildings={onSelectBuildings}
-      />
-
-      <View style={styles.toolbar}>
-        <Pressable
-          style={styles.toolButton}
-          onPress={onToggleLayersPanel}
-          accessibilityRole="button"
-          accessibilityLabel={
-            view.layersPanelOpen ? "Hide layer selector" : "Show layer selector"
-          }
-          accessibilityState={{ selected: view.layersPanelOpen }}
-        >
-          <Text style={styles.toolButtonText}>Layers</Text>
-        </Pressable>
-        <Pressable
-          style={styles.toolButton}
-          onPress={onToggleFilters}
-          accessibilityRole="button"
-          accessibilityLabel={
-            view.filterPanelOpen ? "Hide filters" : "Show filters"
-          }
-          accessibilityState={{ selected: view.filterPanelOpen }}
-        >
-          <Text style={styles.toolButtonText}>Filters</Text>
-        </Pressable>
-        {onRetry ? (
-          <Pressable
-            style={styles.toolButton}
-            onPress={onRetry}
-            accessibilityRole="button"
-            accessibilityLabel="Retry World"
-          >
-            <Text style={styles.toolButtonText}>Retry</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      {view.layersPanelOpen ? (
-        <>
-          <WorldPlaceLayerSelector
-            layers={view.placeLayers}
-            onToggle={onTogglePlaceLayer}
-          />
-          <WorldLayerSelector layers={view.layers} onToggle={onToggleLayer} />
-        </>
-      ) : null}
-
-      <WorldFilterPanel
-        open={view.filterPanelOpen}
-        selectedCount={view.filter.categories.length}
-        layers={view.layers}
-        onClose={onCloseFilters}
-        onClear={onClearFilters}
       />
 
       <WorldAttribution text={view.attribution} />
@@ -243,29 +199,13 @@ const styles = StyleSheet.create({
   },
   canvasWrap: {
     flex: 1,
-    paddingHorizontal: 16,
-    minHeight: 240,
+    minHeight: 320,
     position: "relative",
   },
-  toolbar: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  toolButton: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  toolButtonText: {
-    color: colors.accentCyan,
-    fontWeight: "700",
-    fontSize: 13,
+  cameraOverlay: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    zIndex: 5,
   },
 });

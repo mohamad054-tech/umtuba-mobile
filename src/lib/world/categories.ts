@@ -7,13 +7,14 @@ export type WorldCategoryDefinition = {
   supported: boolean;
 };
 
+/** Product layer order: Places → Education → Users → Games → Commerce → Events. */
 const CATEGORY_CATALOG: WorldCategoryDefinition[] = [
-  { id: "users", label: "Users", supported: true },
-  { id: "cities", label: "Cities", supported: true },
+  { id: "cities", label: "Places", supported: true },
   { id: "education", label: "Education", supported: true },
+  { id: "users", label: "Users", supported: true },
   { id: "games", label: "Games", supported: true },
+  { id: "businesses", label: "Commerce", supported: true },
   { id: "events", label: "Events", supported: true },
-  { id: "businesses", label: "Businesses", supported: true },
   { id: "ai", label: "AI", supported: false },
   { id: "future", label: "Future", supported: false },
 ];

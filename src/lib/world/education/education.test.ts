@@ -95,12 +95,7 @@ describe("Education registry + sheet", () => {
     expect(sheet?.name).toBe("Test University");
     expect(sheet?.typeLabel).toBe("University");
     expect(sheet?.cityName).toBe("Amman");
-    expect(sheet?.metrics.every((m) => m.value == null)).toBe(true);
-    expect(sheet?.metrics.map((m) => m.id)).toEqual([
-      "programs",
-      "students",
-      "courses",
-    ]);
+    expect(sheet?.metrics).toEqual([]);
   });
 });
 
@@ -124,7 +119,7 @@ describe("Runtime education layer", () => {
     expect(sheet?.name).toBe(first.name);
     expect(sheet?.typeLabel.length).toBeGreaterThan(0);
     expect(sheet?.cityName).toBe(first.cityName);
-    expect(sheet?.metrics.every((m) => m.value == null)).toBe(true);
+    expect(sheet?.metrics).toEqual([]);
     expect(controller.getViewState().placeSheet).toBeNull();
 
     const renderer = controller.getRendererAdapter();

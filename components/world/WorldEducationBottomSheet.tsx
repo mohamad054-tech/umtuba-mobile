@@ -9,15 +9,15 @@ type WorldEducationBottomSheetProps = {
   onClose?: () => void;
 };
 
-/**
- * Education details sheet — view-state only (no pipeline / MapLibre imports).
- */
+/** Education details — real fields only. */
 export function WorldEducationBottomSheet({
   sheet,
   bottomInset = 0,
   onClose,
 }: WorldEducationBottomSheetProps) {
   if (!sheet?.open) return null;
+
+  const realMetrics = sheet.metrics.filter((m) => m.value != null && m.value !== "");
 
   return (
     <View
@@ -45,16 +45,16 @@ export function WorldEducationBottomSheet({
         ) : null}
       </View>
 
-      <View style={styles.metrics}>
-        {sheet.metrics.map((metric) => (
-          <View key={metric.id} style={styles.metric}>
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <Text style={styles.metricValue}>
-              {metric.value ?? metric.placeholder}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {realMetrics.length > 0 ? (
+        <View style={styles.metrics}>
+          {realMetrics.map((metric) => (
+            <View key={metric.id} style={styles.metric}>
+              <Text style={styles.metricLabel}>{metric.label}</Text>
+              <Text style={styles.metricValue}>{metric.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   metricValue: {
-    color: colors.textSubtle,
+    color: colors.text,
     fontSize: 13,
     fontWeight: "600",
   },

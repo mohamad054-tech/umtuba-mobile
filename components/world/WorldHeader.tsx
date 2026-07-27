@@ -4,19 +4,24 @@ import { colors } from "@/src/theme/colors";
 
 type WorldHeaderProps = {
   title?: string;
-  subtitle: string;
+  subtitle?: string;
   statusLabel: string;
+  compact?: boolean;
 };
 
 export function WorldHeader({
   title = "World",
   subtitle,
   statusLabel,
+  compact = false,
 }: WorldHeaderProps) {
   return (
-    <View style={styles.wrap} accessibilityRole="header">
+    <View
+      style={[styles.wrap, compact && styles.wrapCompact]}
+      accessibilityRole="header"
+    >
       <View style={styles.row}>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={[styles.title, compact && styles.titleCompact]} accessibilityRole="header">
           {title}
         </Text>
         <View
@@ -27,17 +32,20 @@ export function WorldHeader({
           <Text style={styles.badgeText}>{statusLabel}</Text>
         </View>
       </View>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 10,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 6,
+  },
+  wrapCompact: {
+    paddingBottom: 2,
   },
   row: {
     flexDirection: "row",
@@ -47,28 +55,31 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
     letterSpacing: 0.3,
+  },
+  titleCompact: {
+    fontSize: 18,
   },
   badge: {
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minHeight: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minHeight: 28,
     justifyContent: "center",
   },
   badgeText: {
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -9,16 +9,15 @@ type WorldUserBottomSheetProps = {
   onClose?: () => void;
 };
 
-/**
- * User details sheet — view-state only (no providers / MapLibre).
- * Social buttons are disabled placeholders in V1.
- */
+/** User details — public identity only (no placeholder actions). */
 export function WorldUserBottomSheet({
   sheet,
   bottomInset = 0,
   onClose,
 }: WorldUserBottomSheetProps) {
   if (!sheet?.open) return null;
+
+  const enabledActions = sheet.actions.filter((a) => a.enabled);
 
   return (
     <View
@@ -50,21 +49,20 @@ export function WorldUserBottomSheet({
         ) : null}
       </View>
 
-      <View style={styles.actions}>
-        {sheet.actions.map((action) => (
-          <Pressable
-            key={action.id}
-            style={[styles.action, !action.enabled && styles.actionDisabled]}
-            disabled
-            accessibilityRole="button"
-            accessibilityState={{ disabled: true }}
-            accessibilityLabel={`${action.label}, ${action.placeholder}`}
-          >
-            <Text style={styles.actionLabel}>{action.label}</Text>
-            <Text style={styles.actionHint}>{action.placeholder}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {enabledActions.length > 0 ? (
+        <View style={styles.actions}>
+          {enabledActions.map((action) => (
+            <Pressable
+              key={action.id}
+              style={styles.action}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+            >
+              <Text style={styles.actionLabel}>{action.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -149,20 +147,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  actionDisabled: {
-    opacity: 0.55,
+    justifyContent: "center",
   },
   actionLabel: {
     color: colors.text,
     fontSize: 14,
     fontWeight: "700",
-  },
-  actionHint: {
-    color: colors.textSubtle,
-    fontSize: 12,
   },
 });

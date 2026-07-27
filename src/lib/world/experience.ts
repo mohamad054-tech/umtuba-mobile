@@ -166,10 +166,9 @@ export type WorldExperienceViewState = {
 export const WORLD_SCREEN_HREF = "/world" as const;
 
 export const WORLD_ATTRIBUTION_FALLBACK =
-  "World data credits will appear here when the map source is connected.";
+  "Map data credits appear when a map source is connected.";
 
-export const WORLD_RENDERER_PREPARING_MESSAGE =
-  "The owned World map renderer is being prepared. No map imagery or locations are shown yet.";
+export const WORLD_RENDERER_PREPARING_MESSAGE = "Loading map…";
 
 /** Brief yield so Retry can paint a loading/preparing cycle on device. */
 export const WORLD_RETRY_YIELD_MS = 180;
@@ -209,11 +208,12 @@ export async function runWorldInitialization(options?: {
 
 export function createDefaultWorldUiSelection(): WorldUiSelectionState {
   return {
-    selectedCategories: [],
+    /** Cities/Places on by default so the first open is never an empty map. */
+    selectedCategories: ["cities"],
     selectedEntityId: null,
     detailsOpen: false,
     filterPanelOpen: false,
-    layersPanelOpen: false,
+    layersPanelOpen: true,
     selectedPlaceLayers: [
       "cities_capitals",
       "cities_major",
@@ -249,7 +249,8 @@ export function buildWorldLayerControls(
   selectedCategories: WorldCategoryId[]
 ): WorldLayerControlState[] {
   const selected = new Set(selectedCategories);
-  const categories = listWorldCategories({ includeUnsupported: true });
+  /** Product UI: supported layers only (hide AI / Future stubs). */
+  const categories = listWorldCategories({ includeUnsupported: false });
   const layersByCategory = new Set(
     snapshot.layers
       .map((layer) => layer.category)
@@ -265,9 +266,7 @@ export function buildWorldLayerControls(
         label: category.label,
         enabled: false,
         active: false,
-        reason: category.supported
-          ? "No trusted World data is available for this layer yet."
-          : "This World layer is not available yet.",
+        reason: "No World data is available for this layer yet.",
       };
     }
     return {
@@ -300,34 +299,34 @@ export function buildWorldMapSourceControls(
   }));
 }
 
-/** Globe / Map projection switcher — enabled state reflects renderer capabilities. */
+/**
+ * Globe / Map projection switcher — product UI omits unsupported options.
+ * When Globe is unavailable, returns [] so the control row is hidden entirely.
+ */
 export function buildWorldProjectionControls(
   caps: RendererCapabilities,
   preference: WorldProjectionPreference,
   activeProjection: WorldMapProjection
 ): WorldProjectionControlState[] {
   const globeEnabled = caps.supportsGlobe === true;
-  let globeActive =
+  if (!globeEnabled) {
+    return [];
+  }
+
+  const globeActive =
     preference === "globe" ||
     (preference === "auto" && activeProjection === "globe");
-  let mapActive =
+  const mapActive =
     preference === "map" ||
     (preference === "auto" && activeProjection === "mercator");
-
-  if (!globeEnabled) {
-    globeActive = false;
-    mapActive = true;
-  }
 
   return [
     {
       id: "globe",
       label: "Globe",
       active: globeActive,
-      enabled: globeEnabled,
-      reason: globeEnabled
-        ? null
-        : "Globe is not available on this device yet.",
+      enabled: true,
+      reason: null,
     },
     {
       id: "map",

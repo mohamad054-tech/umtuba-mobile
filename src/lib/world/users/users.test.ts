@@ -97,7 +97,7 @@ describe("Runtime users layer", () => {
     expect(sheet?.displayName).toBe(first.displayName);
     expect(sheet?.handle).toBe(first.handle);
     expect(sheet?.cityName).toBe(first.cityName);
-    expect(sheet?.actions.every((a) => a.enabled === false)).toBe(true);
+    expect(sheet?.actions).toEqual([]);
     expect(controller.getViewState().placeSheet).toBeNull();
     expect(controller.getViewState().educationSheet).toBeNull();
 
@@ -121,11 +121,7 @@ describe("Runtime users layer", () => {
     expect(renderer.getUserMarkers().length).toBeGreaterThan(0);
 
     const sheetState = buildWorldUserSheetState(first, true);
-    expect(sheetState?.actions.map((a) => a.id)).toEqual([
-      "view_profile",
-      "follow",
-      "message",
-    ]);
+    expect(sheetState?.actions).toEqual([]);
   });
 
   it("fail-closes users when provider missing without breaking places", async () => {

@@ -31,20 +31,6 @@ export type WorldGameSheetState = {
   actions: WorldGameSheetAction[];
 };
 
-const PLACEHOLDER_META: WorldGameSheetMeta[] = [
-  { id: "status", label: "Status", value: null, placeholder: "Coming soon" },
-  { id: "players", label: "Players", value: null, placeholder: "Coming soon" },
-];
-
-const PLACEHOLDER_ACTIONS: WorldGameSheetAction[] = [
-  {
-    id: "open_game",
-    label: "Open Game",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldGameSheetState(
   record: WorldGameRecord | null,
   open: boolean
@@ -56,7 +42,7 @@ export function buildWorldGameSheetState(
     categoryLabel: formatWorldGameCategoryLabel(record.category),
     cityName: record.cityName,
     open: true,
-    meta: PLACEHOLDER_META.map((m) => ({ ...m })),
-    actions: PLACEHOLDER_ACTIONS.map((a) => ({ ...a })),
+    meta: [],
+    actions: [],
   };
 }

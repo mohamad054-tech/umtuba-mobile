@@ -244,15 +244,10 @@ describe("MapLibre projection adapter fail-closed", () => {
 });
 
 describe("buildWorldProjectionControls", () => {
-  it("disables globe when unsupported with reason", () => {
+  it("hides projection controls when globe is unsupported", () => {
     const caps = defaultNullRendererCapabilities();
     const controls = buildWorldProjectionControls(caps, "auto", "mercator");
-    const globe = controls.find((c) => c.id === "globe");
-    const map = controls.find((c) => c.id === "map");
-    expect(globe?.enabled).toBe(false);
-    expect(globe?.reason).toMatch(/not available/i);
-    expect(map?.enabled).toBe(true);
-    expect(map?.active).toBe(true);
+    expect(controls).toEqual([]);
   });
 
   it("enables globe when supported", () => {
@@ -320,9 +315,7 @@ describe("runtime projection policy", () => {
     expect(controller.getActiveProjection()).toBe("mercator");
     const view = controller.getViewState();
     expect(view.activeProjection).toBe("mercator");
-    expect(view.projectionControls.find((c) => c.id === "globe")?.enabled).toBe(
-      false
-    );
+    expect(view.projectionControls).toEqual([]);
   });
 
   it("preserves selection, registries, map source after preference switch", async () => {
@@ -363,11 +356,6 @@ describe("runtime projection policy", () => {
     expect(controller.setProjectionPreference("globe")).toBe(true);
     expect(controller.getActiveProjection()).toBe("mercator");
     const view = controller.getViewState();
-    expect(view.projectionControls.find((c) => c.id === "globe")?.enabled).toBe(
-      false
-    );
-    expect(view.projectionControls.find((c) => c.id === "map")?.active).toBe(
-      true
-    );
+    expect(view.projectionControls).toEqual([]);
   });
 });

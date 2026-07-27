@@ -10,7 +10,7 @@ type WorldPlaceBottomSheetProps = {
 };
 
 /**
- * Place details sheet — view-state only (no place provider / MapLibre imports).
+ * Place details sheet — real fields only (no placeholder metrics).
  */
 export function WorldPlaceBottomSheet({
   sheet,
@@ -18,6 +18,8 @@ export function WorldPlaceBottomSheet({
   onClose,
 }: WorldPlaceBottomSheetProps) {
   if (!sheet?.open) return null;
+
+  const realMetrics = sheet.metrics.filter((m) => m.value != null && m.value !== "");
 
   return (
     <View
@@ -45,16 +47,16 @@ export function WorldPlaceBottomSheet({
         ) : null}
       </View>
 
-      <View style={styles.metrics}>
-        {sheet.metrics.map((metric) => (
-          <View key={metric.id} style={styles.metric}>
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <Text style={styles.metricValue}>
-              {metric.value ?? metric.placeholder}
-            </Text>
-          </View>
-        ))}
-      </View>
+      {realMetrics.length > 0 ? (
+        <View style={styles.metrics}>
+          {realMetrics.map((metric) => (
+            <View key={metric.id} style={styles.metric}>
+              <Text style={styles.metricLabel}>{metric.label}</Text>
+              <Text style={styles.metricValue}>{metric.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   metricValue: {
-    color: colors.textMuted,
+    color: colors.text,
     fontSize: 13,
     fontWeight: "600",
   },

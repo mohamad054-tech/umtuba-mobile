@@ -53,10 +53,7 @@ export function worldRuntimePhaseMessage(
     case "ready":
       return fallback?.trim() || "World is ready.";
     case "unavailable":
-      return (
-        fallback?.trim() ||
-        "The owned World map renderer is being prepared. No map imagery or locations are shown yet."
-      );
+      return fallback?.trim() || "World map is temporarily unavailable.";
     case "error":
       return "Unable to load World.";
     default:

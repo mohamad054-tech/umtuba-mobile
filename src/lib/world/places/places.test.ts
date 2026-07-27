@@ -126,14 +126,7 @@ describe("Runtime places UX: layers, selection, bottom sheet", () => {
     expect(sheet?.name).toBe("Amman");
     expect(sheet?.countryName).toBe("Jordan");
     expect(sheet?.kindLabel).toBe("Capital");
-    expect(sheet?.metrics.map((m) => m.id)).toEqual([
-      "population",
-      "users",
-      "education",
-      "events",
-      "games",
-    ]);
-    expect(sheet?.metrics.every((m) => m.value == null)).toBe(true);
+    expect(sheet?.metrics).toEqual([]);
     expect(renderer.getSelectedPlaceMarkerId()).toBe("place-amman");
     expect(renderer.getSessionCamera().zoom).toBeGreaterThanOrEqual(6);
 

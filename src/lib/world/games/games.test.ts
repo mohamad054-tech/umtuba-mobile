@@ -87,8 +87,8 @@ describe("Runtime games layer", () => {
     const sheet = controller.getViewState().gameSheet;
     expect(sheet?.gameName).toBe(first.gameName);
     expect(sheet?.cityName).toBe(first.cityName);
-    expect(sheet?.meta.every((m) => m.value === null)).toBe(true);
-    expect(sheet?.actions.every((a) => a.enabled === false)).toBe(true);
+    expect(sheet?.meta).toEqual([]);
+    expect(sheet?.actions).toEqual([]);
     expect(controller.getViewState().placeSheet).toBeNull();
     expect(controller.getViewState().educationSheet).toBeNull();
     expect(controller.getViewState().userSheet).toBeNull();
@@ -113,8 +113,8 @@ describe("Runtime games layer", () => {
     expect(renderer.getGameMarkers().length).toBeGreaterThan(0);
 
     const sheetState = buildWorldGameSheetState(first, true);
-    expect(sheetState?.actions.map((a) => a.id)).toEqual(["open_game"]);
-    expect(sheetState?.meta.map((m) => m.id)).toEqual(["status", "players"]);
+    expect(sheetState?.actions).toEqual([]);
+    expect(sheetState?.meta).toEqual([]);
   });
 
   it("fail-closes games when provider missing without breaking places", async () => {

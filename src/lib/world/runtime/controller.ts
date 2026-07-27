@@ -21,6 +21,7 @@ import {
   DEMO_MAP_SOURCE_ID,
   getMapSourceExperience,
   isWorldMapSourceAvailable,
+  STREET_MAP_SOURCE_ID,
   type MapSourceRegistry,
   type WorldMapSource,
   type WorldMapSourceKind,
@@ -303,7 +304,7 @@ export class WorldRuntimeController {
       options?.mapSourceRegistry ?? createDefaultMapSourceRegistry();
     this.mapSource = resolveMapSource(
       this.mapSourceRegistry,
-      options?.mapSourceId
+      options?.mapSourceId ?? STREET_MAP_SOURCE_ID
     );
     const mapSourceBound = isWorldMapSourceAvailable(this.mapSource);
 

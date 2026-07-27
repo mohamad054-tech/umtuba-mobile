@@ -1,6 +1,6 @@
 /**
  * Education bottom-sheet view model — Runtime builds; UI renders only.
- * Programs / Students / Courses stay null placeholders (no invented metrics).
+ * Only real identity fields are exposed (no placeholder metrics).
  */
 
 import {
@@ -29,27 +29,6 @@ export type WorldEducationSheetState = {
   metrics: WorldEducationSheetMetric[];
 };
 
-const PLACEHOLDER_METRICS: WorldEducationSheetMetric[] = [
-  {
-    id: "programs",
-    label: "Programs",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "students",
-    label: "Students",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "courses",
-    label: "Courses",
-    value: null,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldEducationSheetState(
   record: WorldEducationRecord | null,
   open: boolean
@@ -61,6 +40,6 @@ export function buildWorldEducationSheetState(
     typeLabel: formatWorldEducationKindLabel(record.educationType),
     cityName: record.cityName,
     open: true,
-    metrics: PLACEHOLDER_METRICS.map((m) => ({ ...m })),
+    metrics: [],
   };
 }

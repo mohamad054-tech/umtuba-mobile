@@ -1,33 +1,34 @@
-# Cursor Report — World Visual Quality & Performance V1
+# Cursor Report — World Product Surface Hardening V1
 
 ## Summary
 
-Improved World map visual quality and rendering performance while preserving Runtime → Data Pipeline → Renderer → Map Sources architecture. Split camera vs surface revisions to reduce unnecessary re-renders; added GeoJSON layer caching, tier-based label visibility, cluster opacity transitions, zoom-bucket roads/buildings loading, light loading overlay on map source switch, memory cleanup on unmount, and in-process runtime metrics (no external telemetry). Fail-closed: overlay/source failures do not crash; camera and layer selection persist.
+Hardened UM World product surface without changing Runtime / Data Pipeline / Renderer Adapter architecture and without adding Globe. Defaults: Streets map source + Places/Cities layer on. Collapsible Map settings for Sources/Roads/Buildings; Search + Layers always visible; larger map chrome. Bottom sheets show real fields only (no Coming soon / dead CTAs). Unsupported Globe and AI/Future stubs hidden from product UI. Development/debug copy removed from renderer host.
 
 ## Exact files changed
 
 ### New
-- `src/lib/world/runtime/metrics.ts`
-- `src/lib/world/renderer/maplibre/visualQuality.ts`
-- `src/lib/world/renderer/maplibre/layerCache.ts`
-- `src/lib/world/renderer/maplibre/useMapLibreLayerState.ts`
-- `src/lib/world/renderer/visualQuality.test.ts`
+- `components/world/WorldMapSettingsPanel.tsx`
+- `src/lib/world/productSurface.test.ts`
 
 ### Modified
+- `app/world.tsx`
+- `components/world/WorldExperienceShell.tsx`
+- `components/world/WorldHeader.tsx`
 - `components/world/WorldRendererHost.tsx`
-- `src/lib/world/renderer/index.ts`
-- `src/lib/world/renderer/maplibre/MapLibreRendererAdapter.ts`
-- `src/lib/world/renderer/maplibre/MapLibreMapSurface.tsx`
-- `src/lib/world/renderer/maplibre/MapLibrePlacesLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreUsersLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreGamesLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreCommerceLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreEventsLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreEducationLayer.tsx`
-- `src/lib/world/renderer/maplibre/MapLibreRoadsBuildingsLayer.tsx`
-- `src/lib/world/renderer/maplibre/cameraNavigation.test.ts`
-- `src/lib/world/runtime/controller.ts`
-- `src/lib/world/runtime/index.ts`
+- `components/world/WorldCameraControls.tsx`
+- `components/world/WorldControls.tsx`
+- `components/world/WorldSearchBar.tsx`
+- `components/world/World*BottomSheet.tsx` (all six)
+- `src/lib/world/categories.ts`
+- `src/lib/world/experience.ts`
+- `src/lib/world/experience.test.ts`
+- `src/lib/world/world.test.ts`
+- `src/lib/world/mapSource/registry.ts`
+- `src/lib/world/mapSource/mapSource.test.ts`
+- `src/lib/world/runtime/controller.ts` (default preferred Streets only)
+- `src/lib/world/runtime/stateMachine.ts` (product-facing messages)
+- `src/lib/world/*/ *Sheet.ts` (places/education/users/games/commerce/events)
+- Domain tests + `renderer/globe.test.ts`
 - `docs/ai/CURSOR_REPORT.md`
 
 ## Migrations created
@@ -37,12 +38,12 @@ None.
 ## Security review
 
 - No secrets / `.env` changes.
-- Metrics are in-process only; no external telemetry.
-- UI has no MapLibre / tile URL access.
+- Users privacy model unchanged.
+- Demo map source retained for fail-closed fallback only; not shown in product source chips.
 
 ## Tests
 
-**360/360 PASS** (43 files)
+**367/367 PASS** (44 files)
 
 ## TypeScript
 
@@ -62,5 +63,6 @@ Not run (EAS Build deferred per task note).
 
 ## Open issues
 
-- Other marker setters (`setEducationMarkers`, etc.) still copy arrays without `assignMarkerArray` dedup (only `setPlaceMarkers` optimized).
-- `useMapLibreLayerState` hook created; layers mostly use `surfaceRevision` prop directly from MapSurface.
+- Demo data providers still power the pipeline (product chrome no longer advertises demo).
+- Sheet actions remain deferred until trusted product surfaces exist.
+- Globe dual-surface still not implemented (intentionally deferred).

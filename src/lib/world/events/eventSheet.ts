@@ -31,20 +31,6 @@ export type WorldEventSheetState = {
   actions: WorldEventSheetAction[];
 };
 
-const PLACEHOLDER_META: WorldEventSheetMeta[] = [
-  { id: "date", label: "Date", value: null, placeholder: "Coming soon" },
-  { id: "organizer", label: "Organizer", value: null, placeholder: "Coming soon" },
-];
-
-const PLACEHOLDER_ACTIONS: WorldEventSheetAction[] = [
-  {
-    id: "view_event",
-    label: "View Event",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldEventSheetState(
   record: WorldEventRecord | null,
   open: boolean
@@ -56,7 +42,7 @@ export function buildWorldEventSheetState(
     eventTypeLabel: formatWorldEventKindLabel(record.eventType),
     cityName: record.cityName,
     open: true,
-    meta: PLACEHOLDER_META.map((m) => ({ ...m })),
-    actions: PLACEHOLDER_ACTIONS.map((a) => ({ ...a })),
+    meta: [],
+    actions: [],
   };
 }

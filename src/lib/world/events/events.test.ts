@@ -103,8 +103,8 @@ describe("Runtime events layer", () => {
     const sheet = controller.getViewState().eventSheet;
     expect(sheet?.eventName).toBe(first.eventName);
     expect(sheet?.cityName).toBe(first.cityName);
-    expect(sheet?.meta.every((m) => m.value === null)).toBe(true);
-    expect(sheet?.actions.every((a) => a.enabled === false)).toBe(true);
+    expect(sheet?.meta).toEqual([]);
+    expect(sheet?.actions).toEqual([]);
     expect(controller.getViewState().placeSheet).toBeNull();
     expect(controller.getViewState().gameSheet).toBeNull();
     expect(controller.getViewState().commerceSheet).toBeNull();
@@ -129,8 +129,8 @@ describe("Runtime events layer", () => {
     expect(renderer.getEventMarkers().length).toBeGreaterThan(0);
 
     const sheetState = buildWorldEventSheetState(first, true);
-    expect(sheetState?.actions.map((a) => a.id)).toEqual(["view_event"]);
-    expect(sheetState?.meta.map((m) => m.id)).toEqual(["date", "organizer"]);
+    expect(sheetState?.actions).toEqual([]);
+    expect(sheetState?.meta).toEqual([]);
   });
 
   it("fail-closes events when provider missing without breaking places", async () => {

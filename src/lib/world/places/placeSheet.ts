@@ -1,6 +1,6 @@
 /**
  * Places bottom-sheet view model — Runtime builds this; UI renders only.
- * Population/Users/Education/Events/Games stay placeholders until trusted sources bind.
+ * Only real identity fields are exposed (no placeholder metrics).
  */
 
 import {
@@ -20,7 +20,7 @@ export type WorldPlaceSheetMetricId =
 export type WorldPlaceSheetMetric = {
   id: WorldPlaceSheetMetricId;
   label: string;
-  /** Null = placeholder (fail-closed, no invented counts). */
+  /** Null = no trusted value (omit from product UI). */
   value: string | null;
   placeholder: string;
 };
@@ -35,39 +35,6 @@ export type WorldPlaceSheetState = {
   metrics: WorldPlaceSheetMetric[];
 };
 
-const PLACEHOLDER_METRICS: WorldPlaceSheetMetric[] = [
-  {
-    id: "population",
-    label: "Population",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "users",
-    label: "Users",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "education",
-    label: "Education",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "events",
-    label: "Events",
-    value: null,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "games",
-    label: "Games",
-    value: null,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldPlaceSheetState(
   place: WorldPlace | null,
   open: boolean
@@ -80,6 +47,6 @@ export function buildWorldPlaceSheetState(
     kindLabel: formatWorldPlaceKindLabel(place.kind),
     cityTier: resolvePlaceCityTier(place),
     open: true,
-    metrics: PLACEHOLDER_METRICS.map((m) => ({ ...m })),
+    metrics: [],
   };
 }

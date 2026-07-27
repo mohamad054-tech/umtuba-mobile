@@ -20,6 +20,25 @@ type WorldSearchBarProps = {
   onClear?: () => void;
 };
 
+function sourceBadge(sourceType: WorldSearchResult["sourceType"]): string {
+  switch (sourceType) {
+    case "places":
+      return "Place";
+    case "education":
+      return "Education";
+    case "users":
+      return "User";
+    case "commerce":
+      return "Commerce";
+    case "events":
+      return "Event";
+    case "games":
+      return "Game";
+    default:
+      return "Result";
+  }
+}
+
 /**
  * World search UI — view-state only. Never imports providers or MapLibre.
  */
@@ -38,6 +57,11 @@ export function WorldSearchBar({
     [query, results.length]
   );
 
+  const dismissResults = () => {
+    setFocused(false);
+    Keyboard.dismiss();
+  };
+
   return (
     <View style={styles.wrap} accessibilityLabel="World search">
       <View style={styles.inputRow}>
@@ -46,13 +70,14 @@ export function WorldSearchBar({
           value={query}
           onChangeText={onChangeQuery}
           onFocus={() => setFocused(true)}
-          placeholder="Search cities, education, users, games, businesses, events"
+          placeholder="Search World"
           placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
           accessibilityLabel="Search World"
-          accessibilityHint="Search places and education loaded via World data pipeline"
+          accessibilityHint="Search places, education, users, games, commerce, and events"
+          onSubmitEditing={dismissResults}
         />
         {query.length > 0 ? (
           <Pressable
@@ -60,8 +85,7 @@ export function WorldSearchBar({
             onPress={() => {
               onClear?.();
               onChangeQuery("");
-              setFocused(false);
-              Keyboard.dismiss();
+              dismissResults();
             }}
             accessibilityRole="button"
             accessibilityLabel="Clear search"
@@ -74,9 +98,23 @@ export function WorldSearchBar({
 
       {showPanel ? (
         <View style={styles.resultsPanel} accessibilityRole="list">
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsHeading}>
+              {empty ? "No results" : `${results.length} result${results.length === 1 ? "" : "s"}`}
+            </Text>
+            <Pressable
+              onPress={dismissResults}
+              style={styles.dismissButton}
+              accessibilityRole="button"
+              accessibilityLabel="Close search results"
+              hitSlop={8}
+            >
+              <Text style={styles.dismissText}>Close</Text>
+            </Pressable>
+          </View>
           {empty ? (
             <Text style={styles.emptyText} accessibilityRole="text">
-              No matching places, education, users, games, businesses, or events.
+              Try another name or city.
             </Text>
           ) : (
             <ScrollView
@@ -87,10 +125,12 @@ export function WorldSearchBar({
               {results.map((result) => (
                 <Pressable
                   key={`${result.sourceType}:${result.id}`}
-                  style={styles.resultRow}
+                  style={({ pressed }) => [
+                    styles.resultRow,
+                    pressed && styles.resultRowPressed,
+                  ]}
                   onPress={() => {
-                    Keyboard.dismiss();
-                    setFocused(false);
+                    dismissResults();
                     onSelectResult(result);
                   }}
                   accessibilityRole="button"
@@ -105,17 +145,7 @@ export function WorldSearchBar({
                     </Text>
                   </View>
                   <Text style={styles.resultBadge}>
-                    {result.sourceType === "places"
-                      ? "Place"
-                      : result.sourceType === "education"
-                        ? "Education"
-                        : result.sourceType === "users"
-                          ? "User"
-                          : result.sourceType === "commerce"
-                            ? "Business"
-                            : result.sourceType === "events"
-                              ? "Event"
-                              : "Game"}
+                    {sourceBadge(result.sourceType)}
                   </Text>
                 </Pressable>
               ))}
@@ -129,8 +159,8 @@ export function WorldSearchBar({
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
     zIndex: 20,
   },
   inputRow: {
@@ -140,7 +170,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
@@ -150,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   clearButton: {
-    minHeight: 48,
+    minHeight: 44,
     minWidth: 64,
     paddingHorizontal: 12,
     borderRadius: 12,
@@ -167,15 +197,42 @@ const styles = StyleSheet.create({
   },
   resultsPanel: {
     marginTop: 8,
-    maxHeight: 220,
+    maxHeight: 240,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceElevated,
     overflow: "hidden",
   },
+  resultsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  resultsHeading: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  dismissButton: {
+    minHeight: 32,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismissText: {
+    color: colors.accentCyan,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   resultsScroll: {
-    maxHeight: 220,
+    maxHeight: 190,
   },
   emptyText: {
     color: colors.textMuted,
@@ -192,6 +249,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  resultRowPressed: {
+    backgroundColor: "rgba(34,211,238,0.08)",
   },
   resultText: {
     flex: 1,

@@ -9,15 +9,17 @@ import { colors } from "@/src/theme/colors";
 type WorldCameraControlsProps = {
   controls: WorldCameraControlState[];
   onPress?: (id: WorldCameraControlId) => void;
+  compact?: boolean;
 };
 
 export function WorldCameraControls({
   controls,
   onPress,
+  compact = false,
 }: WorldCameraControlsProps) {
   return (
     <View
-      style={styles.wrap}
+      style={[styles.wrap, compact && styles.wrapCompact]}
       accessibilityRole="summary"
       accessibilityLabel="World camera controls"
     >
@@ -26,7 +28,11 @@ export function WorldCameraControls({
         return (
           <Pressable
             key={control.id}
-            style={[styles.button, disabled && styles.buttonDisabled]}
+            style={[
+              styles.button,
+              compact && styles.buttonCompact,
+              disabled && styles.buttonDisabled,
+            ]}
             disabled={disabled}
             onPress={() => {
               if (disabled) return;
@@ -35,11 +41,6 @@ export function WorldCameraControls({
             accessibilityRole="button"
             accessibilityLabel={control.label}
             accessibilityState={{ disabled }}
-            accessibilityHint={
-              disabled
-                ? "Unavailable until the World renderer is connected"
-                : undefined
-            }
           >
             <Text
               style={[styles.label, disabled && styles.labelDisabled]}
@@ -76,6 +77,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  wrapCompact: {
+    flexDirection: "column",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    gap: 6,
+  },
   button: {
     minWidth: 48,
     minHeight: 48,
@@ -86,6 +93,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  buttonCompact: {
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: 10,
+    backgroundColor: "rgba(15, 23, 42, 0.82)",
+  },
   buttonDisabled: {
     opacity: 0.38,
     borderColor: colors.border,
@@ -93,7 +106,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
   },
   labelDisabled: {

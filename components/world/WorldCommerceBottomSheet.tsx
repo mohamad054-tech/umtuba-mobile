@@ -19,6 +19,8 @@ export function WorldCommerceBottomSheet({
   const subtitle = sheet.brandName
     ? `${sheet.commerceTypeLabel} · ${sheet.cityName} · ${sheet.brandName}`
     : `${sheet.commerceTypeLabel} · ${sheet.cityName}`;
+  const realMeta = sheet.meta.filter((m) => m.value != null && m.value !== "");
+  const enabledActions = sheet.actions.filter((a) => a.enabled);
 
   return (
     <View
@@ -44,26 +46,25 @@ export function WorldCommerceBottomSheet({
         ) : null}
       </View>
 
-      <View style={styles.meta}>
-        {sheet.meta.map((entry) => (
-          <View key={entry.id} style={styles.metaRow}>
-            <Text style={styles.metaLabel}>{entry.label}</Text>
-            <Text style={styles.metaValue}>{entry.value ?? entry.placeholder}</Text>
-          </View>
-        ))}
-      </View>
+      {realMeta.length > 0 ? (
+        <View style={styles.meta}>
+          {realMeta.map((entry) => (
+            <View key={entry.id} style={styles.metaRow}>
+              <Text style={styles.metaLabel}>{entry.label}</Text>
+              <Text style={styles.metaValue}>{entry.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
-      {sheet.actions.map((action) => (
+      {enabledActions.map((action) => (
         <Pressable
           key={action.id}
-          style={[styles.action, !action.enabled && styles.actionDisabled]}
-          disabled
+          style={styles.action}
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel={`${action.label}, ${action.placeholder}`}
+          accessibilityLabel={action.label}
         >
           <Text style={styles.actionLabel}>{action.label}</Text>
-          <Text style={styles.actionHint}>{action.placeholder}</Text>
         </Pressable>
       ))}
     </View>
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   metaLabel: { color: colors.textMuted, fontSize: 13 },
-  metaValue: { color: colors.textSubtle, fontSize: 13, fontWeight: "600" },
+  metaValue: { color: colors.text, fontSize: 13, fontWeight: "600" },
   action: {
     minHeight: 48,
     borderRadius: 12,
@@ -131,11 +132,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
-  actionDisabled: { opacity: 0.55 },
   actionLabel: { color: colors.text, fontSize: 14, fontWeight: "700" },
-  actionHint: { color: colors.textSubtle, fontSize: 12 },
 });

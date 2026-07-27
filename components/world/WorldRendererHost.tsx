@@ -45,13 +45,11 @@ export function WorldRendererHost({
   const styleTransitioning = isMapLibreRendererAdapter(adapter)
     ? adapter.isStyleTransitioning()
     : false;
-  const caps = adapter.getCapabilities();
   const showOverlay =
     !bound ||
     Boolean(loadError) ||
     (bound && !styleReady && !styleTransitioning);
-  const showSourceSwitchOverlay =
-    bound && !loadError && styleTransitioning;
+  const showSourceSwitchOverlay = bound && !loadError && styleTransitioning;
 
   return (
     <View
@@ -61,8 +59,8 @@ export function WorldRendererHost({
         loadError
           ? `World map error. ${loadError}`
           : bound && styleReady
-            ? "World map renderer"
-            : "World map renderer unavailable. Owned World renderer is being prepared."
+            ? "World map"
+            : "Loading World map"
       }
       accessibilityState={{ disabled: !bound || Boolean(loadError) }}
     >
@@ -74,27 +72,12 @@ export function WorldRendererHost({
       ) : null}
       {showOverlay ? (
         <View style={styles.overlay} accessibilityRole="summary">
-          <Text style={styles.kicker}>Owned World</Text>
+          <ActivityIndicator color={colors.accentCyan} size="large" />
           <Text style={styles.title}>
-            {loadError
-              ? "Renderer unavailable"
-              : bound
-                ? "Loading map…"
-                : "Renderer preparing"}
+            {loadError ? "Map unavailable" : "Loading map…"}
           </Text>
           <Text style={styles.body}>
-            {loadError ??
-              (bound
-                ? "Connecting to development map tiles…"
-                : preparingMessage)}
-          </Text>
-          <Text style={styles.meta} accessibilityLabel="Renderer family">
-            Family: {adapter.family}
-          </Text>
-          <Text style={styles.meta} accessibilityLabel="Renderer capabilities">
-            3D:{caps.supports3D ? "on" : "off"} Terrain:
-            {caps.supportsTerrain ? "on" : "off"} Offline:
-            {caps.supportsOffline ? "on" : "off"}
+            {loadError ?? (bound ? "Preparing map tiles…" : preparingMessage)}
           </Text>
         </View>
       ) : null}
@@ -121,11 +104,8 @@ export function WorldAttribution({
 const styles = StyleSheet.create({
   canvas: {
     flex: 1,
-    minHeight: 220,
-    borderRadius: 14,
+    minHeight: 300,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   overlay: {
@@ -134,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    gap: 8,
+    gap: 10,
   },
   switchOverlay: {
     ...StyleSheet.absoluteFill,
@@ -142,17 +122,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  kicker: {
-    color: colors.accentCyan,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
   title: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 17,
+    fontWeight: "700",
     textAlign: "center",
   },
   body: {
@@ -162,20 +135,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 320,
   },
-  meta: {
-    marginTop: 4,
-    color: colors.textSubtle,
-    fontSize: 12,
-    fontWeight: "600",
-  },
   attribution: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   attributionText: {
     color: colors.textSubtle,
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10,
+    lineHeight: 14,
     textAlign: "center",
   },
 });

@@ -62,18 +62,6 @@ export default function WorldScreen() {
       onTogglePlaceLayer={(layerId) => {
         controller.togglePlaceLayer(layerId);
       }}
-      onToggleFilters={() => {
-        controller.toggleFiltersPanel();
-      }}
-      onToggleLayersPanel={() => {
-        controller.toggleLayersPanel();
-      }}
-      onClearFilters={() => {
-        controller.clearFilters();
-      }}
-      onCloseFilters={() => {
-        controller.closeFilters();
-      }}
       onCloseDetails={() => {
         controller.closeDetails();
       }}

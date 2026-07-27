@@ -26,6 +26,7 @@ export function WorldLayerSelector({
       >
         {layers.map((layer) => {
           const disabled = !layer.enabled;
+          const stateLabel = disabled ? "Unavailable" : layer.active ? "On" : "Off";
           return (
             <Pressable
               key={layer.categoryId}
@@ -37,7 +38,7 @@ export function WorldLayerSelector({
               disabled={disabled}
               onPress={() => onToggle?.(layer.categoryId, layer.enabled)}
               accessibilityRole="button"
-              accessibilityLabel={`${layer.label} layer`}
+              accessibilityLabel={`${layer.label} layer, ${stateLabel}`}
               accessibilityState={{
                 disabled,
                 selected: layer.active,
@@ -59,6 +60,16 @@ export function WorldLayerSelector({
                 accessible={false}
               >
                 {layer.label}
+              </Text>
+              <Text
+                style={[
+                  styles.chipState,
+                  layer.active && styles.chipStateActive,
+                  disabled && styles.chipTextDisabled,
+                ]}
+                accessible={false}
+              >
+                {stateLabel}
               </Text>
             </Pressable>
           );
@@ -176,28 +187,33 @@ export function WorldDetailsPanel({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   heading: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "800",
   },
   row: {
     gap: 8,
     paddingVertical: 2,
+    paddingRight: 8,
   },
   chip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
+    minHeight: 48,
+    minWidth: 88,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
   },
   chipActive: {
     borderColor: colors.accentCyan,
@@ -217,6 +233,16 @@ const styles = StyleSheet.create({
   },
   chipTextDisabled: {
     color: colors.textSubtle,
+  },
+  chipState: {
+    color: colors.textSubtle,
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  chipStateActive: {
+    color: colors.accentCyan,
   },
   panel: {
     marginHorizontal: 16,

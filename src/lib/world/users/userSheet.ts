@@ -1,6 +1,6 @@
 /**
  * Users bottom-sheet view model — Runtime builds; UI renders only.
- * Social actions are placeholders (no real profile/follow/message yet).
+ * Only real public identity fields (no placeholder social actions).
  */
 
 import {
@@ -14,7 +14,6 @@ export type WorldUserSheetActionId = "view_profile" | "follow" | "message";
 export type WorldUserSheetAction = {
   id: WorldUserSheetActionId;
   label: string;
-  /** Always false in V1 — placeholders only. */
   enabled: boolean;
   placeholder: string;
 };
@@ -30,27 +29,6 @@ export type WorldUserSheetState = {
   actions: WorldUserSheetAction[];
 };
 
-const PLACEHOLDER_ACTIONS: WorldUserSheetAction[] = [
-  {
-    id: "view_profile",
-    label: "View Profile",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "follow",
-    label: "Follow",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-  {
-    id: "message",
-    label: "Message",
-    enabled: false,
-    placeholder: "Coming soon",
-  },
-];
-
 export function buildWorldUserSheetState(
   record: WorldUserRecord | null,
   open: boolean
@@ -64,6 +42,6 @@ export function buildWorldUserSheetState(
     initial: userDisplayInitial(record.displayName),
     presenceLabel: formatWorldUserPresenceLabel(record.presence),
     open: true,
-    actions: PLACEHOLDER_ACTIONS.map((a) => ({ ...a })),
+    actions: [],
   };
 }
