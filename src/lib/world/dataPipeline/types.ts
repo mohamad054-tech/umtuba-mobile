@@ -61,10 +61,20 @@ export type WorldEducationRecord = {
   longitude: number | null;
 };
 
-/** Games nodes — empty until a real provider binds. */
+export type WorldGameCategory =
+  | "casual_game"
+  | "multiplayer_game"
+  | "tournament"
+  | "game_hub";
+
+/** Games nodes — provider-backed map points. */
 export type WorldGameRecord = {
   id: string;
-  title: string;
+  gameName: string;
+  /** @deprecated Prefer `gameName`; kept for transition compatibility. */
+  title?: string;
+  category: WorldGameCategory;
+  cityName: string;
   latitude: number | null;
   longitude: number | null;
 };

@@ -11,6 +11,7 @@ export type {
   WorldEventsDataProvider,
   WorldEventRecord,
   WorldGamesDataProvider,
+  WorldGameCategory,
   WorldGameRecord,
   WorldPlacesData,
   WorldPlacesDataProvider,

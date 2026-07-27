@@ -46,7 +46,7 @@ export function WorldSearchBar({
           value={query}
           onChangeText={onChangeQuery}
           onFocus={() => setFocused(true)}
-          placeholder="Search cities, education, users"
+          placeholder="Search cities, education, users, games"
           placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           autoCorrect={false}
@@ -76,7 +76,7 @@ export function WorldSearchBar({
         <View style={styles.resultsPanel} accessibilityRole="list">
           {empty ? (
             <Text style={styles.emptyText} accessibilityRole="text">
-              No matching places or education.
+              No matching places, education, users, or games.
             </Text>
           ) : (
             <ScrollView
@@ -109,7 +109,9 @@ export function WorldSearchBar({
                       ? "Place"
                       : result.sourceType === "education"
                         ? "Education"
-                        : "User"}
+                        : result.sourceType === "users"
+                          ? "User"
+                          : "Game"}
                   </Text>
                 </Pressable>
               ))}

@@ -6,6 +6,8 @@
 
 import type { WorldCamera } from "@/src/lib/world/types";
 import type { WorldEducationMarker } from "@/src/lib/world/education";
+import type { WorldGameMarker } from "@/src/lib/world/games";
+import { GAME_FOCUS_ZOOM } from "@/src/lib/world/games";
 import type { WorldPlaceMarker } from "@/src/lib/world/places";
 import { PLACE_FOCUS_ZOOM } from "@/src/lib/world/places/placeUx";
 import type { WorldUserMarker } from "@/src/lib/world/users";
@@ -35,6 +37,7 @@ export { MAPLIBRE_DEFAULT_CAMERA };
 export type PlacePressHandler = (placeId: string) => void;
 export type EducationPressHandler = (educationId: string) => void;
 export type UserPressHandler = (userId: string) => void;
+export type GamePressHandler = (gameId: string) => void;
 
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
@@ -75,6 +78,13 @@ export type MapLibreRendererAdapter = WorldRendererAdapter & {
   clearSelectedUserMarker(): void;
   setUserPressHandler(handler: UserPressHandler | null): void;
   reportUserPress(userId: string): void;
+  setGameMarkers(markers: WorldGameMarker[]): void;
+  getGameMarkers(): WorldGameMarker[];
+  getSelectedGameMarkerId(): string | null;
+  setSelectedGameMarkerId(gameId: string | null): void;
+  clearSelectedGameMarker(): void;
+  setGamePressHandler(handler: GamePressHandler | null): void;
+  reportGamePress(gameId: string): void;
   /** Programmatic camera focus (selection / cluster expand). */
   focusPlaceAt(latitude: number, longitude: number, zoom?: number): boolean;
 };
@@ -112,6 +122,9 @@ export function createMapLibreRendererAdapter(options?: {
   let userMarkers: WorldUserMarker[] = [];
   let selectedUserMarkerId: string | null = null;
   let userPressHandler: UserPressHandler | null = null;
+  let gameMarkers: WorldGameMarker[] = [];
+  let selectedGameMarkerId: string | null = null;
+  let gamePressHandler: GamePressHandler | null = null;
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -336,6 +349,9 @@ export function createMapLibreRendererAdapter(options?: {
       if (!placeMarkers.some((m) => m.id === placeId)) return;
       if (selectedPlaceMarkerId === placeId) return;
       selectedPlaceMarkerId = placeId;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
       bump();
     },
     clearSelectedPlaceMarker(): void {
@@ -353,6 +369,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedPlaceMarkerId = placeId;
       selectedEducationMarkerId = null;
       selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
       // Focus camera on selection for professional UX.
       if (canNavigate()) {
         sessionCamera = normalizeMapLibreCamera(
@@ -403,6 +420,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedEducationMarkerId = educationId;
       selectedPlaceMarkerId = null;
       selectedUserMarkerId = null;
+      selectedGameMarkerId = null;
       bump();
     },
     clearSelectedEducationMarker(): void {
@@ -469,6 +487,7 @@ export function createMapLibreRendererAdapter(options?: {
       selectedUserMarkerId = userId;
       selectedPlaceMarkerId = null;
       selectedEducationMarkerId = null;
+      selectedGameMarkerId = null;
       bump();
     },
     clearSelectedUserMarker(): void {
@@ -501,6 +520,72 @@ export function createMapLibreRendererAdapter(options?: {
       bump();
       try {
         userPressHandler?.(userId);
+      } catch {
+        // Fail-closed.
+      }
+    },
+    setGameMarkers(markers: WorldGameMarker[]): void {
+      gameMarkers = Array.isArray(markers) ? markers.map((m) => ({ ...m })) : [];
+      if (
+        selectedGameMarkerId &&
+        !gameMarkers.some((m) => m.id === selectedGameMarkerId)
+      ) {
+        selectedGameMarkerId = null;
+      }
+      bump();
+    },
+    getGameMarkers(): WorldGameMarker[] {
+      return gameMarkers.map((m) => ({ ...m }));
+    },
+    getSelectedGameMarkerId(): string | null {
+      return selectedGameMarkerId;
+    },
+    setSelectedGameMarkerId(gameId: string | null): void {
+      if (gameId == null) {
+        if (selectedGameMarkerId == null) return;
+        selectedGameMarkerId = null;
+        bump();
+        return;
+      }
+      if (!gameMarkers.some((m) => m.id === gameId)) return;
+      if (selectedGameMarkerId === gameId) return;
+      selectedGameMarkerId = gameId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      bump();
+    },
+    clearSelectedGameMarker(): void {
+      if (selectedGameMarkerId == null) return;
+      selectedGameMarkerId = null;
+      bump();
+    },
+    setGamePressHandler(handler: GamePressHandler | null): void {
+      gamePressHandler = handler;
+    },
+    reportGamePress(gameId: string): void {
+      if (!gameId || typeof gameId !== "string") return;
+      const marker = gameMarkers.find((m) => m.id === gameId);
+      if (!marker) return;
+      selectedGameMarkerId = gameId;
+      selectedPlaceMarkerId = null;
+      selectedEducationMarkerId = null;
+      selectedUserMarkerId = null;
+      if (canNavigate()) {
+        sessionCamera = normalizeMapLibreCamera(
+          {
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+            zoom: Math.max(sessionCamera.zoom, GAME_FOCUS_ZOOM),
+            bearing: sessionCamera.bearing,
+            pitch: sessionCamera.pitch,
+          },
+          sessionCamera
+        );
+      }
+      bump();
+      try {
+        gamePressHandler?.(gameId);
       } catch {
         // Fail-closed.
       }

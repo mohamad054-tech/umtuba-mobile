@@ -18,15 +18,19 @@ describe("WorldSearchService", () => {
   async function demoDataset() {
     const places = await createDemoPlacesDataProvider().listPlaces();
     const education = await createDemoEducationDataProvider().listEducation();
-    const { createDemoUsersDataProvider } = await import("@/src/lib/world");
+    const { createDemoUsersDataProvider, createDemoGamesDataProvider } =
+      await import("@/src/lib/world");
     const users = await createDemoUsersDataProvider().listUsers();
+    const games = await createDemoGamesDataProvider().listGames();
     return buildWorldSearchDataset({
       placesAvailable: true,
       educationAvailable: true,
       usersAvailable: true,
+      gamesAvailable: true,
       places,
       education,
       users,
+      games,
     });
   }
 
@@ -67,19 +71,23 @@ describe("WorldSearchService", () => {
     ).toBe(true);
   });
 
-  it("searches across Places, Education, and Users", async () => {
+  it("searches across Places, Education, Users, and Games", async () => {
     const dataset = await demoDataset();
     const hits = service.search("a", dataset);
     expect(hits.some((h) => h.sourceType === "places")).toBe(true);
     expect(hits.some((h) => h.sourceType === "education")).toBe(true);
     expect(hits.some((h) => h.sourceType === "users")).toBe(true);
+    expect(service.search("game", dataset).some((h) => h.sourceType === "games")).toBe(
+      true
+    );
     for (const hit of hits) {
       expect(hit.id).toBeTruthy();
       expect(hit.title).toBeTruthy();
       expect(
         hit.sourceType === "places" ||
           hit.sourceType === "education" ||
-          hit.sourceType === "users"
+          hit.sourceType === "users" ||
+          hit.sourceType === "games"
       ).toBe(true);
     }
   });
@@ -87,15 +95,19 @@ describe("WorldSearchService", () => {
   it("fail-closes missing provider kinds without breaking others", async () => {
     const places = listDemoPlaces();
     const education = await createDemoEducationDataProvider().listEducation();
-    const { createDemoUsersDataProvider } = await import("@/src/lib/world");
+    const { createDemoUsersDataProvider, createDemoGamesDataProvider } =
+      await import("@/src/lib/world");
     const users = await createDemoUsersDataProvider().listUsers();
+    const games = await createDemoGamesDataProvider().listGames();
     const placesOnly = buildWorldSearchDataset({
       placesAvailable: true,
       educationAvailable: false,
       usersAvailable: false,
+      gamesAvailable: false,
       places,
       education,
       users,
+      games,
     });
     const hits = service.search("amman", placesOnly);
     expect(hits.every((h) => h.sourceType === "places")).toBe(true);
@@ -105,9 +117,11 @@ describe("WorldSearchService", () => {
       placesAvailable: false,
       educationAvailable: true,
       usersAvailable: false,
+      gamesAvailable: false,
       places,
       education,
       users,
+      games,
     });
     const eduHits = service.search("university", eduOnly);
     expect(eduHits.every((h) => h.sourceType === "education")).toBe(true);
@@ -161,11 +175,12 @@ describe("Runtime search + selection", () => {
     expect(hits.length).toBeGreaterThan(0);
   });
 
-  it("pipeline-backed default search sees places, education, and users", async () => {
+  it("pipeline-backed default search sees places, education, users, and games", async () => {
     const pipeline = createDefaultWorldDataPipeline();
     expect(pipeline.isKindAvailable("places")).toBe(true);
     expect(pipeline.isKindAvailable("education")).toBe(true);
     expect(pipeline.isKindAvailable("users")).toBe(true);
+    expect(pipeline.isKindAvailable("games")).toBe(true);
     const controller = createWorldRuntimeController({
       yieldMs: 0,
       dataPipeline: pipeline,
@@ -175,5 +190,8 @@ describe("Runtime search + selection", () => {
     expect(hits.some((h) => h.sourceType === "places")).toBe(true);
     expect(hits.some((h) => h.sourceType === "education")).toBe(true);
     expect(hits.some((h) => h.sourceType === "users")).toBe(true);
+    expect(
+      controller.searchWorld("game").some((h) => h.sourceType === "games")
+    ).toBe(true);
   });
 });

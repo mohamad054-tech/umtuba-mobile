@@ -191,6 +191,8 @@ describe("runtime + renderer integration", () => {
     );
 
     controller.toggleLayer("games", true);
+    expect(renderer.getLayerAdapter().isLayerVisible("games")).toBe(false);
+    controller.toggleLayer("games", true);
     expect(renderer.getLayerAdapter().isLayerVisible("games")).toBe(true);
 
     if (!isMapLibreRendererAdapter(renderer)) {

@@ -3,7 +3,11 @@
  * No external search APIs / MapLibre / UI imports.
  */
 
-export type WorldSearchSourceType = "places" | "education" | "users";
+export type WorldSearchSourceType =
+  | "places"
+  | "education"
+  | "users"
+  | "games";
 
 export type WorldSearchResult = {
   id: string;
@@ -22,6 +26,7 @@ export type WorldSearchDataset = {
   places: import("@/src/lib/world/places").WorldPlace[];
   education: import("@/src/lib/world/dataPipeline").WorldEducationRecord[];
   users: import("@/src/lib/world/dataPipeline").WorldUserRecord[];
+  games: import("@/src/lib/world/dataPipeline").WorldGameRecord[];
 };
 
 export type WorldSearchService = {

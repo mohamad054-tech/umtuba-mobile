@@ -35,6 +35,7 @@ describe("world categories", () => {
       { id: "users", label: "Users", supported: true },
       { id: "cities", label: "Cities", supported: true },
       { id: "education", label: "Education", supported: true },
+      { id: "games", label: "Games", supported: true },
     ]);
     expect(parseWorldCategoryId("events")).toBe("events");
     expect(parseWorldCategoryId("planets")).toBeNull();

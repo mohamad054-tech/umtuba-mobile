@@ -150,6 +150,42 @@ const DEMO_USER_RECORDS: WorldUserRecord[] = [
   },
 ];
 
+/** Development-only demo games layer records. */
+const DEMO_GAME_RECORDS: WorldGameRecord[] = [
+  {
+    id: "game-casual-amman",
+    gameName: "Night Runner",
+    category: "casual_game",
+    cityName: "Amman",
+    latitude: 31.956,
+    longitude: 35.93,
+  },
+  {
+    id: "game-multi-cairo",
+    gameName: "Squad Arena",
+    category: "multiplayer_game",
+    cityName: "Cairo",
+    latitude: 30.041,
+    longitude: 31.232,
+  },
+  {
+    id: "game-tourney-riyadh",
+    gameName: "Riyadh Open Cup",
+    category: "tournament",
+    cityName: "Riyadh",
+    latitude: 24.716,
+    longitude: 46.675,
+  },
+  {
+    id: "game-hub-dubai",
+    gameName: "DXB Game Hub",
+    category: "game_hub",
+    cityName: "Dubai",
+    latitude: 25.206,
+    longitude: 55.273,
+  },
+];
+
 /** Adapt Places foundation provider into the unified data-pipeline contract. */
 export function adaptPlaceProvider(
   placeProvider: WorldPlaceProvider
@@ -226,7 +262,7 @@ export function createDemoGamesDataProvider(): WorldGamesDataProvider {
     kind: "games",
     isAvailable: () => true,
     async listGames(): Promise<WorldGameRecord[]> {
-      return [];
+      return DEMO_GAME_RECORDS.map((row) => ({ ...row }));
     },
   };
 }
