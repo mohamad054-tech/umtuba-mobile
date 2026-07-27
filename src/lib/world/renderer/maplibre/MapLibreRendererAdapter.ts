@@ -48,6 +48,8 @@ export type EventPressHandler = (eventId: string) => void;
 export type MapLibreRendererAdapter = WorldRendererAdapter & {
   /** Bound style URL from Runtime / Map Source — empty when unbound. */
   getStyleUrl(): string;
+  /** Swap style URL without resetting session camera — remounts map surface. */
+  setStyleUrl(next: string): boolean;
   getCameraRevision(): number;
   /** Bumps on each mount so Retry can remount the native Map surface. */
   getMountGeneration(): number;
@@ -117,9 +119,9 @@ export function createMapLibreRendererAdapter(options?: {
   styleUrl?: string | null;
   initialCamera?: WorldCamera;
 }): MapLibreRendererAdapter {
-  const styleUrl =
+  let styleUrl =
     typeof options?.styleUrl === "string" ? options.styleUrl.trim() : "";
-  const hasStyle = styleUrl.length > 0;
+  let hasStyle = styleUrl.length > 0;
   /** Session camera — last center/zoom for this World session. */
   let sessionCamera: WorldCamera = normalizeMapLibreCamera(
     options?.initialCamera ?? createDefaultMapLibreCamera()
@@ -303,6 +305,18 @@ export function createMapLibreRendererAdapter(options?: {
     capability: toFoundationRendererCapability("vector_2d", caps),
     getStyleUrl(): string {
       return styleUrl;
+    },
+    setStyleUrl(next: string): boolean {
+      const trimmed = typeof next === "string" ? next.trim() : "";
+      if (trimmed.length === 0) return false;
+      if (trimmed === styleUrl) return true;
+      styleUrl = trimmed;
+      hasStyle = true;
+      styleReady = false;
+      loadError = null;
+      mountGeneration += 1;
+      bump();
+      return true;
     },
     getCameraRevision(): number {
       return revision;

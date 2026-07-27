@@ -77,6 +77,9 @@ export default function WorldScreen() {
       onCloseDetails={() => {
         controller.closeDetails();
       }}
+      onSelectMapSource={(sourceId) => {
+        controller.setMapSourceId(sourceId);
+      }}
     />
   );
 }

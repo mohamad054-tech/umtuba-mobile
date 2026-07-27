@@ -78,6 +78,15 @@ export type WorldPlaceLayerControlState = {
   reason: string | null;
 };
 
+export type WorldMapSourceControlState = {
+  id: string;
+  label: string;
+  kind: import("@/src/lib/world/mapSource").WorldMapSourceKind;
+  active: boolean;
+  enabled: boolean;
+  reason: string | null;
+};
+
 export type WorldExperienceViewState = {
   phase: WorldExperiencePhase;
   message: string;
@@ -86,6 +95,7 @@ export type WorldExperienceViewState = {
   foundationConfigured: boolean;
   layers: WorldLayerControlState[];
   placeLayers: WorldPlaceLayerControlState[];
+  mapSources: WorldMapSourceControlState[];
   cameraControls: WorldCameraControlState[];
   filter: WorldFilter;
   selectedEntityId: string | null;
@@ -221,6 +231,26 @@ export function buildWorldLayerControls(
   });
 }
 
+/** Streets / Satellite switcher controls — UI never sees style URLs. */
+export function buildWorldMapSourceControls(
+  sources: Array<{
+    id: string;
+    label: string;
+    kind: import("@/src/lib/world/mapSource").WorldMapSourceKind;
+    enabled: boolean;
+  }>,
+  activeSourceId: string | null
+): WorldMapSourceControlState[] {
+  return sources.map((source) => ({
+    id: source.id,
+    label: source.label,
+    kind: source.kind,
+    active: activeSourceId === source.id,
+    enabled: source.enabled,
+    reason: source.enabled ? null : "This map source is not available yet.",
+  }));
+}
+
 export function toggleWorldCategorySelection(
   current: WorldCategoryId[],
   categoryId: WorldCategoryId,
@@ -275,6 +305,7 @@ export function buildWorldExperienceViewState(options?: {
   /** Trusted entities from Runtime (e.g. Places) — never invented in UI. */
   entities?: WorldEntity[];
   placeLayers?: WorldPlaceLayerControlState[];
+  mapSources?: WorldMapSourceControlState[];
   placeSheet?: import("@/src/lib/world/places").WorldPlaceSheetState | null;
   educationSheet?: import("@/src/lib/world/education").WorldEducationSheetState | null;
   userSheet?: import("@/src/lib/world/users").WorldUserSheetState | null;
@@ -303,6 +334,9 @@ export function buildWorldExperienceViewState(options?: {
   const placeLayers = Array.isArray(options?.placeLayers)
     ? options.placeLayers
     : [];
+  const mapSources = Array.isArray(options?.mapSources)
+    ? options.mapSources
+    : [];
   const placeSheet = options?.placeSheet ?? null;
   const educationSheet = options?.educationSheet ?? null;
   const userSheet = options?.userSheet ?? null;
@@ -319,6 +353,7 @@ export function buildWorldExperienceViewState(options?: {
       foundationConfigured,
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
       placeLayers,
+      mapSources,
       cameraControls: buildWorldCameraControls(rendererBound),
       filter: applyWorldCategoryFilter(
         snapshot.filter ?? emptyWorldFilter(),
@@ -349,6 +384,7 @@ export function buildWorldExperienceViewState(options?: {
       foundationConfigured,
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
       placeLayers,
+      mapSources,
       cameraControls: buildWorldCameraControls(false),
       filter: emptyWorldFilter(),
       selectedEntityId: null,
@@ -387,6 +423,7 @@ export function buildWorldExperienceViewState(options?: {
     foundationConfigured,
     layers,
     placeLayers,
+    mapSources,
     cameraControls: buildWorldCameraControls(rendererBound),
     filter: applyWorldCategoryFilter(
       snapshot.filter ?? emptyWorldFilter(),

@@ -1,5 +1,6 @@
 import {
   buildWorldExperienceViewState,
+  buildWorldMapSourceControls,
   createDefaultWorldUiSelection,
   selectWorldEntity,
   toggleWorldCategorySelection,
@@ -11,9 +12,11 @@ import {
 import type { WorldCategoryId, WorldFoundationSnapshot } from "@/src/lib/world/types";
 import {
   createDefaultMapSourceRegistry,
+  DEMO_MAP_SOURCE_ID,
   isWorldMapSourceAvailable,
   type MapSourceRegistry,
   type WorldMapSource,
+  type WorldMapSourceKind,
 } from "@/src/lib/world/mapSource";
 import {
   createDefaultWorldDataPipeline,
@@ -551,6 +554,20 @@ export class WorldRuntimeController {
       this.selection.eventSheetOpen === true && selectedEvent != null
     );
 
+    const switchableSources = this.mapSourceRegistry
+      .list()
+      .filter((s) => s.kind === "street" || s.kind === "satellite")
+      .map((s) => ({
+        id: s.id,
+        label: s.label,
+        kind: s.kind,
+        enabled: isWorldMapSourceAvailable(s),
+      }));
+    const mapSources = buildWorldMapSourceControls(
+      switchableSources,
+      this.mapSource?.id ?? null
+    );
+
     const base = buildWorldExperienceViewState({
       snapshot,
       selection: this.selection,
@@ -566,6 +583,7 @@ export class WorldRuntimeController {
       gameSheet,
       commerceSheet,
       eventSheet,
+      mapSources,
     });
 
     if (runtime.phase === "preparing") {
@@ -678,6 +696,75 @@ export class WorldRuntimeController {
     }
     if (ok) this.emit();
     return ok;
+  }
+
+  /**
+   * Switch map source without full Runtime reinit — preserves camera, selection, layers.
+   * Fail-closed: unavailable preferred id falls back to Demo.
+   */
+  setMapSourceId(sourceId: string): boolean {
+    if (!sourceId || typeof sourceId !== "string") return false;
+    const trimmed = sourceId.trim();
+    if (trimmed.length === 0) return false;
+
+    let next = this.mapSourceRegistry.resolve(trimmed);
+    if (!isWorldMapSourceAvailable(next)) {
+      next = this.mapSourceRegistry.resolve(DEMO_MAP_SOURCE_ID);
+    }
+    if (!isWorldMapSourceAvailable(next)) {
+      return false;
+    }
+
+    if (this.mapSource?.id === next!.id) {
+      return true;
+    }
+
+    let styleUrl = next!.getStyleUrl();
+    if (!styleUrl) {
+      const demo = this.mapSourceRegistry.resolve(DEMO_MAP_SOURCE_ID);
+      if (!isWorldMapSourceAvailable(demo)) return false;
+      next = demo;
+      styleUrl = demo!.getStyleUrl();
+      if (!styleUrl) return false;
+    }
+
+    this.mapSource = next!;
+
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      if (!this.renderer.setStyleUrl(styleUrl)) {
+        const demo = this.mapSourceRegistry.resolve(DEMO_MAP_SOURCE_ID);
+        const demoUrl = demo?.getStyleUrl();
+        if (!isWorldMapSourceAvailable(demo) || !demoUrl) {
+          return false;
+        }
+        this.mapSource = demo!;
+        if (!this.renderer.setStyleUrl(demoUrl)) {
+          return false;
+        }
+      }
+      this.bindPlacePressHandler();
+      this.bindEducationPressHandler();
+      this.bindUserPressHandler();
+      this.bindGamePressHandler();
+      this.bindCommercePressHandler();
+      this.bindEventPressHandler();
+      this.syncAllLayersToRenderer();
+    }
+
+    this.state = {
+      ...this.state,
+      mapSourceBound: isWorldMapSourceAvailable(this.mapSource),
+      rendererBound: isRendererAdapterBound(this.renderer),
+    };
+    this.emit();
+    return true;
+  }
+
+  /** Switch by map source kind — street or satellite only. */
+  setMapSourceKind(kind: Extract<WorldMapSourceKind, "street" | "satellite">): boolean {
+    const match = this.mapSourceRegistry.list().find((s) => s.kind === kind);
+    if (!match) return false;
+    return this.setMapSourceId(match.id);
   }
 
   /** Select a place/entity — used by renderer place press via Runtime handler. */
@@ -1255,6 +1342,15 @@ export class WorldRuntimeController {
         ? worldEventsToMarkers(this.eventsRegistry.listMappable())
         : []
     );
+  }
+
+  private syncAllLayersToRenderer(): void {
+    this.syncPlacesToRenderer();
+    this.syncEducationToRenderer();
+    this.syncUsersToRenderer();
+    this.syncGamesToRenderer();
+    this.syncCommerceToRenderer();
+    this.syncEventsToRenderer();
   }
 
   private async loadPlaces(): Promise<void> {

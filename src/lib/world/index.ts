@@ -39,6 +39,7 @@ export {
   buildWorldCameraControls,
   buildWorldExperienceViewState,
   buildWorldLayerControls,
+  buildWorldMapSourceControls,
   createDefaultWorldUiSelection,
   discoverWorldEntryHref,
   parseWorldExperienceCategorySelection,
@@ -55,6 +56,7 @@ export {
   type WorldExperienceViewState,
   type WorldInitializationResult,
   type WorldLayerControlState,
+  type WorldMapSourceControlState,
   type WorldPlaceLayerControlState,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";

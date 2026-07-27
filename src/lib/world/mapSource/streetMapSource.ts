@@ -2,20 +2,25 @@ import type { WorldMapSource } from "@/src/lib/world/mapSource/types";
 
 export const STREET_MAP_SOURCE_ID = "world-map-source-street" as const;
 
-/** Placeholder — no street tile provider bound yet. */
+export const STREET_MAP_STYLE_URL =
+  "https://tiles.openfreemap.org/styles/liberty";
+
+export const STREET_MAP_ATTRIBUTION =
+  "© OpenFreeMap © OpenMapTiles Data from OpenStreetMap";
+
 export function createStreetMapSource(): WorldMapSource {
   return {
     id: STREET_MAP_SOURCE_ID,
     kind: "street",
-    label: "Street",
+    label: "Streets",
     isAvailable(): boolean {
-      return false;
+      return true;
     },
     getStyleUrl(): string | null {
-      return null;
+      return STREET_MAP_STYLE_URL;
     },
     getAttribution(): string {
-      return "Street map source is not configured.";
+      return STREET_MAP_ATTRIBUTION;
     },
   };
 }

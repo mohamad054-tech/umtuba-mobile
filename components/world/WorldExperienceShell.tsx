@@ -13,6 +13,7 @@ import { WorldGameBottomSheet } from "@/components/world/WorldGameBottomSheet";
 import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet";
 import { WorldUserBottomSheet } from "@/components/world/WorldUserBottomSheet";
 import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
+import { WorldMapSourceSelector } from "@/components/world/WorldMapSourceSelector";
 import {
   WorldAttribution,
   WorldRendererHost,
@@ -43,6 +44,7 @@ type WorldExperienceShellProps = {
   onTogglePlaceLayer?: (layerId: WorldPlaceLayerId) => void;
   onToggleFilters?: () => void;
   onToggleLayersPanel?: () => void;
+  onSelectMapSource?: (sourceId: string) => void;
   onClearFilters?: () => void;
   onCloseFilters?: () => void;
   onCloseDetails?: () => void;
@@ -71,6 +73,7 @@ export function WorldExperienceShell({
   onTogglePlaceLayer,
   onToggleFilters,
   onToggleLayersPanel,
+  onSelectMapSource,
   onClearFilters,
   onCloseFilters,
   onCloseDetails,
@@ -146,6 +149,11 @@ export function WorldExperienceShell({
       <WorldCameraControls
         controls={view.cameraControls}
         onPress={onCameraControl}
+      />
+
+      <WorldMapSourceSelector
+        sources={view.mapSources}
+        onSelect={onSelectMapSource}
       />
 
       <View style={styles.toolbar}>
