@@ -21,6 +21,7 @@ import type {
   LayerAdapter,
   ProjectionAdapter,
   RendererCapabilities,
+  WorldMapProjection,
   WorldRendererAdapter,
 } from "@/src/lib/world/renderer/types";
 import { toFoundationRendererCapability } from "@/src/lib/world/renderer/types";
@@ -169,6 +170,7 @@ export function createMapLibreRendererAdapter(options?: {
   let eventPressHandler: EventPressHandler | null = null;
   let terrainEnabled = false;
   let terrainStyleActive = isTerrainCapableStyleUrl(styleUrl);
+  let projection: WorldMapProjection = "mercator";
 
   const emit = () => {
     for (const listener of listeners) listener();
@@ -190,6 +192,8 @@ export function createMapLibreRendererAdapter(options?: {
     supportsSatellite: true,
     supportsCustomLayers: true,
     supportsBuildings: false,
+    supportsGlobe: false,
+    supportsProjectionSwitch: true,
   };
 
   const cameraAdapter: CameraAdapter = {
@@ -274,6 +278,25 @@ export function createMapLibreRendererAdapter(options?: {
 
   const projectionAdapter: ProjectionAdapter = {
     id: "world-projection-maplibre",
+    getProjection(): WorldMapProjection {
+      return projection;
+    },
+    setProjection(mode: WorldMapProjection): boolean {
+      try {
+        if (mode === projection) return true;
+        if (mode === "globe" && !caps.supportsGlobe) return false;
+        if (mode === "mercator") {
+          projection = "mercator";
+          bump();
+          return true;
+        }
+        projection = "globe";
+        bump();
+        return true;
+      } catch {
+        return false;
+      }
+    },
     project(): { x: number; y: number } | null {
       return null;
     },

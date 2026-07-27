@@ -4,6 +4,7 @@ import type {
   LayerAdapter,
   ProjectionAdapter,
   RendererCapabilities,
+  WorldMapProjection,
   WorldRendererAdapter,
 } from "@/src/lib/world/renderer/types";
 import {
@@ -53,6 +54,13 @@ function createNullLayerAdapter(): LayerAdapter {
 function createNullProjectionAdapter(): ProjectionAdapter {
   return {
     id: "world-projection-none",
+    getProjection(): WorldMapProjection {
+      return "mercator";
+    },
+    setProjection(mode: WorldMapProjection): boolean {
+      if (mode === "mercator") return true;
+      return false;
+    },
     project(): { x: number; y: number } | null {
       return null;
     },

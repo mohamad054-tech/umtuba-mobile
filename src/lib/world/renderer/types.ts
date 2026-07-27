@@ -8,6 +8,8 @@ import type {
   WorldRendererFamily,
 } from "@/src/lib/world/types";
 
+export type WorldMapProjection = "mercator" | "globe";
+
 export type RendererCapabilities = {
   supports3D: boolean;
   supportsTerrain: boolean;
@@ -16,6 +18,8 @@ export type RendererCapabilities = {
   supportsSatellite: boolean;
   supportsCustomLayers: boolean;
   supportsBuildings: boolean;
+  supportsGlobe: boolean;
+  supportsProjectionSwitch: boolean;
 };
 
 export type CameraAdapter = {
@@ -37,6 +41,12 @@ export type LayerAdapter = {
 
 export type ProjectionAdapter = {
   readonly id: string;
+  getProjection(): WorldMapProjection;
+  /**
+   * Switch projection. Fail-closed: returns false if unsupported / fails; mode stays mercator.
+   * Must not throw. Must not reset camera.
+   */
+  setProjection(projection: WorldMapProjection): boolean;
   project(
     latitude: number,
     longitude: number
@@ -77,6 +87,8 @@ export function defaultNullRendererCapabilities(): RendererCapabilities {
     supportsSatellite: false,
     supportsCustomLayers: false,
     supportsBuildings: false,
+    supportsGlobe: false,
+    supportsProjectionSwitch: false,
   };
 }
 

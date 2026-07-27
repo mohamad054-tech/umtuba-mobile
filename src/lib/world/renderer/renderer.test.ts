@@ -29,6 +29,8 @@ describe("null renderer adapter", () => {
     expect(caps.supportsSatellite).toBe(false);
     expect(caps.supportsCustomLayers).toBe(false);
     expect(caps.supportsBuildings).toBe(false);
+    expect(caps.supportsGlobe).toBe(false);
+    expect(caps.supportsProjectionSwitch).toBe(false);
 
     expect(adapter.getCameraAdapter().zoomIn()).toBe(false);
     expect(adapter.getCameraAdapter().getCamera()).toBeNull();
@@ -66,6 +68,10 @@ describe("MapLibre renderer adapter", () => {
     expect(caps.supportsStreetLabels).toBe(true);
     expect(caps.supportsOffline).toBe(false);
 
+    expect(caps.supportsOffline).toBe(false);
+    expect(caps.supportsGlobe).toBe(false);
+    expect(caps.supportsProjectionSwitch).toBe(true);
+
     const camera = adapter.getCameraAdapter();
     expect(camera.getCamera()).toEqual(MAPLIBRE_DEFAULT_CAMERA);
     expect(camera.zoomIn()).toBe(true);
@@ -82,6 +88,10 @@ describe("MapLibre renderer adapter", () => {
 
     expect(adapter.getProjectionAdapter().project(0, 0)).toBeNull();
     expect(adapter.getProjectionAdapter().unproject(0, 0)).toBeNull();
+    expect(adapter.getProjectionAdapter().getProjection()).toBe("mercator");
+    expect(adapter.getProjectionAdapter().setProjection("globe")).toBe(false);
+    expect(adapter.getProjectionAdapter().getProjection()).toBe("mercator");
+    expect(adapter.getProjectionAdapter().setProjection("mercator")).toBe(true);
   });
 
   it("fail-closes without a style URL (no hardcoded tiles)", () => {

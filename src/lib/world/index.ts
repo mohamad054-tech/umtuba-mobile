@@ -40,6 +40,7 @@ export {
   buildWorldExperienceViewState,
   buildWorldLayerControls,
   buildWorldMapSourceControls,
+  buildWorldProjectionControls,
   createDefaultWorldUiSelection,
   discoverWorldEntryHref,
   parseWorldExperienceCategorySelection,
@@ -58,6 +59,8 @@ export {
   type WorldLayerControlState,
   type WorldMapSourceControlState,
   type WorldPlaceLayerControlState,
+  type WorldProjectionControlState,
+  type WorldProjectionPreference,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";
 export {
@@ -92,13 +95,16 @@ export {
   clampMapLibreZoom,
   defaultNullRendererCapabilities,
   getMapLibreZoomLimits,
+  GLOBE_AUTO_MAX_ZOOM,
   isMapLibreRendererAdapter,
   isRendererAdapterBound,
   MAPLIBRE_CAMERA_MAX_ZOOM,
   MAPLIBRE_CAMERA_MIN_ZOOM,
   MAPLIBRE_DEFAULT_CAMERA,
   MAPLIBRE_RENDERER_ID,
+  MERCATOR_AUTO_MIN_ZOOM,
   normalizeMapLibreCamera,
+  resolveAutoProjection,
   toFoundationRendererCapability,
   type CameraAdapter,
   type LayerAdapter,
@@ -106,6 +112,7 @@ export {
   type MapLibreZoomLimits,
   type ProjectionAdapter,
   type RendererCapabilities,
+  type WorldMapProjection,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
 export {

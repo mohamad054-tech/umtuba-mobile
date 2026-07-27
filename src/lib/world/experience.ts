@@ -19,6 +19,10 @@ import {
 import { mapWorldDestination } from "@/src/lib/world/mapDestination";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
 import type {
+  RendererCapabilities,
+  WorldMapProjection,
+} from "@/src/lib/world/renderer/types";
+import type {
   WorldCategoryId,
   WorldEntity,
   WorldFilter,
@@ -87,6 +91,18 @@ export type WorldMapSourceControlState = {
   reason: string | null;
 };
 
+export type WorldProjectionPreference = "auto" | "globe" | "map";
+
+export type WorldProjectionControlId = "globe" | "map";
+
+export type WorldProjectionControlState = {
+  id: WorldProjectionControlId;
+  label: string;
+  active: boolean;
+  enabled: boolean;
+  reason: string | null;
+};
+
 export type WorldExperienceViewState = {
   phase: WorldExperiencePhase;
   message: string;
@@ -96,6 +112,9 @@ export type WorldExperienceViewState = {
   layers: WorldLayerControlState[];
   placeLayers: WorldPlaceLayerControlState[];
   mapSources: WorldMapSourceControlState[];
+  projectionControls: WorldProjectionControlState[];
+  activeProjection: WorldMapProjection;
+  projectionPreference: WorldProjectionPreference;
   cameraControls: WorldCameraControlState[];
   filter: WorldFilter;
   selectedEntityId: string | null;
@@ -251,6 +270,45 @@ export function buildWorldMapSourceControls(
   }));
 }
 
+/** Globe / Map projection switcher — enabled state reflects renderer capabilities. */
+export function buildWorldProjectionControls(
+  caps: RendererCapabilities,
+  preference: WorldProjectionPreference,
+  activeProjection: WorldMapProjection
+): WorldProjectionControlState[] {
+  const globeEnabled = caps.supportsGlobe === true;
+  let globeActive =
+    preference === "globe" ||
+    (preference === "auto" && activeProjection === "globe");
+  let mapActive =
+    preference === "map" ||
+    (preference === "auto" && activeProjection === "mercator");
+
+  if (!globeEnabled) {
+    globeActive = false;
+    mapActive = true;
+  }
+
+  return [
+    {
+      id: "globe",
+      label: "Globe",
+      active: globeActive,
+      enabled: globeEnabled,
+      reason: globeEnabled
+        ? null
+        : "Globe is not available on this device yet.",
+    },
+    {
+      id: "map",
+      label: "Map",
+      active: mapActive,
+      enabled: true,
+      reason: null,
+    },
+  ];
+}
+
 export function toggleWorldCategorySelection(
   current: WorldCategoryId[],
   categoryId: WorldCategoryId,
@@ -306,6 +364,9 @@ export function buildWorldExperienceViewState(options?: {
   entities?: WorldEntity[];
   placeLayers?: WorldPlaceLayerControlState[];
   mapSources?: WorldMapSourceControlState[];
+  projectionControls?: WorldProjectionControlState[];
+  projectionPreference?: WorldProjectionPreference;
+  activeProjection?: WorldMapProjection;
   placeSheet?: import("@/src/lib/world/places").WorldPlaceSheetState | null;
   educationSheet?: import("@/src/lib/world/education").WorldEducationSheetState | null;
   userSheet?: import("@/src/lib/world/users").WorldUserSheetState | null;
@@ -337,6 +398,18 @@ export function buildWorldExperienceViewState(options?: {
   const mapSources = Array.isArray(options?.mapSources)
     ? options.mapSources
     : [];
+  const caps = rendererAdapter.getCapabilities();
+  const projectionPreference = options?.projectionPreference ?? "auto";
+  const activeProjection =
+    options?.activeProjection ??
+    rendererAdapter.getProjectionAdapter().getProjection();
+  const projectionControls = Array.isArray(options?.projectionControls)
+    ? options.projectionControls
+    : buildWorldProjectionControls(
+        caps,
+        projectionPreference,
+        activeProjection
+      );
   const placeSheet = options?.placeSheet ?? null;
   const educationSheet = options?.educationSheet ?? null;
   const userSheet = options?.userSheet ?? null;
@@ -354,6 +427,9 @@ export function buildWorldExperienceViewState(options?: {
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
       placeLayers,
       mapSources,
+      projectionControls,
+      activeProjection,
+      projectionPreference,
       cameraControls: buildWorldCameraControls(rendererBound),
       filter: applyWorldCategoryFilter(
         snapshot.filter ?? emptyWorldFilter(),
@@ -385,6 +461,9 @@ export function buildWorldExperienceViewState(options?: {
       layers: buildWorldLayerControls(snapshot, selection.selectedCategories),
       placeLayers,
       mapSources,
+      projectionControls,
+      activeProjection,
+      projectionPreference,
       cameraControls: buildWorldCameraControls(false),
       filter: emptyWorldFilter(),
       selectedEntityId: null,
@@ -424,6 +503,9 @@ export function buildWorldExperienceViewState(options?: {
     layers,
     placeLayers,
     mapSources,
+    projectionControls,
+    activeProjection,
+    projectionPreference,
     cameraControls: buildWorldCameraControls(rendererBound),
     filter: applyWorldCategoryFilter(
       snapshot.filter ?? emptyWorldFilter(),

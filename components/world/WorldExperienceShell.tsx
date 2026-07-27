@@ -14,6 +14,7 @@ import { WorldPlaceBottomSheet } from "@/components/world/WorldPlaceBottomSheet"
 import { WorldUserBottomSheet } from "@/components/world/WorldUserBottomSheet";
 import { WorldPlaceLayerSelector } from "@/components/world/WorldPlaceLayerSelector";
 import { WorldMapSourceSelector } from "@/components/world/WorldMapSourceSelector";
+import { WorldProjectionSelector } from "@/components/world/WorldProjectionSelector";
 import {
   WorldAttribution,
   WorldRendererHost,
@@ -45,6 +46,7 @@ type WorldExperienceShellProps = {
   onToggleFilters?: () => void;
   onToggleLayersPanel?: () => void;
   onSelectMapSource?: (sourceId: string) => void;
+  onSelectProjection?: (id: "globe" | "map") => void;
   onClearFilters?: () => void;
   onCloseFilters?: () => void;
   onCloseDetails?: () => void;
@@ -74,6 +76,7 @@ export function WorldExperienceShell({
   onToggleFilters,
   onToggleLayersPanel,
   onSelectMapSource,
+  onSelectProjection,
   onClearFilters,
   onCloseFilters,
   onCloseDetails,
@@ -154,6 +157,11 @@ export function WorldExperienceShell({
       <WorldMapSourceSelector
         sources={view.mapSources}
         onSelect={onSelectMapSource}
+      />
+
+      <WorldProjectionSelector
+        controls={view.projectionControls}
+        onSelect={onSelectProjection}
       />
 
       <View style={styles.toolbar}>

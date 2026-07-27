@@ -1,12 +1,14 @@
 import {
   buildWorldExperienceViewState,
   buildWorldMapSourceControls,
+  buildWorldProjectionControls,
   createDefaultWorldUiSelection,
   selectWorldEntity,
   toggleWorldCategorySelection,
   WORLD_RETRY_YIELD_MS,
   type WorldCameraControlId,
   type WorldExperienceViewState,
+  type WorldProjectionPreference,
   type WorldUiSelectionState,
 } from "@/src/lib/world/experience";
 import type { WorldCategoryId, WorldFoundationSnapshot } from "@/src/lib/world/types";
@@ -94,6 +96,8 @@ import {
   createNullRendererAdapter,
   isMapLibreRendererAdapter,
   isRendererAdapterBound,
+  resolveAutoProjection,
+  type WorldMapProjection,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
 import {
@@ -113,6 +117,16 @@ import type {
 } from "@/src/lib/world/runtime/types";
 
 type Listener = () => void;
+
+type RendererWithSubscribe = WorldRendererAdapter & {
+  subscribe(listener: () => void): () => void;
+};
+
+function hasRendererSubscribe(
+  adapter: WorldRendererAdapter
+): adapter is RendererWithSubscribe {
+  return typeof (adapter as RendererWithSubscribe).subscribe === "function";
+}
 
 const MAP_SOURCE_UNAVAILABLE_MESSAGE =
   "World map source is unavailable. No map imagery can be shown.";
@@ -266,6 +280,9 @@ export class WorldRuntimeController {
   private listeners = new Set<Listener>();
   private runToken = 0;
   private started = false;
+  private projectionPreference: WorldProjectionPreference = "auto";
+  private applyingProjectionPolicy = false;
+  private rendererUnsubscribe: (() => void) | null = null;
 
   constructor(options?: WorldRuntimeControllerOptions) {
     this.dataSource = options?.dataSource ?? createUnboundWorldDataSource();
@@ -571,6 +588,13 @@ export class WorldRuntimeController {
       this.mapSource?.id ?? null
     );
 
+    const activeProjection = this.getActiveProjection();
+    const projectionControls = buildWorldProjectionControls(
+      this.renderer.getCapabilities(),
+      this.projectionPreference,
+      activeProjection
+    );
+
     const base = buildWorldExperienceViewState({
       snapshot,
       selection: this.selection,
@@ -587,6 +611,9 @@ export class WorldRuntimeController {
       commerceSheet,
       eventSheet,
       mapSources,
+      projectionControls,
+      projectionPreference: this.projectionPreference,
+      activeProjection,
     });
 
     if (runtime.phase === "preparing") {
@@ -651,6 +678,8 @@ export class WorldRuntimeController {
       this.bindGamePressHandler();
       this.bindCommercePressHandler();
       this.bindEventPressHandler();
+      this.bindRendererSubscription();
+      this.applyProjectionPolicy();
     }
     await this.runLoadCycle();
   }
@@ -671,7 +700,31 @@ export class WorldRuntimeController {
     this.bindGamePressHandler();
     this.bindCommercePressHandler();
     this.bindEventPressHandler();
+    this.bindRendererSubscription();
+    this.applyProjectionPolicy();
     await this.runLoadCycle();
+  }
+
+  /** User-facing projection preference — does not reinit Runtime. */
+  setProjectionPreference(pref: WorldProjectionPreference): boolean {
+    if (pref !== "auto" && pref !== "globe" && pref !== "map") return false;
+    this.projectionPreference = pref;
+    this.applyProjectionPolicy();
+    this.emit();
+    return true;
+  }
+
+  getProjectionPreference(): WorldProjectionPreference {
+    return this.projectionPreference;
+  }
+
+  getActiveProjection(): WorldMapProjection {
+    return this.renderer.getProjectionAdapter().getProjection();
+  }
+
+  /** Optional hook when camera changes outside CameraAdapter (tests / future). */
+  notifyCameraChanged(): void {
+    this.applyProjectionPolicy();
   }
 
   /**
@@ -697,7 +750,10 @@ export class WorldRuntimeController {
       default:
         ok = false;
     }
-    if (ok) this.emit();
+    if (ok) {
+      this.applyProjectionPolicy();
+      this.emit();
+    }
     return ok;
   }
 
@@ -769,6 +825,7 @@ export class WorldRuntimeController {
       }
     }
 
+    this.applyProjectionPolicy();
     this.state = {
       ...this.state,
       mapSourceBound: isWorldMapSourceAvailable(this.mapSource),
@@ -1227,6 +1284,55 @@ export class WorldRuntimeController {
     this.renderer.setEventPressHandler((eventId) => {
       this.selectEvent(eventId);
     });
+  }
+
+  private bindRendererSubscription(): void {
+    this.unbindRendererSubscription();
+    if (!hasRendererSubscribe(this.renderer)) return;
+    this.rendererUnsubscribe = this.renderer.subscribe(() => {
+      if (this.projectionPreference === "auto") {
+        this.applyProjectionPolicy();
+      }
+    });
+  }
+
+  private unbindRendererSubscription(): void {
+    this.rendererUnsubscribe?.();
+    this.rendererUnsubscribe = null;
+  }
+
+  private getSessionZoom(): number | null {
+    if (isMapLibreRendererAdapter(this.renderer)) {
+      return this.renderer.getSessionCamera().zoom;
+    }
+    const cam = this.renderer.getCameraAdapter().getCamera();
+    return cam?.zoom ?? null;
+  }
+
+  private applyProjectionPolicy(): void {
+    if (this.applyingProjectionPolicy) return;
+    this.applyingProjectionPolicy = true;
+    try {
+      const projectionAdapter = this.renderer.getProjectionAdapter();
+      let target: WorldMapProjection;
+      if (this.projectionPreference === "globe") {
+        target = "globe";
+      } else if (this.projectionPreference === "map") {
+        target = "mercator";
+      } else {
+        const zoom = this.getSessionZoom();
+        if (zoom == null) return;
+        target = resolveAutoProjection(
+          zoom,
+          projectionAdapter.getProjection()
+        );
+      }
+      projectionAdapter.setProjection(target);
+    } catch {
+      // Fail-closed: projection policy must not crash Runtime.
+    } finally {
+      this.applyingProjectionPolicy = false;
+    }
   }
 
   private syncPlacesToRenderer(): void {

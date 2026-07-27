@@ -80,6 +80,9 @@ export default function WorldScreen() {
       onSelectMapSource={(sourceId) => {
         controller.setMapSourceId(sourceId);
       }}
+      onSelectProjection={(id) => {
+        controller.setProjectionPreference(id === "globe" ? "globe" : "map");
+      }}
     />
   );
 }

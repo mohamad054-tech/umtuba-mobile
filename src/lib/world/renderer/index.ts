@@ -3,6 +3,7 @@ export type {
   LayerAdapter,
   ProjectionAdapter,
   RendererCapabilities,
+  WorldMapProjection,
   WorldRendererAdapter,
 } from "@/src/lib/world/renderer/types";
 export {
@@ -30,3 +31,8 @@ export {
   normalizeMapLibreCamera,
   type MapLibreZoomLimits,
 } from "@/src/lib/world/renderer/maplibre/cameraNavigation";
+export {
+  GLOBE_AUTO_MAX_ZOOM,
+  MERCATOR_AUTO_MIN_ZOOM,
+  resolveAutoProjection,
+} from "@/src/lib/world/renderer/maplibre/projection";
