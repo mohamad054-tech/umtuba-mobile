@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from "expo-router";
-import { Text, type ColorValue } from "react-native";
+import { Platform, Text, type ColorValue } from "react-native";
 
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
@@ -68,6 +68,8 @@ export default function TabLayout() {
         name="live"
         options={{
           title: "Live",
+          // Unfinished Live join is an App Review risk on iOS. Android unchanged.
+          href: Platform.OS === "ios" ? null : "/(tabs)/live",
           tabBarIcon: ({ color }) => <TabLabel label="◉" color={color} />,
         }}
       />

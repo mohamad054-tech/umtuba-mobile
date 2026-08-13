@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   BackHandler,
   Dimensions,
@@ -26,6 +27,12 @@ import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
+import { useAuth } from "@/src/lib/auth/AuthContext";
+import {
+  applySuccessfulDeleteToList,
+  deletePostForOwner,
+  viewerMaySeeDeleteControl,
+} from "@/src/lib/social/deleteOwnedPost";
 import {
   togglePostLike,
   togglePostSave,
@@ -65,6 +72,7 @@ function toLifecycleState(state: AppStateStatus): AppLifecycleState {
 export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const params = useLocalSearchParams<{ post?: string }>();
   const focusPostId =
@@ -288,6 +296,45 @@ export default function WatchScreen() {
     [patchVideo]
   );
 
+  const onDeleteOwn = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId || !user?.id) return;
+      if (!viewerMaySeeDeleteControl(user.id, video.author.id)) return;
+      Alert.alert(
+        "Delete video",
+        "This removes your video from Watch. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const result = await deletePostForOwner(
+                  getSupabase(),
+                  user.id,
+                  video.postId as number
+                );
+                if (!result.ok) {
+                  Alert.alert("Delete failed", result.message);
+                  return;
+                }
+                setVideos((prev) =>
+                  applySuccessfulDeleteToList(
+                    prev,
+                    (row) => row.id === video.id,
+                    true
+                  )
+                );
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [user?.id]
+  );
+
   const onToggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
@@ -409,6 +456,11 @@ export default function WatchScreen() {
         onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
         onToggleSave={() => void onToggleSave(item)}
+        onDeleteOwn={
+          viewerMaySeeDeleteControl(user?.id, item.author.id)
+            ? () => onDeleteOwn(item)
+            : undefined
+        }
         onOpenProfile={() => {
           const username = item.author.username.replace(/^@/, "");
           if (username) {
@@ -432,9 +484,11 @@ export default function WatchScreen() {
       onActiveEnded,
       onScrubGestureChange,
       onToggleAutoNext,
+      onDeleteOwn,
       onToggleLike,
       onToggleMute,
       onToggleSave,
+      user?.id,
       onVolumeChange,
       refreshSrcFor,
       router,

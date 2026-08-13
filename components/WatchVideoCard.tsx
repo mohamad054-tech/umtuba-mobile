@@ -65,6 +65,8 @@ export type WatchVideoCardProps = {
   onEnded?: () => void;
   onToggleLike: () => void;
   onToggleSave: () => void;
+  /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
+  onDeleteOwn?: () => void;
   onOpenProfile?: () => void;
   onRefreshSrc?: () => Promise<string | null>;
   style?: StyleProp<ViewStyle>;
@@ -423,6 +425,7 @@ function WatchVideoCardComponent({
   onEnded,
   onToggleLike,
   onToggleSave,
+  onDeleteOwn,
   onOpenProfile,
   onRefreshSrc,
   style,
@@ -722,6 +725,17 @@ function WatchVideoCardComponent({
             <Text style={[styles.actionIcon, styles.disabledIcon]}>↗</Text>
             <Text style={styles.actionCount}>{video.stats.shares}</Text>
           </Pressable>
+          {onDeleteOwn ? (
+            <Pressable
+              style={styles.action}
+              onPress={onDeleteOwn}
+              accessibilityRole="button"
+              accessibilityLabel="Delete your video"
+            >
+              <Text style={[styles.actionIcon, styles.deleteIcon]}>⌫</Text>
+              <Text style={styles.actionCount}>Delete</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/*
@@ -912,6 +926,9 @@ const styles = StyleSheet.create({
   },
   disabledIcon: {
     opacity: 0.45,
+  },
+  deleteIcon: {
+    color: colors.danger,
   },
   on: {
     color: colors.accentViolet,

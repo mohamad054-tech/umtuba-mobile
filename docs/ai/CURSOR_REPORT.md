@@ -1,34 +1,34 @@
-# Cursor Report — World Product Surface Hardening V1
+# CURSOR_REPORT — PC2 iOS App Store Operator Mode V1
+
+```text
+TASK_ID = PC2_IOS_APP_STORE_OPERATOR_MODE_V1
+DEVICE = PC2
+DEVICE_ROLE = IOS_APP_STORE_PRIMARY_OPERATOR
+CENTRAL_COORDINATOR = SERVER
+AUTHORITATIVE_BASE_SHA = 3b335610ced48aa2595fe49eef5b97511c7f4cb5
+BRANCH = master
+IOS_APP_STORE_READY_FOR_BUILD = NO
+SIGN_IN_WITH_APPLE_REQUIRED = NO
+SECRET_VALUES_PRINTED = NO
+TESTFLIGHT_SUBMIT = NOT_ATTEMPTED
+APP_STORE_UPLOAD = NOT_ATTEMPTED
+CENTRAL_TESTFLIGHT_GO = ABSENT
+```
 
 ## Summary
 
-Hardened UM World product surface without changing Runtime / Data Pipeline / Renderer Adapter architecture and without adding Globe. Defaults: Streets map source + Places/Cities layer on. Collapsible Map settings for Sources/Roads/Buildings; Search + Layers always visible; larger map chrome. Bottom sheets show real fields only (no Coming soon / dead CTAs). Unsupported Globe and AI/Future stubs hidden from product UI. Development/debug copy removed from renderer host.
+Operator mode consumed web UAF-12 own-delete on Watch (same `posts` table / ownership filter, no second backend), hid unfinished Live on iOS only, and wrote the App Store operator packet. Ready-for-build remains NO. Next action is Apple Developer Individual enrollment by the account owner.
 
 ## Exact files changed
 
-### New
-- `components/world/WorldMapSettingsPanel.tsx`
-- `src/lib/world/productSurface.test.ts`
-
-### Modified
-- `app/world.tsx`
-- `components/world/WorldExperienceShell.tsx`
-- `components/world/WorldHeader.tsx`
-- `components/world/WorldRendererHost.tsx`
-- `components/world/WorldCameraControls.tsx`
-- `components/world/WorldControls.tsx`
-- `components/world/WorldSearchBar.tsx`
-- `components/world/World*BottomSheet.tsx` (all six)
-- `src/lib/world/categories.ts`
-- `src/lib/world/experience.ts`
-- `src/lib/world/experience.test.ts`
-- `src/lib/world/world.test.ts`
-- `src/lib/world/mapSource/registry.ts`
-- `src/lib/world/mapSource/mapSource.test.ts`
-- `src/lib/world/runtime/controller.ts` (default preferred Streets only)
-- `src/lib/world/runtime/stateMachine.ts` (product-facing messages)
-- `src/lib/world/*/ *Sheet.ts` (places/education/users/games/commerce/events)
-- Domain tests + `renderer/globe.test.ts`
+- `src/lib/social/deleteOwnedPostShared.ts`
+- `src/lib/social/deleteOwnedPost.ts`
+- `src/lib/social/deleteOwnedPost.test.ts`
+- `app/(tabs)/watch.tsx`
+- `components/WatchVideoCard.tsx`
+- `app/(tabs)/_layout.tsx`
+- `app/(tabs)/live.tsx`
+- `docs/app-store/OPERATOR_PACKET.md`
 - `docs/ai/CURSOR_REPORT.md`
 
 ## Migrations created
@@ -37,32 +37,28 @@ None.
 
 ## Security review
 
-- No secrets / `.env` changes.
-- Users privacy model unchanged.
-- Demo map source retained for fail-closed fallback only; not shown in product source chips.
+No secrets. No invented Team ID. Android Live tab and `android.permissions` unchanged. Own-delete is owner-only in app code; RLS remains the authorization source. Report/block still missing — not invented.
 
 ## Tests
 
-**367/367 PASS** (44 files)
+`tsc --noEmit` PASS. Focused vitest 18 PASS (delete 4, emailConfirm, ugcSafety, live).
 
 ## TypeScript
 
-**PASS** (`npx tsc --noEmit`)
+PASS.
 
 ## Build
 
-Not run (EAS Build deferred per task note).
+EAS cloud path prepared only. No local Xcode. No `eas login`. No submit.
 
 ## git diff --check
 
-**PASS**
+Clean on staged operator files.
 
 ## git status --short
 
-(see after commit)
+See operator report after commit/push.
 
 ## Open issues
 
-- Demo data providers still power the pipeline (product chrome no longer advertises demo).
-- Sheet actions remain deferred until trusted product surfaces exist.
-- Globe dual-surface still not implemented (intentionally deferred).
+IOS-B01 Team ID / live AASA 404. IOS-B02 account-deletion page observed live, Central verification not confirmed. IOS-B03 report/block missing. IOS-B04 camera/mic still declared via expo-camera. Expo/EAS not logged in. STOP at Apple owner enrollment.

@@ -1,8 +1,10 @@
+import { Redirect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -21,6 +23,14 @@ import {
 import { colors } from "@/src/theme/colors";
 
 export default function LiveScreen() {
+  // Unfinished Live join is an App Review risk. Hide the iOS surface; Android unchanged.
+  if (Platform.OS === "ios") {
+    return <Redirect href="/(tabs)/watch" />;
+  }
+  return <LiveLobbyScreen />;
+}
+
+function LiveLobbyScreen() {
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<LiveLobbyPhase>("loading");
   const [sessions, setSessions] = useState<LiveSession[]>([]);
