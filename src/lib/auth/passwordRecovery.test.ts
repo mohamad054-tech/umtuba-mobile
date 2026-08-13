@@ -76,6 +76,11 @@ describe("isRecoveryCallbackUrl", () => {
       isRecoveryCallbackUrl("umtuba://auth/update-password?code=abc")
     ).toBe(true);
     expect(isRecoveryCallbackUrl("umtuba://watch")).toBe(false);
+    expect(
+      isRecoveryCallbackUrl(
+        "umtuba://auth/callback#access_token=a&refresh_token=b&type=signup"
+      )
+    ).toBe(false);
   });
 });
 

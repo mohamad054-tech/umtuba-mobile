@@ -220,6 +220,14 @@ export function parseDeepLink(url: string): ParsedDeepLink {
     };
   }
 
+  if (head === "auth" && segments[1]?.toLowerCase() === "callback") {
+    return {
+      target: { type: "watch", postId: null },
+      referralCode: refFromQuery,
+      rawUrl,
+    };
+  }
+
   return {
     target: { type: "unknown", path: pathOnly },
     referralCode: refFromQuery,

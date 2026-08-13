@@ -22,6 +22,7 @@ describe("auth redirect URLs", () => {
     expect(SUPABASE_AUTH_REDIRECT_ALLOWLIST).toContain(
       "umtuba://auth/update-password"
     );
+    expect(SUPABASE_AUTH_REDIRECT_ALLOWLIST).toContain("umtuba://auth/callback");
     expect(SUPABASE_AUTH_REDIRECT_ALLOWLIST).toContain("umtuba://**");
     expect(
       SUPABASE_AUTH_REDIRECT_ALLOWLIST.every(

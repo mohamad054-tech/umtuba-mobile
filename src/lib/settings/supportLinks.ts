@@ -7,6 +7,8 @@ export const SUPPORT_LINKS = {
   contact: "https://umtuba.com",
   privacy: "https://umtuba.com/privacy",
   terms: "https://umtuba.com/terms",
+  /** Central/Desktop web account-deletion contract. Do not recreate the backend here. */
+  accountDeletion: "https://umtuba.com/account-deletion",
 } as const;
 
 export type SupportLinkKey = keyof typeof SUPPORT_LINKS;

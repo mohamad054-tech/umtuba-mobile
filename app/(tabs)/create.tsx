@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   AppState,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -51,6 +52,11 @@ import {
 } from "@/src/lib/video/pickVideo";
 import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
 import { uploadPostVideo } from "@/src/lib/video/uploadPostVideo";
+import {
+  UGC_PUBLISH_ACK_LABEL,
+  UGC_TERMS_URL,
+  canPublishWithUgcAck,
+} from "@/src/lib/video/ugcSafety";
 import { colors } from "@/src/theme/colors";
 
 export default function CreateScreen() {
@@ -61,6 +67,7 @@ export default function CreateScreen() {
   const [journey, setJourney] = useState<CreateJourneyState>(
     initialCreateJourneyState()
   );
+  const [ugcAck, setUgcAck] = useState(false);
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState
   );
@@ -86,6 +93,7 @@ export default function CreateScreen() {
     abortRef.current = null;
     setAsset(null);
     setCaption("");
+    setUgcAck(false);
     setJourney(initialCreateJourneyState());
   }, []);
 
@@ -255,6 +263,14 @@ export default function CreateScreen() {
 
   const onPublish = useCallback(async () => {
     if (!asset || busy) return;
+    if (!canPublishWithUgcAck(ugcAck)) {
+      setJourney((s) => ({
+        ...s,
+        phase: "error",
+        error: "Confirm that this video follows UMTUBA Terms before publishing.",
+      }));
+      return;
+    }
     const captionCheck = validateCaption(caption);
     if (!captionCheck.ok) {
       setJourney((s) => ({
@@ -265,7 +281,7 @@ export default function CreateScreen() {
       return;
     }
     await runPublishPipeline(asset, caption);
-  }, [asset, busy, caption, runPublishPipeline]);
+  }, [asset, busy, caption, runPublishPipeline, ugcAck]);
 
   const onRetry = useCallback(() => {
     setJourney((s) => retryFromError(s));
@@ -546,17 +562,53 @@ export default function CreateScreen() {
           ) : null}
 
           <Pressable
+            style={styles.ackRow}
+            onPress={() => setUgcAck((value) => !value)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: ugcAck }}
+            accessibilityLabel={UGC_PUBLISH_ACK_LABEL}
+          >
+            <View
+              style={[styles.checkbox, ugcAck && styles.checkboxChecked]}
+              accessible={false}
+            >
+              {ugcAck ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </View>
+            <Text style={styles.ackText}>{UGC_PUBLISH_ACK_LABEL}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void Linking.openURL(UGC_TERMS_URL)}
+            accessibilityRole="link"
+            accessibilityLabel="Open UMTUBA Terms"
+          >
+            <Text style={styles.link}>Read Terms</Text>
+          </Pressable>
+
+          <Pressable
             style={[
               styles.primary,
-              (!asset || busy || journey.phase === "success") && styles.disabled,
+              (!asset ||
+                busy ||
+                journey.phase === "success" ||
+                !canPublishWithUgcAck(ugcAck)) &&
+                styles.disabled,
             ]}
             onPress={() => void onPublish()}
-            disabled={!asset || busy || journey.phase === "success"}
+            disabled={
+              !asset ||
+              busy ||
+              journey.phase === "success" ||
+              !canPublishWithUgcAck(ugcAck)
+            }
             accessibilityRole="button"
             accessibilityLabel="Publish video"
             accessibilityHint="Uploads to your private folder then publishes to Watch"
             accessibilityState={{
-              disabled: !asset || busy || journey.phase === "success",
+              disabled:
+                !asset ||
+                busy ||
+                journey.phase === "success" ||
+                !canPublishWithUgcAck(ugcAck),
               busy,
             }}
           >
@@ -752,5 +804,38 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     gap: 10,
+  },
+  ackRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 8,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.accentCyan,
+    borderColor: colors.accentCyan,
+  },
+  checkboxMark: {
+    color: colors.bg,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  ackText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

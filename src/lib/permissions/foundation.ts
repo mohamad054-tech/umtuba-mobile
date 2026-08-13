@@ -17,11 +17,11 @@ export type PermissionOutcome = {
 
 const EXPLANATIONS: Record<PermissionKind, string> = {
   camera:
-    "UMTUBA uses the camera so you can capture photos and join video sessions.",
+    "UMTUBA uses the camera so you can record or join a live video session.",
   microphone:
-    "UMTUBA uses the microphone so you can record audio and join live sessions.",
+    "UMTUBA uses the microphone so you can record audio or join a live session.",
   mediaLibrary:
-    "UMTUBA needs media library access so you can choose clips and photos to share.",
+    "UMTUBA needs media library access so you can choose a video to publish.",
   notifications:
     "UMTUBA can notify you about likes, rewards, and live activity you care about.",
 };

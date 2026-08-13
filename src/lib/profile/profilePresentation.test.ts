@@ -82,6 +82,9 @@ describe("buildProfilePresentation", () => {
 describe("supportLinks", () => {
   it("allowlists known UMTUBA public pages only", () => {
     expect(getSupportUrl("privacy")).toBe("https://umtuba.com/privacy");
+    expect(getSupportUrl("accountDeletion")).toBe(
+      "https://umtuba.com/account-deletion"
+    );
     expect(resolveSupportUrl("https://umtuba.com/terms")).toBe(
       "https://umtuba.com/terms"
     );

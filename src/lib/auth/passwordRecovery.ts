@@ -94,7 +94,8 @@ export function parseRecoveryAuthUrl(rawUrl: string): ParsedRecoveryAuth {
 export function isRecoveryCallbackUrl(rawUrl: string): boolean {
   const parsed = parseRecoveryAuthUrl(rawUrl);
   if (parsed.kind === "tokens") {
-    return !parsed.type || parsed.type === "recovery";
+    // Only explicit recovery tokens. Missing type must not steal email-confirm links.
+    return parsed.type === "recovery";
   }
   if (parsed.kind === "code") {
     // PKCE code on the update-password path is treated as recovery callback.

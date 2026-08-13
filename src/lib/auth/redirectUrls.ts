@@ -6,6 +6,9 @@ export const APP_SCHEME = "umtuba";
 /** Path used for password-recovery redirects (must stay in sync with deepLinks). */
 export const AUTH_UPDATE_PASSWORD_PATH = "auth/update-password";
 
+/** Path used for email-confirm / signup PKCE redirects (must stay in sync with deepLinks). */
+export const AUTH_EMAIL_CONFIRM_PATH = "auth/callback";
+
 /**
  * Public redirect URL patterns to allow in Supabase Dashboard → Authentication →
  * URL Configuration → Redirect URLs.
@@ -15,6 +18,7 @@ export const AUTH_UPDATE_PASSWORD_PATH = "auth/update-password";
  */
 export const SUPABASE_AUTH_REDIRECT_ALLOWLIST = [
   "umtuba://auth/update-password",
+  "umtuba://auth/callback",
   "umtuba://**",
   "https://umtuba.com/**",
   "https://www.umtuba.com/**",

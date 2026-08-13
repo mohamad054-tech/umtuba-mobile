@@ -10,6 +10,10 @@ import "react-native-reanimated";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import {
+  establishEmailConfirmSession,
+  isEmailConfirmCallbackUrl,
+} from "@/src/lib/auth/emailConfirm";
+import {
   establishRecoverySession,
   isRecoveryCallbackUrl,
   parseRecoveryAuthUrl,
@@ -62,6 +66,20 @@ function DeepLinkHandler() {
         }
         markPasswordRecoveryPending();
         router.push("/(auth)/update-password" as never);
+        return;
+      }
+
+      if (isEmailConfirmCallbackUrl(url)) {
+        const parsed = parseRecoveryAuthUrl(url);
+        const result = await establishEmailConfirmSession(getSupabase(), parsed);
+        if (!result.ok) {
+          router.push({
+            pathname: "/(auth)/login",
+            params: { error: result.message },
+          } as never);
+          return;
+        }
+        router.replace("/(tabs)/watch" as never);
         return;
       }
 

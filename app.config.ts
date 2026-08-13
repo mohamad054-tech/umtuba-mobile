@@ -22,15 +22,38 @@ const config: ExpoConfig = {
       usesNonExemptEncryption: false,
     },
     infoPlist: {
+      CFBundleDisplayName: "UMTUBA",
       UIStatusBarStyle: "UIStatusBarStyleLightContent",
       NSCameraUsageDescription:
-        "UMTUBA needs camera access so you can take photos and join video sessions.",
+        "UMTUBA needs camera access so you can record or join a live video session.",
       NSMicrophoneUsageDescription:
-        "UMTUBA needs microphone access so you can record audio and join live sessions.",
+        "UMTUBA needs microphone access so you can record audio or join a live session.",
       NSPhotoLibraryUsageDescription:
-        "UMTUBA needs photo library access so you can choose and share media.",
-      NSPhotoLibraryAddUsageDescription:
-        "UMTUBA needs permission to save media you create to your library.",
+        "UMTUBA needs photo library access so you can choose a video to publish.",
+      NSUserNotificationsUsageDescription:
+        "UMTUBA can notify you about activity on your account, such as likes, rewards, and live sessions.",
+    },
+    privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+      NSPrivacyAccessedAPITypes: [
+        {
+          NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults",
+          NSPrivacyAccessedAPITypeReasons: ["CA92.1"],
+        },
+        {
+          NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryFileTimestamp",
+          NSPrivacyAccessedAPITypeReasons: ["C617.1"],
+        },
+        {
+          NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategorySystemBootTime",
+          NSPrivacyAccessedAPITypeReasons: ["35F9.1"],
+        },
+        {
+          NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryDiskSpace",
+          NSPrivacyAccessedAPITypeReasons: ["E174.1"],
+        },
+      ],
     },
   },
   android: {
@@ -90,9 +113,9 @@ const config: ExpoConfig = {
       "expo-camera",
       {
         cameraPermission:
-          "UMTUBA needs camera access so you can take photos and join video sessions.",
+          "UMTUBA needs camera access so you can record or join a live video session.",
         microphonePermission:
-          "UMTUBA needs microphone access so you can record audio and join live sessions.",
+          "UMTUBA needs microphone access so you can record audio or join a live session.",
         recordAudioAndroid: true,
       },
     ],
@@ -100,19 +123,9 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission:
-          "UMTUBA needs photo library access so you can choose and share media.",
+          "UMTUBA needs photo library access so you can choose a video to publish.",
         cameraPermission:
-          "UMTUBA needs camera access so you can take photos and join video sessions.",
-      },
-    ],
-    [
-      "expo-media-library",
-      {
-        photosPermission:
-          "UMTUBA needs photo library access so you can choose and share media.",
-        savePhotosPermission:
-          "UMTUBA needs permission to save media you create to your library.",
-        isAccessMediaLocationEnabled: true,
+          "UMTUBA needs camera access so you can record or join a live video session.",
       },
     ],
     [

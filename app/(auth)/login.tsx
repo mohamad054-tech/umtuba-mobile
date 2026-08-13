@@ -1,4 +1,4 @@
-import { Link, Redirect, useRouter } from "expo-router";
+import { Link, Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,10 +15,15 @@ import { colors } from "@/src/theme/colors";
 export default function LoginScreen() {
   const { signIn, session, loading, passwordRecoveryPending } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ error?: string }>();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    typeof params.error === "string" && params.error.trim()
+      ? params.error
+      : null
+  );
 
   if (!loading && session && passwordRecoveryPending) {
     return <Redirect href="/(auth)/update-password" />;

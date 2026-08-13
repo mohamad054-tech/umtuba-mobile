@@ -52,6 +52,10 @@ describe("parseDeepLink", () => {
     expect(
       parseDeepLink("exp://127.0.0.1:8081/--/auth/update-password").target.type
     ).toBe("update-password");
+    expect(parseDeepLink("umtuba://auth/callback?code=demo").target).toEqual({
+      type: "watch",
+      postId: null,
+    });
   });
 
   it("parses messages conversation deep links", () => {

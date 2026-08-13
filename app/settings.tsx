@@ -242,6 +242,15 @@ export default function SettingsScreen() {
       onPress: onSignOut,
       accessibilityHint: "Ends your session on this device",
     },
+    {
+      id: "delete-account",
+      label: "Delete account",
+      kind: "external",
+      destructive: true,
+      onPress: () => void openSupport("accountDeletion"),
+      accessibilityHint:
+        "Opens the UMTUBA account deletion page in your browser",
+    },
   ];
 
   const privacyRows: SettingsRow[] = [

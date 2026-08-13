@@ -22,6 +22,10 @@ import {
 } from "@/src/contracts/validation";
 import { getProfileForUser } from "@/src/lib/auth/profile";
 import {
+  AUTH_EMAIL_CONFIRM_PATH,
+  createAuthRedirectUrl,
+} from "@/src/lib/auth/redirectUrls";
+import {
   clearReferralAttribution,
   getOrCreateVisitorId,
   getReferralAttribution,
@@ -269,6 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password: input.password,
         options: {
+          emailRedirectTo: createAuthRedirectUrl(AUTH_EMAIL_CONFIRM_PATH),
           data: {
             full_name: fullName,
             display_name: fullName,
