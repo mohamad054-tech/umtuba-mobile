@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import config from "../../../app.config";
+import eas from "../../../eas.json";
 
 describe("iOS App Store build config", () => {
   it("keeps the committed bundle identity and Team ID", () => {
@@ -10,6 +11,14 @@ describe("iOS App Store build config", () => {
     expect(config.ios?.buildNumber).toBe("1");
     expect(config.name).toBe("UMTUBA");
     expect(config.scheme).toBe("umtuba");
+    expect(eas.submit.production.ios.appleTeamId).toBe("M6HDH86Z55");
+    expect(eas.build.production.autoIncrement).toBe(true);
+  });
+
+  it("keeps preview as internal device IPA (not simulator)", () => {
+    expect(eas.build.preview.distribution).toBe("internal");
+    expect(eas.build.preview.ios.simulator).toBe(false);
+    expect("autoIncrement" in eas.build.preview).toBe(false);
   });
 
   it("declares Universal Links hosts without inventing extra Apple IDs", () => {
