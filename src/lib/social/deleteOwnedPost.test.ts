@@ -57,6 +57,21 @@ describe("UAF-12 own content delete — mobile consume", () => {
     expect(viewerMaySeeDeleteControl(null, OWNER)).toBe(false);
   });
 
+  it("fails closed for auth and invalid post ids before touching posts", async () => {
+    const supabase = { from: vi.fn() };
+    expect(await deletePostForOwner(supabase as never, "not-a-uuid", 42)).toEqual({
+      ok: false,
+      code: "auth_required",
+      message: OWN_CONTENT_DELETE_ERRORS.authRequired,
+    });
+    expect(await deletePostForOwner(supabase as never, OWNER, 0)).toEqual({
+      ok: false,
+      code: "invalid",
+      message: OWN_CONTENT_DELETE_ERRORS.invalid,
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
   it("rejects a non-owner after load", async () => {
     const supabase = createSupabaseMock({
       load: {
@@ -75,6 +90,17 @@ describe("UAF-12 own content delete — mobile consume", () => {
       ok: false,
       code: "not_owner",
       message: OWN_CONTENT_DELETE_ERRORS.notOwner,
+    });
+  });
+
+  it("returns not_found when the owned post is already gone", async () => {
+    const supabase = createSupabaseMock({
+      load: { data: null, error: null },
+    });
+    expect(await deletePostForOwner(supabase as never, OWNER, 99)).toEqual({
+      ok: false,
+      code: "not_found",
+      message: OWN_CONTENT_DELETE_ERRORS.notFound,
     });
   });
 
