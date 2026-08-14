@@ -322,7 +322,7 @@ export default function CreateScreen() {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "android" ? 24 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 24}
       >
         <ScrollView
           contentContainerStyle={styles.content}

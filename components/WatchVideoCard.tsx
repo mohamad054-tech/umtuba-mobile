@@ -67,6 +67,10 @@ export type WatchVideoCardProps = {
   onToggleSave: () => void;
   /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
   onDeleteOwn?: () => void;
+  /** Other people's content only — Guideline 1.2 report. */
+  onReport?: () => void;
+  /** Other accounts only — Guideline 1.2 block. */
+  onBlockUser?: () => void;
   onOpenProfile?: () => void;
   onRefreshSrc?: () => Promise<string | null>;
   style?: StyleProp<ViewStyle>;
@@ -426,6 +430,8 @@ function WatchVideoCardComponent({
   onToggleLike,
   onToggleSave,
   onDeleteOwn,
+  onReport,
+  onBlockUser,
   onOpenProfile,
   onRefreshSrc,
   style,
@@ -734,6 +740,28 @@ function WatchVideoCardComponent({
             >
               <Text style={[styles.actionIcon, styles.deleteIcon]}>⌫</Text>
               <Text style={styles.actionCount}>Delete</Text>
+            </Pressable>
+          ) : null}
+          {onReport ? (
+            <Pressable
+              style={styles.action}
+              onPress={onReport}
+              accessibilityRole="button"
+              accessibilityLabel="Report this video"
+            >
+              <Text style={styles.actionIcon}>⚑</Text>
+              <Text style={styles.actionCount}>Report</Text>
+            </Pressable>
+          ) : null}
+          {onBlockUser ? (
+            <Pressable
+              style={styles.action}
+              onPress={onBlockUser}
+              accessibilityRole="button"
+              accessibilityLabel="Block this account"
+            >
+              <Text style={styles.actionIcon}>⊘</Text>
+              <Text style={styles.actionCount}>Block</Text>
             </Pressable>
           ) : null}
         </View>

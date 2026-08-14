@@ -1,12 +1,7 @@
-import { Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
 
-export type PermissionKind =
-  | "camera"
-  | "microphone"
-  | "mediaLibrary"
-  | "notifications";
+export type PermissionKind = "mediaLibrary" | "notifications";
 
 export type PermissionOutcome = {
   kind: PermissionKind;
@@ -16,54 +11,11 @@ export type PermissionOutcome = {
 };
 
 const EXPLANATIONS: Record<PermissionKind, string> = {
-  camera:
-    "UMTUBA uses the camera so you can record or join a live video session.",
-  microphone:
-    "UMTUBA uses the microphone so you can record audio or join a live session.",
   mediaLibrary:
     "UMTUBA needs media library access so you can choose a video to publish.",
   notifications:
-    "UMTUBA can notify you about likes, rewards, and live activity you care about.",
+    "UMTUBA can notify you about likes, rewards, and account activity you care about.",
 };
-
-/** Foundation-only wrappers — Phase 2 wires these into Create / Live flows. */
-export async function requestCameraPermission(): Promise<PermissionOutcome> {
-  const current = await Camera.getCameraPermissionsAsync();
-  if (current.granted) {
-    return {
-      kind: "camera",
-      granted: true,
-      canAskAgain: current.canAskAgain,
-      explanation: EXPLANATIONS.camera,
-    };
-  }
-  const result = await Camera.requestCameraPermissionsAsync();
-  return {
-    kind: "camera",
-    granted: result.granted,
-    canAskAgain: result.canAskAgain,
-    explanation: EXPLANATIONS.camera,
-  };
-}
-
-export async function requestMicrophonePermission(): Promise<PermissionOutcome> {
-  const current = await Camera.getMicrophonePermissionsAsync();
-  if (current.granted) {
-    return {
-      kind: "microphone",
-      granted: true,
-      canAskAgain: current.canAskAgain,
-      explanation: EXPLANATIONS.microphone,
-    };
-  }
-  const result = await Camera.requestMicrophonePermissionsAsync();
-  return {
-    kind: "microphone",
-    granted: result.granted,
-    canAskAgain: result.canAskAgain,
-    explanation: EXPLANATIONS.microphone,
-  };
-}
 
 /**
  * Aligns with expo-image-picker (Create gallery flow).

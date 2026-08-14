@@ -13,6 +13,8 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: "com.umtuba.app",
     buildNumber: "1",
+    // Same Team ID already published in live AASA (M6HDH86Z55.com.umtuba.app).
+    appleTeamId: "M6HDH86Z55",
     associatedDomains: [
       "applinks:umtuba.com",
       "applinks:www.umtuba.com",
@@ -24,14 +26,10 @@ const config: ExpoConfig = {
     infoPlist: {
       CFBundleDisplayName: "UMTUBA",
       UIStatusBarStyle: "UIStatusBarStyleLightContent",
-      NSCameraUsageDescription:
-        "UMTUBA needs camera access so you can record or join a live video session.",
-      NSMicrophoneUsageDescription:
-        "UMTUBA needs microphone access so you can record audio or join a live session.",
       NSPhotoLibraryUsageDescription:
         "UMTUBA needs photo library access so you can choose a video to publish.",
       NSUserNotificationsUsageDescription:
-        "UMTUBA can notify you about activity on your account, such as likes, rewards, and live sessions.",
+        "UMTUBA can notify you about likes, rewards, and account activity.",
     },
     privacyManifests: {
       NSPrivacyTracking: false,
@@ -110,22 +108,10 @@ const config: ExpoConfig = {
       },
     ],
     [
-      "expo-camera",
-      {
-        cameraPermission:
-          "UMTUBA needs camera access so you can record or join a live video session.",
-        microphonePermission:
-          "UMTUBA needs microphone access so you can record audio or join a live session.",
-        recordAudioAndroid: true,
-      },
-    ],
-    [
       "expo-image-picker",
       {
         photosPermission:
           "UMTUBA needs photo library access so you can choose a video to publish.",
-        cameraPermission:
-          "UMTUBA needs camera access so you can record or join a live video session.",
       },
     ],
     [

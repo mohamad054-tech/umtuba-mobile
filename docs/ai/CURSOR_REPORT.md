@@ -1,35 +1,46 @@
-# CURSOR_REPORT — PC2 iOS App Store Operator Mode V1
+# CURSOR_REPORT — PC2 iOS App Store Execution Preparation V2
 
 ```text
-TASK_ID = PC2_IOS_APP_STORE_OPERATOR_MODE_V1
+TASK_ID = PC2_IOS_BUILD_APP_STORE_EXECUTION_PREPARATION_V2
 DEVICE = PC2
-DEVICE_ROLE = IOS_APP_STORE_PRIMARY_OPERATOR
+DEVICE_ROLE = IOS_APP_STORE_EXECUTION_PRIMARY
 CENTRAL_COORDINATOR = SERVER
-AUTHORITATIVE_BASE_SHA = 3b335610ced48aa2595fe49eef5b97511c7f4cb5
-COMMIT_SHA = 45f0dbc953ad6770ed263b0961306fa04f04688c
-BRANCH = master
-IOS_APP_STORE_READY_FOR_BUILD = NO
-SIGN_IN_WITH_APPLE_REQUIRED = NO
-SECRET_VALUES_PRINTED = NO
+AUTHORITATIVE_BASE_SHA = db7f927467eb2a5416b612c330bfa8440bcf50f0
+BRANCH = pc2/ios-app-store-execution-prep-v2
+IOS_BUILD_CONFIG_READY = YES
+EAS_IOS_READY = NO
 TESTFLIGHT_SUBMIT = NOT_ATTEMPTED
 APP_STORE_UPLOAD = NOT_ATTEMPTED
-CENTRAL_TESTFLIGHT_GO = ABSENT
+PUSH = NO
 ```
 
 ## Summary
 
-Operator mode consumed web UAF-12 own-delete on Watch (same `posts` table / ownership filter, no second backend), hid unfinished Live on iOS only, and wrote the App Store operator packet. Ready-for-build remains NO. Next action is Apple Developer Individual enrollment by the account owner.
+Closed iOS policy gaps that could be fixed without a new backend: Watch Report/Block UI, device-local hide/block, unused camera/mic removal, Team ID in Expo iOS config, and operator-ready App Store docs. Server-side UGC report remains unbound (20260928 SQL off alpha). Expo/EAS are not logged in on PC2. Do not submit.
 
 ## Exact files changed
 
-- `src/lib/social/deleteOwnedPostShared.ts`
-- `src/lib/social/deleteOwnedPost.ts`
-- `src/lib/social/deleteOwnedPost.test.ts`
+- `app.config.ts`
+- `app/(tabs)/create.tsx`
 - `app/(tabs)/watch.tsx`
+- `app/_layout.tsx`
+- `app/blocked-users.tsx`
+- `app/messages/[id].tsx`
+- `app/settings.tsx`
 - `components/WatchVideoCard.tsx`
-- `app/(tabs)/_layout.tsx`
-- `app/(tabs)/live.tsx`
+- `package.json`
+- `package-lock.json`
+- `src/lib/ios/appStoreConfig.test.ts`
+- `src/lib/permissions/foundation.ts`
+- `src/lib/profile/profilePresentation.test.ts`
+- `src/lib/settings/supportLinks.ts`
+- `src/lib/social/ugcModeration.ts`
+- `src/lib/social/ugcModerationShared.ts`
+- `src/lib/social/ugcModeration.test.ts`
 - `docs/app-store/OPERATOR_PACKET.md`
+- `docs/app-store/APP_PRIVACY.md`
+- `docs/app-store/REVIEWER_NOTES.md`
+- `docs/app-store/SCREENSHOT_MATRIX.md`
 - `docs/ai/CURSOR_REPORT.md`
 
 ## Migrations created
@@ -38,11 +49,11 @@ None.
 
 ## Security review
 
-No secrets. No invented Team ID. Android Live tab and `android.permissions` unchanged. Own-delete is owner-only in app code; RLS remains the authorization source. Report/block still missing — not invented.
+No secrets printed. Team ID written only in committed Expo iOS config (`ios.appleTeamId`), matching live AASA `M6HDH86Z55.com.umtuba.app`. No new public-doc leak. No competing UGC backend. Local block/hide is device-only. Report fails closed while the 20260928 adapter is unbound. Android `android.permissions` array unchanged. Live remains hidden on iOS.
 
 ## Tests
 
-`tsc --noEmit` PASS. Focused vitest 18 PASS (delete 4, emailConfirm, ugcSafety, live).
+`tsc --noEmit` PASS. Focused shared/iOS vitest 109 PASS. Full suite 385 PASS / 1 FAIL (`src/lib/wallet/format.test.ts` locale grouping — pre-existing Arabic-numeral environment, not this change).
 
 ## TypeScript
 
@@ -50,16 +61,20 @@ PASS.
 
 ## Build
 
-EAS cloud path prepared only. No local Xcode. No `eas login`. No submit.
+Config-only. No `eas build`. No Xcode. Expo/EAS not logged in.
 
 ## git diff --check
 
-Clean on staged operator files.
+Clean.
 
 ## git status --short
 
-See operator report after commit/push.
+See commit on `pc2/ios-app-store-execution-prep-v2`. Not pushed.
 
 ## Open issues
 
-IOS-B01 Team ID / live AASA 404. IOS-B02 account-deletion page observed live, Central verification not confirmed. IOS-B03 report/block missing. IOS-B04 camera/mic still declared via expo-camera. Expo/EAS not logged in. STOP at Apple owner enrollment.
+- EAS/Expo login missing on PC2
+- Server-side UGC report queue unbound
+- Reviewer account not created
+- Screenshots not captured
+- No Central TestFlight or App Store GO

@@ -3,8 +3,10 @@
  */
 export const SUPPORT_LINKS = {
   about: "https://umtuba.com",
-  help: "https://umtuba.com",
-  contact: "https://umtuba.com",
+  /** Dedicated /support is 404. Use the live privacy page as the support URL. */
+  help: "https://umtuba.com/privacy",
+  contact: "https://umtuba.com/privacy",
+  support: "https://umtuba.com/privacy",
   privacy: "https://umtuba.com/privacy",
   terms: "https://umtuba.com/terms",
   /** Central/Desktop web account-deletion contract. Do not recreate the backend here. */

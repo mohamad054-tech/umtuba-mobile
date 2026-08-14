@@ -37,6 +37,18 @@ import {
   togglePostLike,
   togglePostSave,
 } from "@/src/lib/social/interactions";
+import {
+  blockUserLocally,
+  filterWatchItemsForViewer,
+  loadBlockedUsers,
+  loadHiddenPostIds,
+  reportWatchPost,
+  UGC_REPORT_REASON_LABELS,
+  UGC_REPORT_REASONS,
+  viewerMaySeeBlockControl,
+  viewerMaySeeReportControl,
+  type UgcReportReason,
+} from "@/src/lib/social/ugcModeration";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   DEFAULT_WATCH_AUTO_NEXT,
@@ -97,6 +109,12 @@ export default function WatchScreen() {
   );
   const [itemHeight, setItemHeight] = useState(WINDOW_HEIGHT);
   const [listScrollEnabled, setListScrollEnabled] = useState(true);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<number>>(
+    () => new Set()
+  );
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -112,6 +130,12 @@ export default function WatchScreen() {
   useFocusEffect(
     useCallback(() => {
       setScreenFocused(true);
+      void Promise.all([loadBlockedUsers(), loadHiddenPostIds()]).then(
+        ([users, posts]) => {
+          setBlockedUserIds(new Set(users.map((row) => row.userId)));
+          setHiddenPostIds(new Set(posts));
+        }
+      );
       return () => {
         setScreenFocused(false);
       };
@@ -146,9 +170,18 @@ export default function WatchScreen() {
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
 
+  const visibleVideos = useMemo(
+    () =>
+      filterWatchItemsForViewer(videos, {
+        blockedUserIds,
+        hiddenPostIds,
+      }),
+    [blockedUserIds, hiddenPostIds, videos]
+  );
+
   useEffect(() => {
-    videosLengthRef.current = videos.length;
-  }, [videos.length]);
+    videosLengthRef.current = visibleVideos.length;
+  }, [visibleVideos.length]);
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -335,6 +368,88 @@ export default function WatchScreen() {
     [user?.id]
   );
 
+  const onReport = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId || !user?.id) return;
+      if (!viewerMaySeeReportControl(user.id, video.author.id)) return;
+      Alert.alert(
+        "Report video",
+        "Why are you reporting this video?",
+        [
+          { text: "Cancel", style: "cancel" },
+          ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
+            text: UGC_REPORT_REASON_LABELS[reason],
+            onPress: () => {
+              void (async () => {
+                const result = await reportWatchPost({
+                  viewerId: user.id,
+                  ownerUserId: video.author.id,
+                  postId: video.postId as number,
+                  reason,
+                });
+                setHiddenPostIds((prev) => {
+                  const next = new Set(prev);
+                  next.add(video.postId as number);
+                  return next;
+                });
+                Alert.alert(
+                  result.ok ? "Report submitted" : "Report recorded",
+                  result.ok
+                    ? "Thanks. This video is hidden on this device."
+                    : result.message
+                );
+              })();
+            },
+          })),
+        ]
+      );
+    },
+    [user?.id]
+  );
+
+  const onBlockUser = useCallback(
+    (video: WatchVideo) => {
+      if (!user?.id || !video.author.id) return;
+      if (!viewerMaySeeBlockControl(user.id, video.author.id)) return;
+      Alert.alert(
+        "Block account",
+        `Hide @${video.author.username.replace(/^@/, "")} on this device?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Block",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const result = await blockUserLocally({
+                  viewerId: user.id,
+                  targetUserId: video.author.id,
+                  username: video.author.username,
+                });
+                if (!result.ok) {
+                  Alert.alert("Block failed", result.message);
+                  return;
+                }
+                setBlockedUserIds((prev) => {
+                  const next = new Set(prev);
+                  next.add(result.userId);
+                  return next;
+                });
+                Alert.alert(
+                  "Account blocked",
+                  result.localOnly
+                    ? "This account is hidden on this device. UMTUBA cannot store the block on the server yet."
+                    : "You will no longer see this account."
+                );
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [user?.id]
+  );
+
   const onToggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
@@ -446,7 +561,7 @@ export default function WatchScreen() {
         muted={muted}
         volume={volume}
         autoNext={autoNext}
-        isLastItem={index >= videos.length - 1}
+        isLastItem={index >= visibleVideos.length - 1}
         appState={appState}
         screenFocused={screenFocused}
         onToggleMute={onToggleMute}
@@ -459,6 +574,16 @@ export default function WatchScreen() {
         onDeleteOwn={
           viewerMaySeeDeleteControl(user?.id, item.author.id)
             ? () => onDeleteOwn(item)
+            : undefined
+        }
+        onReport={
+          viewerMaySeeReportControl(user?.id, item.author.id)
+            ? () => onReport(item)
+            : undefined
+        }
+        onBlockUser={
+          viewerMaySeeBlockControl(user?.id, item.author.id)
+            ? () => onBlockUser(item)
             : undefined
         }
         onOpenProfile={() => {
@@ -484,7 +609,9 @@ export default function WatchScreen() {
       onActiveEnded,
       onScrubGestureChange,
       onToggleAutoNext,
+      onBlockUser,
       onDeleteOwn,
+      onReport,
       onToggleLike,
       onToggleMute,
       onToggleSave,
@@ -493,7 +620,7 @@ export default function WatchScreen() {
       refreshSrcFor,
       router,
       screenFocused,
-      videos.length,
+      visibleVideos.length,
       volume,
     ]
   );
@@ -551,7 +678,7 @@ export default function WatchScreen() {
     );
   }
 
-  if (videos.length === 0) {
+  if (visibleVideos.length === 0) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
@@ -588,7 +715,7 @@ export default function WatchScreen() {
       ) : null}
       <FlatList
         ref={listRef}
-        data={videos}
+        data={visibleVideos}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         pagingEnabled

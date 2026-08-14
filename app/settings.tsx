@@ -283,13 +283,9 @@ export default function SettingsScreen() {
     {
       id: "blocked-users",
       label: "Blocked users",
-      kind: "unavailable",
-      value: "Not available yet",
-      onPress: () =>
-        showUnavailable(
-          "Blocked users",
-          "Blocking is not available in this version."
-        ),
+      kind: "link",
+      href: "/blocked-users" as Href,
+      accessibilityHint: "Accounts hidden on this device",
     },
   ];
 

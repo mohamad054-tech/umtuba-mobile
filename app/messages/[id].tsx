@@ -376,7 +376,7 @@ export default function ConversationThreadScreen() {
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "android" ? 24 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 24}
     >
       <View style={styles.root}>
         {peerTyping ? (
