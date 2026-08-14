@@ -58,7 +58,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.umtuba.app",
-    versionCode: 1,
+    versionCode: 5,
     adaptiveIcon: {
       backgroundColor: "#050510",
       foregroundImage: "./assets/images/android-icon-foreground.png",
