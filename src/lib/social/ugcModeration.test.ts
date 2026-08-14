@@ -5,6 +5,7 @@ import {
   isUgcBlockBackendConfigured,
   isUgcReportBackendConfigured,
   reportWatchPost,
+  reportWatchUser,
 } from "./ugcModeration";
 import {
   filterWatchItemsForViewer,
@@ -18,6 +19,7 @@ const VIEWER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 
 const memory = new Map<string, string>();
+const rpc = vi.fn();
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
@@ -39,15 +41,20 @@ vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
 }));
 
+vi.mock("@/src/lib/supabase/client", () => ({
+  getSupabase: () => ({ rpc }),
+}));
+
 describe("UGC report/block contracts", () => {
   beforeEach(() => {
     memory.clear();
     vi.clearAllMocks();
+    rpc.mockResolvedValue({ data: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", error: null });
   });
 
-  it("keeps the 20260928 backend adapter unbound", () => {
-    expect(isUgcReportBackendConfigured()).toBe(false);
-    expect(isUgcBlockBackendConfigured()).toBe(false);
+  it("marks the 20260928 backend adapter as bound", () => {
+    expect(isUgcReportBackendConfigured()).toBe(true);
+    expect(isUgcBlockBackendConfigured()).toBe(true);
   });
 
   it("shows report/block only for other people's content", () => {
@@ -64,18 +71,35 @@ describe("UGC report/block contracts", () => {
     expect(isAllowedUgcReportReason("not-a-reason")).toBe(false);
   });
 
-  it("fails closed when reporting because no backend is bound", async () => {
+  it("submits content reports through report_ugc_content", async () => {
     const result = await reportWatchPost({
       viewerId: VIEWER,
       ownerUserId: OTHER,
       postId: 42,
       reason: "spam",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("backend_unavailable");
-      expect(result.message).toBe(UGC_MODERATION_ERRORS.backendUnavailable);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backendAccepted).toBe(true);
+      expect(result.hiddenLocally).toBe(true);
     }
+    expect(rpc).toHaveBeenCalledWith("report_ugc_content", {
+      p_post_id: 42,
+      p_reason_code: "spam",
+    });
+  });
+
+  it("submits user reports through report_ugc_user", async () => {
+    const result = await reportWatchUser({
+      viewerId: VIEWER,
+      targetUserId: OTHER,
+      reason: "harassment",
+    });
+    expect(result.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("report_ugc_user", {
+      p_user_id: OTHER,
+      p_reason_code: "harassment",
+    });
   });
 
   it("rejects reporting your own post", async () => {
@@ -90,9 +114,10 @@ describe("UGC report/block contracts", () => {
       code: "own_content",
       message: UGC_MODERATION_ERRORS.ownContent,
     });
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("blocks another user locally without inventing a backend", async () => {
+  it("blocks another user through block_ugc_user", async () => {
     const result = await blockUserLocally({
       viewerId: VIEWER,
       targetUserId: OTHER,
@@ -102,8 +127,11 @@ describe("UGC report/block contracts", () => {
       ok: true,
       userId: OTHER,
       blocked: true,
-      backendAccepted: false,
-      localOnly: true,
+      backendAccepted: true,
+      localOnly: false,
+    });
+    expect(rpc).toHaveBeenCalledWith("block_ugc_user", {
+      p_user_id: OTHER,
     });
   });
 

@@ -70,8 +70,8 @@ export default function BlockedUsersScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.subtitle}>
-          Accounts you block are hidden on this device. Server-side blocks are
-          not available until Central binds the existing UGC contract.
+          Accounts you block are hidden on this device and stored with your
+          UMTUBA account when signed in.
         </Text>
 
         {loading ? (

@@ -1,7 +1,7 @@
 /**
  * Shared Watch UGC report/block contracts (iOS + Android).
- * No second backend. Server/RLS remain the authority when Central binds
- * the Desktop 20260928 UGC SQL. Until that adapter is bound, calls fail closed.
+ * No second backend. Server/RLS remain the authority for the
+ * Desktop 20260928 UGC SQL RPCs bound by Central.
  */
 
 const UUID_RE =
@@ -54,7 +54,8 @@ export type UgcModerationCode =
 export type UgcReportResult =
   | {
       ok: true;
-      postId: number;
+      postId?: number;
+      userId?: string;
       reason: UgcReportReason;
       backendAccepted: boolean;
       hiddenLocally: boolean;
@@ -78,15 +79,15 @@ export type BlockedUserRecord = {
 };
 
 /**
- * Desktop 20260928 UGC SQL is off alpha. No Android client adapter is bound.
- * Keep false until Central wires the existing contract — do not invent RPCs.
+ * Production 20260928 UGC RPCs are applied. Mobile binds:
+ * report_ugc_content, report_ugc_user, block_ugc_user, unblock_ugc_user.
  */
 export function isUgcReportBackendConfigured(): boolean {
-  return false;
+  return true;
 }
 
 export function isUgcBlockBackendConfigured(): boolean {
-  return false;
+  return true;
 }
 
 export function isAllowedUgcReportReason(

@@ -43,6 +43,7 @@ import {
   loadBlockedUsers,
   loadHiddenPostIds,
   reportWatchPost,
+  reportWatchUser,
   UGC_REPORT_REASON_LABELS,
   UGC_REPORT_REASONS,
   viewerMaySeeBlockControl,
@@ -372,37 +373,63 @@ export default function WatchScreen() {
     (video: WatchVideo) => {
       if (!video.postId || !user?.id) return;
       if (!viewerMaySeeReportControl(user.id, video.author.id)) return;
-      Alert.alert(
-        "Report video",
-        "Why are you reporting this video?",
-        [
-          { text: "Cancel", style: "cancel" },
-          ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
-            text: UGC_REPORT_REASON_LABELS[reason],
-            onPress: () => {
-              void (async () => {
-                const result = await reportWatchPost({
-                  viewerId: user.id,
-                  ownerUserId: video.author.id,
-                  postId: video.postId as number,
-                  reason,
-                });
-                setHiddenPostIds((prev) => {
-                  const next = new Set(prev);
-                  next.add(video.postId as number);
-                  return next;
-                });
-                Alert.alert(
-                  result.ok ? "Report submitted" : "Report recorded",
-                  result.ok
-                    ? "Thanks. This video is hidden on this device."
-                    : result.message
-                );
-              })();
-            },
-          })),
-        ]
-      );
+
+      const pickReason = (target: "content" | "user") => {
+        Alert.alert(
+          target === "content" ? "Report video" : "Report account",
+          target === "content"
+            ? "Why are you reporting this video?"
+            : "Why are you reporting this account?",
+          [
+            { text: "Cancel", style: "cancel" },
+            ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
+              text: UGC_REPORT_REASON_LABELS[reason],
+              onPress: () => {
+                void (async () => {
+                  if (target === "content") {
+                    const result = await reportWatchPost({
+                      viewerId: user.id,
+                      ownerUserId: video.author.id,
+                      postId: video.postId as number,
+                      reason,
+                    });
+                    setHiddenPostIds((prev) => {
+                      const next = new Set(prev);
+                      next.add(video.postId as number);
+                      return next;
+                    });
+                    Alert.alert(
+                      result.ok ? "Report submitted" : "Unable to report",
+                      result.ok
+                        ? "Thanks. Moderators received this report and the video is hidden on this device."
+                        : result.message
+                    );
+                    return;
+                  }
+
+                  const result = await reportWatchUser({
+                    viewerId: user.id,
+                    targetUserId: video.author.id,
+                    reason,
+                  });
+                  Alert.alert(
+                    result.ok ? "Report submitted" : "Unable to report",
+                    result.ok
+                      ? "Thanks. Moderators received this account report."
+                      : result.message
+                  );
+                })();
+              },
+            })),
+          ]
+        );
+      };
+
+      Alert.alert("Report", "What do you want to report?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "This video", onPress: () => pickReason("content") },
+        { text: "This account", onPress: () => pickReason("user") },
+      ]);
     },
     [user?.id]
   );
@@ -438,8 +465,8 @@ export default function WatchScreen() {
                 Alert.alert(
                   "Account blocked",
                   result.localOnly
-                    ? "This account is hidden on this device. UMTUBA cannot store the block on the server yet."
-                    : "You will no longer see this account."
+                    ? "This account is hidden on this device only."
+                    : "This account is blocked on UMTUBA and hidden on this device."
                 );
               })();
             },
