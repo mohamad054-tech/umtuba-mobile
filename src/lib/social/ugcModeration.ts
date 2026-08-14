@@ -111,8 +111,76 @@ function parseHiddenPosts(raw: string | null): number[] {
   }
 }
 
+function parseServerBlockedRows(data: unknown): BlockedUserRecord[] {
+  if (!Array.isArray(data)) return [];
+  const out: BlockedUserRecord[] = [];
+  for (const row of data) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as {
+      user_id?: unknown;
+      username?: unknown;
+      created_at?: unknown;
+    };
+    if (!isUuid(typeof record.user_id === "string" ? record.user_id : null)) {
+      continue;
+    }
+    const createdAt =
+      typeof record.created_at === "string"
+        ? Date.parse(record.created_at)
+        : NaN;
+    out.push({
+      userId: record.user_id as string,
+      username:
+        typeof record.username === "string" && record.username.trim()
+          ? record.username.trim()
+          : null,
+      blockedAt: Number.isFinite(createdAt) ? createdAt : 0,
+    });
+  }
+  return out;
+}
+
+function mergeBlockedUsers(
+  local: BlockedUserRecord[],
+  remote: BlockedUserRecord[]
+): BlockedUserRecord[] {
+  const byId = new Map<string, BlockedUserRecord>();
+  for (const row of local) {
+    byId.set(row.userId, row);
+  }
+  for (const row of remote) {
+    const prev = byId.get(row.userId);
+    byId.set(row.userId, {
+      userId: row.userId,
+      username: row.username || prev?.username || null,
+      blockedAt: row.blockedAt || prev?.blockedAt || 0,
+    });
+  }
+  return [...byId.values()].sort((a, b) => b.blockedAt - a.blockedAt);
+}
+
 export async function loadBlockedUsers(): Promise<BlockedUserRecord[]> {
-  return parseBlockedUsers(await readRaw(BLOCKED_USERS_KEY));
+  const local = parseBlockedUsers(await readRaw(BLOCKED_USERS_KEY));
+  if (!isUgcBlockBackendConfigured()) {
+    return local;
+  }
+
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.rpc("list_my_blocked_users");
+    if (error) {
+      return local;
+    }
+    const remote = parseServerBlockedRows(data);
+    if (remote.length === 0 && local.length === 0) {
+      return local;
+    }
+    const merged = mergeBlockedUsers(local, remote);
+    await persistBlockedUsers(merged);
+    return merged;
+  } catch {
+    return local;
+  }
 }
 
 export async function loadHiddenPostIds(): Promise<number[]> {

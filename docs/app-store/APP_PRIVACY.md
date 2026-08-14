@@ -40,7 +40,7 @@ Operator pastes answers into App Store Connect. Do not treat this file as a file
 
 - Privacy: `https://umtuba.com/privacy`
 - Account deletion: `https://umtuba.com/account-deletion` (Settings → Delete account)
-- Support URL for ASC: `https://umtuba.com/privacy` (`/support` is 404)
+- Support URL for ASC: `https://umtuba.com/support`
 
 ## Accessed-API reasons (privacy manifest)
 

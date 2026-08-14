@@ -22,9 +22,10 @@ Open Watch to play a public video.
 Create: pick a library video, check the Terms box, then Publish.
 Owners can delete their own Watch video from the side rail.
 Other people's videos show Report (reason list) and Block (hides that account on this device).
-Settings → Blocked users lists device-local blocks.
+Settings → Blocked users lists accounts blocked for your UMTUBA session.
 Settings → Delete account opens https://umtuba.com/account-deletion
-Settings → Help / Contact / Privacy open https://umtuba.com/privacy
+Settings → Help / Contact / Support open https://umtuba.com/support
+Privacy: https://umtuba.com/privacy
 Terms: https://umtuba.com/terms
 
 Live is hidden on iOS in this build (join is not shipped).
@@ -37,4 +38,4 @@ Custom scheme: umtuba://auth/callback and umtuba://auth/update-password
 
 - Live join / camera / microphone
 - Learning, Store, or World as finished product surfaces
-- A dedicated `/support` page (404). Use privacy/contact instead.
+- In-app support ticket filing (Help opens the public Support page)

@@ -33,13 +33,13 @@ Not an App Store submission. Do not upload to TestFlight or App Store from this 
   Live, Learning, and Store are not finished iOS product surfaces in this build. Do not market them as shipped.
 
 - **Promotional text (optional):** Watch short videos and publish your own. Report and hide content you do not want to see.
-- **Support URL:** `https://umtuba.com/privacy` (dedicated `/support` is 404; privacy is the live contact/policy page)
+- **Support URL:** `https://umtuba.com/support`
 - **Privacy URL:** `https://umtuba.com/privacy`
 - **Marketing URL:** `https://umtuba.com`
 - **Terms:** `https://umtuba.com/terms`
 - **Account deletion URL:** `https://umtuba.com/account-deletion`
 
-In-app Help, Contact, Privacy, and Terms open those same allowlisted pages. There is no separate in-app support ticket screen.
+In-app Help, Contact, Support, Privacy, and Terms open those same allowlisted pages. There is no separate in-app support ticket screen.
 
 ## Age rating inputs (evidence, not a legal attestation)
 
@@ -61,11 +61,11 @@ Likely outcome: **12+ or 17+** because of unrestricted UGC.
 | Control | State |
 | --- | --- |
 | Terms acceptance before publish | Required checkbox on Create |
-| Own-content deletion | Watch owner control (UAF-12) |
-| Report objectionable content | Watch Report action with closed reasons |
-| Block users | Watch Block + Settings → Blocked users (device-local until Central binds 20260928 UGC SQL) |
+| Own-content deletion | Watch owner control (UAF-12 / posts RLS) |
+| Report objectionable content | Watch Report → `report_ugc_content` / `report_ugc_user` (20260928) |
+| Block users | Watch Block + Settings → Blocked users (`block_ugc_user` / `list_my_blocked_users`) |
 | Filter objectionable material | Reported posts and blocked authors are hidden on-device |
-| Server-side moderation queue | **Not bound** — Desktop 20260928 UGC SQL is off alpha. Honest BLOCKER for submission. |
+| Server-side moderation queue | Bound to production 20260928 `ugc_reports` / `user_blocks` RPCs |
 
 ## App Privacy answers / evidence
 

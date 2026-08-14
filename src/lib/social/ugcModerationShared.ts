@@ -11,12 +11,15 @@ export function isUuid(value: string | null | undefined): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
+/** Closed set matching production 20260928 ugc_reports.reason_code. */
 export const UGC_REPORT_REASONS = [
   "spam",
   "harassment",
   "hate",
   "sexual",
   "violence",
+  "illegal",
+  "impersonation",
   "other",
 ] as const;
 
@@ -28,6 +31,8 @@ export const UGC_REPORT_REASON_LABELS: Record<UgcReportReason, string> = {
   hate: "Hate or discrimination",
   sexual: "Sexual or pornographic content",
   violence: "Violence or dangerous acts",
+  illegal: "Illegal activity",
+  impersonation: "Impersonation or identity fraud",
   other: "Other objectionable content",
 };
 
@@ -80,7 +85,9 @@ export type BlockedUserRecord = {
 
 /**
  * Production 20260928 UGC RPCs are applied. Mobile binds:
- * report_ugc_content, report_ugc_user, block_ugc_user, unblock_ugc_user.
+ * report_ugc_content, report_ugc_user, block_ugc_user, unblock_ugc_user,
+ * list_my_blocked_users. Terms ack + account deletion reuse web contracts;
+ * own-content delete reuses posts RLS (UAF-12).
  */
 export function isUgcReportBackendConfigured(): boolean {
   return true;

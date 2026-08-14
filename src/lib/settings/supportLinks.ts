@@ -1,12 +1,12 @@
 /**
  * Allowlisted public support destinations. Fail-closed: anything else is rejected.
+ * Production /support is live (200). Terms + account-deletion reuse web contracts.
  */
 export const SUPPORT_LINKS = {
   about: "https://umtuba.com",
-  /** Dedicated /support is 404. Use the live privacy page as the support URL. */
-  help: "https://umtuba.com/privacy",
-  contact: "https://umtuba.com/privacy",
-  support: "https://umtuba.com/privacy",
+  help: "https://umtuba.com/support",
+  contact: "https://umtuba.com/support",
+  support: "https://umtuba.com/support",
   privacy: "https://umtuba.com/privacy",
   terms: "https://umtuba.com/terms",
   /** Central/Desktop web account-deletion contract. Do not recreate the backend here. */

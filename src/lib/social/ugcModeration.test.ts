@@ -4,6 +4,7 @@ import {
   blockUserLocally,
   isUgcBlockBackendConfigured,
   isUgcReportBackendConfigured,
+  loadBlockedUsers,
   reportWatchPost,
   reportWatchUser,
 } from "./ugcModeration";
@@ -68,6 +69,8 @@ describe("UGC report/block contracts", () => {
   it("accepts only closed report reasons", () => {
     expect(isAllowedUgcReportReason("spam")).toBe(true);
     expect(isAllowedUgcReportReason("hate")).toBe(true);
+    expect(isAllowedUgcReportReason("illegal")).toBe(true);
+    expect(isAllowedUgcReportReason("impersonation")).toBe(true);
     expect(isAllowedUgcReportReason("not-a-reason")).toBe(false);
   });
 
@@ -133,6 +136,29 @@ describe("UGC report/block contracts", () => {
     expect(rpc).toHaveBeenCalledWith("block_ugc_user", {
       p_user_id: OTHER,
     });
+  });
+
+  it("loads blocked users through list_my_blocked_users", async () => {
+    rpc.mockResolvedValueOnce({
+      data: [
+        {
+          user_id: OTHER,
+          username: "other",
+          display_name: "Other",
+          created_at: "2026-08-14T10:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const users = await loadBlockedUsers();
+    expect(rpc).toHaveBeenCalledWith("list_my_blocked_users");
+    expect(users).toEqual([
+      {
+        userId: OTHER,
+        username: "other",
+        blockedAt: Date.parse("2026-08-14T10:00:00.000Z"),
+      },
+    ]);
   });
 
   it("filters hidden posts and blocked authors from the feed", () => {
