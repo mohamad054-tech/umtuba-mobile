@@ -274,7 +274,10 @@ describe("UGC report/block contracts", () => {
     });
     expect(rpc).not.toHaveBeenCalled();
 
-    rpc.mockResolvedValueOnce({ data: null, error: { message: "rpc down" } });
+    // loadBlockedUsers may call list_my_blocked_users before block_ugc_user.
+    rpc
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: "rpc down" } });
     const failed = await blockUserLocally({
       viewerId: VIEWER,
       targetUserId: OTHER,
