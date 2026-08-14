@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   BackHandler,
   Dimensions,
@@ -19,13 +20,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IdentityHeader } from "@/components/IdentityHeader";
+import { UgcSafetySheet, type UgcSafetyTarget } from "@/components/UgcSafetySheet";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
+import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
+import { blockUgcUser } from "@/src/lib/safety/blocks";
+import { reportUgcContent, reportUgcUser } from "@/src/lib/safety/reports";
+import { filterVideosByBlockedAuthors } from "@/src/lib/safety/ugcPolicy";
+import {
+  applySuccessfulDeleteToList,
+  deletePostForOwner,
+  viewerMaySeeDeleteControl,
+} from "@/src/lib/social/deleteOwnedPost";
 import {
   togglePostLike,
   togglePostSave,
@@ -65,6 +76,7 @@ function toLifecycleState(state: AppStateStatus): AppLifecycleState {
 export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const params = useLocalSearchParams<{ post?: string }>();
   const focusPostId =
@@ -89,6 +101,12 @@ export default function WatchScreen() {
   );
   const [itemHeight, setItemHeight] = useState(WINDOW_HEIGHT);
   const [listScrollEnabled, setListScrollEnabled] = useState(true);
+  const [safetyTarget, setSafetyTarget] = useState<UgcSafetyTarget | null>(null);
+  const [safetyBusy, setSafetyBusy] = useState(false);
+  const [safetyError, setSafetyError] = useState<string | null>(null);
+  const [safetyConfirmation, setSafetyConfirmation] = useState<string | null>(
+    null
+  );
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -274,6 +292,76 @@ export default function WatchScreen() {
     [patchVideo]
   );
 
+  const closeSafety = useCallback(() => {
+    setSafetyTarget(null);
+    setSafetyError(null);
+    setSafetyConfirmation(null);
+    setSafetyBusy(false);
+  }, []);
+
+  const onReportContent = useCallback(
+    async (reason: string, detail: string | null) => {
+      if (!safetyTarget?.postId) return;
+      setSafetyBusy(true);
+      setSafetyError(null);
+      const result = await reportUgcContent(getSupabase(), {
+        postId: safetyTarget.postId,
+        reasonCode: reason,
+        detail,
+      });
+      setSafetyBusy(false);
+      if (!result.ok) {
+        setSafetyError(result.message);
+        return;
+      }
+      setSafetyConfirmation(
+        "Thanks. We received your report and will review this video."
+      );
+    },
+    [safetyTarget]
+  );
+
+  const onReportUser = useCallback(
+    async (reason: string, detail: string | null) => {
+      if (!safetyTarget?.userId) return;
+      setSafetyBusy(true);
+      setSafetyError(null);
+      const result = await reportUgcUser(getSupabase(), {
+        userId: safetyTarget.userId,
+        reasonCode: reason,
+        detail,
+      });
+      setSafetyBusy(false);
+      if (!result.ok) {
+        setSafetyError(result.message);
+        return;
+      }
+      setSafetyConfirmation(
+        "Thanks. We received your report and will review this account."
+      );
+    },
+    [safetyTarget]
+  );
+
+  const onBlockUser = useCallback(async () => {
+    if (!safetyTarget?.userId) return;
+    setSafetyBusy(true);
+    setSafetyError(null);
+    const result = await blockUgcUser(getSupabase(), user?.id, safetyTarget.userId);
+    setSafetyBusy(false);
+    if (!result.ok) {
+      setSafetyError(result.message);
+      return;
+    }
+    const blockedId = safetyTarget.userId;
+    setVideos((prev) =>
+      filterVideosByBlockedAuthors(prev, new Set([blockedId]))
+    );
+    setSafetyConfirmation(
+      "Account blocked. You will no longer see their videos or messages."
+    );
+  }, [safetyTarget, user?.id]);
+
   const onToggleSave = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
@@ -286,6 +374,45 @@ export default function WatchScreen() {
       });
     },
     [patchVideo]
+  );
+
+  const onDeleteOwn = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId || !user?.id) return;
+      if (!viewerMaySeeDeleteControl(user.id, video.author.id)) return;
+      Alert.alert(
+        "Delete video",
+        "This removes your video from Watch. This cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const result = await deletePostForOwner(
+                  getSupabase(),
+                  user.id,
+                  video.postId as number
+                );
+                if (!result.ok) {
+                  Alert.alert("Delete failed", result.message);
+                  return;
+                }
+                setVideos((prev) =>
+                  applySuccessfulDeleteToList(
+                    prev,
+                    (row) => row.id === video.id,
+                    true
+                  )
+                );
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [user?.id]
   );
 
   const onToggleMute = useCallback(() => {
@@ -409,6 +536,20 @@ export default function WatchScreen() {
         onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
         onToggleSave={() => void onToggleSave(item)}
+        onDeleteOwn={
+          viewerMaySeeDeleteControl(user?.id, item.author.id)
+            ? () => onDeleteOwn(item)
+            : undefined
+        }
+        onOpenSafety={() => {
+          setSafetyError(null);
+          setSafetyConfirmation(null);
+          setSafetyTarget({
+            postId: item.postId,
+            userId: item.author.id,
+            displayName: item.author.username,
+          });
+        }}
         onOpenProfile={() => {
           const username = item.author.username.replace(/^@/, "");
           if (username) {
@@ -435,6 +576,8 @@ export default function WatchScreen() {
       onToggleLike,
       onToggleMute,
       onToggleSave,
+      onDeleteOwn,
+      user?.id,
       onVolumeChange,
       refreshSrcFor,
       router,
@@ -581,6 +724,18 @@ export default function WatchScreen() {
             });
           }, 100);
         }}
+      />
+      <UgcSafetySheet
+        visible={safetyTarget != null}
+        viewerId={user?.id}
+        target={safetyTarget}
+        busy={safetyBusy}
+        error={safetyError}
+        confirmation={safetyConfirmation}
+        onClose={closeSafety}
+        onReportContent={(reason, detail) => void onReportContent(reason, detail)}
+        onReportUser={(reason, detail) => void onReportUser(reason, detail)}
+        onBlockUser={() => void onBlockUser()}
       />
     </View>
   );
