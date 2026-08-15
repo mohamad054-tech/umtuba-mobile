@@ -94,9 +94,11 @@ describe("planMessengerRealtimeChannels", () => {
 });
 
 describe("realtimeChannelAllowsNewCallbacks", () => {
-  it("rejects joined and joining — the supabase-js v2 invariant", () => {
+  it("rejects joined, joining, and subscribed — never .on() after subscribe", () => {
     expect(realtimeChannelAllowsNewCallbacks("joined")).toBe(false);
     expect(realtimeChannelAllowsNewCallbacks("joining")).toBe(false);
+    expect(realtimeChannelAllowsNewCallbacks("subscribed")).toBe(false);
+    expect(realtimeChannelAllowsNewCallbacks("SUBSCRIBED")).toBe(false);
     expect(realtimeChannelAllowsNewCallbacks("closed")).toBe(true);
     expect(realtimeChannelAllowsNewCallbacks("errored")).toBe(true);
     expect(realtimeChannelAllowsNewCallbacks(undefined)).toBe(true);

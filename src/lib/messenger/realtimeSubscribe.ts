@@ -48,5 +48,10 @@ export function planMessengerRealtimeChannels(
 export function realtimeChannelAllowsNewCallbacks(
   state: string | undefined | null
 ): boolean {
-  return state !== "joined" && state !== "joining";
+  const normalized = (state ?? "").toLowerCase();
+  return (
+    normalized !== "joined" &&
+    normalized !== "joining" &&
+    normalized !== "subscribed"
+  );
 }
