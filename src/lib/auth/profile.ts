@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { normalizeUsername } from "@/src/contracts/validation";
 import type { UserProfile } from "@/src/lib/auth/types";
+import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { getSupabase } from "@/src/lib/supabase/client";
 
 const PROFILE_COLUMNS =
@@ -48,6 +49,26 @@ export async function getProfileByUsername(
     .from("profiles")
     .select(PROFILE_COLUMNS)
     .eq("username", key)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapProfileRow(data as Parameters<typeof mapProfileRow>[0]);
+}
+
+export async function getProfileById(
+  userId: string
+): Promise<UserProfile | null> {
+  const id = parseProfileUserId(userId);
+  if (!id) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !data) {

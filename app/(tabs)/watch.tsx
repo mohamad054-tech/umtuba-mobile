@@ -28,6 +28,7 @@ import {
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
 import {
   applySuccessfulDeleteToList,
   deletePostForOwner,
@@ -620,9 +621,9 @@ export default function WatchScreen() {
             : undefined
         }
         onOpenProfile={() => {
-          const username = item.author.username.replace(/^@/, "");
-          if (username) {
-            router.push(`/profile?u=${encodeURIComponent(username)}` as never);
+          const href = buildWatchCreatorProfileHref(item.author);
+          if (href) {
+            router.push(href as never);
           }
         }}
         onRefreshSrc={() => refreshSrcFor(item)}

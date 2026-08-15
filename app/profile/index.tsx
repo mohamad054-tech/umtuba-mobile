@@ -12,10 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import { getProfileByUsername } from "@/src/lib/auth/profile";
+import { getProfileById, getProfileByUsername } from "@/src/lib/auth/profile";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
-import { resolveProfileTarget } from "@/src/lib/profile/resolveTarget";
+import {
+  planOtherProfileLookup,
+  resolveProfileTarget,
+} from "@/src/lib/profile/resolveTarget";
 import {
   followButtonLabel,
   getProfileFollowSnapshot,
@@ -27,7 +30,7 @@ import { colors } from "@/src/theme/colors";
 export default function ProfileScreen() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const router = useRouter();
-  const params = useLocalSearchParams<{ u?: string }>();
+  const params = useLocalSearchParams<{ u?: string; id?: string }>();
   const [refreshing, setRefreshing] = useState(false);
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
   const [otherStatus, setOtherStatus] = useState<
@@ -41,9 +44,11 @@ export default function ProfileScreen() {
     () =>
       resolveProfileTarget({
         queryUsername: params.u,
+        queryUserId: params.id,
         signedInUsername: profile?.username ?? null,
+        signedInUserId: user?.id ?? profile?.id ?? null,
       }),
-    [params.u, profile?.username]
+    [params.id, params.u, profile?.id, profile?.username, user?.id]
   );
   const isOwn = target.kind === "own";
 
@@ -56,14 +61,22 @@ export default function ProfileScreen() {
       return;
     }
 
-    const username = target.username;
+    const plan = planOtherProfileLookup(target);
     let cancelled = false;
     setOtherStatus("loading");
     setFollowError(null);
 
     void (async () => {
       try {
-        const row = await getProfileByUsername(username);
+        const primary =
+          plan.primary.field === "id"
+            ? await getProfileById(plan.primary.value)
+            : await getProfileByUsername(plan.primary.value);
+        const row =
+          primary ??
+          (plan.fallback
+            ? await getProfileByUsername(plan.fallback.value)
+            : null);
         if (cancelled) return;
         if (!row) {
           setOtherProfile(null);
