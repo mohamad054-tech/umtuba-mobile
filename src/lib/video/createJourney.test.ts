@@ -24,6 +24,7 @@ import {
   failPublish,
   failUpload,
   initialCreateJourneyState,
+  openWatchAfterPublishHref,
 } from "@/src/lib/video/createJourney";
 import { signedPlaybackRefreshContract } from "@/src/lib/video/publishVideoPost";
 import { getErrorMessage } from "@/src/contracts/validation";
@@ -113,9 +114,19 @@ describe("publish journey", () => {
       "uid/file.mp4"
     );
     expect(canStartPublish(state)).toBe(false);
-    state = completePublish(state);
+    state = completePublish(state, 42);
     expect(state.phase).toBe("success");
     expect(state.publishBusy).toBe(false);
+    expect(state.publishedPostId).toBe(42);
+  });
+
+  it("Open Watch deep-links to the published post, not the bare feed", () => {
+    expect(openWatchAfterPublishHref(42)).toBe("/(tabs)/watch?post=42");
+    expect(openWatchAfterPublishHref(null)).toBe("/(tabs)/watch");
+    expect(openWatchAfterPublishHref(0)).toBe("/(tabs)/watch");
+    expect(completePublish(initialCreateJourneyState(), -1).publishedPostId).toBe(
+      null
+    );
   });
 
   it("publish failure sanitizes technical errors", () => {
