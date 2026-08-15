@@ -11,6 +11,7 @@ import {
 import { AuthScreen } from "@/components/AuthScreen";
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import {
   getReferralAttribution,
   saveReferralAttribution,
@@ -48,7 +49,7 @@ export default function SignupScreen() {
   }
 
   if (!loading && session) {
-    return <Redirect href="/(tabs)/watch" />;
+    return <Redirect href={POST_AUTH_HREF} />;
   }
 
   const onSubmit = async () => {
@@ -65,7 +66,7 @@ export default function SignupScreen() {
         username,
         referralCode: referralCode || null,
       });
-      router.replace("/(tabs)/watch");
+      router.replace(POST_AUTH_HREF);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to create your account."

@@ -10,6 +10,7 @@ import {
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { colors } from "@/src/theme/colors";
 
 export default function LoginScreen() {
@@ -30,7 +31,7 @@ export default function LoginScreen() {
   }
 
   if (!loading && session) {
-    return <Redirect href="/(tabs)/watch" />;
+    return <Redirect href={POST_AUTH_HREF} />;
   }
 
   const onSubmit = async () => {
@@ -38,7 +39,7 @@ export default function LoginScreen() {
     setError(null);
     try {
       await signIn(email, password);
-      router.replace("/(tabs)/watch");
+      router.replace(POST_AUTH_HREF);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {

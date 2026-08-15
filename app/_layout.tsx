@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
+import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import {
   establishEmailConfirmSession,
@@ -79,7 +80,7 @@ function DeepLinkHandler() {
           } as never);
           return;
         }
-        router.replace("/(tabs)/watch" as never);
+        router.replace(POST_AUTH_HREF as never);
         return;
       }
 
