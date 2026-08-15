@@ -123,35 +123,90 @@ export async function togglePostLike(
   };
 }
 
+/**
+ * Persist Watch saves through `post_saves` RLS, not `toggle_post_save`.
+ *
+ * Production `toggle_post_save` is SECURITY INVOKER. Saving another user's
+ * post then calls `award_um_points_to_user` / `try_award_activity_score`,
+ * which 20260723 revoked from `authenticated`. The insert rolls back and
+ * the client surfaces "Unable to update save." Own-video saves skip that
+ * block; other-user saves do not. Table RLS still allows the viewer's own
+ * bookmark row; `sync_post_saves_count` keeps `posts.saves` in sync.
+ */
 export async function togglePostSave(
   supabase: SupabaseClient,
   postId: number
 ): Promise<ActionResult<ToggleSaveResult>> {
-  const { data, error } = await supabase.rpc("toggle_post_save", {
-    p_post_id: postId,
-  });
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return { ok: false, message: "Unable to update save. Please try again." };
+  }
 
-  if (error) {
-    const message = (error.message || "").toLowerCase();
-    if (message.includes("authentication required")) {
-      return {
-        ok: false,
-        message: "Please sign in to save posts.",
-        requiresAuth: true,
-      };
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user?.id) {
+    return {
+      ok: false,
+      message: "Please sign in to save posts.",
+      requiresAuth: true,
+    };
+  }
+
+  const existing = await supabase
+    .from("post_saves")
+    .select("post_id")
+    .eq("user_id", user.id)
+    .eq("post_id", postId)
+    .maybeSingle();
+
+  if (existing.error) {
+    return { ok: false, message: "Unable to update save. Please try again." };
+  }
+
+  let saved: boolean;
+
+  if (existing.data) {
+    const { error } = await supabase
+      .from("post_saves")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("post_id", postId);
+
+    if (error) {
+      return { ok: false, message: "Unable to update save. Please try again." };
     }
-    return { ok: false, message: "Unable to update save. Please try again." };
+    saved = false;
+  } else {
+    const { error } = await supabase.from("post_saves").insert({
+      user_id: user.id,
+      post_id: postId,
+    });
+
+    if (error) {
+      const code = "code" in error ? String(error.code) : "";
+      const message = (error.message || "").toLowerCase();
+      if (code === "23505" || message.includes("duplicate")) {
+        saved = true;
+      } else {
+        return { ok: false, message: "Unable to update save. Please try again." };
+      }
+    } else {
+      saved = true;
+    }
   }
 
-  const payload = parseRpcJson(data);
-  if (!payload) {
-    return { ok: false, message: "Unable to update save. Please try again." };
-  }
+  const { data: postRow } = await supabase
+    .from("posts")
+    .select("saves")
+    .eq("id", postId)
+    .maybeSingle();
 
   return {
     ok: true,
-    saved: asBoolean(payload.saved),
-    saves: asNumber(payload.saves),
+    saved,
+    saves: asNumber(postRow?.saves, 0),
   };
 }
 
