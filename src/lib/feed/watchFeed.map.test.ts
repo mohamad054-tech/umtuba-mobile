@@ -36,8 +36,21 @@ describe("mapRowToWatchVideo", () => {
     expect(video.author.username).toBe("@ada");
     expect(video.likedByMe).toBe(true);
     expect(video.savedByMe).toBe(false);
+    expect(video.author.isFollowing).toBe(false);
     expect(video.stats.likes).toBe(3);
     expect(video.source).toBe("supabase");
+  });
+
+  it("maps viewer follow state onto the creator", () => {
+    const video = mapRowToWatchVideo({
+      row: baseRow,
+      playbackUrl: "https://cdn.example/signed.mp4",
+      likedByMe: false,
+      savedByMe: false,
+      isFollowing: true,
+    });
+    expect(video.author.id).toBe(baseRow.user_id);
+    expect(video.author.isFollowing).toBe(true);
   });
 
   it("prefixes username with @ when missing", () => {

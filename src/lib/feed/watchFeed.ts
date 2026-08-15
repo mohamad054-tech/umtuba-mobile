@@ -12,6 +12,7 @@ import {
 } from "@/src/contracts/watch";
 import { listUgcBlockIds, toBlockedIdSet } from "@/src/lib/safety/blocks";
 import { filterVideosByBlockedAuthors } from "@/src/lib/safety/ugcPolicy";
+import { loadViewerFollowingSet } from "@/src/lib/social/follows";
 import { loadViewerInteractionState } from "@/src/lib/social/interactions";
 
 export type VideoPostRow = {
@@ -57,11 +58,12 @@ export type MappedPlaybackRow = {
   playbackUrl: string;
   likedByMe: boolean;
   savedByMe: boolean;
+  isFollowing?: boolean;
 };
 
 /** Pure mapper — unit-tested without Supabase. */
 export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
-  const { row, playbackUrl, likedByMe, savedByMe } = input;
+  const { row, playbackUrl, likedByMe, savedByMe, isFollowing } = input;
   const username = row.author_username?.startsWith("@")
     ? row.author_username
     : `@${row.author_username || "user"}`;
@@ -83,6 +85,7 @@ export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
       name: row.author_name || username,
       username,
       avatar: row.author_avatar || "U",
+      isFollowing: Boolean(isFollowing),
     },
     stats: {
       likes: row.likes ?? 0,
@@ -211,6 +214,13 @@ export async function fetchWatchFeedPage(
     user?.id,
     visibleRows.map((row) => row.id)
   );
+  const followingSet = await loadViewerFollowingSet(
+    supabase,
+    user?.id,
+    visibleRows
+      .map((row) => row.user_id)
+      .filter((id): id is string => Boolean(id))
+  );
 
   const videos: WatchVideo[] = [];
 
@@ -224,6 +234,7 @@ export async function fetchWatchFeedPage(
         playbackUrl,
         likedByMe: state?.likedByMe ?? false,
         savedByMe: state?.savedByMe ?? false,
+        isFollowing: row.user_id ? followingSet.has(row.user_id) : false,
       })
     );
   }

@@ -16,6 +16,10 @@ import {
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  resolveWatchFollowAccessibilityHint,
+  resolveWatchFollowLabel,
+} from "@/src/lib/social/follows";
+import {
   canSeekWithDuration,
   clampWatchVolume,
   formatPlaybackClock,
@@ -69,6 +73,9 @@ export type WatchVideoCardProps = {
   onDeleteOwn?: () => void;
   onOpenSafety?: () => void;
   onOpenProfile?: () => void;
+  /** Other-creator Follow/Following. Hidden for self / demo. */
+  onToggleFollow?: () => void;
+  followPending?: boolean;
   onRefreshSrc?: () => Promise<string | null>;
   style?: StyleProp<ViewStyle>;
   topInset?: number;
@@ -429,6 +436,8 @@ function WatchVideoCardComponent({
   onDeleteOwn,
   onOpenSafety,
   onOpenProfile,
+  onToggleFollow,
+  followPending = false,
   onRefreshSrc,
   style,
   topInset = 0,
@@ -665,18 +674,57 @@ function WatchVideoCardComponent({
           style={[styles.meta, { marginBottom: timelineBottom + 36 }]}
           pointerEvents="box-none"
         >
-          <Pressable
-            onPress={onOpenProfile}
-            disabled={!onOpenProfile}
-            accessibilityRole="button"
-            accessibilityLabel={`Profile ${video.author.username}`}
-            accessibilityState={{ disabled: !onOpenProfile }}
-            hitSlop={8}
-          >
-            <Text style={styles.username} numberOfLines={1}>
-              {video.author.username}
-            </Text>
-          </Pressable>
+          <View style={styles.authorRow} pointerEvents="box-none">
+            <Pressable
+              onPress={onOpenProfile}
+              disabled={!onOpenProfile}
+              accessibilityRole="button"
+              accessibilityLabel={`Profile ${video.author.username}`}
+              accessibilityState={{ disabled: !onOpenProfile }}
+              hitSlop={8}
+              style={styles.authorNameHit}
+            >
+              <Text style={styles.username} numberOfLines={1}>
+                {video.author.username}
+              </Text>
+            </Pressable>
+            {onToggleFollow ? (
+              <Pressable
+                style={[
+                  styles.followBtn,
+                  video.author.isFollowing && styles.followBtnOn,
+                ]}
+                onPress={onToggleFollow}
+                disabled={followPending}
+                accessibilityRole="button"
+                accessibilityLabel={resolveWatchFollowLabel({
+                  following: Boolean(video.author.isFollowing),
+                  pending: followPending,
+                })}
+                accessibilityHint={resolveWatchFollowAccessibilityHint(
+                  Boolean(video.author.isFollowing)
+                )}
+                accessibilityState={{
+                  selected: Boolean(video.author.isFollowing),
+                  busy: followPending,
+                  disabled: followPending,
+                }}
+              >
+                <Text
+                  style={[
+                    styles.followBtnText,
+                    video.author.isFollowing && styles.followBtnTextOn,
+                  ]}
+                >
+                  {followPending
+                    ? "…"
+                    : resolveWatchFollowLabel({
+                        following: Boolean(video.author.isFollowing),
+                      })}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <Text style={styles.caption} numberOfLines={3}>
             {video.caption || video.title}
           </Text>
@@ -910,11 +958,42 @@ const styles = StyleSheet.create({
     maxWidth: "72%",
     zIndex: 5,
   },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+  },
+  authorNameHit: {
+    flexShrink: 1,
+    minHeight: 44,
+    justifyContent: "center",
+  },
   username: {
     color: colors.text,
     fontWeight: "700",
     fontSize: 15,
-    marginBottom: 4,
+  },
+  followBtn: {
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: colors.text,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  followBtnOn: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  followBtnText: {
+    color: colors.bg,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  followBtnTextOn: {
+    color: colors.text,
   },
   caption: {
     color: colors.textMuted,

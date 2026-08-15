@@ -29,6 +29,10 @@ import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
+import {
+  buildWatchProfileHref,
+  resolveWatchSafetyTarget,
+} from "@/src/lib/profile/profileTarget";
 import { blockUgcUser } from "@/src/lib/safety/blocks";
 import { reportUgcContent, reportUgcUser } from "@/src/lib/safety/reports";
 import { filterVideosByBlockedAuthors } from "@/src/lib/safety/ugcPolicy";
@@ -37,6 +41,12 @@ import {
   deletePostForOwner,
   viewerMaySeeDeleteControl,
 } from "@/src/lib/social/deleteOwnedPost";
+import {
+  applyCreatorFollowState,
+  applyFollowToggleResult,
+  canShowWatchFollowControl,
+  toggleProfileFollow,
+} from "@/src/lib/social/follows";
 import {
   togglePostLike,
   togglePostSave,
@@ -107,6 +117,9 @@ export default function WatchScreen() {
   const [safetyConfirmation, setSafetyConfirmation] = useState<string | null>(
     null
   );
+  const [followPendingAuthorId, setFollowPendingAuthorId] = useState<
+    string | null
+  >(null);
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -376,6 +389,48 @@ export default function WatchScreen() {
     [patchVideo]
   );
 
+  const onToggleFollow = useCallback(
+    async (video: WatchVideo) => {
+      const creatorId = video.author.id;
+      if (!canShowWatchFollowControl({ viewerId: user?.id, creatorId })) {
+        return;
+      }
+      if (!user?.id) {
+        router.push("/(auth)/login");
+        return;
+      }
+      if (followPendingAuthorId === creatorId) return;
+
+      const previousFollowing = Boolean(video.author.isFollowing);
+      setFollowPendingAuthorId(creatorId);
+      try {
+        const result = await toggleProfileFollow(
+          getSupabase(),
+          creatorId as string,
+          user.id
+        );
+        const next = applyFollowToggleResult({
+          previousFollowing,
+          result,
+        });
+        if (!next.applied) {
+          if (result.ok === false && result.requiresAuth) {
+            router.push("/(auth)/login");
+          }
+          return;
+        }
+        setVideos((prev) =>
+          applyCreatorFollowState(prev, creatorId as string, next.following)
+        );
+      } finally {
+        setFollowPendingAuthorId((current) =>
+          current === creatorId ? null : current
+        );
+      }
+    },
+    [followPendingAuthorId, router, user?.id]
+  );
+
   const onDeleteOwn = useCallback(
     (video: WatchVideo) => {
       if (!video.postId || !user?.id) return;
@@ -544,18 +599,23 @@ export default function WatchScreen() {
         onOpenSafety={() => {
           setSafetyError(null);
           setSafetyConfirmation(null);
-          setSafetyTarget({
-            postId: item.postId,
-            userId: item.author.id,
-            displayName: item.author.username,
-          });
+          setSafetyTarget(resolveWatchSafetyTarget(item));
         }}
         onOpenProfile={() => {
-          const username = item.author.username.replace(/^@/, "");
-          if (username) {
-            router.push(`/profile?u=${encodeURIComponent(username)}` as never);
+          const href = buildWatchProfileHref(item.author);
+          if (href) {
+            router.push(href as never);
           }
         }}
+        onToggleFollow={
+          canShowWatchFollowControl({
+            viewerId: user?.id,
+            creatorId: item.author.id,
+          })
+            ? () => void onToggleFollow(item)
+            : undefined
+        }
+        followPending={followPendingAuthorId === item.author.id}
         onRefreshSrc={() => refreshSrcFor(item)}
         style={{ height: itemHeight }}
         topInset={insets.top + 44}
@@ -576,7 +636,9 @@ export default function WatchScreen() {
       onToggleLike,
       onToggleMute,
       onToggleSave,
+      onToggleFollow,
       onDeleteOwn,
+      followPendingAuthorId,
       user?.id,
       onVolumeChange,
       refreshSrcFor,

@@ -5,6 +5,8 @@ export type WatchVideoAuthor = {
   name: string;
   username: string;
   avatar: string;
+  /** Viewer follow state for this creator. Direct FOLLOW dependency. */
+  isFollowing?: boolean;
 };
 
 export type WatchVideoStats = {

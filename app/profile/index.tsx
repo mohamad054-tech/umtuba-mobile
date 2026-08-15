@@ -1,5 +1,5 @@
-import { Link, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,10 +12,179 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import { buildProfilePresentation } from "@/src/lib/profile";
+import { getPublicProfileByIdentity } from "@/src/lib/auth/profile";
+import type { UserProfile } from "@/src/lib/auth/types";
+import {
+  buildProfilePresentation,
+  firstRouteParam,
+  resolveProfileScreenIdentity,
+} from "@/src/lib/profile";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
+  const { profile, user } = useAuth();
+  const params = useLocalSearchParams<{ u?: string | string[]; uid?: string | string[] }>();
+
+  const identity = resolveProfileScreenIdentity({
+    paramUserId: firstRouteParam(params.uid),
+    paramUsername: firstRouteParam(params.u),
+    viewerId: user?.id ?? null,
+    viewerUsername: profile?.username ?? null,
+  });
+
+  if (identity.mode === "other") {
+    return (
+      <PublicProfileView
+        userId={identity.userId}
+        username={identity.username}
+      />
+    );
+  }
+
+  return <OwnProfileView />;
+}
+
+function PublicProfileView({
+  userId,
+  username,
+}: {
+  userId: string | null;
+  username: string | null;
+}) {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setNotFound(false);
+    try {
+      const result = await getPublicProfileByIdentity(getSupabase(), {
+        userId,
+        username,
+      });
+      setProfile(result);
+      setNotFound(result == null);
+    } catch {
+      setProfile(null);
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, username]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setNotFound(false);
+      try {
+        const result = await getPublicProfileByIdentity(getSupabase(), {
+          userId,
+          username,
+        });
+        if (cancelled) return;
+        setProfile(result);
+        setNotFound(result == null);
+      } catch {
+        if (cancelled) return;
+        setProfile(null);
+        setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, username]);
+
+  const view = buildProfilePresentation(profile, null);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.root} edges={["bottom"]}>
+        <View
+          style={styles.center}
+          accessibilityLabel="Loading profile"
+          accessibilityRole="progressbar"
+        >
+          <ActivityIndicator color={colors.accentCyan} size="large" />
+          <Text style={styles.muted}>Loading profile…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (notFound || !profile) {
+    return (
+      <SafeAreaView style={styles.root} edges={["bottom"]}>
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle} accessibilityRole="header">
+            Profile unavailable
+          </Text>
+          <Text style={styles.muted}>
+            {username
+              ? `We couldn’t load @${username.replace(/^@/, "")}.`
+              : "We couldn’t load this profile."}
+          </Text>
+          <Pressable
+            style={styles.secondaryBtn}
+            onPress={() => void load()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading profile"
+          >
+            <Text style={styles.secondaryBtnText}>Retry</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View
+          style={styles.avatar}
+          accessibilityLabel={
+            view.hasReliableIdentity
+              ? `Avatar for ${view.displayName || view.username || "user"}`
+              : "Profile avatar placeholder"
+          }
+        >
+          {view.avatarUrl ? (
+            <Image
+              source={{ uri: view.avatarUrl }}
+              style={styles.avatarImage}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <Text style={styles.avatarText} accessible={false}>
+              {view.avatarInitial}
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.name} accessibilityRole="header">
+          {view.displayName || view.username || "Account"}
+        </Text>
+        {view.username ? (
+          <Text style={styles.username}>@{view.username}</Text>
+        ) : null}
+        {view.bio ? <Text style={styles.bio}>{view.bio}</Text> : null}
+        {view.locationLine ? (
+          <Text style={styles.meta}>{view.locationLine}</Text>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function OwnProfileView() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);

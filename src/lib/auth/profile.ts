@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import { normalizeUsername } from "@/src/contracts/validation";
 import type { UserProfile } from "@/src/lib/auth/types";
@@ -75,4 +75,39 @@ export async function getProfileForUser(user: User): Promise<UserProfile> {
     avatar_url: null,
     avatar_initial: fullName.charAt(0).toUpperCase() || "U",
   };
+}
+
+/**
+ * Load another user's public profile by stable id (preferred) or username.
+ * Used when opening a content owner's profile from Watch or a `u`/`uid`
+ * deep link. Returns null when the profile cannot be found or read.
+ */
+export async function getPublicProfileByIdentity(
+  supabase: SupabaseClient,
+  identity: { userId?: string | null; username?: string | null }
+): Promise<UserProfile | null> {
+  const userId =
+    typeof identity.userId === "string" ? identity.userId.trim() : "";
+  const username =
+    typeof identity.username === "string"
+      ? identity.username.trim().replace(/^@+/, "").toLowerCase()
+      : "";
+
+  if (!userId && !username) {
+    return null;
+  }
+
+  let query = supabase.from("profiles").select(PROFILE_COLUMNS);
+  query = userId ? query.eq("id", userId) : query.eq("username", username);
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    console.error("Unable to load public profile:", error);
+    return null;
+  }
+  if (!data) {
+    return null;
+  }
+  return mapProfileRow(data as Parameters<typeof mapProfileRow>[0]);
 }
