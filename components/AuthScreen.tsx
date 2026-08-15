@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { colors } from "@/src/theme/colors";
 
 type AuthScreenProps = {
@@ -31,6 +32,9 @@ export function AuthScreen({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
       >
+        <View style={styles.topBar}>
+          <GlobalBackButton />
+        </View>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
@@ -53,10 +57,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   flex: { flex: 1 },
+  topBar: {
+    paddingHorizontal: 8,
+    minHeight: 44,
+    justifyContent: "center",
+    alignItems: "flex-start",
+  },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 48,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   brand: {

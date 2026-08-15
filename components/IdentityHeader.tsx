@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { colors } from "@/src/theme/colors";
@@ -15,9 +16,12 @@ export function IdentityHeader({ title = "UMTUBA" }: IdentityHeaderProps) {
 
   return (
     <View style={styles.row}>
-      <Text style={styles.brand} numberOfLines={1}>
-        {title}
-      </Text>
+      <View style={styles.left}>
+        <GlobalBackButton />
+        <Text style={styles.brand} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
       <View style={styles.right}>
         <WalletTierBadge />
         <Link href="/(tabs)/profile" asChild>
@@ -40,8 +44,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     minHeight: 44,
+  },
+  left: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+    minWidth: 0,
   },
   brand: {
     color: colors.text,

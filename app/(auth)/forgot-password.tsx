@@ -1,4 +1,4 @@
-import { Link, Redirect, useRouter } from "expo-router";
+import { Link, Redirect } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { AuthScreen } from "@/components/AuthScreen";
+import { useGlobalBack } from "@/components/GlobalBackButton";
 import {
   getErrorMessage,
   isValidEmail,
@@ -20,7 +21,7 @@ import { colors } from "@/src/theme/colors";
 
 export default function ForgotPasswordScreen() {
   const { session, loading, passwordRecoveryPending } = useAuth();
-  const router = useRouter();
+  const goBack = useGlobalBack();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +112,7 @@ export default function ForgotPasswordScreen() {
           <Text style={styles.buttonText}>Send reset link</Text>
         )}
       </Pressable>
-      <Pressable onPress={() => router.back()} accessibilityRole="button">
+      <Pressable onPress={goBack} accessibilityRole="button">
         <Text style={styles.back}>Cancel</Text>
       </Pressable>
     </AuthScreen>

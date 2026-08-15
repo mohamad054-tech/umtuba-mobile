@@ -7,9 +7,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
+import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
+import { GLOBAL_STACK_HEADER_OPTIONS } from "@/src/lib/nav/globalBack";
 import {
   establishEmailConfirmSession,
   isEmailConfirmCallbackUrl,
@@ -195,11 +197,16 @@ export default function RootLayout() {
                 headerStyle: { backgroundColor: colors.surface },
                 headerTintColor: colors.text,
                 contentStyle: { backgroundColor: colors.bg },
+                ...GLOBAL_STACK_HEADER_OPTIONS,
+                headerLeft: () => <GlobalBackButton />,
               }}
             >
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="(tabs)"
+                options={{ headerShown: false, title: "" }}
+              />
               <Stack.Screen name="profile/index" options={{ title: "Profile" }} />
               <Stack.Screen
                 name="notifications"

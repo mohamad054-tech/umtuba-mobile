@@ -1,8 +1,10 @@
 import { Redirect, Tabs } from "expo-router";
 import { Platform, Text, type ColorValue } from "react-native";
 
+import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { GLOBAL_BACK_TITLE_OPTIONS } from "@/src/lib/nav/globalBack";
 import { colors } from "@/src/theme/colors";
 
 function TabLabel({
@@ -39,6 +41,8 @@ export default function TabLayout() {
         },
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
+        ...GLOBAL_BACK_TITLE_OPTIONS,
+        headerLeft: () => <GlobalBackButton />,
         headerRight: () => <WalletTierBadge />,
       }}
     >
