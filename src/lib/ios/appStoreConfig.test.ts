@@ -33,6 +33,21 @@ describe("iOS App Store build config", () => {
     expect(pluginNames).not.toContain("expo-camera");
   });
 
+  it("declares a truthful location purpose string without expo-location", () => {
+    const info = config.ios?.infoPlist ?? {};
+    const purpose = String(info.NSLocationWhenInUseUsageDescription ?? "");
+    expect(purpose).toMatch(/map library/i);
+    expect(purpose).toMatch(/does not use your location/i);
+    expect(purpose).not.toMatch(/nearby/i);
+    expect(info.NSLocationAlwaysUsageDescription).toBeUndefined();
+    expect(info.NSLocationAlwaysAndWhenInUseUsageDescription).toBeUndefined();
+    const pluginNames = (config.plugins ?? []).map((plugin) =>
+      Array.isArray(plugin) ? plugin[0] : plugin
+    );
+    expect(pluginNames).toContain("@maplibre/maplibre-react-native");
+    expect(pluginNames).not.toContain("expo-location");
+  });
+
   it("does not request unused Android CAMERA or RECORD_AUDIO", () => {
     const permissions = config.android?.permissions ?? [];
     expect(permissions).not.toContain("CAMERA");

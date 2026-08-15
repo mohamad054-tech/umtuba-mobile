@@ -30,6 +30,10 @@ const config: ExpoConfig = {
         "UMTUBA needs photo library access so you can choose a video to publish.",
       NSUserNotificationsUsageDescription:
         "UMTUBA can notify you about likes, rewards, and account activity.",
+      // ITMS-90683: MapLibre ships CLLocationManager even though World does
+      // not request GPS. expo-location is unused; do not invent a nearby-users case.
+      NSLocationWhenInUseUsageDescription:
+        "UMTUBA includes a world map. The bundled map library references location services. UMTUBA does not use your location.",
     },
     privacyManifests: {
       NSPrivacyTracking: false,
