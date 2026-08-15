@@ -12,6 +12,10 @@ import {
   type MessengerMessageRow,
 } from "@/src/lib/messenger/mapMessage";
 import {
+  planMessengerRealtimeChannels,
+  realtimeChannelAllowsNewCallbacks,
+} from "@/src/lib/messenger/realtimeSubscribe";
+import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_PAGE_SIZE,
   TYPING_ACTIVE_MS,
@@ -562,8 +566,10 @@ export type MessengerRealtimeHandlers = {
 };
 
 /**
- * Subscribe to thread messages + own inbox participant updates.
- * Caller must invoke the returned cleanup (prevents duplicate channels).
+ * Subscribe to thread messages or inbox participant updates — never both on
+ * the same live channel. `.on()` must run before `.subscribe()`, and must not
+ * run on a channel supabase-js already joined (list + thread share one client).
+ * Caller must invoke the returned cleanup.
  */
 export function subscribeMessengerRealtime(
   supabase: SupabaseClient,
@@ -574,67 +580,78 @@ export function subscribeMessengerRealtime(
   }
 ): () => void {
   const channels: RealtimeChannel[] = [];
+  const plan = planMessengerRealtimeChannels({
+    conversationId: input.conversationId,
+    currentUserId: input.currentUserId,
+  });
 
-  if (input.conversationId) {
-    const thread = supabase
-      .channel(`messenger:${input.conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${input.conversationId}`,
-        },
-        (payload) => {
-          input.handlers.onMessageInsert(
-            payload.new as MessengerMessageRow
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${input.conversationId}`,
-        },
-        (payload) => {
-          input.handlers.onMessageUpdate(
-            payload.new as MessengerMessageRow
-          );
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          input.handlers.onResync?.();
-        }
-      });
-    channels.push(thread);
+  if (plan.threadTopic && input.conversationId) {
+    const conversationId = input.conversationId;
+    const thread = supabase.channel(plan.threadTopic);
+    if (realtimeChannelAllowsNewCallbacks(thread.state)) {
+      thread
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            input.handlers.onMessageInsert(
+              payload.new as MessengerMessageRow
+            );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            input.handlers.onMessageUpdate(
+              payload.new as MessengerMessageRow
+            );
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            input.handlers.onResync?.();
+          }
+        });
+      channels.push(thread);
+    }
   }
 
-  const inbox = supabase
-    .channel(`messenger-inbox:${input.currentUserId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "conversation_participants",
-        filter: `user_id=eq.${input.currentUserId}`,
-      },
-      (payload) => {
-        input.handlers.onInboxParticipantChange?.(
-          payload.new as {
-            conversation_id?: string;
-            unread_count?: number | null;
+  if (plan.inboxTopic) {
+    const inbox = supabase.channel(plan.inboxTopic);
+    if (realtimeChannelAllowsNewCallbacks(inbox.state)) {
+      inbox
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "conversation_participants",
+            filter: `user_id=eq.${input.currentUserId}`,
+          },
+          (payload) => {
+            input.handlers.onInboxParticipantChange?.(
+              payload.new as {
+                conversation_id?: string;
+                unread_count?: number | null;
+              }
+            );
           }
-        );
-      }
-    )
-    .subscribe();
-  channels.push(inbox);
+        )
+        .subscribe();
+      channels.push(inbox);
+    }
+  }
 
   return () => {
     for (const channel of channels) {

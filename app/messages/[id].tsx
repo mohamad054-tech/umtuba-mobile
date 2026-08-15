@@ -186,37 +186,55 @@ export default function ConversationThreadScreen() {
     return () => sub.remove();
   }, [loadThread]);
 
+  const realtimeHandlersRef = useRef({
+    peerLastReadAt,
+    loadThread,
+    scrollToEnd,
+    userId: user?.id ?? null,
+  });
+  realtimeHandlersRef.current = {
+    peerLastReadAt,
+    loadThread,
+    scrollToEnd,
+    userId: user?.id ?? null,
+  };
+
   useEffect(() => {
-    if (!user || !conversationId) return;
+    const userId = realtimeHandlersRef.current.userId;
+    if (!userId || !conversationId) return;
 
     const cleanup = subscribeMessengerRealtime(getSupabase(), {
       conversationId,
-      currentUserId: user.id,
+      currentUserId: userId,
       handlers: {
         onMessageInsert: (row) => {
-          const mapped = mapMessengerMessageRow(row, user.id, {
-            peerLastReadAt,
+          const live = realtimeHandlersRef.current;
+          if (!live.userId) return;
+          const mapped = mapMessengerMessageRow(row, live.userId, {
+            peerLastReadAt: live.peerLastReadAt,
           });
           setMessages((prev) => mergeMessages(prev, [mapped]));
-          if (row.sender_id !== user.id) {
+          if (row.sender_id !== live.userId) {
             void markConversationRead(getSupabase(), conversationId, row.id);
           }
-          scrollToEnd(true);
+          live.scrollToEnd(true);
         },
         onMessageUpdate: (row) => {
-          const mapped = mapMessengerMessageRow(row, user.id, {
-            peerLastReadAt,
+          const live = realtimeHandlersRef.current;
+          if (!live.userId) return;
+          const mapped = mapMessengerMessageRow(row, live.userId, {
+            peerLastReadAt: live.peerLastReadAt,
           });
           setMessages((prev) => mergeMessages(prev, [mapped]));
         },
         onResync: () => {
-          void loadThread({ soft: true });
+          void realtimeHandlersRef.current.loadThread({ soft: true });
         },
       },
     });
 
     return cleanup;
-  }, [conversationId, loadThread, peerLastReadAt, scrollToEnd, user]);
+  }, [conversationId, user?.id]);
 
   useEffect(() => {
     if (!conversationId || !appActive) return;
