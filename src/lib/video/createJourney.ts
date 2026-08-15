@@ -17,9 +17,27 @@ export type CreateJourneyState = {
   message: string | null;
   error: string | null;
   uploadedPath: string | null;
+  publishedPostId: number | null;
   publishBusy: boolean;
   uploadBusy: boolean;
 };
+
+export function normalizePublishedPostId(
+  postId: number | null | undefined
+): number | null {
+  if (typeof postId !== "number" || !Number.isInteger(postId) || postId <= 0) {
+    return null;
+  }
+  return postId;
+}
+
+/** Watch already focuses `?post=` — Open Watch must pass the published id. */
+export function openWatchAfterPublishHref(
+  postId: number | null | undefined
+): string {
+  const id = normalizePublishedPostId(postId);
+  return id ? `/(tabs)/watch?post=${id}` : "/(tabs)/watch";
+}
 
 export function initialCreateJourneyState(): CreateJourneyState {
   return {
@@ -29,6 +47,7 @@ export function initialCreateJourneyState(): CreateJourneyState {
     message: null,
     error: null,
     uploadedPath: null,
+    publishedPostId: null,
     publishBusy: false,
     uploadBusy: false,
   };
@@ -55,6 +74,7 @@ export function beginUpload(state: CreateJourneyState): CreateJourneyState | nul
     error: null,
     message: "Uploading…",
     uploadedPath: null,
+    publishedPostId: null,
   };
 }
 
@@ -98,7 +118,10 @@ export function beginPublishing(state: CreateJourneyState): CreateJourneyState {
   };
 }
 
-export function completePublish(state: CreateJourneyState): CreateJourneyState {
+export function completePublish(
+  state: CreateJourneyState,
+  postId?: number | null
+): CreateJourneyState {
   const next = processingProgressOnReady();
   return {
     ...state,
@@ -108,6 +131,7 @@ export function completePublish(state: CreateJourneyState): CreateJourneyState {
     uploadBusy: false,
     message: "Video published.",
     error: null,
+    publishedPostId: normalizePublishedPostId(postId),
   };
 }
 

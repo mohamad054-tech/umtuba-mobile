@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { mapRowToWatchVideo, type VideoPostRow } from "./watchFeed";
+import {
+  mapRowToWatchVideo,
+  promoteFocusedWatchRow,
+  type VideoPostRow,
+} from "./watchFeed";
 
 const baseRow: VideoPostRow = {
   id: 99,
@@ -49,5 +53,27 @@ describe("mapRowToWatchVideo", () => {
     });
     expect(video.author.username).toBe("@already");
     expect(video.savedByMe).toBe(true);
+  });
+});
+
+describe("promoteFocusedWatchRow", () => {
+  it("moves an in-page focused post to the front", () => {
+    const rows = [{ id: 1 }, { id: 42 }, { id: 3 }];
+    expect(promoteFocusedWatchRow(rows, null, 42).map((row) => row.id)).toEqual([
+      42, 1, 3,
+    ]);
+  });
+
+  it("prepends a fetched focused post that is missing from the page", () => {
+    const rows = [{ id: 1 }, { id: 2 }];
+    expect(
+      promoteFocusedWatchRow(rows, { id: 99 }, 99).map((row) => row.id)
+    ).toEqual([99, 1, 2]);
+  });
+
+  it("leaves the page unchanged without a valid focus id", () => {
+    const rows = [{ id: 1 }, { id: 2 }];
+    expect(promoteFocusedWatchRow(rows, { id: 99 }, null)).toEqual(rows);
+    expect(promoteFocusedWatchRow(rows, null, 0)).toEqual(rows);
   });
 });

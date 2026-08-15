@@ -34,6 +34,7 @@ import {
   failPublish,
   failUpload,
   initialCreateJourneyState,
+  openWatchAfterPublishHref,
   retryFromError,
   type CreateJourneyState,
 } from "@/src/lib/video/createJourney";
@@ -221,7 +222,7 @@ export default function CreateScreen() {
         }
 
         await clearPendingVideoUpload(uploaded.path);
-        setJourney((s) => completePublish(s));
+        setJourney((s) => completePublish(s, result.postId));
       } catch (error) {
         if (isAbortError(error)) {
           if (uploadedPath) {
@@ -516,7 +517,11 @@ export default function CreateScreen() {
               <Text style={styles.successTitle}>{CREATE_SUCCESS_MESSAGE}</Text>
               <Pressable
                 style={styles.primary}
-                onPress={() => router.replace("/(tabs)/watch")}
+                onPress={() =>
+                  router.replace(
+                    openWatchAfterPublishHref(journey.publishedPostId) as never
+                  )
+                }
                 accessibilityRole="button"
                 accessibilityLabel="Open Watch"
               >

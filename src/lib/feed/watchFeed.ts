@@ -137,6 +137,24 @@ export type FetchWatchFeedInput = {
   limit?: number;
 };
 
+/** Put the focused post first so Watch `activeIndex` 0 surfaces it. */
+export function promoteFocusedWatchRow<T extends { id: number }>(
+  rows: T[],
+  focused: T | null | undefined,
+  focusPostId: number | null | undefined
+): T[] {
+  if (
+    focusPostId == null ||
+    !Number.isInteger(focusPostId) ||
+    focusPostId <= 0
+  ) {
+    return rows;
+  }
+  const target = focused ?? rows.find((row) => row.id === focusPostId);
+  if (!target || target.id !== focusPostId) return rows;
+  return [target, ...rows.filter((row) => row.id !== focusPostId)];
+}
+
 export async function fetchWatchFeedPage(
   supabase: SupabaseClient,
   input: FetchWatchFeedInput = {}
@@ -173,9 +191,11 @@ export async function fetchWatchFeedPage(
   let rows = (data ?? []) as VideoPostRow[];
 
   if (!cursor && input.focusPostId && input.focusPostId > 0) {
-    const focusedInPage = rows.some((row) => row.id === input.focusPostId);
-    if (!focusedInPage) {
-      const { data: focused } = await supabase
+    const focusedInPage =
+      rows.find((row) => row.id === input.focusPostId) ?? null;
+    let focused = focusedInPage;
+    if (!focused) {
+      const { data: fetched } = await supabase
         .from("posts")
         .select(postColumns)
         .eq("id", input.focusPostId)
@@ -183,10 +203,9 @@ export async function fetchWatchFeedPage(
         .eq("media_status", "ready")
         .not("video_path", "is", null)
         .maybeSingle();
-      if (focused) {
-        rows = [focused as VideoPostRow, ...rows];
-      }
+      focused = (fetched as VideoPostRow | null) ?? null;
     }
+    rows = promoteFocusedWatchRow(rows, focused, input.focusPostId);
   }
 
   const hasMore = rows.length > limit;
