@@ -25,7 +25,7 @@ DEVICE_PASS_INVENTED = NO
 ```text
 SAVE_ROOT_CAUSE = toggle_post_save is SECURITY INVOKER; other-user save calls award_um_points_to_user / try_award_activity_score which 20260723 revoked from authenticated; insert rolls back; V5 alert surfaces "Unable to update save."
 SAVE_FIX_APPLIED = YES — togglePostSave now writes post_saves via RLS (viewer bookmark row) and reads posts.saves; no longer calls toggle_post_save
-SAVE_FIX_COMMIT = (filled after commit)
+SAVE_FIX_COMMIT = 831936cf1816d7d3cceb95a03cb300df9e8bc5ec
 TESTS = PASS — vitest src/lib/social/interactions.test.ts + watchFeed.map.test.ts + deleteOwnedPost.test.ts (17 passed)
 TYPECHECK = PASS — npx tsc --noEmit
 BUILD5_REQUIRED = YES — Build 4 binary is edc898f and still calls the broken RPC
