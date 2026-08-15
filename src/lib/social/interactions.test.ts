@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { togglePostLike, togglePostSave } from "./interactions";
+import {
+  loadViewerInteractionState,
+  togglePostLike,
+  togglePostSave,
+} from "./interactions";
 
 const VIEWER = "11111111-1111-4111-8111-111111111111";
 const OTHER_POST_ID = 99;
@@ -14,6 +18,7 @@ function createSaveClient(options: {
   insertError?: { message: string; code?: string } | null;
   deleteError?: { message: string } | null;
   selectError?: { message: string } | null;
+  countError?: { message: string } | null;
 }) {
   const saves: SaveRow[] = options.existing ? [options.existing] : [];
   const rpc = vi.fn();
@@ -64,6 +69,9 @@ function createSaveClient(options: {
           eq: vi.fn(() => ({
             maybeSingle: vi.fn(async () => {
               calls.push({ table, op: "select-count" });
+              if (options.countError) {
+                return { data: null, error: options.countError };
+              }
               return {
                 data: { saves: options.savesCount ?? (saves.length > 0 ? 1 : 0) },
                 error: null,
@@ -150,6 +158,135 @@ describe("togglePostSave — other-user Watch bookmark", () => {
     const result = await togglePostSave(supabase as never, 0);
     expect(result.ok).toBe(false);
     expect(supabase.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when the post_saves insert fails", async () => {
+    const supabase = createSaveClient({
+      userId: VIEWER,
+      insertError: { message: "permission denied", code: "42501" },
+    });
+    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
+    expect(result).toEqual({
+      ok: false,
+      message: "Unable to update save. Please try again.",
+    });
+  });
+
+  it("does not report success when unsave delete fails", async () => {
+    const supabase = createSaveClient({
+      userId: VIEWER,
+      existing: { user_id: VIEWER, post_id: OTHER_POST_ID },
+      deleteError: { message: "permission denied" },
+    });
+    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
+    expect(result).toEqual({
+      ok: false,
+      message: "Unable to update save. Please try again.",
+    });
+  });
+
+  it("does not report success when the existing-save lookup fails", async () => {
+    const supabase = createSaveClient({
+      userId: VIEWER,
+      selectError: { message: "network" },
+    });
+    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
+    expect(result).toEqual({
+      ok: false,
+      message: "Unable to update save. Please try again.",
+    });
+    expect(supabase.calls.some((call) => call.op === "insert")).toBe(false);
+    expect(supabase.calls.some((call) => call.op === "delete")).toBe(false);
+  });
+
+  it("keeps the bookmark when award/notification RPCs would throw", async () => {
+    const supabase = createSaveClient({ userId: VIEWER, savesCount: 4 });
+    supabase.rpc.mockImplementation(async (name: string) => {
+      throw new Error(`side effect ${name} must not run`);
+    });
+    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
+    expect(result).toEqual({ ok: true, saved: true, saves: 4 });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.calls).toContainEqual({
+      table: "post_saves",
+      op: "insert",
+      payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
+    });
+  });
+
+  it("treats a failed posts.saves count read as optional after a successful save", async () => {
+    const supabase = createSaveClient({
+      userId: VIEWER,
+      countError: { message: "timeout" },
+    });
+    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
+    expect(result).toEqual({ ok: true, saved: true, saves: 1 });
+    expect(supabase.calls).toContainEqual({
+      table: "post_saves",
+      op: "insert",
+      payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
+    });
+  });
+});
+
+function createViewerStateClient(options: {
+  likedPostIds?: number[];
+  savedPostIds?: number[];
+  savesError?: { message: string } | null;
+}) {
+  const from = vi.fn((table: string) => {
+    const ids =
+      table === "post_likes"
+        ? (options.likedPostIds ?? [])
+        : table === "post_saves"
+          ? (options.savedPostIds ?? [])
+          : [];
+    const error = table === "post_saves" ? (options.savesError ?? null) : null;
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          in: vi.fn(async () => ({
+            data: error ? null : ids.map((post_id) => ({ post_id })),
+            error,
+          })),
+        })),
+      })),
+    };
+  });
+  return { from };
+}
+
+describe("loadViewerInteractionState — save persistence after reload", () => {
+  it("restores other-user saved state from post_saves", async () => {
+    const supabase = createViewerStateClient({
+      savedPostIds: [OTHER_POST_ID],
+    });
+    const state = await loadViewerInteractionState(
+      supabase as never,
+      VIEWER,
+      [OTHER_POST_ID, 7]
+    );
+    expect(state.get(OTHER_POST_ID)).toEqual({
+      likedByMe: false,
+      savedByMe: true,
+    });
+    expect(state.get(7)).toEqual({ likedByMe: false, savedByMe: false });
+  });
+
+  it("does not invent a saved bookmark when post_saves read fails", async () => {
+    const supabase = createViewerStateClient({
+      savedPostIds: [OTHER_POST_ID],
+      savesError: { message: "timeout" },
+    });
+    const state = await loadViewerInteractionState(
+      supabase as never,
+      VIEWER,
+      [OTHER_POST_ID]
+    );
+    expect(state.get(OTHER_POST_ID)).toEqual({
+      likedByMe: false,
+      savedByMe: false,
+    });
   });
 });
 

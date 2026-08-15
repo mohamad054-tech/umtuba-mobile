@@ -206,7 +206,9 @@ export async function togglePostSave(
   return {
     ok: true,
     saved,
-    saves: asNumber(postRow?.saves, 0),
+    // Count read is optional. A failed/missing posts.saves row must not
+    // imply the bookmark write failed, and must not report 0 after a save.
+    saves: asNumber(postRow?.saves, saved ? 1 : 0),
   };
 }
 
