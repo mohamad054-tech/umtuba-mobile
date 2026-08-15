@@ -307,7 +307,10 @@ export default function WatchScreen() {
       if (!video.postId) return;
       const supabase = getSupabase();
       const result = await togglePostLike(supabase, video.postId);
-      if (!result.ok) return;
+      if (!result.ok) {
+        Alert.alert("Like failed", result.message);
+        return;
+      }
       patchVideo(video.id, {
         likedByMe: result.liked,
         stats: { ...video.stats, likes: result.likes },
@@ -321,7 +324,10 @@ export default function WatchScreen() {
       if (!video.postId) return;
       const supabase = getSupabase();
       const result = await togglePostSave(supabase, video.postId);
-      if (!result.ok) return;
+      if (!result.ok) {
+        Alert.alert("Save failed", result.message);
+        return;
+      }
       patchVideo(video.id, {
         savedByMe: result.saved,
         stats: { ...video.stats, saves: result.saves },

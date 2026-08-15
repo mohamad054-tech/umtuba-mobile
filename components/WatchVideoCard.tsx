@@ -38,6 +38,11 @@ import {
   applyPlaybackIntent,
   applySeekTime,
 } from "@/src/lib/watch/playerSession";
+import {
+  WATCH_RAIL_ACTION_MIN_HEIGHT,
+  WATCH_RAIL_GAP,
+  WATCH_VOLUME_RIGHT_CLEARANCE,
+} from "@/src/lib/watch/railLayout";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -909,8 +914,8 @@ const styles = StyleSheet.create({
   },
   volumeBlock: {
     position: "absolute",
-    right: 16,
-    width: 240,
+    right: WATCH_VOLUME_RIGHT_CLEARANCE,
+    width: 180,
     gap: 8,
     zIndex: 6,
   },
@@ -939,13 +944,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 12,
     alignItems: "center",
-    gap: 18,
+    gap: WATCH_RAIL_GAP,
     zIndex: 5,
   },
   action: {
     alignItems: "center",
-    minWidth: 48,
-    minHeight: 48,
+    minWidth: 44,
+    minHeight: WATCH_RAIL_ACTION_MIN_HEIGHT,
     justifyContent: "center",
   },
   actionIcon: {
