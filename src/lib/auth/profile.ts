@@ -37,6 +37,26 @@ function mapProfileRow(row: {
   };
 }
 
+export async function getProfileByUsername(
+  username: string
+): Promise<UserProfile | null> {
+  const key = normalizeUsername(username);
+  if (!key) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("username", key)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapProfileRow(data as Parameters<typeof mapProfileRow>[0]);
+}
+
 export async function getProfileForUser(user: User): Promise<UserProfile> {
   const supabase = getSupabase();
 

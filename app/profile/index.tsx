@@ -1,5 +1,5 @@
-import { Link, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,15 +12,88 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { getProfileByUsername } from "@/src/lib/auth/profile";
+import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
+import { resolveProfileTarget } from "@/src/lib/profile/resolveTarget";
+import {
+  followButtonLabel,
+  getProfileFollowSnapshot,
+  toggleProfileFollow,
+} from "@/src/lib/social/follows";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ u?: string }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
+  const [otherStatus, setOtherStatus] = useState<
+    "idle" | "loading" | "missing" | "error"
+  >("idle");
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followError, setFollowError] = useState<string | null>(null);
 
-  const view = buildProfilePresentation(profile, user);
+  const target = useMemo(
+    () =>
+      resolveProfileTarget({
+        queryUsername: params.u,
+        signedInUsername: profile?.username ?? null,
+      }),
+    [params.u, profile?.username]
+  );
+  const isOwn = target.kind === "own";
+
+  useEffect(() => {
+    if (target.kind !== "other") {
+      setOtherProfile(null);
+      setOtherStatus("idle");
+      setFollowing(false);
+      setFollowError(null);
+      return;
+    }
+
+    const username = target.username;
+    let cancelled = false;
+    setOtherStatus("loading");
+    setFollowError(null);
+
+    void (async () => {
+      try {
+        const row = await getProfileByUsername(username);
+        if (cancelled) return;
+        if (!row) {
+          setOtherProfile(null);
+          setOtherStatus("missing");
+          return;
+        }
+        setOtherProfile(row);
+        setOtherStatus("idle");
+        const snap = await getProfileFollowSnapshot(getSupabase(), row.id);
+        if (cancelled) return;
+        if (snap.ok) {
+          setFollowing(snap.following);
+        }
+      } catch {
+        if (!cancelled) {
+          setOtherProfile(null);
+          setOtherStatus("error");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [target]);
+
+  const view = buildProfilePresentation(
+    isOwn ? profile : otherProfile,
+    isOwn ? user : null
+  );
 
   const onRetry = useCallback(async () => {
     clearError();
@@ -32,7 +105,33 @@ export default function ProfileScreen() {
     }
   }, [clearError, restore]);
 
-  if (loading && !user) {
+  const onToggleFollow = useCallback(async () => {
+    if (!otherProfile?.id) return;
+    if (!user) {
+      router.replace("/(auth)/login");
+      return;
+    }
+    setFollowBusy(true);
+    setFollowError(null);
+    const previous = following;
+    setFollowing(!previous);
+    try {
+      const result = await toggleProfileFollow(getSupabase(), otherProfile.id);
+      if (!result.ok) {
+        setFollowing(previous);
+        setFollowError(result.message);
+        if (result.requiresAuth) {
+          router.replace("/(auth)/login");
+        }
+        return;
+      }
+      setFollowing(result.following);
+    } finally {
+      setFollowBusy(false);
+    }
+  }, [following, otherProfile?.id, router, user]);
+
+  if (loading && !user && isOwn) {
     return (
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View
@@ -47,7 +146,7 @@ export default function ProfileScreen() {
     );
   }
 
-  if (!user) {
+  if (isOwn && !user) {
     return (
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View style={styles.center}>
@@ -65,6 +164,38 @@ export default function ProfileScreen() {
           >
             <Text style={styles.primaryBtnText}>Sign in</Text>
           </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isOwn && otherStatus === "loading") {
+    return (
+      <SafeAreaView style={styles.root} edges={["bottom"]}>
+        <View
+          style={styles.center}
+          accessibilityLabel="Loading profile"
+          accessibilityRole="progressbar"
+        >
+          <ActivityIndicator color={colors.accentCyan} size="large" />
+          <Text style={styles.muted}>Loading profile…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isOwn && (otherStatus === "missing" || otherStatus === "error")) {
+    return (
+      <SafeAreaView style={styles.root} edges={["bottom"]}>
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle} accessibilityRole="header">
+            Profile not found
+          </Text>
+          <Text style={styles.muted}>
+            {otherStatus === "error"
+              ? "Unable to load this profile right now."
+              : "This account is no longer available."}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -109,7 +240,7 @@ export default function ProfileScreen() {
             {view.locationLine ? (
               <Text style={styles.meta}>{view.locationLine}</Text>
             ) : null}
-            {view.email ? (
+            {isOwn && view.email ? (
               <Text
                 style={styles.meta}
                 accessibilityLabel={`Email ${view.email}`}
@@ -124,23 +255,25 @@ export default function ProfileScreen() {
             <Text style={styles.muted}>
               We couldn’t load a reliable identity for this account yet.
             </Text>
-            <Pressable
-              style={styles.secondaryBtn}
-              onPress={() => void onRetry()}
-              disabled={refreshing}
-              accessibilityRole="button"
-              accessibilityLabel="Retry loading profile"
-            >
-              {refreshing ? (
-                <ActivityIndicator color={colors.accentCyan} />
-              ) : (
-                <Text style={styles.secondaryBtnText}>Retry</Text>
-              )}
-            </Pressable>
+            {isOwn ? (
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => void onRetry()}
+                disabled={refreshing}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading profile"
+              >
+                {refreshing ? (
+                  <ActivityIndicator color={colors.accentCyan} />
+                ) : (
+                  <Text style={styles.secondaryBtnText}>Retry</Text>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         )}
 
-        {error ? (
+        {isOwn && error ? (
           <View style={styles.errorBox} accessibilityRole="alert">
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
@@ -153,45 +286,86 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionLabel}>Shortcuts</Text>
-        <View style={styles.links}>
-          <Link href="/rewards" asChild>
+        {!isOwn && otherProfile ? (
+          <View style={styles.followBlock}>
             <Pressable
-              style={styles.linkRow}
-              accessibilityRole="link"
-              accessibilityLabel="Open rewards"
+              style={[
+                styles.followBtn,
+                following && styles.followBtnOn,
+                followBusy && styles.buttonDisabled,
+              ]}
+              onPress={() => void onToggleFollow()}
+              disabled={followBusy}
+              accessibilityRole="button"
+              accessibilityLabel={followButtonLabel(following)}
+              accessibilityState={{ selected: following, busy: followBusy }}
             >
-              <Text style={styles.linkText}>Rewards</Text>
-              <Text style={styles.chevron} accessible={false}>
-                ›
-              </Text>
+              {followBusy ? (
+                <ActivityIndicator
+                  color={following ? colors.accentCyan : colors.bg}
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.followBtnText,
+                    following && styles.followBtnTextOn,
+                  ]}
+                >
+                  {followButtonLabel(following)}
+                </Text>
+              )}
             </Pressable>
-          </Link>
-          <Link href="/notifications" asChild>
-            <Pressable
-              style={styles.linkRow}
-              accessibilityRole="link"
-              accessibilityLabel="Open notifications"
-            >
-              <Text style={styles.linkText}>Notifications</Text>
-              <Text style={styles.chevron} accessible={false}>
-                ›
+            {followError ? (
+              <Text style={styles.errorText} accessibilityRole="alert">
+                {followError}
               </Text>
-            </Pressable>
-          </Link>
-          <Link href="/settings" asChild>
-            <Pressable
-              style={styles.linkRow}
-              accessibilityRole="link"
-              accessibilityLabel="Open settings"
-            >
-              <Text style={styles.linkText}>Settings</Text>
-              <Text style={styles.chevron} accessible={false}>
-                ›
-              </Text>
-            </Pressable>
-          </Link>
-        </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isOwn ? (
+          <>
+            <Text style={styles.sectionLabel}>Shortcuts</Text>
+            <View style={styles.links}>
+              <Link href="/rewards" asChild>
+                <Pressable
+                  style={styles.linkRow}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open rewards"
+                >
+                  <Text style={styles.linkText}>Rewards</Text>
+                  <Text style={styles.chevron} accessible={false}>
+                    ›
+                  </Text>
+                </Pressable>
+              </Link>
+              <Link href="/notifications" asChild>
+                <Pressable
+                  style={styles.linkRow}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open notifications"
+                >
+                  <Text style={styles.linkText}>Notifications</Text>
+                  <Text style={styles.chevron} accessible={false}>
+                    ›
+                  </Text>
+                </Pressable>
+              </Link>
+              <Link href="/settings" asChild>
+                <Pressable
+                  style={styles.linkRow}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open settings"
+                >
+                  <Text style={styles.linkText}>Settings</Text>
+                  <Text style={styles.chevron} accessible={false}>
+                    ›
+                  </Text>
+                </Pressable>
+              </Link>
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -292,6 +466,32 @@ const styles = StyleSheet.create({
     color: colors.accentCyan,
     fontWeight: "600",
   },
+  followBlock: {
+    marginTop: 16,
+    gap: 8,
+  },
+  followBtn: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: colors.text,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  followBtnOn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  followBtnText: {
+    color: colors.bg,
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  followBtnTextOn: {
+    color: colors.text,
+  },
+  buttonDisabled: { opacity: 0.7 },
   sectionLabel: {
     marginTop: 24,
     marginBottom: 10,
