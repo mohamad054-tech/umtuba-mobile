@@ -32,4 +32,20 @@ describe("iOS App Store build config", () => {
     );
     expect(pluginNames).not.toContain("expo-camera");
   });
+
+  it("does not request unused Android CAMERA or RECORD_AUDIO", () => {
+    const permissions = config.android?.permissions ?? [];
+    expect(permissions).not.toContain("CAMERA");
+    expect(permissions).not.toContain("RECORD_AUDIO");
+    expect(permissions).not.toContain("android.permission.CAMERA");
+    expect(permissions).not.toContain("android.permission.RECORD_AUDIO");
+    const blocked = config.android?.blockedPermissions ?? [];
+    expect(blocked).toEqual(
+      expect.arrayContaining([
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+      ])
+    );
+    expect(config.android?.package).toBe("com.umtuba.app");
+  });
 });

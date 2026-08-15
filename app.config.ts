@@ -76,9 +76,13 @@ const config: ExpoConfig = {
         category: ["BROWSABLE", "DEFAULT"],
       },
     ],
+    // Live camera/mic are unused (Live fail-closed; Create uses gallery only).
+    // Block leftovers so plugins cannot re-add them to the Play manifest.
+    blockedPermissions: [
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO",
+    ],
     permissions: [
-      "CAMERA",
-      "RECORD_AUDIO",
       "READ_MEDIA_IMAGES",
       "READ_MEDIA_VIDEO",
       "READ_EXTERNAL_STORAGE",
