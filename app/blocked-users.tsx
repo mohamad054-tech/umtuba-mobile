@@ -16,9 +16,11 @@ import {
   unblockUserLocally,
   type BlockedUserRecord,
 } from "@/src/lib/social/ugcModeration";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 export default function BlockedUsersScreen() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<BlockedUserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -40,14 +42,16 @@ export default function BlockedUsersScreen() {
 
   const onUnblock = useCallback((row: BlockedUserRecord) => {
     Alert.alert(
-      "Unblock account",
+      t("unblock.title"),
       row.username
-        ? `Show @${row.username.replace(/^@/, "")} again on this device?`
-        : "Show this account again on this device?",
+        ? t("unblock.body", {
+            values: { username: row.username.replace(/^@/, "") },
+          })
+        : t("unblock.bodyGeneric"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("actions.cancel"), style: "cancel" },
         {
-          text: "Unblock",
+          text: t("actions.unblock"),
           onPress: () => {
             void (async () => {
               setBusyId(row.userId);
@@ -61,7 +65,7 @@ export default function BlockedUsersScreen() {
         },
       ]
     );
-  }, []);
+  }, [t]);
 
   return (
     <SafeAreaView style={styles.root} edges={["bottom"]}>
@@ -69,18 +73,15 @@ export default function BlockedUsersScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.subtitle}>
-          Accounts you block are hidden on this device and stored with your
-          UMTUBA account when signed in.
-        </Text>
+        <Text style={styles.subtitle}>{t("blocked.subtitle")}</Text>
 
         {loading ? (
           <ActivityIndicator
             color={colors.accentCyan}
-            accessibilityLabel="Loading blocked accounts"
+            accessibilityLabel={t("blocked.loading")}
           />
         ) : users.length === 0 ? (
-          <Text style={styles.empty}>No blocked accounts on this device.</Text>
+          <Text style={styles.empty}>{t("blocked.empty")}</Text>
         ) : (
           <View style={styles.card}>
             {users.map((row, index) => (
@@ -91,26 +92,22 @@ export default function BlockedUsersScreen() {
                     <Text style={styles.label}>
                       {row.username
                         ? `@${row.username.replace(/^@/, "")}`
-                        : "Blocked account"}
+                        : t("blocked.account")}
                     </Text>
                     <Text style={styles.value}>
-                      Hidden on this device
+                      {t("block.hiddenDevice")}
                     </Text>
                   </View>
                   <Pressable
                     onPress={() => onUnblock(row)}
                     disabled={busyId === row.userId}
                     accessibilityRole="button"
-                    accessibilityLabel={
-                      row.username
-                        ? `Unblock ${row.username}`
-                        : "Unblock account"
-                    }
+                    accessibilityLabel={t("actions.unblock")}
                   >
                     {busyId === row.userId ? (
                       <ActivityIndicator color={colors.accentCyan} />
                     ) : (
-                      <Text style={styles.unblock}>Unblock</Text>
+                      <Text style={styles.unblock}>{t("actions.unblock")}</Text>
                     )}
                   </Pressable>
                 </View>

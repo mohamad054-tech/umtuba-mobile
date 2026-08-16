@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WorldExperienceShell } from "@/components/world/WorldExperienceShell";
+import { useTranslation } from "@/src/lib/i18n";
 import { useWorldRuntime } from "@/src/lib/world/runtime";
 import type { WorldSearchResult } from "@/src/lib/world/search";
 import { colors } from "@/src/theme/colors";
@@ -13,6 +14,7 @@ import { colors } from "@/src/theme/colors";
  */
 export default function WorldScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { controller } = useWorldRuntime();
   const view = controller.getViewState();
   const renderer = controller.getRendererAdapter();
@@ -28,12 +30,14 @@ export default function WorldScreen() {
       <View
         style={styles.center}
         accessibilityLabel={
-          view.phase === "preparing" ? "Preparing World" : "Loading World"
+          view.phase === "preparing" ? t("world.preparing") : t("world.loading")
         }
         accessibilityRole="progressbar"
       >
         <ActivityIndicator color={colors.accentCyan} size="large" />
-        <Text style={styles.muted}>{view.message}</Text>
+        <Text style={styles.muted}>
+          {view.phase === "preparing" ? t("world.preparing") : t("world.loading")}
+        </Text>
       </View>
     );
   }

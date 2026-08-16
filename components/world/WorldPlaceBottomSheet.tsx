@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldPlaceSheetState } from "@/src/lib/world/places";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldPlaceBottomSheetProps = {
@@ -17,6 +18,7 @@ export function WorldPlaceBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldPlaceBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const realMetrics = sheet.metrics.filter((m) => m.value != null && m.value !== "");
@@ -40,9 +42,9 @@ export function WorldPlaceBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close place details"
+            accessibilityLabel={t("world.closePlace")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

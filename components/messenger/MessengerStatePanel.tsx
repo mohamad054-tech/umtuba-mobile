@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type MessengerStatePanelProps = {
@@ -17,6 +18,7 @@ export function MessengerStatePanel({
   busy = false,
   variant = "empty",
 }: MessengerStatePanelProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.title} accessibilityRole="header">
@@ -34,13 +36,13 @@ export function MessengerStatePanel({
           onPress={onRetry}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Retry"
+          accessibilityLabel={t("actions.retry")}
           accessibilityState={{ disabled: busy }}
         >
           {busy ? (
             <ActivityIndicator color={colors.accentCyan} />
           ) : (
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t("actions.retry")}</Text>
           )}
         </Pressable>
       ) : null}

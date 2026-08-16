@@ -9,6 +9,7 @@ import type {
   WorldRoadDetail,
   WorldRoadDetailControlState,
 } from "@/src/lib/world/experience";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldMapSettingsPanelProps = {
@@ -36,16 +37,21 @@ export function WorldMapSettingsPanel({
   onSelectRoadDetail,
   onSelectBuildings,
 }: WorldMapSettingsPanelProps) {
+  const { t } = useTranslation();
   return (
-    <View style={styles.wrap} accessibilityLabel="Map settings">
+    <View style={styles.wrap} accessibilityLabel={t("world.mapSettings")}>
       <Pressable
         style={[styles.toggle, open && styles.toggleOpen]}
         onPress={onToggle}
         accessibilityRole="button"
-        accessibilityLabel={open ? "Hide map settings" : "Show map settings"}
+        accessibilityLabel={
+          open ? t("world.hideSettings") : t("world.showSettings")
+        }
         accessibilityState={{ expanded: open }}
       >
-        <Text style={styles.toggleText}>Map settings</Text>
+        <Text style={styles.toggleText} numberOfLines={1}>
+          {t("world.mapSettings")}
+        </Text>
         <Text style={styles.toggleChevron}>{open ? "▾" : "▸"}</Text>
       </Pressable>
 

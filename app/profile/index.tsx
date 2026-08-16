@@ -262,7 +262,9 @@ export default function ProfileScreen() {
             {isOwn && view.email ? (
               <Text
                 style={styles.meta}
-                accessibilityLabel={`Email ${view.email}`}
+                accessibilityLabel={t("profile.emailA11y", {
+                  values: { email: view.email },
+                })}
               >
                 {view.email}
               </Text>

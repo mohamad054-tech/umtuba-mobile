@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldCommerceSheetState } from "@/src/lib/world/commerce";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldCommerceBottomSheetProps = {
@@ -14,6 +15,7 @@ export function WorldCommerceBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldCommerceBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const subtitle = sheet.brandName
@@ -39,9 +41,9 @@ export function WorldCommerceBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close business details"
+            accessibilityLabel={t("world.closeCommerce")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

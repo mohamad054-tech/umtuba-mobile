@@ -1,13 +1,11 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
-import {
-  conversationPreviewText,
-  trustedUnreadCount,
-} from "@/src/lib/messenger/conversationParse";
+import { trustedUnreadCount } from "@/src/lib/messenger/conversationParse";
 import {
   formatMessageTime,
   type Conversation,
 } from "@/src/lib/messenger/types";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type ConversationListItemProps = {
@@ -19,8 +17,11 @@ export function ConversationListItem({
   conversation,
   onPress,
 }: ConversationListItemProps) {
+  const { t } = useTranslation();
   const unread = trustedUnreadCount(conversation);
-  const preview = conversationPreviewText(conversation);
+  const preview = conversation.isTyping
+    ? t("messages.typing")
+    : conversation.lastMessagePreview.trim() || t("messages.threadEmpty");
   const timeLabel = formatMessageTime(conversation.lastMessageAt);
   const muted = conversation.muted === true;
 
@@ -29,10 +30,14 @@ export function ConversationListItem({
       style={styles.row}
       onPress={() => onPress(conversation)}
       accessibilityRole="button"
-      accessibilityLabel={`Conversation with ${conversation.peerName}${
-        unread ? `, ${unread} unread` : ""
-      }${muted ? ", muted" : ""}`}
-      accessibilityHint="Opens the message thread"
+      accessibilityLabel={`${t("messages.withPeer", {
+        values: { name: conversation.peerName },
+      })}${
+        unread
+          ? `, ${t("messages.unreadCount", { values: { count: unread } })}`
+          : ""
+      }${muted ? `, ${t("messages.muted")}` : ""}`}
+      accessibilityHint={t("messages.openThread")}
     >
       <View style={styles.avatar} accessibilityElementsHidden>
         {conversation.peerAvatarUrl ? (
@@ -60,7 +65,12 @@ export function ConversationListItem({
         </Text>
       </View>
       {unread != null ? (
-        <View style={styles.badge} accessibilityLabel={`${unread} unread`}>
+        <View
+          style={styles.badge}
+          accessibilityLabel={t("messages.unreadCount", {
+            values: { count: unread },
+          })}
+        >
           <Text style={styles.badgeText}>{unread > 99 ? "99+" : unread}</Text>
         </View>
       ) : null}

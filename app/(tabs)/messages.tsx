@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConversationListItem } from "@/components/messenger/ConversationListItem";
 import { MessengerStatePanel } from "@/components/messenger/MessengerStatePanel";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import {
   getOrCreateDirectConversation,
   listConversationsForUser,
@@ -39,6 +40,7 @@ type InboxPhase =
 
 export default function MessagesInboxScreen() {
   const { user, session, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -130,7 +132,7 @@ export default function MessagesInboxScreen() {
         }
         const href = conversationThreadHref(result.conversationId);
         if (!href) {
-          setError("Unable to open that conversation.");
+          setError(t("messages.openFailed"));
           setPhase("error");
           return;
         }
@@ -162,6 +164,7 @@ export default function MessagesInboxScreen() {
     params.creatorId,
     params.message,
     router,
+    t,
     user,
   ]);
 
@@ -186,15 +189,15 @@ export default function MessagesInboxScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.title} accessibilityRole="header">
-          Sign in to message
+          {t("messages.signInTitle")}
         </Text>
         <Pressable
           style={styles.button}
           onPress={() => router.push("/(auth)/login")}
           accessibilityRole="button"
-          accessibilityLabel="Sign in"
+          accessibilityLabel={t("actions.signIn")}
         >
-          <Text style={styles.buttonText}>Sign in</Text>
+          <Text style={styles.buttonText}>{t("actions.signIn")}</Text>
         </Pressable>
       </View>
     );
@@ -205,7 +208,7 @@ export default function MessagesInboxScreen() {
       <View style={styles.center}>
         <ActivityIndicator
           color={colors.accentCyan}
-          accessibilityLabel="Loading conversations"
+          accessibilityLabel={t("messages.loading")}
         />
       </View>
     );
@@ -236,27 +239,24 @@ export default function MessagesInboxScreen() {
           phase === "unavailable" ? (
             <MessengerStatePanel
               variant="unavailable"
-              title="Messages unavailable"
-              body={
-                error ??
-                "The messenger backend is not available in this environment yet."
-              }
+              title={t("messages.unavailable")}
+              body={error ?? t("messages.unavailableBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />
           ) : phase === "error" ? (
             <MessengerStatePanel
               variant="error"
-              title="Couldn’t load messages"
-              body={error ?? "Unable to load conversations."}
+              title={t("messages.loadFailed")}
+              body={error ?? t("messages.loadFailedBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />
           ) : phase === "empty" ? (
             <MessengerStatePanel
               variant="empty"
-              title="No conversations yet"
-              body="Direct messages will show up here. Groups, attachments, and calls are not available yet."
+              title={t("messages.empty")}
+              body={t("messages.emptyBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />

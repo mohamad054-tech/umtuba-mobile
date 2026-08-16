@@ -2,6 +2,7 @@ import { useRouter, type Href } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { DiscoverCardModel } from "@/src/lib/discover";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type DiscoverCardProps = {
@@ -11,6 +12,7 @@ type DiscoverCardProps = {
 
 export function DiscoverCard({ item, compact = false }: DiscoverCardProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const canOpen = Boolean(item.destination) && !item.unavailable;
 
   const onPress = () => {
@@ -24,9 +26,9 @@ export function DiscoverCard({ item, compact = false }: DiscoverCardProps) {
       onPress={onPress}
       disabled={!canOpen}
       accessibilityRole={canOpen ? "button" : "text"}
-      accessibilityLabel={`${item.title}${item.subtitle ? `, ${item.subtitle}` : ""}${item.unavailable ? ", unavailable" : ""}`}
+      accessibilityLabel={`${item.title}${item.subtitle ? `, ${item.subtitle}` : ""}${item.unavailable ? `, ${t("status.unavailable")}` : ""}`}
       accessibilityHint={
-        canOpen ? "Opens related content" : "No destination available"
+        canOpen ? t("discover.openContent") : t("discover.noDestination")
       }
     >
       <View style={[styles.media, compact && styles.mediaCompact]}>
@@ -59,7 +61,7 @@ export function DiscoverCard({ item, compact = false }: DiscoverCardProps) {
           </Text>
         ) : null}
         {item.unavailable ? (
-          <Text style={styles.unavailable}>Unavailable</Text>
+          <Text style={styles.unavailable}>{t("status.unavailable")}</Text>
         ) : null}
       </View>
     </Pressable>

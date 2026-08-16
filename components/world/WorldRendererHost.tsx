@@ -10,6 +10,7 @@ import {
   isMapLibreRendererAdapter,
   type WorldRendererAdapter,
 } from "@/src/lib/world/renderer";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldRendererHostProps = {
@@ -26,6 +27,7 @@ export function WorldRendererHost({
   adapter,
   preparingMessage = WORLD_RENDERER_PREPARING_MESSAGE,
 }: WorldRendererHostProps) {
+  const { t } = useTranslation();
   const [, bump] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
@@ -57,10 +59,10 @@ export function WorldRendererHost({
       accessibilityRole="image"
       accessibilityLabel={
         loadError
-          ? `World map error. ${loadError}`
+          ? t("world.mapError", { values: { error: loadError } })
           : bound && styleReady
-            ? "World map"
-            : "Loading World map"
+            ? t("world.map")
+            : t("world.mapLoading")
       }
       accessibilityState={{ disabled: !bound || Boolean(loadError) }}
     >
@@ -74,10 +76,11 @@ export function WorldRendererHost({
         <View style={styles.overlay} accessibilityRole="summary">
           <ActivityIndicator color={colors.accentCyan} size="large" />
           <Text style={styles.title}>
-            {loadError ? "Map unavailable" : "Loading map…"}
+            {loadError ? t("world.mapUnavailable") : t("world.loadingMap")}
           </Text>
           <Text style={styles.body}>
-            {loadError ?? (bound ? "Preparing map tiles…" : preparingMessage)}
+            {loadError ??
+              (bound ? t("world.preparingTiles") : t("world.loadingMap"))}
           </Text>
         </View>
       ) : null}
@@ -90,11 +93,12 @@ export function WorldAttribution({
 }: {
   text?: string;
 }): ReactElement {
+  const { t } = useTranslation();
   return (
     <View
       style={styles.attribution}
       accessibilityRole="text"
-      accessibilityLabel={`Attribution. ${text}`}
+      accessibilityLabel={t("world.attribution", { values: { text } })}
     >
       <Text style={styles.attributionText}>{text}</Text>
     </View>

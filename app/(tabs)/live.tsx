@@ -20,6 +20,7 @@ import {
   type LiveLobbyPhase,
   type LiveSession,
 } from "@/src/lib/live";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 export default function LiveScreen() {
@@ -32,6 +33,7 @@ export default function LiveScreen() {
 
 function LiveLobbyScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<LiveLobbyPhase>("loading");
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +56,11 @@ function LiveLobbyScreen() {
     } catch (err) {
       setSessions([]);
       setError(
-        err instanceof Error ? err.message : "Unable to load live sessions."
+        err instanceof Error ? err.message : t("live.unable")
       );
       setPhase("error");
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -78,22 +80,22 @@ function LiveLobbyScreen() {
     if (!join.canJoin) {
       Alert.alert(
         session.title,
-        join.reason ?? "Live joining is not available yet."
+        join.reason ?? t("live.joinUnavailable")
       );
       return;
     }
     // Reserved: navigate with join.href when a trusted join contract exists.
-  }, []);
+  }, [t]);
 
   if (phase === "loading" && !refreshing) {
     return (
       <View
         style={styles.center}
-        accessibilityLabel="Loading live sessions"
+        accessibilityLabel={t("live.loading")}
         accessibilityRole="progressbar"
       >
         <ActivityIndicator color={colors.accentCyan} size="large" />
-        <Text style={styles.muted}>Loading Live…</Text>
+        <Text style={styles.muted}>{t("live.loading")}</Text>
       </View>
     );
   }
@@ -123,38 +125,33 @@ function LiveLobbyScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.heading} accessibilityRole="header">
-              Live
+              {t("nav.live")}
             </Text>
-            <Text style={styles.subheading}>
-              Sessions from trusted UMTUBA live sources appear here.
-            </Text>
+            <Text style={styles.subheading}>{t("live.subtitle")}</Text>
           </View>
         }
         ListEmptyComponent={
           phase === "unavailable" ? (
             <LiveStatePanel
               variant="unavailable"
-              title="Live unavailable"
-              body={
-                error ??
-                "Live lobby listing and joining are not available on this app yet."
-              }
+              title={t("live.unavailable")}
+              body={error ?? t("live.unavailableBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />
           ) : phase === "error" ? (
             <LiveStatePanel
               variant="error"
-              title="Couldn’t load Live"
-              body={error ?? "Unable to load live sessions."}
+              title={t("live.loadFailed")}
+              body={error ?? t("live.loadFailedBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />
           ) : phase === "empty" ? (
             <LiveStatePanel
               variant="empty"
-              title="No live sessions"
-              body="There are no scheduled or live sessions right now. Pull to refresh."
+              title={t("live.empty")}
+              body={t("live.emptyBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />

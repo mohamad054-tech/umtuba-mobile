@@ -8,6 +8,11 @@ import {
 
 import { DiscoverCard } from "@/components/discover/DiscoverCard";
 import type { DiscoverSectionModel } from "@/src/lib/discover";
+import {
+  DISCOVER_SECTION_MESSAGE_KEYS,
+  DISCOVER_SECTION_TITLE_KEYS,
+  useTranslation,
+} from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type DiscoverSectionProps = {
@@ -15,37 +20,49 @@ type DiscoverSectionProps = {
 };
 
 export function DiscoverSection({ section }: DiscoverSectionProps) {
+  const { t } = useTranslation();
+  const titleKey =
+    DISCOVER_SECTION_TITLE_KEYS[
+      section.id as keyof typeof DISCOVER_SECTION_TITLE_KEYS
+    ];
+  const messageKey =
+    DISCOVER_SECTION_MESSAGE_KEYS[
+      section.id as keyof typeof DISCOVER_SECTION_MESSAGE_KEYS
+    ];
+  const title = titleKey ? t(titleKey) : section.title;
+  const fallbackMessage =
+    section.status === "unavailable"
+      ? t("discover.sectionUnavailable")
+      : section.status === "empty"
+        ? t("discover.sectionEmpty")
+        : t("discover.sectionError");
+  const message = messageKey ? t(messageKey) : section.message ?? fallbackMessage;
+
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.title} accessibilityRole="header">
-        {section.title}
+        {title}
       </Text>
 
       {section.status === "unavailable" ? (
         <View
           style={styles.banner}
           accessibilityRole="text"
-          accessibilityLabel={`${section.title} unavailable. ${section.message ?? ""}`}
+          accessibilityLabel={`${title}. ${message}`}
         >
-          <Text style={styles.bannerText}>
-            {section.message ?? "Not available yet."}
-          </Text>
+          <Text style={styles.bannerText}>{message}</Text>
         </View>
       ) : null}
 
       {section.status === "empty" ? (
         <View style={styles.banner} accessibilityRole="text">
-          <Text style={styles.bannerText}>
-            {section.message ?? "Nothing here yet."}
-          </Text>
+          <Text style={styles.bannerText}>{message}</Text>
         </View>
       ) : null}
 
       {section.status === "error" ? (
         <View style={styles.banner} accessibilityRole="alert">
-          <Text style={styles.errorText}>
-            {section.message ?? "Unable to load this section."}
-          </Text>
+          <Text style={styles.errorText}>{message}</Text>
         </View>
       ) : null}
 
@@ -70,16 +87,17 @@ export function DiscoverPlaceholderChip({
   label: string;
   onPress?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       style={styles.chip}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${label}, not available yet`}
-      accessibilityHint="Placeholder for a future Discover surface"
+      accessibilityLabel={t("discover.soonA11y", { values: { label } })}
+      accessibilityHint={t("discover.soonHint")}
     >
       <Text style={styles.chipText}>{label}</Text>
-      <Text style={styles.chipMeta}>Soon</Text>
+      <Text style={styles.chipMeta}>{t("discover.soon")}</Text>
     </Pressable>
   );
 }

@@ -9,10 +9,10 @@ import {
 import { LiveStatusBadge } from "@/components/live/LiveStatusBadge";
 import {
   formatLiveSessionTime,
-  formatLiveViewerCount,
   resolveLiveJoin,
   type LiveSession,
 } from "@/src/lib/live";
+import { LIVE_STATUS_KEYS, useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type LiveSessionCardProps = {
@@ -21,9 +21,22 @@ type LiveSessionCardProps = {
 };
 
 export function LiveSessionCard({ session, onPress }: LiveSessionCardProps) {
+  const { t } = useTranslation();
   const join = resolveLiveJoin(session);
   const startLabel = formatLiveSessionTime(session.startsAt);
-  const viewers = formatLiveViewerCount(session.viewerCount);
+  const viewerCount = session.viewerCount;
+  const viewerAmount =
+    viewerCount != null && Number.isFinite(viewerCount) && viewerCount >= 0
+      ? Math.trunc(viewerCount) >= 1_000_000
+        ? `${(Math.trunc(viewerCount) / 1_000_000).toFixed(1)}M`
+        : Math.trunc(viewerCount) >= 1_000
+          ? `${(Math.trunc(viewerCount) / 1_000).toFixed(1)}K`
+          : String(Math.trunc(viewerCount))
+      : null;
+  const viewers = viewerAmount
+    ? t("live.watching", { values: { count: viewerAmount } })
+    : null;
+  const statusLabel = t(LIVE_STATUS_KEYS[session.status]);
   const mediaUrl = session.thumbnailUrl || session.avatarUrl;
   const actionable = Boolean(onPress);
 
@@ -33,11 +46,11 @@ export function LiveSessionCard({ session, onPress }: LiveSessionCardProps) {
       onPress={actionable ? () => onPress?.(session) : undefined}
       disabled={!actionable}
       accessibilityRole={actionable ? "button" : "summary"}
-      accessibilityLabel={`${session.title}. ${session.status}${session.hostDisplayName ? `. Host ${session.hostDisplayName}` : ""}${viewers ? `. ${viewers}` : ""}`}
+      accessibilityLabel={`${session.title}. ${statusLabel}${session.hostDisplayName ? `. ${t("live.host", { values: { name: session.hostDisplayName } })}` : ""}${viewers ? `. ${viewers}` : ""}`}
       accessibilityHint={
         join.canJoin
-          ? "Joins the live session"
-          : join.reason ?? "Details only. Joining is not available."
+          ? t("live.joinHint")
+          : join.reason ?? t("live.detailsOnly")
       }
       accessibilityState={{ disabled: !actionable }}
     >
@@ -74,7 +87,9 @@ export function LiveSessionCard({ session, onPress }: LiveSessionCardProps) {
         ) : null}
         {startLabel ? (
           <Text style={styles.meta} numberOfLines={1}>
-            {session.status === "scheduled" ? `Starts ${startLabel}` : startLabel}
+            {session.status === "scheduled"
+              ? t("live.starts", { values: { time: startLabel } })
+              : startLabel}
           </Text>
         ) : null}
         {viewers && session.status === "live" ? (
@@ -84,10 +99,12 @@ export function LiveSessionCard({ session, onPress }: LiveSessionCardProps) {
         ) : null}
 
         {join.canJoin ? (
-          <Text style={styles.joinHint}>Join</Text>
+          <Text style={styles.joinHint} numberOfLines={1}>
+            {t("live.join")}
+          </Text>
         ) : (
           <Text style={styles.disabledHint} numberOfLines={2}>
-            {join.reason ?? "Live joining is not available yet."}
+            {join.reason ?? t("live.joinUnavailable")}
           </Text>
         )}
       </View>

@@ -15,16 +15,13 @@ import {
 } from "react-native";
 
 import type { WatchVideo } from "@/src/contracts/watch";
+import { useTranslation } from "@/src/lib/i18n";
 import {
   canSeekWithDuration,
   clampWatchVolume,
   formatPlaybackClock,
   quantizeWatchVolume,
-  resolveAutoNextButtonText,
   resolveEffectiveAudio,
-  resolveMuteButtonText,
-  resolveMuteLabel,
-  resolvePlayPauseFeedbackLabel,
   resolveProgressRatio,
   resolveScrubRatioFromPageX,
   resolveSeekTimeOrNull,
@@ -369,6 +366,8 @@ function WatchPlayerPane({
     }
   }, [onRefreshSrc, player, shouldPlay, src]);
 
+  const { t } = useTranslation();
+
   return (
     <View
       style={styles.playerWrap}
@@ -389,7 +388,7 @@ function WatchPlayerPane({
         <View style={styles.centerOverlay} pointerEvents="none">
           <ActivityIndicator
             color={colors.accentCyan}
-            accessibilityLabel="Loading video"
+            accessibilityLabel={t("watch.loadingVideo")}
           />
         </View>
       )}
@@ -397,18 +396,18 @@ function WatchPlayerPane({
       {status === "error" && (
         <View style={styles.centerOverlay} accessibilityRole="alert">
           <Text style={styles.errorText}>
-            {errorMessage ?? "Unable to play this video. Try again."}
+            {errorMessage ?? t("watch.playbackFailed")}
           </Text>
           <Pressable
             style={styles.retryBtn}
             onPress={() => void onRetry()}
             disabled={refreshing}
             accessibilityRole="button"
-            accessibilityLabel="Retry playback"
+            accessibilityLabel={t("watch.retryPlayback")}
             accessibilityState={{ busy: refreshing, disabled: refreshing }}
           >
             <Text style={styles.retryText}>
-              {refreshing ? "Retrying…" : "Retry"}
+              {refreshing ? t("status.retrying") : t("actions.retry")}
             </Text>
           </Pressable>
         </View>
@@ -443,6 +442,7 @@ function WatchVideoCardComponent({
   topInset = 0,
   bottomInset = 0,
 }: WatchVideoCardProps) {
+  const { t } = useTranslation();
   const [userPaused, setUserPaused] = useState(false);
   const [timeline, setTimeline] = useState<TimelineState>({
     currentTime: 0,
@@ -568,10 +568,10 @@ function WatchVideoCardComponent({
   const a11ySummary = [
     video.author.username,
     video.caption || video.title,
-    muted ? "Muted" : "Sound on",
-    `Volume ${Math.round(volume * 100)} percent`,
-    autoNext ? "Auto-next on" : "Auto-next off",
-    userPaused ? "Paused" : isActive ? "Now playing" : "Paused",
+    muted ? t("watch.muted") : t("watch.soundOn"),
+    t("watch.volume", { values: { percent: Math.round(volume * 100) } }),
+    autoNext ? t("watch.autoNextOn") : t("watch.autoNextOff"),
+    userPaused ? t("watch.paused") : isActive ? t("watch.nowPlaying") : t("watch.paused"),
   ]
     .filter(Boolean)
     .join(". ");
@@ -608,8 +608,8 @@ function WatchVideoCardComponent({
           style={styles.tapLayer}
           onPress={onTogglePlayPause}
           accessibilityRole="button"
-          accessibilityLabel={userPaused ? "Play video" : "Pause video"}
-          accessibilityHint="Toggles play and pause"
+          accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
+          accessibilityHint={t("watch.playPauseHint")}
         />
 
         {feedback ? (
@@ -622,7 +622,7 @@ function WatchVideoCardComponent({
               {feedback === "pause" ? "❚❚" : "▶"}
             </Text>
             <Text style={styles.feedbackText}>
-              {resolvePlayPauseFeedbackLabel(feedback === "pause")}
+              {feedback === "pause" ? t("watch.paused") : t("watch.playing")}
             </Text>
           </View>
         ) : null}
@@ -635,21 +635,23 @@ function WatchVideoCardComponent({
             style={[styles.chipBtn, autoNext && styles.chipBtnOn]}
             onPress={onToggleAutoNext}
             accessibilityRole="switch"
-            accessibilityLabel="Auto-next"
+            accessibilityLabel={t("watch.autoNext")}
             accessibilityState={{ checked: autoNext }}
           >
-            <Text style={styles.chipText}>
-              {resolveAutoNextButtonText(autoNext)}
+            <Text style={styles.chipText} numberOfLines={1}>
+              {autoNext ? t("watch.autoNextOn") : t("watch.autoNextOff")}
             </Text>
           </Pressable>
           <Pressable
             style={[styles.chipBtn, muted && styles.chipBtnMuted]}
             onPress={onToggleMute}
             accessibilityRole="button"
-            accessibilityLabel={resolveMuteLabel(muted)}
+            accessibilityLabel={muted ? t("watch.unmuteVideo") : t("watch.muteVideo")}
             accessibilityState={{ selected: muted }}
           >
-            <Text style={styles.chipText}>{resolveMuteButtonText(muted)}</Text>
+            <Text style={styles.chipText} numberOfLines={1}>
+              {muted ? t("watch.unmute") : t("watch.mute")}
+            </Text>
           </Pressable>
         </View>
 
@@ -658,11 +660,11 @@ function WatchVideoCardComponent({
           pointerEvents="box-none"
         >
           <Text style={styles.volumeLabel}>
-            Volume {Math.round(volume * 100)}%
+            {t("watch.volume", { values: { percent: Math.round(volume * 100) } })}
           </Text>
           <ScrubBar
             ratio={volume}
-            accessibilityLabel="In-app volume"
+            accessibilityLabel={t("watch.volumeA11y")}
             onSeekRatio={onVolumeSeek}
             onGestureActiveChange={onScrubActive}
             tall
@@ -678,7 +680,9 @@ function WatchVideoCardComponent({
             onPress={onOpenProfile}
             disabled={!onOpenProfile}
             accessibilityRole="button"
-            accessibilityLabel={`Profile ${video.author.username}`}
+            accessibilityLabel={t("watch.openProfile", {
+              values: { name: video.author.username },
+            })}
             accessibilityState={{ disabled: !onOpenProfile }}
             hitSlop={8}
           >
@@ -696,7 +700,7 @@ function WatchVideoCardComponent({
             style={styles.action}
             onPress={onToggleLike}
             accessibilityRole="button"
-            accessibilityLabel={video.likedByMe ? "Unlike" : "Like"}
+            accessibilityLabel={video.likedByMe ? t("watch.unlike") : t("watch.like")}
             accessibilityState={{ selected: video.likedByMe }}
           >
             <Text style={[styles.actionIcon, video.likedByMe && styles.on]}>
@@ -708,7 +712,7 @@ function WatchVideoCardComponent({
             style={styles.action}
             onPress={onToggleSave}
             accessibilityRole="button"
-            accessibilityLabel={video.savedByMe ? "Unsave" : "Save"}
+            accessibilityLabel={video.savedByMe ? t("watch.unsave") : t("watch.save")}
             accessibilityState={{ selected: video.savedByMe }}
           >
             <Text style={[styles.actionIcon, video.savedByMe && styles.on]}>
@@ -720,7 +724,7 @@ function WatchVideoCardComponent({
             style={styles.action}
             disabled
             accessibilityRole="button"
-            accessibilityLabel="Comments, coming soon"
+            accessibilityLabel={t("watch.commentsSoon")}
             accessibilityState={{ disabled: true }}
           >
             <Text style={[styles.actionIcon, styles.disabledIcon]}>◌</Text>
@@ -730,7 +734,7 @@ function WatchVideoCardComponent({
             style={styles.action}
             disabled
             accessibilityRole="button"
-            accessibilityLabel="Share, coming soon"
+            accessibilityLabel={t("watch.shareSoon")}
             accessibilityState={{ disabled: true }}
           >
             <Text style={[styles.actionIcon, styles.disabledIcon]}>↗</Text>
@@ -741,10 +745,12 @@ function WatchVideoCardComponent({
               style={styles.action}
               onPress={onDeleteOwn}
               accessibilityRole="button"
-              accessibilityLabel="Delete your video"
+              accessibilityLabel={t("watch.deleteOwn")}
             >
               <Text style={[styles.actionIcon, styles.deleteIcon]}>⌫</Text>
-              <Text style={styles.actionCount}>Delete</Text>
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {t("actions.delete")}
+              </Text>
             </Pressable>
           ) : null}
           {onReport ? (
@@ -752,10 +758,12 @@ function WatchVideoCardComponent({
               style={styles.action}
               onPress={onReport}
               accessibilityRole="button"
-              accessibilityLabel="Report this video"
+              accessibilityLabel={t("watch.reportVideo")}
             >
               <Text style={styles.actionIcon}>⚑</Text>
-              <Text style={styles.actionCount}>Report</Text>
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {t("actions.report")}
+              </Text>
             </Pressable>
           ) : null}
           {onBlockUser ? (
@@ -763,10 +771,12 @@ function WatchVideoCardComponent({
               style={styles.action}
               onPress={onBlockUser}
               accessibilityRole="button"
-              accessibilityLabel="Block this account"
+              accessibilityLabel={t("watch.blockAccount")}
             >
               <Text style={styles.actionIcon}>⊘</Text>
-              <Text style={styles.actionCount}>Block</Text>
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {t("actions.block")}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -791,7 +801,7 @@ function WatchVideoCardComponent({
           </View>
           <ScrubBar
             ratio={isActive ? timeline.ratio : 0}
-            accessibilityLabel="Seek timeline"
+            accessibilityLabel={t("watch.seek")}
             onSeekRatio={onSeekRatio}
             onGestureActiveChange={onScrubActive}
             tall

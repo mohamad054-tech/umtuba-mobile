@@ -209,6 +209,11 @@ export type MobileMessages = {
   "watch.openProfile": string;
   "watch.loadFailed": string;
   "watch.loadMoreFailed": string;
+  "watch.playing": string;
+  "watch.playPauseHint": string;
+  "watch.autoNext": string;
+  "watch.muteVideo": string;
+  "watch.unmuteVideo": string;
 
   "discover.loading": string;
   "discover.unavailable": string;
@@ -237,6 +242,17 @@ export type MobileMessages = {
   "discover.category.events": string;
   "discover.openCategory": string;
   "discover.unable": string;
+  "discover.soon": string;
+  "discover.soonA11y": string;
+  "discover.soonHint": string;
+  "discover.section.latest": string;
+  "discover.section.trending": string;
+  "discover.section.recommended": string;
+  "discover.section.latestEmpty": string;
+  "discover.section.trendingEmpty": string;
+  "discover.section.recommendedBody": string;
+  "discover.openContent": string;
+  "discover.noDestination": string;
 
   "create.title": string;
   "create.subtitle": string;
@@ -274,6 +290,10 @@ export type MobileMessages = {
   "create.uploadFailed": string;
   "create.selectedA11y": string;
   "create.openTerms": string;
+  "create.fileHint": string;
+  "create.cancelHint": string;
+  "create.publishingA11y": string;
+  "create.uploadProgressA11y": string;
 
   "messages.unavailable": string;
   "messages.unavailableBody": string;
@@ -301,6 +321,21 @@ export type MobileMessages = {
   "messages.blockAccount": string;
   "messages.safetyA11y": string;
   "messages.openThread": string;
+  "messages.signInTitle": string;
+  "messages.loadingConversation": string;
+  "messages.reportOrBlock": string;
+  "messages.threadEmpty": string;
+  "messages.threadEmptyBody": string;
+  "messages.sending": string;
+  "messages.failed": string;
+  "messages.receipt.sent": string;
+  "messages.receipt.delivered": string;
+  "messages.receipt.seen": string;
+  "messages.gateHint": string;
+  "messages.withPeer": string;
+  "messages.unreadCount": string;
+  "messages.muted": string;
+  "messages.composerA11y": string;
 
   "profile.loading": string;
   "profile.notFound": string;
@@ -340,6 +375,13 @@ export type MobileMessages = {
   "notifications.category.games": string;
   "notifications.category.system": string;
   "notifications.listA11y": string;
+  "notifications.signInBody": string;
+  "notifications.unavailable": string;
+  "notifications.unavailableBody": string;
+  "notifications.loadFailed": string;
+  "notifications.localReadHint": string;
+  "notifications.empty": string;
+  "notifications.emptyBody": string;
 
   "rewards.title": string;
   "rewards.umPoints": string;
@@ -406,6 +448,28 @@ export type MobileMessages = {
   "world.roadDetail": string;
   "world.buildings": string;
   "world.layerCategories": string;
+  "world.experience": string;
+  "world.retryA11y": string;
+  "world.status.preparing": string;
+  "world.status.loading": string;
+  "world.loadingMap": string;
+  "world.mapError": string;
+  "world.attribution": string;
+  "world.clear": string;
+  "world.tryAnother": string;
+  "world.layers": string;
+  "world.layerA11y": string;
+  "world.selectedCount": string;
+  "world.selectedCountOne": string;
+  "world.detailsHeading": string;
+  "world.category.places": string;
+  "world.category.education": string;
+  "world.category.users": string;
+  "world.category.games": string;
+  "world.category.commerce": string;
+  "world.category.events": string;
+  "world.category.ai": string;
+  "world.category.future": string;
 
   "live.loading": string;
   "live.unavailable": string;
@@ -418,6 +482,18 @@ export type MobileMessages = {
   "live.joinHint": string;
   "live.detailsOnly": string;
   "live.unable": string;
+  "live.subtitle": string;
+  "live.join": string;
+  "live.starts": string;
+  "live.host": string;
+  "live.retryA11y": string;
+  "live.status.live": string;
+  "live.status.scheduled": string;
+  "live.status.ended": string;
+  "live.status.cancelled": string;
+  "live.status.unavailable": string;
+  "live.statusA11y": string;
+  "live.watching": string;
 
   "report.video": string;
   "report.account": string;
@@ -461,6 +537,8 @@ export type MobileMessages = {
   "notFound.home": string;
   "identity.openProfile": string;
   "wallet.unavailable": string;
+  "wallet.a11y": string;
+  "wallet.unavailableShort": string;
   "common.you": string;
 };
 

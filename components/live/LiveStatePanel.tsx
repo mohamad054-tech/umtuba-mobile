@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type LiveStatePanelProps = {
@@ -17,6 +18,7 @@ export function LiveStatePanel({
   busy = false,
   variant = "empty",
 }: LiveStatePanelProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text
@@ -38,13 +40,13 @@ export function LiveStatePanel({
           onPress={onRetry}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading live sessions"
+          accessibilityLabel={t("live.retryA11y")}
           accessibilityState={{ disabled: busy }}
         >
           {busy ? (
             <ActivityIndicator color={colors.accentCyan} />
           ) : (
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t("actions.retry")}</Text>
           )}
         </Pressable>
       ) : null}

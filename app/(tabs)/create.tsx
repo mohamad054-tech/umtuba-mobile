@@ -19,11 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   extractHashtags,
   MAX_CAPTION_LENGTH,
-  VIDEO_FILE_HINT,
   validateCaption,
 } from "@/src/contracts/video";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   applyUploadProgress,
@@ -38,10 +38,7 @@ import {
   retryFromError,
   type CreateJourneyState,
 } from "@/src/lib/video/createJourney";
-import {
-  CREATE_SUCCESS_MESSAGE,
-  isAbortError,
-} from "@/src/lib/video/createProgress";
+import { isAbortError } from "@/src/lib/video/createProgress";
 import { deleteOwnedVideoObject } from "@/src/lib/video/deleteOwnedVideo";
 import {
   clearPendingVideoUpload,
@@ -53,16 +50,13 @@ import {
 } from "@/src/lib/video/pickVideo";
 import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
 import { uploadPostVideo } from "@/src/lib/video/uploadPostVideo";
-import {
-  UGC_PUBLISH_ACK_LABEL,
-  UGC_TERMS_URL,
-  canPublishWithUgcAck,
-} from "@/src/lib/video/ugcSafety";
+import { UGC_TERMS_URL, canPublishWithUgcAck } from "@/src/lib/video/ugcSafety";
 import { colors } from "@/src/theme/colors";
 
 export default function CreateScreen() {
   const { session, user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [asset, setAsset] = useState<PickedVideoAsset | null>(null);
   const [caption, setCaption] = useState("");
   const [journey, setJourney] = useState<CreateJourneyState>(
@@ -133,7 +127,7 @@ export default function CreateScreen() {
     async (picked: PickedVideoAsset, captionText: string) => {
       if (!user || !session) {
         setJourney((s) =>
-          failPublish(s, new Error("Please sign in to publish a video."))
+          failPublish(s, new Error(t("create.signInToPublish")))
         );
         return;
       }
@@ -155,7 +149,7 @@ export default function CreateScreen() {
         } = await getSupabase().auth.getSession();
 
         if (sessionError || !liveSession?.access_token) {
-          throw new Error("Please sign in to upload a video.");
+          throw new Error(t("create.signInToUpload"));
         }
 
         const uploaded = await uploadPostVideo({
@@ -179,7 +173,7 @@ export default function CreateScreen() {
         } = await getSupabase().auth.getUser();
         if (!liveUser || liveUser.id !== user.id) {
           await queuePendingVideoUpload(uploaded.path);
-          throw Object.assign(new Error("Please sign in to publish a video."), {
+          throw Object.assign(new Error(t("create.signInToPublish")), {
             code: "auth_required",
           });
         }
@@ -250,7 +244,7 @@ export default function CreateScreen() {
             new Error(
               getErrorMessage(
                 error,
-                "The video could not be uploaded. Please try again."
+                t("create.uploadFailed")
               )
             )
           )
@@ -259,7 +253,7 @@ export default function CreateScreen() {
         abortRef.current = null;
       }
     },
-    [profile, session, user]
+    [profile, session, t, user]
   );
 
   const onPublish = useCallback(async () => {
@@ -268,7 +262,7 @@ export default function CreateScreen() {
       setJourney((s) => ({
         ...s,
         phase: "error",
-        error: "Confirm that this video follows UMTUBA Terms before publishing.",
+        error: t("create.ackRequired"),
       }));
       return;
     }
@@ -282,7 +276,7 @@ export default function CreateScreen() {
       return;
     }
     await runPublishPipeline(asset, caption);
-  }, [asset, busy, caption, runPublishPipeline, ugcAck]);
+  }, [asset, busy, caption, runPublishPipeline, t, ugcAck]);
 
   const onRetry = useCallback(() => {
     setJourney((s) => retryFromError(s));
@@ -302,17 +296,15 @@ export default function CreateScreen() {
   if (!session || !user) {
     return (
       <SafeAreaView style={styles.center} edges={["bottom"]}>
-        <Text style={styles.title}>Sign in to create</Text>
-        <Text style={styles.body}>
-          Publishing uses your account so videos stay in your folder only.
-        </Text>
+        <Text style={styles.title}>{t("create.signInTitle")}</Text>
+        <Text style={styles.body}>{t("create.signInBody")}</Text>
         <Pressable
           style={styles.primary}
           onPress={() => router.push("/(auth)/login")}
           accessibilityRole="button"
-          accessibilityLabel="Sign in"
+          accessibilityLabel={t("actions.signIn")}
         >
-          <Text style={styles.primaryText}>Sign in</Text>
+          <Text style={styles.primaryText}>{t("actions.signIn")}</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -330,19 +322,17 @@ export default function CreateScreen() {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
         >
-          <Text style={styles.title}>Create</Text>
-          <Text style={styles.body}>
-            Pick a short video, add a caption, and publish to Watch.
-          </Text>
-          <Text style={styles.hint}>{VIDEO_FILE_HINT}</Text>
+          <Text style={styles.title}>{t("create.title")}</Text>
+          <Text style={styles.body}>{t("create.subtitle")}</Text>
+          <Text style={styles.hint}>{t("create.fileHint")}</Text>
 
           {appState !== "active" && busy ? (
             <Text
               style={styles.banner}
               accessibilityLiveRegion="polite"
-              accessibilityLabel="Upload continues in the background"
+              accessibilityLabel={t("create.backgroundUpload")}
             >
-              Upload continues while the app is in the background.
+              {t("create.backgroundUpload")}
             </Text>
           ) : null}
 
@@ -351,12 +341,12 @@ export default function CreateScreen() {
             onPress={() => void onPick()}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Choose video from library"
-            accessibilityHint="Opens the device media library to choose a video"
+            accessibilityLabel={t("create.chooseA11y")}
+            accessibilityHint={t("create.chooseHint")}
             accessibilityState={{ disabled: busy, busy: journey.phase === "picking" }}
           >
             <Text style={styles.secondaryText}>
-              {asset ? "Choose a different video" : "Choose video"}
+              {asset ? t("create.chooseDifferent") : t("create.chooseVideo")}
             </Text>
           </Pressable>
 
@@ -366,7 +356,7 @@ export default function CreateScreen() {
               accessibilityRole="alert"
               accessibilityLiveRegion="assertive"
             >
-              <Text style={styles.errorTitle}>Could not use that video</Text>
+              <Text style={styles.errorTitle}>{t("create.pickFailed")}</Text>
               <Text style={styles.errorText}>{journey.error}</Text>
               <View style={styles.row}>
                 <Pressable
@@ -374,10 +364,10 @@ export default function CreateScreen() {
                   onPress={() => void onPick()}
                   disabled={busy}
                   accessibilityRole="button"
-                  accessibilityLabel="Choose another video"
+                  accessibilityLabel={t("create.chooseAnother")}
                   accessibilityState={{ disabled: busy }}
                 >
-                  <Text style={styles.secondaryText}>Choose another</Text>
+                  <Text style={styles.secondaryText}>{t("create.chooseAnother")}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.secondary}
@@ -385,9 +375,9 @@ export default function CreateScreen() {
                     setJourney((s) => ({ ...s, error: null, phase: "ready" }))
                   }
                   accessibilityRole="button"
-                  accessibilityLabel="Dismiss error"
+                  accessibilityLabel={t("actions.dismiss")}
                 >
-                  <Text style={styles.secondaryText}>Dismiss</Text>
+                  <Text style={styles.secondaryText}>{t("actions.dismiss")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -396,7 +386,12 @@ export default function CreateScreen() {
           {asset ? (
             <View
               style={styles.card}
-              accessibilityLabel={`Selected ${asset.fileName}, ${(asset.byteSize / (1024 * 1024)).toFixed(1)} megabytes`}
+              accessibilityLabel={t("create.selectedA11y", {
+                values: {
+                  name: asset.fileName,
+                  mb: (asset.byteSize / (1024 * 1024)).toFixed(1),
+                },
+              })}
             >
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {asset.fileName}
@@ -405,39 +400,41 @@ export default function CreateScreen() {
                 {(asset.byteSize / (1024 * 1024)).toFixed(1)} MB
                 {asset.durationMs != null
                   ? ` · ${Math.round(asset.durationMs / 1000)}s`
-                  : " · duration unavailable"}
+                  : ` · ${t("create.durationUnavailable")}`}
                 {asset.mimeType ? ` · ${asset.mimeType}` : ""}
               </Text>
               <Pressable
                 onPress={resetSelection}
                 disabled={busy}
                 accessibilityRole="button"
-                accessibilityLabel="Clear selected video"
+                accessibilityLabel={t("create.clearSelection")}
                 accessibilityState={{ disabled: busy }}
               >
-                <Text style={styles.link}>Clear selection</Text>
+                <Text style={styles.link}>{t("create.clearSelection")}</Text>
               </Pressable>
             </View>
           ) : (
             <Text style={styles.empty}>
               {journey.error
-                ? "No video selected — pick another clip to continue."
-                : "No video selected yet."}
+                ? t("create.noVideoAfterError")
+                : t("create.noVideo")}
             </Text>
           )}
 
-          <Text style={styles.label}>Caption</Text>
+          <Text style={styles.label}>{t("create.caption")}</Text>
           <TextInput
             style={styles.input}
             value={caption}
             onChangeText={setCaption}
-            placeholder="What is this clip about? Use #hashtags if you like."
+            placeholder={t("create.captionPlaceholder")}
             placeholderTextColor={colors.textSubtle}
             multiline
             maxLength={MAX_CAPTION_LENGTH}
             editable={!busy}
-            accessibilityLabel="Caption"
-            accessibilityHint={`Up to ${MAX_CAPTION_LENGTH} characters. Hashtags are optional.`}
+            accessibilityLabel={t("create.caption")}
+            accessibilityHint={t("create.captionHint", {
+              values: { max: MAX_CAPTION_LENGTH },
+            })}
             accessibilityState={{ disabled: busy }}
           />
           <Text style={styles.counter}>
@@ -453,10 +450,7 @@ export default function CreateScreen() {
               ))}
             </View>
           ) : (
-            <Text style={styles.hint}>
-              Privacy options are not available yet — published videos follow
-              the same public Watch rules as web.
-            </Text>
+            <Text style={styles.hint}>{t("create.privacyHint")}</Text>
           )}
 
           {journey.phase === "uploading" ||
@@ -467,8 +461,10 @@ export default function CreateScreen() {
               accessibilityRole="progressbar"
               accessibilityLabel={
                 journey.phase === "uploading"
-                  ? `Upload progress ${journey.uploadPercent} percent`
-                  : "Publishing video"
+                  ? t("create.uploadProgressA11y", {
+                      values: { percent: journey.uploadPercent },
+                    })
+                  : t("create.publishingA11y")
               }
               accessibilityValue={
                 journey.phase === "uploading"
@@ -493,18 +489,20 @@ export default function CreateScreen() {
               </View>
               <Text style={styles.progressText}>
                 {journey.phase === "uploading"
-                  ? `Uploading ${journey.uploadPercent}%`
-                  : journey.message || "Publishing…"}
+                  ? t("create.uploading", {
+                      values: { percent: journey.uploadPercent },
+                    })
+                  : journey.message || t("create.publishing")}
               </Text>
               {journey.phase === "uploading" ? (
                 <Pressable
                   style={styles.cancel}
                   onPress={onCancelUpload}
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel upload"
-                  accessibilityHint="Stops the upload and cleans up"
+                  accessibilityLabel={t("create.cancelUpload")}
+                  accessibilityHint={t("create.cancelHint")}
                 >
-                  <Text style={styles.cancelText}>Cancel upload</Text>
+                  <Text style={styles.cancelText}>{t("create.cancelUpload")}</Text>
                 </Pressable>
               ) : (
                 <ActivityIndicator color={colors.accentCyan} />
@@ -514,7 +512,7 @@ export default function CreateScreen() {
 
           {journey.phase === "success" ? (
             <View style={styles.success} accessibilityRole="text">
-              <Text style={styles.successTitle}>{CREATE_SUCCESS_MESSAGE}</Text>
+              <Text style={styles.successTitle}>{t("create.success")}</Text>
               <Pressable
                 style={styles.primary}
                 onPress={() =>
@@ -523,23 +521,23 @@ export default function CreateScreen() {
                   )
                 }
                 accessibilityRole="button"
-                accessibilityLabel="Open Watch"
+                accessibilityLabel={t("create.openWatch")}
               >
-                <Text style={styles.primaryText}>Open Watch</Text>
+                <Text style={styles.primaryText}>{t("create.openWatch")}</Text>
               </Pressable>
               <Pressable
                 onPress={resetSelection}
                 accessibilityRole="button"
-                accessibilityLabel="Create another video"
+                accessibilityLabel={t("create.another")}
               >
-                <Text style={styles.link}>Create another</Text>
+                <Text style={styles.link}>{t("create.another")}</Text>
               </Pressable>
             </View>
           ) : null}
 
           {journey.error && asset ? (
             <View style={styles.errorBox} accessibilityRole="alert">
-              <Text style={styles.errorTitle}>Publish failed</Text>
+              <Text style={styles.errorTitle}>{t("create.publishFailed")}</Text>
               <Text style={styles.errorText}>{journey.error}</Text>
               <View style={styles.row}>
                 <Pressable
@@ -547,10 +545,10 @@ export default function CreateScreen() {
                   onPress={onRetry}
                   disabled={!asset}
                   accessibilityRole="button"
-                  accessibilityLabel="Retry upload and publish"
+                  accessibilityLabel={t("actions.retry")}
                   accessibilityState={{ disabled: !asset }}
                 >
-                  <Text style={styles.secondaryText}>Retry</Text>
+                  <Text style={styles.secondaryText}>{t("actions.retry")}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.secondary}
@@ -558,9 +556,9 @@ export default function CreateScreen() {
                     setJourney((s) => ({ ...s, error: null, phase: "ready" }))
                   }
                   accessibilityRole="button"
-                  accessibilityLabel="Dismiss error"
+                  accessibilityLabel={t("actions.dismiss")}
                 >
-                  <Text style={styles.secondaryText}>Dismiss</Text>
+                  <Text style={styles.secondaryText}>{t("actions.dismiss")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -571,7 +569,7 @@ export default function CreateScreen() {
             onPress={() => setUgcAck((value) => !value)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: ugcAck }}
-            accessibilityLabel={UGC_PUBLISH_ACK_LABEL}
+            accessibilityLabel={t("create.ack")}
           >
             <View
               style={[styles.checkbox, ugcAck && styles.checkboxChecked]}
@@ -579,14 +577,14 @@ export default function CreateScreen() {
             >
               {ugcAck ? <Text style={styles.checkboxMark}>✓</Text> : null}
             </View>
-            <Text style={styles.ackText}>{UGC_PUBLISH_ACK_LABEL}</Text>
+            <Text style={styles.ackText}>{t("create.ack")}</Text>
           </Pressable>
           <Pressable
             onPress={() => void Linking.openURL(UGC_TERMS_URL)}
             accessibilityRole="link"
-            accessibilityLabel="Open UMTUBA Terms"
+            accessibilityLabel={t("create.openTerms")}
           >
-            <Text style={styles.link}>Read Terms</Text>
+            <Text style={styles.link}>{t("create.readTerms")}</Text>
           </Pressable>
 
           <Pressable
@@ -606,8 +604,8 @@ export default function CreateScreen() {
               !canPublishWithUgcAck(ugcAck)
             }
             accessibilityRole="button"
-            accessibilityLabel="Publish video"
-            accessibilityHint="Uploads to your private folder then publishes to Watch"
+            accessibilityLabel={t("create.publish")}
+            accessibilityHint={t("create.publishHint")}
             accessibilityState={{
               disabled:
                 !asset ||
@@ -620,7 +618,9 @@ export default function CreateScreen() {
             {busy ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={styles.primaryText}>Publish</Text>
+              <Text style={styles.primaryText} numberOfLines={1}>
+                {t("create.publish")}
+              </Text>
             )}
           </Pressable>
         </ScrollView>

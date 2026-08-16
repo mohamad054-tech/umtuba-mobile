@@ -4,6 +4,7 @@ import type {
   WorldCameraControlId,
   WorldCameraControlState,
 } from "@/src/lib/world/experience";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldCameraControlsProps = {
@@ -17,11 +18,12 @@ export function WorldCameraControls({
   onPress,
   compact = false,
 }: WorldCameraControlsProps) {
+  const { t } = useTranslation();
   return (
     <View
       style={[styles.wrap, compact && styles.wrapCompact]}
       accessibilityRole="summary"
-      accessibilityLabel="World camera controls"
+      accessibilityLabel={t("world.camera")}
     >
       {controls.map((control) => {
         const disabled = !control.enabled;

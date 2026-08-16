@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldEventSheetState } from "@/src/lib/world/events";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldEventBottomSheetProps = {
@@ -14,6 +15,7 @@ export function WorldEventBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldEventBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const realMeta = sheet.meta.filter((m) => m.value != null && m.value !== "");
@@ -38,9 +40,9 @@ export function WorldEventBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close event details"
+            accessibilityLabel={t("world.closeEvent")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

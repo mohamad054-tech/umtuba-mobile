@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { WorldProjectionControlState } from "@/src/lib/world/experience";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldProjectionSelectorProps = {
@@ -15,18 +16,19 @@ export function WorldProjectionSelector({
   controls,
   onSelect,
 }: WorldProjectionSelectorProps) {
+  const { t } = useTranslation();
   if (controls.length === 0) return null;
 
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.heading} accessibilityRole="header">
-        View
+        {t("world.projection")}
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
-        accessibilityLabel="World projection"
+        accessibilityLabel={t("world.projection")}
       >
         {controls.map((control) => {
           const disabled = !control.enabled;

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WalletBalance } from "@/src/contracts/wallet";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { getMyActivityTierProgress } from "@/src/lib/tiers/fetchTier";
 import { fetchUmPointsWalletBalance } from "@/src/lib/wallet/fetchBalance";
@@ -12,6 +13,7 @@ import { colors } from "@/src/theme/colors";
 
 export function WalletTierBadge() {
   const { user, session } = useAuth();
+  const { t } = useTranslation();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [tierLabel, setTierLabel] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -52,10 +54,10 @@ export function WalletTierBadge() {
 
   const amountLabel =
     balance != null ? `${formatWalletAmount(balance.amount)} UM` : failed ? "—" : "…";
-  const tier = tierLabel ?? (failed ? "Unavailable" : "…");
+  const tier = tierLabel ?? (failed ? t("wallet.unavailableShort") : "…");
   const a11y = failed
-    ? "Wallet and tier unavailable. Open rewards."
-    : `Wallet ${amountLabel}, tier ${tier}. Open rewards.`;
+    ? t("wallet.unavailable")
+    : t("wallet.a11y", { values: { amount: amountLabel, tier } });
 
   return (
     <Link href="/rewards" asChild>

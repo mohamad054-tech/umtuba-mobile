@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldGameSheetState } from "@/src/lib/world/games";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldGameBottomSheetProps = {
@@ -14,6 +15,7 @@ export function WorldGameBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldGameBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const realMeta = sheet.meta.filter((m) => m.value != null && m.value !== "");
@@ -38,9 +40,9 @@ export function WorldGameBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close game details"
+            accessibilityLabel={t("world.closeGame")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

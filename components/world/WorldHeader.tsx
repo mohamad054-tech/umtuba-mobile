@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldHeaderProps = {
@@ -10,11 +11,12 @@ type WorldHeaderProps = {
 };
 
 export function WorldHeader({
-  title = "World",
+  title,
   subtitle,
   statusLabel,
   compact = false,
 }: WorldHeaderProps) {
+  const { t } = useTranslation();
   return (
     <View
       style={[styles.wrap, compact && styles.wrapCompact]}
@@ -22,12 +24,14 @@ export function WorldHeader({
     >
       <View style={styles.row}>
         <Text style={[styles.title, compact && styles.titleCompact]} accessibilityRole="header">
-          {title}
+          {title ?? t("world.title")}
         </Text>
         <View
           style={styles.badge}
           accessibilityRole="text"
-          accessibilityLabel={`World status: ${statusLabel}`}
+          accessibilityLabel={t("world.statusA11y", {
+            values: { status: statusLabel },
+          })}
         >
           <Text style={styles.badgeText}>{statusLabel}</Text>
         </View>

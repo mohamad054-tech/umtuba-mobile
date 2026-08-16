@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldEducationSheetState } from "@/src/lib/world/education";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldEducationBottomSheetProps = {
@@ -15,6 +16,7 @@ export function WorldEducationBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldEducationBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const realMetrics = sheet.metrics.filter((m) => m.value != null && m.value !== "");
@@ -38,9 +40,9 @@ export function WorldEducationBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close education details"
+            accessibilityLabel={t("world.closeEducation")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

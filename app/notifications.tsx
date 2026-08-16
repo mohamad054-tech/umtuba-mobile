@@ -12,11 +12,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { NOTIFICATION_CATEGORY_KEYS, useTranslation } from "@/src/lib/i18n";
 import {
   formatNotificationTime,
   listMyNotifications,
   mapNotificationHrefToMobile,
-  notificationCategoryLabel,
   resolveMarkNotificationRead,
   type AppNotification,
 } from "@/src/lib/notifications";
@@ -32,20 +32,19 @@ function NotificationRow({
   item: AppNotification;
   onPress: (item: AppNotification) => void;
 }) {
+  const { t } = useTranslation();
   const destination = mapNotificationHrefToMobile(item.href);
   const timeLabel = formatNotificationTime(item.createdAt);
-  const category = notificationCategoryLabel(item.uiCategory);
+  const category = t(NOTIFICATION_CATEGORY_KEYS[item.uiCategory]);
 
   return (
     <Pressable
       style={[styles.row, item.unread && styles.rowUnread]}
       onPress={() => onPress(item)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.unread ? "Unread. " : ""}${item.title}. ${category}${timeLabel ? `. ${timeLabel}` : ""}`}
+      accessibilityLabel={`${item.unread ? `${t("notifications.unread")} ` : ""}${item.title}. ${category}${timeLabel ? `. ${timeLabel}` : ""}`}
       accessibilityHint={
-        destination
-          ? "Opens related content when available"
-          : "Marks as read when possible. No destination linked."
+        destination ? t("notifications.openHint") : t("notifications.markHint")
       }
     >
       <View style={styles.badge}>
@@ -83,6 +82,7 @@ function NotificationRow({
 
 export default function NotificationsScreen() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -181,7 +181,7 @@ export default function NotificationsScreen() {
 
   if (authLoading || (phase === "loading" && !refreshing)) {
     return (
-      <View style={styles.center} accessibilityLabel="Loading notifications">
+      <View style={styles.center} accessibilityLabel={t("notifications.loading")}>
         <ActivityIndicator color={colors.accentCyan} />
       </View>
     );
@@ -190,10 +190,8 @@ export default function NotificationsScreen() {
   if (!user) {
     return (
       <View style={[styles.center, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={styles.emptyTitle}>Sign in required</Text>
-        <Text style={styles.emptyBody}>
-          Sign in to see your notifications inbox.
-        </Text>
+        <Text style={styles.emptyTitle}>{t("auth.required.title")}</Text>
+        <Text style={styles.emptyBody}>{t("notifications.signInBody")}</Text>
       </View>
     );
   }
@@ -201,19 +199,15 @@ export default function NotificationsScreen() {
   if (phase === "unavailable") {
     return (
       <View style={[styles.center, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={styles.emptyTitle}>Notifications unavailable</Text>
-        <Text style={styles.emptyBody}>
-          The in-app inbox source is not provisioned on this environment yet.
-          Push delivery can still work separately. Pull to retry after the
-          notifications backend is enabled.
-        </Text>
+        <Text style={styles.emptyTitle}>{t("notifications.unavailable")}</Text>
+        <Text style={styles.emptyBody}>{t("notifications.unavailableBody")}</Text>
         <Pressable
           style={styles.retry}
           onPress={() => void load()}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading notifications"
+          accessibilityLabel={t("notifications.retry")}
         >
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t("actions.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -222,15 +216,15 @@ export default function NotificationsScreen() {
   if (phase === "error" && empty) {
     return (
       <View style={[styles.center, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={styles.emptyTitle}>Couldn’t load notifications</Text>
+        <Text style={styles.emptyTitle}>{t("notifications.loadFailed")}</Text>
         <Text style={styles.emptyBody}>{error}</Text>
         <Pressable
           style={styles.retry}
           onPress={() => void load()}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading notifications"
+          accessibilityLabel={t("notifications.retry")}
         >
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t("actions.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -240,8 +234,7 @@ export default function NotificationsScreen() {
     <View style={styles.root}>
       {readPersistence === "local" ? (
         <Text style={styles.hint} accessibilityLiveRegion="polite">
-          Read state is temporary for this session until server sync is
-          available.
+          {t("notifications.localReadHint")}
         </Text>
       ) : null}
       {phase === "error" && error ? (
@@ -270,15 +263,15 @@ export default function NotificationsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyBlock}>
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
+            <Text style={styles.emptyTitle}>{t("notifications.empty")}</Text>
             <Text style={styles.emptyBody}>
-              Likes, follows, messages, and system updates will show up here.
+              {t("notifications.emptyBody")}
             </Text>
           </View>
         }
         initialNumToRender={12}
         windowSize={9}
-        accessibilityLabel="Notifications list"
+        accessibilityLabel={t("notifications.listA11y")}
       />
     </View>
   );

@@ -6,6 +6,7 @@ import type {
   WorldRoadDetail,
   WorldRoadDetailControlState,
 } from "@/src/lib/world/experience";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldMapExperienceSelectorProps = {
@@ -24,6 +25,7 @@ export function WorldMapExperienceSelector({
   onSelectRoadDetail,
   onSelectBuildings,
 }: WorldMapExperienceSelectorProps) {
+  const { t } = useTranslation();
   if (roadControls.length === 0 && buildingsControls.length === 0) {
     return null;
   }
@@ -33,13 +35,13 @@ export function WorldMapExperienceSelector({
       {roadControls.length > 0 ? (
         <>
           <Text style={styles.heading} accessibilityRole="header">
-            Roads
+            {t("world.roadDetail")}
           </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.row}
-            accessibilityLabel="Road detail"
+            accessibilityLabel={t("world.roadDetail")}
           >
             {roadControls.map((control) => {
               const disabled = !control.enabled;
@@ -80,13 +82,13 @@ export function WorldMapExperienceSelector({
       {buildingsControls.length > 0 ? (
         <>
           <Text style={styles.heading} accessibilityRole="header">
-            Buildings
+            {t("world.buildings")}
           </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.row}
-            accessibilityLabel="Buildings mode"
+            accessibilityLabel={t("world.buildings")}
           >
             {buildingsControls.map((control) => {
               const disabled = !control.enabled;

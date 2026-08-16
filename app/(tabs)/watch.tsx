@@ -23,6 +23,7 @@ import { IdentityHeader } from "@/components/IdentityHeader";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
+import { REPORT_REASON_KEYS, useTranslation } from "@/src/lib/i18n";
 import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
@@ -45,7 +46,6 @@ import {
   loadHiddenPostIds,
   reportWatchPost,
   reportWatchUser,
-  UGC_REPORT_REASON_LABELS,
   UGC_REPORT_REASONS,
   viewerMaySeeBlockControl,
   viewerMaySeeReportControl,
@@ -87,6 +87,7 @@ export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const params = useLocalSearchParams<{ post?: string }>();
   const focusPostId =
@@ -230,14 +231,14 @@ export default function WatchScreen() {
         setEndReached(!page.nextCursor);
         setActiveIndex(0);
       } catch (err) {
-        setError(getErrorMessage(err, "Unable to load Watch feed."));
+        setError(getErrorMessage(err, t("watch.loadFailed")));
       } finally {
         setLoading(false);
         setRefreshing(false);
         initialInFlight.current = false;
       }
     },
-    [focusPostId]
+    [focusPostId, t]
   );
 
   useEffect(() => {
@@ -258,12 +259,12 @@ export default function WatchScreen() {
       }
     } catch (err) {
       console.error("Watch pagination failed:", err);
-      setError(getErrorMessage(err, "Unable to load more videos."));
+      setError(getErrorMessage(err, t("watch.loadMoreFailed")));
     } finally {
       setLoadingMore(false);
       moreInFlight.current = false;
     }
-  }, [cursor, endReached, loadingMore]);
+  }, [cursor, endReached, loadingMore, t]);
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -309,7 +310,7 @@ export default function WatchScreen() {
       const supabase = getSupabase();
       const result = await togglePostLike(supabase, video.postId);
       if (!result.ok) {
-        Alert.alert("Like failed", result.message);
+        Alert.alert(t("watch.likeFailed"), result.message);
         return;
       }
       patchVideo(video.id, {
@@ -317,7 +318,7 @@ export default function WatchScreen() {
         stats: { ...video.stats, likes: result.likes },
       });
     },
-    [patchVideo]
+    [patchVideo, t]
   );
 
   const onToggleSave = useCallback(
@@ -326,7 +327,7 @@ export default function WatchScreen() {
       const supabase = getSupabase();
       const result = await togglePostSave(supabase, video.postId);
       if (!result.ok) {
-        Alert.alert("Save failed", result.message);
+        Alert.alert(t("watch.saveFailed"), result.message);
         return;
       }
       patchVideo(video.id, {
@@ -334,7 +335,7 @@ export default function WatchScreen() {
         stats: { ...video.stats, saves: result.saves },
       });
     },
-    [patchVideo]
+    [patchVideo, t]
   );
 
   const onDeleteOwn = useCallback(
@@ -342,12 +343,12 @@ export default function WatchScreen() {
       if (!video.postId || !user?.id) return;
       if (!viewerMaySeeDeleteControl(user.id, video.author.id)) return;
       Alert.alert(
-        "Delete video",
-        "This removes your video from Watch. This cannot be undone.",
+        t("watch.deleteTitle"),
+        t("watch.deleteBody"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("actions.cancel"), style: "cancel" },
           {
-            text: "Delete",
+            text: t("actions.delete"),
             style: "destructive",
             onPress: () => {
               void (async () => {
@@ -357,7 +358,7 @@ export default function WatchScreen() {
                   video.postId as number
                 );
                 if (!result.ok) {
-                  Alert.alert("Delete failed", result.message);
+                  Alert.alert(t("watch.deleteFailed"), result.message);
                   return;
                 }
                 setVideos((prev) =>
@@ -373,7 +374,7 @@ export default function WatchScreen() {
         ]
       );
     },
-    [user?.id]
+    [t, user?.id]
   );
 
   const onReport = useCallback(
@@ -383,14 +384,14 @@ export default function WatchScreen() {
 
       const pickReason = (target: "content" | "user") => {
         Alert.alert(
-          target === "content" ? "Report video" : "Report account",
+          target === "content" ? t("report.video") : t("report.account"),
           target === "content"
-            ? "Why are you reporting this video?"
-            : "Why are you reporting this account?",
+            ? t("report.whyVideo")
+            : t("report.whyAccount"),
           [
-            { text: "Cancel", style: "cancel" },
+            { text: t("actions.cancel"), style: "cancel" },
             ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
-              text: UGC_REPORT_REASON_LABELS[reason],
+              text: t(REPORT_REASON_KEYS[reason]),
               onPress: () => {
                 void (async () => {
                   if (target === "content") {
@@ -406,9 +407,9 @@ export default function WatchScreen() {
                       return next;
                     });
                     Alert.alert(
-                      result.ok ? "Report submitted" : "Unable to report",
+                      result.ok ? t("report.submitted") : t("report.failed"),
                       result.ok
-                        ? "Thanks. Moderators received this report and the video is hidden on this device."
+                        ? t("report.thanksVideo")
                         : result.message
                     );
                     return;
@@ -420,9 +421,9 @@ export default function WatchScreen() {
                     reason,
                   });
                   Alert.alert(
-                    result.ok ? "Report submitted" : "Unable to report",
+                    result.ok ? t("report.submitted") : t("report.failed"),
                     result.ok
-                      ? "Thanks. Moderators received this account report."
+                      ? t("report.thanksAccount")
                       : result.message
                   );
                 })();
@@ -432,13 +433,13 @@ export default function WatchScreen() {
         );
       };
 
-      Alert.alert("Report", "What do you want to report?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "This video", onPress: () => pickReason("content") },
-        { text: "This account", onPress: () => pickReason("user") },
+      Alert.alert(t("actions.report"), t("report.what"), [
+        { text: t("actions.cancel"), style: "cancel" },
+        { text: t("report.thisVideo"), onPress: () => pickReason("content") },
+        { text: t("report.thisAccount"), onPress: () => pickReason("user") },
       ]);
     },
-    [user?.id]
+    [t, user?.id]
   );
 
   const onBlockUser = useCallback(
@@ -446,12 +447,14 @@ export default function WatchScreen() {
       if (!user?.id || !video.author.id) return;
       if (!viewerMaySeeBlockControl(user.id, video.author.id)) return;
       Alert.alert(
-        "Block account",
-        `Hide @${video.author.username.replace(/^@/, "")} on this device?`,
+        t("block.title"),
+        t("block.body", {
+          values: { username: video.author.username.replace(/^@/, "") },
+        }),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("actions.cancel"), style: "cancel" },
           {
-            text: "Block",
+            text: t("actions.block"),
             style: "destructive",
             onPress: () => {
               void (async () => {
@@ -461,7 +464,7 @@ export default function WatchScreen() {
                   username: video.author.username,
                 });
                 if (!result.ok) {
-                  Alert.alert("Block failed", result.message);
+                  Alert.alert(t("block.failed"), result.message);
                   return;
                 }
                 setBlockedUserIds((prev) => {
@@ -470,10 +473,10 @@ export default function WatchScreen() {
                   return next;
                 });
                 Alert.alert(
-                  "Account blocked",
+                  t("block.done"),
                   result.localOnly
-                    ? "This account is hidden on this device only."
-                    : "This account is blocked on UMTUBA and hidden on this device."
+                    ? t("block.localOnly")
+                    : t("block.serverAndLocal")
                 );
               })();
             },
@@ -481,7 +484,7 @@ export default function WatchScreen() {
         ]
       );
     },
-    [user?.id]
+    [t, user?.id]
   );
 
   const onToggleMute = useCallback(() => {
@@ -665,19 +668,19 @@ export default function WatchScreen() {
         <ActivityIndicator
           style={{ marginVertical: 24 }}
           color={colors.accentCyan}
-          accessibilityLabel="Loading more videos"
+          accessibilityLabel={t("watch.loadingMore")}
         />
       );
     }
     if (endReached && videos.length > 0) {
       return (
         <Text style={styles.endHint} accessibilityLiveRegion="polite">
-          You’re caught up.
+          {t("watch.caughtUp")}
         </Text>
       );
     }
     return null;
-  }, [endReached, loadingMore, videos.length]);
+  }, [endReached, loadingMore, t, videos.length]);
 
   if (loading) {
     return (
@@ -686,9 +689,9 @@ export default function WatchScreen() {
         <ActivityIndicator
           color={colors.accentCyan}
           size="large"
-          accessibilityLabel="Loading Watch feed"
+          accessibilityLabel={t("watch.loading")}
         />
-        <Text style={styles.hint}>Loading Watch…</Text>
+        <Text style={styles.hint}>{t("watch.loading")}</Text>
       </View>
     );
   }
@@ -704,9 +707,9 @@ export default function WatchScreen() {
           style={styles.retry}
           onPress={() => void loadInitial()}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading Watch feed"
+          accessibilityLabel={t("actions.retry")}
         >
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t("actions.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -716,15 +719,15 @@ export default function WatchScreen() {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
-        <IdentityHeader title="Watch" />
-        <Text style={styles.hint}>No videos yet. Check back soon.</Text>
+        <IdentityHeader title={t("watch.title")} />
+        <Text style={styles.hint}>{t("watch.empty")}</Text>
         <Pressable
           style={styles.retry}
           onPress={() => void loadInitial({ soft: true })}
           accessibilityRole="button"
-          accessibilityLabel="Refresh Watch feed"
+          accessibilityLabel={t("actions.refresh")}
         >
-          <Text style={styles.retryText}>Refresh</Text>
+          <Text style={styles.retryText}>{t("actions.refresh")}</Text>
         </Pressable>
       </View>
     );
@@ -737,13 +740,13 @@ export default function WatchScreen() {
         style={[styles.header, { paddingTop: insets.top }]}
         pointerEvents="box-none"
       >
-        <IdentityHeader title="Watch" />
+        <IdentityHeader title={t("watch.title")} />
       </View>
       {error ? (
         <View style={[styles.banner, { top: insets.top + 48 }]}>
           <Text style={styles.bannerText}>{error}</Text>
           <Pressable onPress={() => setError(null)} accessibilityRole="button">
-            <Text style={styles.bannerDismiss}>Dismiss</Text>
+            <Text style={styles.bannerDismiss}>{t("actions.dismiss")}</Text>
           </Pressable>
         </View>
       ) : null}

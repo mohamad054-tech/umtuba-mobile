@@ -1,5 +1,6 @@
 import { StyleSheet, TextInput, View } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type DiscoverSearchBarProps = {
@@ -11,22 +12,23 @@ type DiscoverSearchBarProps = {
 export function DiscoverSearchBar({
   value,
   onChangeText,
-  placeholder = "Search Watch titles and creators",
+  placeholder,
 }: DiscoverSearchBarProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.wrap}>
       <TextInput
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("discover.searchPlaceholder")}
         placeholderTextColor={colors.textSubtle}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
         clearButtonMode="while-editing"
-        accessibilityLabel="Search Discover"
-        accessibilityHint="Filters loaded Discover items. No invented results."
+        accessibilityLabel={t("discover.searchA11y")}
+        accessibilityHint={t("discover.searchHint")}
       />
     </View>
   );

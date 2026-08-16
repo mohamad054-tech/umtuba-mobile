@@ -29,6 +29,7 @@ import type { WorldCategoryId } from "@/src/lib/world";
 import type { WorldPlaceLayerId } from "@/src/lib/world/places";
 import type { WorldSearchResult } from "@/src/lib/world/search";
 import type { WorldRendererAdapter } from "@/src/lib/world/renderer";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldExperienceShellProps = {
@@ -50,13 +51,13 @@ type WorldExperienceShellProps = {
   onCloseDetails?: () => void;
 };
 
-function statusLabel(view: WorldExperienceViewState): string {
-  if (view.phase === "error") return "Error";
-  if (view.phase === "preparing") return "Preparing";
-  if (view.phase === "loading") return "Loading";
-  if (!view.rendererBound) return "Preparing";
-  if (view.phase === "unavailable") return "Unavailable";
-  return "Ready";
+function statusKey(view: WorldExperienceViewState) {
+  if (view.phase === "error") return "world.error" as const;
+  if (view.phase === "preparing") return "world.status.preparing" as const;
+  if (view.phase === "loading") return "world.status.loading" as const;
+  if (!view.rendererBound) return "world.status.preparing" as const;
+  if (view.phase === "unavailable") return "world.unavailable" as const;
+  return "world.ready" as const;
 }
 
 export function WorldExperienceShell({
@@ -77,6 +78,7 @@ export function WorldExperienceShell({
   onSelectBuildings,
   onCloseDetails,
 }: WorldExperienceShellProps) {
+  const { t } = useTranslation();
   const [mapSettingsOpen, setMapSettingsOpen] = useState(false);
   const citiesActive = view.layers.some(
     (layer) => layer.categoryId === "cities" && layer.active
@@ -88,12 +90,13 @@ export function WorldExperienceShell({
     return (
       <View style={[styles.root, { paddingBottom: bottomInset }]}>
         <WorldHeader
-          subtitle="World could not be loaded."
-          statusLabel="Error"
+          title={t("world.title")}
+          subtitle={t("world.loadFailedBody")}
+          statusLabel={t("world.error")}
         />
         <WorldStatePanel
-          title="Unable to load World"
-          body={view.errorMessage ?? view.message}
+          title={t("world.loadFailed")}
+          body={view.errorMessage ?? t("world.loadFailedBody")}
           variant="error"
           onRetry={onRetry}
         />
@@ -104,11 +107,22 @@ export function WorldExperienceShell({
   return (
     <View
       style={[styles.root, { paddingBottom: Math.max(bottomInset, 8) }]}
-      accessibilityLabel="World experience"
+      accessibilityLabel={t("world.experience")}
     >
       <WorldHeader
-        subtitle={showCompactHeader ? undefined : view.message}
-        statusLabel={statusLabel(view)}
+        title={t("world.title")}
+        subtitle={
+          showCompactHeader
+            ? undefined
+            : view.phase === "preparing"
+              ? t("world.preparing")
+              : view.phase === "loading"
+                ? t("world.loading")
+                : view.phase === "unavailable"
+                  ? t("world.unavailable")
+                  : t("world.ready")
+        }
+        statusLabel={t(statusKey(view))}
         compact={showCompactHeader}
       />
 

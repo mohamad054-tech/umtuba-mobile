@@ -30,6 +30,10 @@ import {
   type DiscoverHomeModel,
 } from "@/src/lib/discover";
 import { discoverWorldEntryHref } from "@/src/lib/world/experience";
+import {
+  DISCOVER_CATEGORY_KEYS,
+  useTranslation,
+} from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -42,17 +46,18 @@ function DiscoverMoreSection({
   onPeoplePress: () => void;
   onHashtagsPress: () => void;
 }) {
+  const { t } = useTranslation();
   if (!shouldShowDiscoverWorldEntry()) return null;
 
   return (
     <>
       <Text style={styles.sectionLabel} accessibilityRole="header">
-        More
+        {t("discover.more")}
       </Text>
       <View style={styles.placeholders}>
-        <DiscoverPlaceholderChip label="World" onPress={onWorldPress} />
-        <DiscoverPlaceholderChip label="People" onPress={onPeoplePress} />
-        <DiscoverPlaceholderChip label="Hashtags" onPress={onHashtagsPress} />
+        <DiscoverPlaceholderChip label={t("nav.world")} onPress={onWorldPress} />
+        <DiscoverPlaceholderChip label={t("discover.people")} onPress={onPeoplePress} />
+        <DiscoverPlaceholderChip label={t("discover.hashtags")} onPress={onHashtagsPress} />
       </View>
     </>
   );
@@ -61,6 +66,7 @@ function DiscoverMoreSection({
 export default function DiscoverScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [home, setHome] = useState<DiscoverHomeModel | null>(null);
   const [cards, setCards] = useState<DiscoverCardModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,12 +95,12 @@ export default function DiscoverScreen() {
       setHome(null);
       setCards([]);
       setError(
-        err instanceof Error ? err.message : "Unable to load Discover."
+        err instanceof Error ? err.message : t("discover.unable")
       );
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -125,8 +131,11 @@ export default function DiscoverScreen() {
     const href = mapDiscoverCategoryHref(category.id);
     if (!href) {
       Alert.alert(
-        category.label,
-        "This category is not available in this version."
+        t(
+          DISCOVER_CATEGORY_KEYS[category.id] ??
+            "discover.category.watch"
+        ),
+        t("discover.categoryUnavailable")
       );
       return;
     }
@@ -140,10 +149,7 @@ export default function DiscoverScreen() {
   const onWorldPress = () => {
     const href = discoverWorldEntryHref();
     if (!href) {
-      Alert.alert(
-        "World",
-        "World is not available through a safe route in this version."
-      );
+      Alert.alert(t("nav.world"), t("discover.worldUnavailable"));
       return;
     }
     router.push(href as Href);
@@ -153,13 +159,10 @@ export default function DiscoverScreen() {
     <DiscoverMoreSection
       onWorldPress={onWorldPress}
       onPeoplePress={() =>
-        onPlaceholderPress("People", "People discovery is not available yet.")
+        onPlaceholderPress(t("discover.people"), t("discover.peopleSoon"))
       }
       onHashtagsPress={() =>
-        onPlaceholderPress(
-          "Hashtags",
-          "Hashtag discovery is not available yet."
-        )
+        onPlaceholderPress(t("discover.hashtags"), t("discover.hashtagsSoon"))
       }
     />
   );
@@ -171,11 +174,11 @@ export default function DiscoverScreen() {
       >
         <View
           style={styles.centerFlex}
-          accessibilityLabel="Loading Discover"
+          accessibilityLabel={t("discover.loading")}
           accessibilityRole="progressbar"
         >
           <ActivityIndicator color={colors.accentCyan} size="large" />
-          <Text style={styles.muted}>Loading Discover…</Text>
+          <Text style={styles.muted}>{t("discover.loading")}</Text>
         </View>
         {moreSection}
       </View>
@@ -189,7 +192,7 @@ export default function DiscoverScreen() {
       >
         <View style={styles.centerFlex}>
           <Text style={styles.emptyTitle} accessibilityRole="header">
-            {unavailable ? "Discover unavailable" : "Couldn’t load Discover"}
+            {unavailable ? t("discover.unavailable") : t("discover.loadFailed")}
           </Text>
           <Text style={styles.muted} accessibilityRole="alert">
             {error}
@@ -198,9 +201,9 @@ export default function DiscoverScreen() {
             style={styles.retryBtn}
             onPress={() => void load()}
             accessibilityRole="button"
-            accessibilityLabel="Retry loading Discover"
+            accessibilityLabel={t("actions.retry")}
           >
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t("actions.retry")}</Text>
           </Pressable>
         </View>
         {moreSection}
@@ -226,9 +229,9 @@ export default function DiscoverScreen() {
         ) : null}
         {searchPhase === "empty" ? (
           <View style={styles.centerFlex}>
-            <Text style={styles.emptyTitle}>No results</Text>
+            <Text style={styles.emptyTitle}>{t("discover.noResults")}</Text>
             <Text style={styles.muted}>
-              No loaded Discover items match “{query.trim()}”.
+              {t("discover.noResultsBody", { values: { query: query.trim() } })}
             </Text>
           </View>
         ) : null}
@@ -269,7 +272,7 @@ export default function DiscoverScreen() {
         <DiscoverSearchBar value={query} onChangeText={setQuery} />
 
         <Text style={styles.sectionLabel} accessibilityRole="header">
-          Categories
+          {t("discover.categories")}
         </Text>
         <ScrollView
           horizontal
@@ -282,9 +285,15 @@ export default function DiscoverScreen() {
               style={styles.categoryChip}
               onPress={() => onCategoryPress(category)}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${category.label}`}
+              accessibilityLabel={t("discover.openCategory", {
+                values: {
+                  label: t(DISCOVER_CATEGORY_KEYS[category.id]),
+                },
+              })}
             >
-              <Text style={styles.categoryText}>{category.label}</Text>
+              <Text style={styles.categoryText} numberOfLines={1}>
+                {t(DISCOVER_CATEGORY_KEYS[category.id])}
+              </Text>
             </Pressable>
           ))}
         </ScrollView>

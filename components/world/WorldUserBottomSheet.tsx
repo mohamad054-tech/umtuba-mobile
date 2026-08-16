@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { WorldUserSheetState } from "@/src/lib/world/users";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldUserBottomSheetProps = {
@@ -15,6 +16,7 @@ export function WorldUserBottomSheet({
   bottomInset = 0,
   onClose,
 }: WorldUserBottomSheetProps) {
+  const { t } = useTranslation();
   if (!sheet?.open) return null;
 
   const enabledActions = sheet.actions.filter((a) => a.enabled);
@@ -42,9 +44,9 @@ export function WorldUserBottomSheet({
             onPress={onClose}
             style={styles.close}
             accessibilityRole="button"
-            accessibilityLabel="Close user details"
+            accessibilityLabel={t("world.closeUser")}
           >
-            <Text style={styles.closeText}>Close</Text>
+            <Text style={styles.closeText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>

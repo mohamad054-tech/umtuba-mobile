@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { WorldLayerControlState } from "@/src/lib/world/experience";
 import type { WorldCategoryId } from "@/src/lib/world";
+import { WORLD_CATEGORY_KEYS, useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldLayerSelectorProps = {
@@ -13,20 +14,30 @@ export function WorldLayerSelector({
   layers,
   onToggle,
 }: WorldLayerSelectorProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.heading} accessibilityRole="header">
-        Layers
+        {t("world.layers")}
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
-        accessibilityLabel="World layer categories"
+        accessibilityLabel={t("world.layerCategories")}
       >
         {layers.map((layer) => {
           const disabled = !layer.enabled;
-          const stateLabel = disabled ? "Unavailable" : layer.active ? "On" : "Off";
+          const stateLabel = disabled
+            ? t("world.layerUnavailable")
+            : layer.active
+              ? t("world.layerOn")
+              : t("world.layerOff");
+          const categoryKey =
+            WORLD_CATEGORY_KEYS[
+              layer.categoryId as keyof typeof WORLD_CATEGORY_KEYS
+            ];
+          const label = t(categoryKey ?? "world.kind.result");
           return (
             <Pressable
               key={layer.categoryId}
@@ -38,17 +49,19 @@ export function WorldLayerSelector({
               disabled={disabled}
               onPress={() => onToggle?.(layer.categoryId, layer.enabled)}
               accessibilityRole="button"
-              accessibilityLabel={`${layer.label} layer, ${stateLabel}`}
+              accessibilityLabel={t("world.layerA11y", {
+                values: { label, state: stateLabel },
+              })}
               accessibilityState={{
                 disabled,
                 selected: layer.active,
               }}
               accessibilityHint={
                 disabled
-                  ? layer.reason ?? "Layer unavailable"
+                  ? layer.reason ?? t("world.layerUnavailable")
                   : layer.active
-                    ? "Hide this layer"
-                    : "Show this layer"
+                    ? t("world.hideLayer")
+                    : t("world.showLayer")
               }
             >
               <Text
@@ -59,7 +72,7 @@ export function WorldLayerSelector({
                 ]}
                 accessible={false}
               >
-                {layer.label}
+                {label}
               </Text>
               <Text
                 style={[
@@ -94,6 +107,7 @@ export function WorldFilterPanel({
   onClose,
   onClear,
 }: WorldFilterPanelProps) {
+  const { t } = useTranslation();
   if (!open) return null;
 
   const enabledCount = layers.filter((l) => l.enabled).length;
@@ -102,36 +116,38 @@ export function WorldFilterPanel({
     <View
       style={styles.panel}
       accessibilityRole="summary"
-      accessibilityLabel="World filters"
+      accessibilityLabel={t("world.filters")}
     >
       <View style={styles.panelHeader}>
         <Text style={styles.heading} accessibilityRole="header">
-          Filters
+          {t("world.filters")}
         </Text>
         {onClose ? (
           <Pressable
             onPress={onClose}
             style={styles.panelAction}
             accessibilityRole="button"
-            accessibilityLabel="Close filters"
+            accessibilityLabel={t("world.closeFilters")}
           >
-            <Text style={styles.panelActionText}>Close</Text>
+            <Text style={styles.panelActionText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>
       <Text style={styles.panelBody}>
         {enabledCount === 0
-          ? "Category filters stay inactive until trusted World data is connected. No fake counts or entities are shown."
-          : `${selectedCount} categor${selectedCount === 1 ? "y" : "ies"} selected.`}
+          ? t("world.filtersHint")
+          : selectedCount === 1
+            ? t("world.selectedCountOne", { values: { count: selectedCount } })
+            : t("world.selectedCount", { values: { count: selectedCount } })}
       </Text>
       {selectedCount > 0 && onClear ? (
         <Pressable
           style={styles.clear}
           onPress={onClear}
           accessibilityRole="button"
-          accessibilityLabel="Clear category filters"
+          accessibilityLabel={t("world.clearFilters")}
         >
-          <Text style={styles.clearText}>Clear filters</Text>
+          <Text style={styles.clearText}>{t("world.clearFilters")}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -151,35 +167,35 @@ export function WorldDetailsPanel({
   entitySubtitle,
   onClose,
 }: WorldDetailsPanelProps) {
+  const { t } = useTranslation();
   if (!open) return null;
 
   return (
     <View
       style={styles.panel}
       accessibilityRole="summary"
-      accessibilityLabel="World entity details"
+      accessibilityLabel={t("world.details")}
     >
       <View style={styles.panelHeader}>
         <Text style={styles.heading} accessibilityRole="header">
-          Details
+          {t("world.detailsHeading")}
         </Text>
         {onClose ? (
           <Pressable
             onPress={onClose}
             style={styles.panelAction}
             accessibilityRole="button"
-            accessibilityLabel="Close details"
+            accessibilityLabel={t("world.closeDetails")}
           >
-            <Text style={styles.panelActionText}>Close</Text>
+            <Text style={styles.panelActionText}>{t("actions.close")}</Text>
           </Pressable>
         ) : null}
       </View>
       <Text style={styles.panelTitle}>
-        {entityTitle ?? "No entity selected"}
+        {entityTitle ?? t("world.noEntity")}
       </Text>
       <Text style={styles.panelBody}>
-        {entitySubtitle ??
-          "Entity details appear here when a trusted World source provides them."}
+        {entitySubtitle ?? t("world.entityHint")}
       </Text>
     </View>
   );

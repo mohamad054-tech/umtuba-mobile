@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { liveStatusLabel } from "@/src/lib/live";
 import type { LiveSessionStatus } from "@/src/lib/live";
+import { LIVE_STATUS_KEYS, useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type LiveStatusBadgeProps = {
@@ -9,7 +9,8 @@ type LiveStatusBadgeProps = {
 };
 
 export function LiveStatusBadge({ status }: LiveStatusBadgeProps) {
-  const label = liveStatusLabel(status);
+  const { t } = useTranslation();
+  const label = t(LIVE_STATUS_KEYS[status]);
   const isLive = status === "live";
 
   return (
@@ -22,7 +23,7 @@ export function LiveStatusBadge({ status }: LiveStatusBadgeProps) {
         status === "unavailable" && styles.badgeUnavailable,
       ]}
       accessibilityRole="text"
-      accessibilityLabel={`Status ${label}`}
+      accessibilityLabel={t("live.statusA11y", { values: { label } })}
     >
       <Text
         style={[styles.text, isLive && styles.textLive]}

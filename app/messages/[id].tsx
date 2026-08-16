@@ -19,6 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
+  MESSAGE_RECEIPT_KEYS,
+  REPORT_REASON_KEYS,
+  useTranslation,
+} from "@/src/lib/i18n";
+import {
   assertConversationMembership,
   getConversationPeerId,
   getConversationPeerState,
@@ -46,7 +51,6 @@ import {
   MESSAGE_MAX_LENGTH,
   PEER_POLL_MS,
   TYPING_IDLE_CLEAR_MS,
-  receiptLabel,
   type Message,
 } from "@/src/lib/messenger/types";
 import {
@@ -54,7 +58,6 @@ import {
   reportWatchUser,
 } from "@/src/lib/social/ugcModeration";
 import {
-  UGC_REPORT_REASON_LABELS,
   UGC_REPORT_REASONS,
   viewerMaySeeBlockControl,
   viewerMaySeeReportControl,
@@ -70,6 +73,7 @@ export default function ConversationThreadScreen() {
     typeof params.message === "string" ? params.message : null;
 
   const { user } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<Message>>(null);
@@ -369,10 +373,10 @@ export default function ConversationThreadScreen() {
   const onReportPeer = useCallback(() => {
     if (!user?.id || !peerId) return;
     if (!viewerMaySeeReportControl(user.id, peerId)) return;
-    Alert.alert("Report account", "Why are you reporting this account?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("report.account"), t("report.whyAccount"), [
+      { text: t("actions.cancel"), style: "cancel" },
       ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
-        text: UGC_REPORT_REASON_LABELS[reason],
+        text: t(REPORT_REASON_KEYS[reason]),
         onPress: () => {
           void (async () => {
             const result = await reportWatchUser({
@@ -381,27 +385,25 @@ export default function ConversationThreadScreen() {
               reason,
             });
             Alert.alert(
-              result.ok ? "Report submitted" : "Unable to report",
-              result.ok
-                ? "Thanks. Moderators received this account report."
-                : result.message
+              result.ok ? t("report.submitted") : t("report.failed"),
+              result.ok ? t("report.thanksAccount") : result.message
             );
           })();
         },
       })),
     ]);
-  }, [peerId, user?.id]);
+  }, [peerId, t, user?.id]);
 
   const onBlockPeer = useCallback(() => {
     if (!user?.id || !peerId) return;
     if (!viewerMaySeeBlockControl(user.id, peerId)) return;
     Alert.alert(
-      "Block account",
-      "You will no longer see this account's messages on this device.",
+      t("block.title"),
+      t("block.bodyGeneric"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("actions.cancel"), style: "cancel" },
         {
-          text: "Block",
+          text: t("actions.block"),
           style: "destructive",
           onPress: () => {
             void (async () => {
@@ -410,14 +412,14 @@ export default function ConversationThreadScreen() {
                 targetUserId: peerId,
               });
               if (!result.ok) {
-                Alert.alert("Block failed", result.message);
+                Alert.alert(t("block.failed"), result.message);
                 return;
               }
               Alert.alert(
-                "Account blocked",
+                t("block.done"),
                 result.localOnly
-                  ? "This account is hidden on this device only."
-                  : "This account is blocked on UMTUBA and hidden on this device."
+                  ? t("block.localOnly")
+                  : t("block.serverAndLocal")
               );
               router.replace("/(tabs)/messages");
             })();
@@ -425,22 +427,26 @@ export default function ConversationThreadScreen() {
         },
       ]
     );
-  }, [peerId, router, user?.id]);
+  }, [peerId, router, t, user?.id]);
 
   const onSafetyMenu = useCallback(() => {
-    Alert.alert("Safety", "Report or block this account?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Report account", onPress: onReportPeer },
-      { text: "Block account", style: "destructive", onPress: onBlockPeer },
+    Alert.alert(t("messages.safety"), t("messages.safetyBody"), [
+      { text: t("actions.cancel"), style: "cancel" },
+      { text: t("messages.reportAccount"), onPress: onReportPeer },
+      {
+        text: t("messages.blockAccount"),
+        style: "destructive",
+        onPress: onBlockPeer,
+      },
     ]);
-  }, [onBlockPeer, onReportPeer]);
+  }, [onBlockPeer, onReportPeer, t]);
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator
           color={colors.accentCyan}
-          accessibilityLabel="Loading conversation"
+          accessibilityLabel={t("messages.loadingConversation")}
         />
       </View>
     );
@@ -450,7 +456,9 @@ export default function ConversationThreadScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorTitle} accessibilityRole="header">
-          {unavailable ? "Conversation unavailable" : "Couldn’t load conversation"}
+          {unavailable
+            ? t("messages.conversationUnavailable")
+            : t("messages.conversationLoadFailed")}
         </Text>
         <Text style={styles.error} accessibilityRole="alert">
           {error}
@@ -459,16 +467,16 @@ export default function ConversationThreadScreen() {
           style={styles.retry}
           onPress={() => void loadThread()}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading conversation"
+          accessibilityLabel={t("messages.retryConversation")}
         >
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t("actions.retry")}</Text>
         </Pressable>
         <Pressable
           onPress={() => router.replace("/(tabs)/messages")}
           accessibilityRole="button"
-          accessibilityLabel="Back to conversations"
+          accessibilityLabel={t("messages.backToInbox")}
         >
-          <Text style={styles.link}>Back to Messages</Text>
+          <Text style={styles.link}>{t("messages.backToInbox")}</Text>
         </Pressable>
       </View>
     );
@@ -486,18 +494,18 @@ export default function ConversationThreadScreen() {
             style={styles.safetyBar}
             onPress={onSafetyMenu}
             accessibilityRole="button"
-            accessibilityLabel="Report or block this account"
+            accessibilityLabel={t("messages.safetyA11y")}
           >
-            <Text style={styles.safetyBarText}>Report or block</Text>
+            <Text style={styles.safetyBarText}>{t("messages.reportOrBlock")}</Text>
           </Pressable>
         ) : null}
         {peerTyping ? (
           <Text
             style={styles.typing}
             accessibilityLiveRegion="polite"
-            accessibilityLabel="Peer is typing"
+            accessibilityLabel={t("messages.typing")}
           >
-            Typing…
+            {t("messages.typing")}
           </Text>
         ) : null}
         {error ? (
@@ -516,10 +524,9 @@ export default function ConversationThreadScreen() {
           ]}
           ListEmptyComponent={
             <View style={styles.emptyThread}>
-              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyTitle}>{t("messages.threadEmpty")}</Text>
               <Text style={styles.emptyBody}>
-                Say hello to start the conversation. Attachments and calls are
-                not available yet.
+                {t("messages.threadEmptyBody")}
               </Text>
             </View>
           }
@@ -533,9 +540,9 @@ export default function ConversationThreadScreen() {
               <Pressable
                 onPress={() => void loadOlder()}
                 accessibilityRole="button"
-                accessibilityLabel="Load earlier messages"
+                accessibilityLabel={t("messages.loadEarlier")}
               >
-                <Text style={styles.loadEarlier}>Load earlier</Text>
+                <Text style={styles.loadEarlier}>{t("messages.loadEarlier")}</Text>
               </Pressable>
             ) : null
           }
@@ -546,7 +553,7 @@ export default function ConversationThreadScreen() {
                 item.isMine ? styles.mineWrap : styles.theirsWrap,
                 highlightId === item.id && styles.highlight,
               ]}
-              accessibilityLabel={`${item.isMine ? "You" : "Them"}: ${item.text}`}
+              accessibilityLabel={`${item.isMine ? t("messages.you") : t("messages.them")}: ${item.text}`}
             >
               <View
                 style={[
@@ -566,11 +573,11 @@ export default function ConversationThreadScreen() {
                 <Text style={styles.meta}>
                   {formatBubbleTime(item.sentAt)}
                   {item.status === "sending"
-                    ? " · Sending"
+                    ? ` · ${t("messages.sending")}`
                     : item.status === "failed"
-                      ? " · Failed"
+                      ? ` · ${t("messages.failed")}`
                       : item.isMine && item.receiptStatus
-                        ? ` · ${receiptLabel(item.receiptStatus)}`
+                        ? ` · ${t(MESSAGE_RECEIPT_KEYS[item.receiptStatus])}`
                         : ""}
                 </Text>
               </View>
@@ -578,10 +585,10 @@ export default function ConversationThreadScreen() {
                 <Pressable
                   onPress={() => void send(item.clientId, item.text)}
                   accessibilityRole="button"
-                  accessibilityLabel="Retry sending message"
+                  accessibilityLabel={t("messages.retrySend")}
                   style={styles.retryChip}
                 >
-                  <Text style={styles.link}>Retry</Text>
+                  <Text style={styles.link}>{t("actions.retry")}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -601,12 +608,12 @@ export default function ConversationThreadScreen() {
             style={styles.input}
             value={draft}
             onChangeText={onChangeDraft}
-            placeholder="Message"
+            placeholder={t("messages.composer")}
             placeholderTextColor={colors.textSubtle}
             multiline
             maxLength={MESSAGE_MAX_LENGTH}
-            accessibilityLabel="Message composer"
-            accessibilityHint="Type a text message. Attachments are not available yet."
+            accessibilityLabel={t("messages.composerA11y")}
+            accessibilityHint={t("messages.composerHint")}
           />
           <Pressable
             style={[
@@ -616,20 +623,19 @@ export default function ConversationThreadScreen() {
             onPress={() => void send()}
             disabled={!draft.trim() || sending}
             accessibilityRole="button"
-            accessibilityLabel="Send message"
+            accessibilityLabel={t("messages.send")}
             accessibilityState={{ disabled: !draft.trim() || sending, busy: sending }}
           >
             {sending ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={styles.sendText}>Send</Text>
+              <Text style={styles.sendText} numberOfLines={1}>
+                {t("actions.send")}
+              </Text>
             )}
           </Pressable>
         </View>
-        <Text style={styles.gateHint}>
-          Text only — attachments, voice notes, stickers, groups, and calls are
-          not available yet.
-        </Text>
+        <Text style={styles.gateHint}>{t("messages.gateHint")}</Text>
       </View>
     </KeyboardAvoidingView>
   );

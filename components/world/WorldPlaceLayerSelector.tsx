@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { WorldPlaceLayerControlState } from "@/src/lib/world/experience";
 import type { WorldPlaceLayerId } from "@/src/lib/world/places";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldPlaceLayerSelectorProps = {
@@ -16,18 +17,19 @@ export function WorldPlaceLayerSelector({
   layers,
   onToggle,
 }: WorldPlaceLayerSelectorProps) {
+  const { t } = useTranslation();
   if (layers.length === 0) return null;
 
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.heading} accessibilityRole="header">
-        Places
+        {t("world.category.places")}
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
-        accessibilityLabel="World place layers"
+        accessibilityLabel={t("world.placeLayers")}
       >
         {layers.map((layer) => {
           const disabled = !layer.enabled;

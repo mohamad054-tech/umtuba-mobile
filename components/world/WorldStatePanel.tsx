@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldStatePanelProps = {
@@ -17,6 +18,7 @@ export function WorldStatePanel({
   busy = false,
   variant = "unavailable",
 }: WorldStatePanelProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text
@@ -38,10 +40,12 @@ export function WorldStatePanel({
           onPress={onRetry}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading World"
+          accessibilityLabel={t("world.retryA11y")}
           accessibilityState={{ disabled: busy }}
         >
-          <Text style={styles.retryText}>{busy ? "Retrying…" : "Retry"}</Text>
+          <Text style={styles.retryText}>
+            {busy ? t("status.retrying") : t("actions.retry")}
+          </Text>
         </Pressable>
       ) : null}
     </View>

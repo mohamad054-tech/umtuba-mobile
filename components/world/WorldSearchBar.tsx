@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import { WORLD_KIND_KEYS, useTranslation } from "@/src/lib/i18n";
 import type { WorldSearchResult } from "@/src/lib/world/search";
 import { colors } from "@/src/theme/colors";
 
@@ -20,23 +21,8 @@ type WorldSearchBarProps = {
   onClear?: () => void;
 };
 
-function sourceBadge(sourceType: WorldSearchResult["sourceType"]): string {
-  switch (sourceType) {
-    case "places":
-      return "Place";
-    case "education":
-      return "Education";
-    case "users":
-      return "User";
-    case "commerce":
-      return "Commerce";
-    case "events":
-      return "Event";
-    case "games":
-      return "Game";
-    default:
-      return "Result";
-  }
+function sourceBadgeKey(sourceType: WorldSearchResult["sourceType"]) {
+  return WORLD_KIND_KEYS[sourceType] ?? ("world.kind.result" as const);
 }
 
 /**
@@ -49,6 +35,7 @@ export function WorldSearchBar({
   onSelectResult,
   onClear,
 }: WorldSearchBarProps) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const showPanel = query.trim().length > 0 && focused;
 
@@ -63,20 +50,20 @@ export function WorldSearchBar({
   };
 
   return (
-    <View style={styles.wrap} accessibilityLabel="World search">
+    <View style={styles.wrap} accessibilityLabel={t("world.search")}>
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
           value={query}
           onChangeText={onChangeQuery}
           onFocus={() => setFocused(true)}
-          placeholder="Search World"
+          placeholder={t("world.search")}
           placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          accessibilityLabel="Search World"
-          accessibilityHint="Search places, education, users, games, commerce, and events"
+          accessibilityLabel={t("world.search")}
+          accessibilityHint={t("world.searchHint")}
           onSubmitEditing={dismissResults}
         />
         {query.length > 0 ? (
@@ -88,10 +75,10 @@ export function WorldSearchBar({
               dismissResults();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Clear search"
+            accessibilityLabel={t("world.clearSearch")}
             hitSlop={8}
           >
-            <Text style={styles.clearText}>Clear</Text>
+            <Text style={styles.clearText}>{t("world.clear")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -100,21 +87,25 @@ export function WorldSearchBar({
         <View style={styles.resultsPanel} accessibilityRole="list">
           <View style={styles.resultsHeader}>
             <Text style={styles.resultsHeading}>
-              {empty ? "No results" : `${results.length} result${results.length === 1 ? "" : "s"}`}
+              {empty
+                ? t("world.noResults")
+                : results.length === 1
+                  ? t("world.resultCount", { values: { count: results.length } })
+                  : t("world.resultsCount", { values: { count: results.length } })}
             </Text>
             <Pressable
               onPress={dismissResults}
               style={styles.dismissButton}
               accessibilityRole="button"
-              accessibilityLabel="Close search results"
+              accessibilityLabel={t("world.closeResults")}
               hitSlop={8}
             >
-              <Text style={styles.dismissText}>Close</Text>
+              <Text style={styles.dismissText}>{t("actions.close")}</Text>
             </Pressable>
           </View>
           {empty ? (
             <Text style={styles.emptyText} accessibilityRole="text">
-              Try another name or city.
+              {t("world.tryAnother")}
             </Text>
           ) : (
             <ScrollView
@@ -145,7 +136,7 @@ export function WorldSearchBar({
                     </Text>
                   </View>
                   <Text style={styles.resultBadge}>
-                    {sourceBadge(result.sourceType)}
+                    {t(sourceBadgeKey(result.sourceType))}
                   </Text>
                 </Pressable>
               ))}

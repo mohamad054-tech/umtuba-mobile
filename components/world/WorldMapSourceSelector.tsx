@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { WorldMapSourceControlState } from "@/src/lib/world/experience";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type WorldMapSourceSelectorProps = {
@@ -15,18 +16,19 @@ export function WorldMapSourceSelector({
   sources,
   onSelect,
 }: WorldMapSourceSelectorProps) {
+  const { t } = useTranslation();
   if (sources.length === 0) return null;
 
   return (
     <View style={styles.wrap} accessibilityRole="summary">
       <Text style={styles.heading} accessibilityRole="header">
-        Map
+        {t("world.map")}
       </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
-        accessibilityLabel="World map sources"
+        accessibilityLabel={t("world.mapSources")}
       >
         {sources.map((source) => {
           const disabled = !source.enabled;
