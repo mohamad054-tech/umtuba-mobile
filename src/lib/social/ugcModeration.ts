@@ -26,6 +26,7 @@ import {
 } from "@/src/lib/social/ugcModerationShared";
 
 export {
+  filterConversationsByBlockedPeers,
   filterWatchItemsForViewer,
   isAllowedUgcReportReason,
   isUgcBlockBackendConfigured,

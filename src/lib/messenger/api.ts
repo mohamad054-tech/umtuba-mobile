@@ -484,6 +484,22 @@ export async function setConversationTyping(
   return { ok: true, done: true };
 }
 
+export async function getConversationPeerId(
+  supabase: SupabaseClient,
+  conversationId: string
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc("list_conversation_peers", {
+    p_conversation_ids: [conversationId],
+  });
+  if (error) return null;
+  const peers = (data ?? []) as Array<{
+    conversation_id: string;
+    user_id?: string;
+  }>;
+  const peer = peers.find((row) => row.conversation_id === conversationId);
+  return peer?.user_id ?? null;
+}
+
 export async function getConversationPeerState(
   supabase: SupabaseClient,
   conversationId: string

@@ -25,6 +25,8 @@ import {
   preserveDeepLinkMessageId,
 } from "@/src/lib/messenger/threadState";
 import type { Conversation } from "@/src/lib/messenger/types";
+import { loadBlockedUsers } from "@/src/lib/social/ugcModeration";
+import { filterConversationsByBlockedPeers } from "@/src/lib/social/ugcModerationShared";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -67,7 +69,12 @@ export default function MessagesInboxScreen() {
           setPhase(result.unavailable ? "unavailable" : "error");
           return;
         }
-        const next = dedupeConversations(result.conversations);
+        const blocked = await loadBlockedUsers();
+        const blockedIds = new Set(blocked.map((row) => row.userId));
+        const next = filterConversationsByBlockedPeers(
+          dedupeConversations(result.conversations),
+          blockedIds
+        );
         setConversations(next);
         setPhase(next.length === 0 ? "empty" : "ready");
       } finally {

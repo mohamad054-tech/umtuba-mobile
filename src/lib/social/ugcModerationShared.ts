@@ -148,3 +148,12 @@ export function filterWatchItemsForViewer<
     return true;
   });
 }
+
+export function filterConversationsByBlockedPeers<
+  T extends { peerId?: string | null },
+>(conversations: T[], blockedUserIds: ReadonlySet<string>): T[] {
+  return conversations.filter((row) => {
+    const peerId = row.peerId;
+    return !peerId || !blockedUserIds.has(peerId);
+  });
+}

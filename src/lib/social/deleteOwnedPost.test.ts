@@ -51,26 +51,28 @@ describe("UAF-12 own content delete — mobile consume", () => {
     vi.clearAllMocks();
   });
 
-  it("OWNER_DELETE_ALLOWED: shows the delete control only to the owner", () => {
+  it("shows the delete control only to the owner", () => {
     expect(viewerMaySeeDeleteControl(OWNER, OWNER)).toBe(true);
     expect(viewerMaySeeDeleteControl(OTHER, OWNER)).toBe(false);
     expect(viewerMaySeeDeleteControl(null, OWNER)).toBe(false);
   });
 
-  it("ANON denied: rejects unsigned delete attempts", async () => {
-    const supabase = createSupabaseMock({
-      load: { data: null, error: null },
-    });
-    const result = await deletePostForOwner(supabase as never, "not-a-uuid", 42);
-    expect(result).toEqual({
+  it("fails closed for auth and invalid post ids before touching posts", async () => {
+    const supabase = { from: vi.fn() };
+    expect(await deletePostForOwner(supabase as never, "not-a-uuid", 42)).toEqual({
       ok: false,
       code: "auth_required",
       message: OWN_CONTENT_DELETE_ERRORS.authRequired,
     });
+    expect(await deletePostForOwner(supabase as never, OWNER, 0)).toEqual({
+      ok: false,
+      code: "invalid",
+      message: OWN_CONTENT_DELETE_ERRORS.invalid,
+    });
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("NON_OWNER denied: rejects a non-owner after load", async () => {
+  it("rejects a non-owner after load", async () => {
     const supabase = createSupabaseMock({
       load: {
         data: {
@@ -91,7 +93,18 @@ describe("UAF-12 own content delete — mobile consume", () => {
     });
   });
 
-  it("OWNER_DELETE_ALLOWED: deletes when the signed-in user owns the post", async () => {
+  it("returns not_found when the owned post is already gone", async () => {
+    const supabase = createSupabaseMock({
+      load: { data: null, error: null },
+    });
+    expect(await deletePostForOwner(supabase as never, OWNER, 99)).toEqual({
+      ok: false,
+      code: "not_found",
+      message: OWN_CONTENT_DELETE_ERRORS.notFound,
+    });
+  });
+
+  it("deletes when the signed-in user owns the post", async () => {
     const supabase = createSupabaseMock({
       load: {
         data: {

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   BackHandler,
   FlatList,
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   assertConversationMembership,
+  getConversationPeerId,
   getConversationPeerState,
   listMessagesForConversation,
   markConversationRead,
@@ -47,6 +49,17 @@ import {
   receiptLabel,
   type Message,
 } from "@/src/lib/messenger/types";
+import {
+  blockUserLocally,
+  reportWatchUser,
+} from "@/src/lib/social/ugcModeration";
+import {
+  UGC_REPORT_REASON_LABELS,
+  UGC_REPORT_REASONS,
+  viewerMaySeeBlockControl,
+  viewerMaySeeReportControl,
+  type UgcReportReason,
+} from "@/src/lib/social/ugcModerationShared";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
@@ -77,6 +90,7 @@ export default function ConversationThreadScreen() {
   const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [appActive, setAppActive] = useState(true);
+  const [peerId, setPeerId] = useState<string | null>(null);
 
   const scrollToEnd = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -103,10 +117,11 @@ export default function ConversationThreadScreen() {
         return;
       }
 
-      const peer = await getConversationPeerState(
-        getSupabase(),
-        conversationId
-      );
+      const [peer, loadedPeerId] = await Promise.all([
+        getConversationPeerState(getSupabase(), conversationId),
+        getConversationPeerId(getSupabase(), conversationId),
+      ]);
+      if (loadedPeerId) setPeerId(loadedPeerId);
       const peerRead = peer.ok ? peer.peerLastReadAt : null;
       if (peer.ok) {
         setPeerTyping(peer.isTyping);
@@ -351,6 +366,75 @@ export default function ConversationThreadScreen() {
     [conversationId, draft, scrollToEnd, sending, user]
   );
 
+  const onReportPeer = useCallback(() => {
+    if (!user?.id || !peerId) return;
+    if (!viewerMaySeeReportControl(user.id, peerId)) return;
+    Alert.alert("Report account", "Why are you reporting this account?", [
+      { text: "Cancel", style: "cancel" },
+      ...UGC_REPORT_REASONS.map((reason: UgcReportReason) => ({
+        text: UGC_REPORT_REASON_LABELS[reason],
+        onPress: () => {
+          void (async () => {
+            const result = await reportWatchUser({
+              viewerId: user.id,
+              targetUserId: peerId,
+              reason,
+            });
+            Alert.alert(
+              result.ok ? "Report submitted" : "Unable to report",
+              result.ok
+                ? "Thanks. Moderators received this account report."
+                : result.message
+            );
+          })();
+        },
+      })),
+    ]);
+  }, [peerId, user?.id]);
+
+  const onBlockPeer = useCallback(() => {
+    if (!user?.id || !peerId) return;
+    if (!viewerMaySeeBlockControl(user.id, peerId)) return;
+    Alert.alert(
+      "Block account",
+      "You will no longer see this account's messages on this device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              const result = await blockUserLocally({
+                viewerId: user.id,
+                targetUserId: peerId,
+              });
+              if (!result.ok) {
+                Alert.alert("Block failed", result.message);
+                return;
+              }
+              Alert.alert(
+                "Account blocked",
+                result.localOnly
+                  ? "This account is hidden on this device only."
+                  : "This account is blocked on UMTUBA and hidden on this device."
+              );
+              router.replace("/(tabs)/messages");
+            })();
+          },
+        },
+      ]
+    );
+  }, [peerId, router, user?.id]);
+
+  const onSafetyMenu = useCallback(() => {
+    Alert.alert("Safety", "Report or block this account?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Report account", onPress: onReportPeer },
+      { text: "Block account", style: "destructive", onPress: onBlockPeer },
+    ]);
+  }, [onBlockPeer, onReportPeer]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -397,6 +481,16 @@ export default function ConversationThreadScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 24}
     >
       <View style={styles.root}>
+        {peerId && user?.id && viewerMaySeeReportControl(user.id, peerId) ? (
+          <Pressable
+            style={styles.safetyBar}
+            onPress={onSafetyMenu}
+            accessibilityRole="button"
+            accessibilityLabel="Report or block this account"
+          >
+            <Text style={styles.safetyBarText}>Report or block</Text>
+          </Pressable>
+        ) : null}
         {peerTyping ? (
           <Text
             style={styles.typing}
@@ -543,6 +637,17 @@ export default function ConversationThreadScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  safetyBar: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  safetyBarText: {
+    color: colors.accentCyan,
+    fontWeight: "700",
+  },
   center: {
     flex: 1,
     backgroundColor: colors.bg,
