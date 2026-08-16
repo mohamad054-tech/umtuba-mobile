@@ -31,6 +31,7 @@ import {
   getReferralAttribution,
 } from "@/src/lib/auth/referralAttribution";
 import type { UserProfile } from "@/src/lib/auth/types";
+import { useTranslation } from "@/src/lib/i18n";
 import { unregisterPushOnLogout } from "@/src/lib/push/service";
 import { getSupabase } from "@/src/lib/supabase/client";
 
@@ -95,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [configError, setConfigError] = useState<string | null>(null);
   const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const hydratingRef = useRef(true);
+  const { t } = useTranslation();
 
   const applySession = useCallback(async (next: Session | null) => {
     setSession(next);
@@ -151,7 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    void restore();
+    void restore().finally(() => {
+      hydratingRef.current = false;
+    });
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const supabase = getSupabase();
@@ -161,6 +166,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (event === "SIGNED_OUT") {
           setPasswordRecoveryPending(false);
+        }
+        // INITIAL_SESSION(null) on a storage/decrypt error must not wipe a
+        // session that restore() already applied from the durable copy.
+        if (
+          hydratingRef.current &&
+          event === "INITIAL_SESSION" &&
+          !nextSession
+        ) {
+          return;
         }
         void applySession(nextSession);
       });
@@ -198,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       setError(null);
       if (!isValidEmail(email)) {
-        throw new Error("Please enter a valid email address.");
+        throw new Error(t("auth.forgot.invalidEmail"));
       }
       const passwordError = validatePassword(password);
       if (passwordError) {
@@ -220,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await applySession(data.session);
     },
-    [applySession]
+    [applySession, t]
   );
 
   const signUp = useCallback(
@@ -237,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const username = normalizeUsername(input.username);
 
       if (!isValidEmail(email)) {
-        throw new Error("Please enter a valid email address.");
+        throw new Error(t("auth.forgot.invalidEmail"));
       }
       const passwordError = validatePassword(input.password);
       if (passwordError) {
@@ -301,7 +315,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await applySession(data.session);
       await claimReferralAfterSignup();
     },
-    [applySession]
+    [applySession, t]
   );
 
   const signOut = useCallback(async () => {

@@ -36,31 +36,25 @@ function LiveLobbyScreen() {
   const { t } = useTranslation();
   const [phase, setPhase] = useState<LiveLobbyPhase>("loading");
   const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (opts?: { soft?: boolean }) => {
     const soft = opts?.soft === true;
     if (!soft) setPhase("loading");
-    setError(null);
     try {
       const result = await loadLiveLobby();
       if (!result.ok) {
         setSessions([]);
-        setError(result.message);
         setPhase(result.unavailable ? "unavailable" : "error");
         return;
       }
       setSessions(result.sessions);
       setPhase(result.sessions.length === 0 ? "empty" : "ready");
-    } catch (err) {
+    } catch {
       setSessions([]);
-      setError(
-        err instanceof Error ? err.message : t("live.unable")
-      );
       setPhase("error");
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -135,7 +129,7 @@ function LiveLobbyScreen() {
             <LiveStatePanel
               variant="unavailable"
               title={t("live.unavailable")}
-              body={error ?? t("live.unavailableBody")}
+              body={t("live.unavailableBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />
@@ -143,7 +137,7 @@ function LiveLobbyScreen() {
             <LiveStatePanel
               variant="error"
               title={t("live.loadFailed")}
-              body={error ?? t("live.loadFailedBody")}
+              body={t("live.loadFailedBody")}
               onRetry={() => void load()}
               busy={refreshing}
             />

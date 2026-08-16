@@ -22,6 +22,26 @@ function TabLabel({
   );
 }
 
+function TabBarCaption({
+  label,
+  color,
+}: {
+  label: string;
+  color: ColorValue;
+}) {
+  return (
+    <Text
+      style={{ color, fontSize: 10, fontWeight: "600", textAlign: "center" }}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.65}
+      allowFontScaling={false}
+    >
+      {label}
+    </Text>
+  );
+}
+
 export default function TabLayout() {
   const { session, loading, passwordRecoveryPending } = useAuth();
   const { t } = useTranslation();
@@ -39,6 +59,10 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.accentCyan,
         tabBarInactiveTintColor: colors.textSubtle,
+        tabBarAllowFontScaling: false,
+        tabBarLabel: ({ children, color }) => (
+          <TabBarCaption label={String(children)} color={color} />
+        ),
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
