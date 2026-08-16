@@ -10,6 +10,7 @@ import {
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import {
   recoveryFailureMessage,
   updatePasswordWithSession,
@@ -40,6 +41,7 @@ export default function UpdatePasswordScreen() {
     restore,
     signOut,
   } = useAuth();
+  const { t } = useTranslation();
 
   const linkError = useMemo(
     () => firstParam(params.error),
@@ -92,7 +94,7 @@ export default function UpdatePasswordScreen() {
       router.replace("/(auth)/login");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to update password."
+        err instanceof Error ? err.message : t("auth.update.failed")
       );
     } finally {
       setBusy(false);
@@ -104,21 +106,21 @@ export default function UpdatePasswordScreen() {
 
   return (
     <AuthScreen
-      title="Choose a new password"
+      title={t("auth.update.title")}
       subtitle={
         showMissingSession
-          ? "This reset link is missing, invalid, or expired."
-          : "Enter a new password for your UMTUBA account."
+          ? t("auth.update.missing")
+          : t("auth.update.subtitle")
       }
       footer={
         <Link href="/(auth)/forgot-password" asChild>
           <Pressable
             accessibilityRole="link"
-            accessibilityLabel="Request a new reset link"
+            accessibilityLabel={t("auth.update.requestNew")}
           >
             <Text style={styles.link}>
-              Need a new link?{" "}
-              <Text style={styles.linkStrong}>Request reset</Text>
+              {t("auth.update.needLink")}{" "}
+              <Text style={styles.linkStrong}>{t("auth.update.requestReset")}</Text>
             </Text>
           </Pressable>
         </Link>
@@ -135,13 +137,13 @@ export default function UpdatePasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel="Request a new password reset"
           >
-            <Text style={styles.buttonText}>Request a new link</Text>
+            <Text style={styles.buttonText}>{t("auth.update.requestNew")}</Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace("/(auth)/login")}
             accessibilityRole="button"
           >
-            <Text style={styles.back}>Back to sign in</Text>
+            <Text style={styles.back}>{t("auth.forgot.backToSignIn")}</Text>
           </Pressable>
         </>
       ) : (
@@ -151,24 +153,24 @@ export default function UpdatePasswordScreen() {
             secureTextEntry
             autoComplete="new-password"
             textContentType="newPassword"
-            placeholder="New password"
+            placeholder={t("auth.update.newPassword")}
             placeholderTextColor={colors.textSubtle}
             value={password}
             onChangeText={setPassword}
             editable={!busy && !success}
-            accessibilityLabel="New password"
+            accessibilityLabel={t("auth.update.newPassword")}
           />
           <TextInput
             style={styles.input}
             secureTextEntry
             autoComplete="new-password"
             textContentType="newPassword"
-            placeholder="Confirm new password"
+            placeholder={t("auth.update.confirmPassword")}
             placeholderTextColor={colors.textSubtle}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             editable={!busy && !success}
-            accessibilityLabel="Confirm new password"
+            accessibilityLabel={t("auth.update.confirmPassword")}
           />
           {error ? (
             <Text style={styles.error} accessibilityRole="alert">
@@ -177,7 +179,7 @@ export default function UpdatePasswordScreen() {
           ) : null}
           {success ? (
             <Text style={styles.success} accessibilityLiveRegion="polite">
-              Password updated. Sign in with your new password.
+              {t("auth.update.success")}
             </Text>
           ) : null}
           <Pressable
@@ -185,19 +187,19 @@ export default function UpdatePasswordScreen() {
             onPress={() => void onSubmit()}
             disabled={busy || success || !canUpdate}
             accessibilityRole="button"
-            accessibilityLabel="Update password"
+            accessibilityLabel={t("auth.update.submit")}
           >
             {busy ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={styles.buttonText}>Update password</Text>
+              <Text style={styles.buttonText}>{t("auth.update.submit")}</Text>
             )}
           </Pressable>
           <Pressable
             onPress={() => router.replace("/(auth)/login")}
             accessibilityRole="button"
           >
-            <Text style={styles.back}>Cancel</Text>
+            <Text style={styles.back}>{t("actions.cancel")}</Text>
           </Pressable>
         </>
       )}

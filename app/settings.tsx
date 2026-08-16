@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { getLocaleDefinition, useTranslation } from "@/src/lib/i18n";
+import { chevronGlyph } from "@/src/lib/i18n/rtl";
 import {
   formatBuildLabel,
   getSupportUrl,
@@ -63,6 +65,7 @@ function SettingsRowView({
   busyId: string | null;
   onNavigate: (href: Href) => void;
 }) {
+  const { locale, t } = useTranslation();
   const busy = busyId === row.id;
   const showChevron =
     row.kind === "link" || row.kind === "external" || row.kind === "action";
@@ -85,7 +88,7 @@ function SettingsRowView({
         <ActivityIndicator color={colors.accentCyan} />
       ) : showChevron ? (
         <Text style={styles.chevron} accessible={false}>
-          ›
+          {chevronGlyph(locale)}
         </Text>
       ) : null}
     </>
@@ -112,7 +115,7 @@ function SettingsRowView({
         accessibilityRole="button"
         accessibilityLabel={row.label}
         accessibilityHint={
-          row.accessibilityHint ?? "Not available in this version"
+          row.accessibilityHint ?? t("settings.notAvailableVersion")
         }
       >
         {content}
@@ -151,6 +154,7 @@ function SettingsRowView({
 
 export default function SettingsScreen() {
   const { signOut, user, clearError } = useAuth();
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -169,30 +173,30 @@ export default function SettingsScreen() {
   const openSupport = useCallback(async (key: SupportLinkKey) => {
     const url = resolveSupportUrl(getSupportUrl(key));
     if (!url) {
-      Alert.alert("Unavailable", "This link is not available.");
+      Alert.alert(t("settings.unavailableTitle"), t("settings.linkUnavailable"));
       return;
     }
     try {
       const can = await Linking.canOpenURL(url);
       if (!can) {
-        Alert.alert("Unavailable", "Unable to open this page on this device.");
+        Alert.alert(t("settings.unavailableTitle"), t("settings.linkUnavailableDevice"));
         return;
       }
       await Linking.openURL(url);
     } catch {
-      Alert.alert("Unavailable", "Unable to open this page right now.");
+      Alert.alert(t("settings.unavailableTitle"), t("settings.linkUnavailableNow"));
     }
-  }, []);
+  }, [t]);
 
   const showUnavailable = useCallback((title: string, body: string) => {
     Alert.alert(title, body);
   }, []);
 
   const onSignOut = useCallback(() => {
-    Alert.alert("Sign out", "End your session on this device?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("settings.signOut"), t("settings.signOutConfirm"), [
+      { text: t("actions.cancel"), style: "cancel" },
       {
-        text: "Sign out",
+        text: t("settings.signOut"),
         style: "destructive",
         onPress: () => {
           void (async () => {
@@ -203,8 +207,8 @@ export default function SettingsScreen() {
               router.replace("/(auth)/login");
             } catch (err) {
               const message =
-                err instanceof Error ? err.message : "Unable to sign out.";
-              Alert.alert("Sign out failed", message);
+                err instanceof Error ? err.message : t("settings.signOutUnable");
+              Alert.alert(t("settings.signOutFailed"), message);
             } finally {
               setBusyId(null);
             }
@@ -212,106 +216,104 @@ export default function SettingsScreen() {
         },
       },
     ]);
-  }, [clearError, router, signOut]);
+  }, [clearError, router, signOut, t]);
 
   const accountRows: SettingsRow[] = [
     {
       id: "edit-profile",
-      label: "Edit profile",
+      label: t("settings.editProfile"),
       kind: "unavailable",
-      value: "Not available yet",
+      value: t("settings.notAvailableYet"),
       onPress: () =>
-        showUnavailable(
-          "Edit profile",
-          "In-app profile editing is not available in this version."
-        ),
-      accessibilityHint: "Not available yet",
+        showUnavailable(t("settings.editProfile"), t("settings.editProfileBody")),
+      accessibilityHint: t("settings.notAvailableYet"),
     },
     {
       id: "change-password",
-      label: "Change password",
+      label: t("settings.changePassword"),
       kind: "link",
       href: "/change-password" as Href,
-      accessibilityHint: "Update your account password",
+      accessibilityHint: t("settings.changePasswordHint"),
     },
     {
       id: "logout",
-      label: "Sign out",
+      label: t("settings.signOut"),
       kind: "action",
       destructive: true,
       onPress: onSignOut,
-      accessibilityHint: "Ends your session on this device",
+      accessibilityHint: t("settings.signOutConfirm"),
     },
     {
       id: "delete-account",
-      label: "Delete account",
+      label: t("settings.deleteAccount"),
       kind: "external",
       destructive: true,
       onPress: () => void openSupport("accountDeletion"),
-      accessibilityHint:
-        "Opens the UMTUBA account deletion page in your browser",
+      accessibilityHint: t("settings.deleteAccountHint"),
     },
   ];
 
   const privacyRows: SettingsRow[] = [
     {
       id: "privacy-settings",
-      label: "Privacy settings",
+      label: t("settings.privacySettings"),
       kind: "unavailable",
-      value: "Not available yet",
+      value: t("settings.notAvailableYet"),
       onPress: () =>
         showUnavailable(
-          "Privacy settings",
-          "Privacy controls are not available in this version."
+          t("settings.privacySettings"),
+          t("settings.privacyUnavailable")
         ),
     },
     {
       id: "notification-inbox",
-      label: "Notifications inbox",
+      label: t("settings.notificationsInbox"),
       kind: "link",
       href: "/notifications",
     },
     {
       id: "system-notifications",
-      label: "System notification settings",
+      label: t("settings.systemNotifications"),
       kind: "action",
       onPress: () => {
         void Linking.openSettings();
       },
-      accessibilityHint: "Opens device settings for notification permissions",
+      accessibilityHint: t("settings.systemNotificationsHint"),
     },
     {
       id: "blocked-users",
-      label: "Blocked users",
+      label: t("settings.blockedUsers"),
       kind: "link",
       href: "/blocked-users" as Href,
-      accessibilityHint: "Accounts hidden on this device",
+      accessibilityHint: t("settings.blockedUsersHint"),
     },
   ];
 
   const appRows: SettingsRow[] = [
     {
       id: "theme",
-      label: "Theme",
+      label: t("settings.theme"),
       kind: "info",
-      value: "Dark",
+      value: t("settings.themeDark"),
     },
     {
       id: "language",
-      label: "Language",
-      kind: "info",
-      value: "English",
+      label: t("settings.language"),
+      kind: "link",
+      href: "/language" as Href,
+      value: getLocaleDefinition(locale).nativeName,
+      accessibilityHint: t("settings.languageDescription"),
     },
     {
       id: "about",
-      label: "About",
+      label: t("settings.about"),
       kind: "external",
       onPress: () => void openSupport("about"),
-      accessibilityHint: "Opens the UMTUBA website",
+      accessibilityHint: t("settings.aboutHint"),
     },
     {
       id: "app-version",
-      label: "App version",
+      label: t("settings.appVersion"),
       kind: "info",
       value: appInfo.appVersion,
     },
@@ -320,25 +322,25 @@ export default function SettingsScreen() {
   const supportRows: SettingsRow[] = [
     {
       id: "help",
-      label: "Help",
+      label: t("settings.help"),
       kind: "external",
       onPress: () => void openSupport("help"),
     },
     {
       id: "contact",
-      label: "Contact",
+      label: t("settings.contact"),
       kind: "external",
       onPress: () => void openSupport("contact"),
     },
     {
       id: "privacy-policy",
-      label: "Privacy Policy",
+      label: t("settings.privacyPolicy"),
       kind: "external",
       onPress: () => void openSupport("privacy"),
     },
     {
       id: "terms",
-      label: "Terms",
+      label: t("settings.terms"),
       kind: "external",
       onPress: () => void openSupport("terms"),
     },
@@ -347,13 +349,13 @@ export default function SettingsScreen() {
   const developerRows: SettingsRow[] = [
     {
       id: "dev-app-version",
-      label: "App version",
+      label: t("settings.appVersion"),
       kind: "info",
       value: appInfo.appVersion,
     },
     {
       id: "dev-build",
-      label: "Build version",
+      label: t("settings.buildVersion"),
       kind: "info",
       value: formatBuildLabel(appInfo),
     },
@@ -361,7 +363,7 @@ export default function SettingsScreen() {
       ? ([
           {
             id: "dev-debug",
-            label: "Debug info",
+            label: t("settings.debugInfo"),
             kind: "info",
             value: [
               `platform=${appInfo.platform}`,
@@ -385,10 +387,10 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.subtitle}>
-          Account, privacy, and app preferences.
+          {t("settings.subtitle")}
         </Text>
 
-        <Section title="Account">
+        <Section title={t("settings.sectionAccount")}>
           {accountRows.map((row, index) => (
             <View key={row.id}>
               {index > 0 ? <View style={styles.divider} /> : null}
@@ -401,7 +403,7 @@ export default function SettingsScreen() {
           ))}
         </Section>
 
-        <Section title="Privacy">
+        <Section title={t("settings.sectionPrivacy")}>
           {privacyRows.map((row, index) => (
             <View key={row.id}>
               {index > 0 ? <View style={styles.divider} /> : null}
@@ -414,7 +416,7 @@ export default function SettingsScreen() {
           ))}
         </Section>
 
-        <Section title="App">
+        <Section title={t("settings.sectionApp")}>
           {appRows.map((row, index) => (
             <View key={row.id}>
               {index > 0 ? <View style={styles.divider} /> : null}
@@ -427,7 +429,7 @@ export default function SettingsScreen() {
           ))}
         </Section>
 
-        <Section title="Support">
+        <Section title={t("settings.sectionSupport")}>
           {supportRows.map((row, index) => (
             <View key={row.id}>
               {index > 0 ? <View style={styles.divider} /> : null}
@@ -440,7 +442,7 @@ export default function SettingsScreen() {
           ))}
         </Section>
 
-        <Section title="Developer">
+        <Section title={t("settings.sectionDeveloper")}>
           {developerRows.map((row, index) => (
             <View key={row.id}>
               {index > 0 ? <View style={styles.divider} /> : null}

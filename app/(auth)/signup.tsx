@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { AuthScreen } from "@/components/AuthScreen";
+import { useTranslation } from "@/src/lib/i18n";
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
@@ -20,6 +21,7 @@ import { colors } from "@/src/theme/colors";
 
 export default function SignupScreen() {
   const { signUp, session, loading, passwordRecoveryPending } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ ref?: string }>();
   const [fullName, setFullName] = useState("");
@@ -69,7 +71,7 @@ export default function SignupScreen() {
       router.replace(POST_AUTH_HREF);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to create your account."
+        err instanceof Error ? err.message : t("auth.signup.failed")
       );
     } finally {
       setBusy(false);
@@ -78,17 +80,17 @@ export default function SignupScreen() {
 
   return (
     <AuthScreen
-      title="Join UMTUBA"
-      subtitle="Create your account to watch, create, and earn."
+      title={t("auth.signup.title")}
+      subtitle={t("auth.signup.subtitle")}
       footer={
         <Link href="/(auth)/login" asChild>
           <Pressable
             accessibilityRole="link"
-            accessibilityLabel="Sign in to existing account"
+            accessibilityLabel={t("auth.signup.signIn")}
           >
             <Text style={styles.link}>
-              Already have an account?{" "}
-              <Text style={styles.linkStrong}>Sign in</Text>
+              {t("auth.signup.haveAccount")}{" "}
+              <Text style={styles.linkStrong}>{t("auth.signup.signIn")}</Text>
             </Text>
           </Pressable>
         </Link>
@@ -96,56 +98,56 @@ export default function SignupScreen() {
     >
       <TextInput
         style={styles.input}
-        placeholder="Full name"
+        placeholder={t("auth.signup.fullName")}
         placeholderTextColor={colors.textSubtle}
         value={fullName}
         onChangeText={setFullName}
         autoComplete="name"
         textContentType="name"
-        accessibilityLabel="Full name"
+        accessibilityLabel={t("auth.signup.fullName")}
       />
       <TextInput
         style={styles.input}
         autoCapitalize="none"
-        placeholder="Username"
+        placeholder={t("auth.signup.username")}
         placeholderTextColor={colors.textSubtle}
         value={username}
         onChangeText={setUsername}
         autoComplete="username"
         textContentType="username"
-        accessibilityLabel="Username"
+        accessibilityLabel={t("auth.signup.username")}
       />
       <TextInput
         style={styles.input}
         autoCapitalize="none"
         keyboardType="email-address"
-        placeholder="Email"
+        placeholder={t("auth.signup.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
         autoComplete="email"
         textContentType="emailAddress"
-        accessibilityLabel="Email"
+        accessibilityLabel={t("auth.signup.email")}
       />
       <TextInput
         style={styles.input}
         secureTextEntry
-        placeholder="Password"
+        placeholder={t("auth.signup.password")}
         placeholderTextColor={colors.textSubtle}
         value={password}
         onChangeText={setPassword}
         autoComplete="new-password"
         textContentType="newPassword"
-        accessibilityLabel="Password"
+        accessibilityLabel={t("auth.signup.password")}
       />
       <TextInput
         style={styles.input}
         autoCapitalize="characters"
-        placeholder="Referral code (optional)"
+        placeholder={t("auth.signup.referral")}
         placeholderTextColor={colors.textSubtle}
         value={referralCode}
         onChangeText={setReferralCode}
-        accessibilityLabel="Referral code, optional"
+        accessibilityLabel={t("auth.signup.referralA11y")}
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
@@ -157,12 +159,12 @@ export default function SignupScreen() {
         onPress={() => void onSubmit()}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Create account"
+        accessibilityLabel={t("auth.signup.create")}
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
         ) : (
-          <Text style={styles.buttonText}>Create account</Text>
+          <Text style={styles.buttonText}>{t("auth.signup.create")}</Text>
         )}
       </Pressable>
     </AuthScreen>

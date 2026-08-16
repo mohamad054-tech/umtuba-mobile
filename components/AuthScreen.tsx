@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GlobalBackButton } from "@/components/GlobalBackButton";
+import { useTranslation } from "@/src/lib/i18n";
+import { localeTextAlign, localeWritingDirection } from "@/src/lib/i18n/rtl";
 import { colors } from "@/src/theme/colors";
 
 type AuthScreenProps = {
@@ -25,6 +27,9 @@ export function AuthScreen({
   children,
   footer,
 }: AuthScreenProps) {
+  const { locale } = useTranslation();
+  const textAlign = localeTextAlign(locale);
+  const writingDirection = localeWritingDirection(locale);
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
@@ -41,8 +46,12 @@ export function AuthScreen({
           automaticallyAdjustKeyboardInsets
         >
           <Text style={styles.brand}>UMTUBA</Text>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          <Text style={[styles.title, { textAlign, writingDirection }]}>{title}</Text>
+          {subtitle ? (
+            <Text style={[styles.subtitle, { textAlign, writingDirection }]}>
+              {subtitle}
+            </Text>
+          ) : null}
           <View style={styles.form}>{children}</View>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </ScrollView>

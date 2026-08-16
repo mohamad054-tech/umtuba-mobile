@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 type IdentityHeaderProps = {
@@ -12,6 +13,7 @@ type IdentityHeaderProps = {
 
 export function IdentityHeader({ title = "UMTUBA" }: IdentityHeaderProps) {
   const { profile } = useAuth();
+  const { t } = useTranslation();
   const initial = profile?.avatar_initial || "U";
 
   return (
@@ -29,7 +31,7 @@ export function IdentityHeader({ title = "UMTUBA" }: IdentityHeaderProps) {
             style={styles.avatar}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Open profile"
+            accessibilityLabel={t("identity.openProfile")}
           >
             <Text style={styles.avatarText}>{initial}</Text>
           </Pressable>

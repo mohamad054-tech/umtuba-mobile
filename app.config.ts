@@ -26,6 +26,7 @@ const config: ExpoConfig = {
     infoPlist: {
       CFBundleDisplayName: "UMTUBA",
       UIStatusBarStyle: "UIStatusBarStyleLightContent",
+      // IOS_ONLY store-native English usage strings (not the in-app catalog).
       NSPhotoLibraryUsageDescription:
         "UMTUBA needs photo library access so you can choose a video to publish.",
       NSUserNotificationsUsageDescription:

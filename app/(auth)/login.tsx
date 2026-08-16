@@ -10,11 +10,13 @@ import {
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { colors } from "@/src/theme/colors";
 
 export default function LoginScreen() {
   const { signIn, session, loading, passwordRecoveryPending } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ error?: string }>();
   const [email, setEmail] = useState("");
@@ -41,7 +43,7 @@ export default function LoginScreen() {
       await signIn(email, password);
       router.replace(POST_AUTH_HREF);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to sign in.");
+      setError(err instanceof Error ? err.message : t("auth.login.failed"));
     } finally {
       setBusy(false);
     }
@@ -49,26 +51,26 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      title="Welcome back"
-      subtitle="Sign in to Watch, earn UM Points, and continue your journey."
+      title={t("auth.login.title")}
+      subtitle={t("auth.login.subtitle")}
       footer={
         <>
           <Link href="/(auth)/forgot-password" asChild>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel="Forgot password"
+              accessibilityLabel={t("auth.login.forgotPassword")}
             >
-              <Text style={styles.forgot}>Forgot password?</Text>
+              <Text style={styles.forgot}>{t("auth.login.forgotPassword")}</Text>
             </Pressable>
           </Link>
           <Link href="/(auth)/signup" asChild>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel="Create an account"
+              accessibilityLabel={t("auth.login.createOne")}
             >
               <Text style={styles.link}>
-                New here?{" "}
-                <Text style={styles.linkStrong}>Create an account</Text>
+                {t("auth.login.noAccount")}{" "}
+                <Text style={styles.linkStrong}>{t("auth.login.createOne")}</Text>
               </Text>
             </Pressable>
           </Link>
@@ -81,22 +83,22 @@ export default function LoginScreen() {
         keyboardType="email-address"
         autoComplete="email"
         textContentType="emailAddress"
-        placeholder="Email"
+        placeholder={t("auth.login.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
-        accessibilityLabel="Email"
+        accessibilityLabel={t("auth.login.email")}
       />
       <TextInput
         style={styles.input}
         secureTextEntry
         autoComplete="password"
         textContentType="password"
-        placeholder="Password"
+        placeholder={t("auth.login.password")}
         placeholderTextColor={colors.textSubtle}
         value={password}
         onChangeText={setPassword}
-        accessibilityLabel="Password"
+        accessibilityLabel={t("auth.login.password")}
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
@@ -108,12 +110,12 @@ export default function LoginScreen() {
         onPress={() => void onSubmit()}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Sign in"
+        accessibilityLabel={t("auth.login.submit")}
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
         ) : (
-          <Text style={styles.buttonText}>Sign in</Text>
+          <Text style={styles.buttonText}>{t("auth.login.submit")}</Text>
         )}
       </Pressable>
     </AuthScreen>

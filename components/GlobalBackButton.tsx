@@ -8,6 +8,8 @@ import {
 import { useCallback } from "react";
 import { Pressable, StyleSheet, Text, type ColorValue } from "react-native";
 
+import { useTranslation } from "@/src/lib/i18n";
+import { backGlyph } from "@/src/lib/i18n/rtl";
 import {
   applyGlobalBackDecision,
   previousRouteNameFromState,
@@ -54,6 +56,7 @@ export function GlobalBackButton({
   tintColor = colors.text,
 }: GlobalBackButtonProps) {
   const onPress = useGlobalBack();
+  const { t, locale } = useTranslation();
 
   return (
     <Pressable
@@ -61,10 +64,10 @@ export function GlobalBackButton({
       hitSlop={12}
       style={styles.hit}
       accessibilityRole="button"
-      accessibilityLabel="Back"
+      accessibilityLabel={t("actions.back")}
     >
       <Text style={[styles.arrow, { color: tintColor }]} allowFontScaling={false}>
-        ‹
+        {backGlyph(locale)}
       </Text>
     </Pressable>
   );

@@ -9,6 +9,7 @@ import "react-native-reanimated";
 
 import { GlobalBackButton } from "@/components/GlobalBackButton";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
+import { I18nProvider, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import { GLOBAL_STACK_HEADER_OPTIONS } from "@/src/lib/nav/globalBack";
@@ -122,27 +123,70 @@ function SplashGate({ children }: { children: ReactNode }) {
   }
 
   if (configError) {
-    return (
-      <View style={configStyles.root} accessibilityRole="alert">
-        <Text style={configStyles.brand}>UMTUBA</Text>
-        <Text style={configStyles.title}>Configuration needed</Text>
-        <Text style={configStyles.body}>
-          Copy `.env.example` to `.env` and set your public Supabase URL and
-          publishable key. Never add a service-role secret.
-        </Text>
-        <Pressable
-          style={configStyles.button}
-          onPress={() => void restore()}
-          accessibilityRole="button"
-          accessibilityLabel="Retry configuration"
-        >
-          <Text style={configStyles.buttonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ConfigNeeded onRetry={() => void restore()} />;
   }
 
   return <>{children}</>;
+}
+
+function ConfigNeeded({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={configStyles.root} accessibilityRole="alert">
+      <Text style={configStyles.brand}>UMTUBA</Text>
+      <Text style={configStyles.title}>{t("auth.config.title")}</Text>
+      <Text style={configStyles.body}>{t("auth.config.body")}</Text>
+      <Pressable
+        style={configStyles.button}
+        onPress={onRetry}
+        accessibilityRole="button"
+        accessibilityLabel={t("auth.config.retry")}
+      >
+        <Text style={configStyles.buttonText}>{t("actions.retry")}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function LocalizedStack() {
+  const { t } = useTranslation();
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        contentStyle: { backgroundColor: colors.bg },
+        ...GLOBAL_STACK_HEADER_OPTIONS,
+        headerLeft: () => <GlobalBackButton />,
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "" }} />
+      <Stack.Screen name="profile/index" options={{ title: t("nav.profile") }} />
+      <Stack.Screen
+        name="notifications"
+        options={{ title: t("settings.notifications") }}
+      />
+      <Stack.Screen name="rewards" options={{ title: t("rewards.title") }} />
+      <Stack.Screen name="world" options={{ title: t("nav.world") }} />
+      <Stack.Screen name="settings" options={{ title: t("settings.title") }} />
+      <Stack.Screen name="language" options={{ title: t("language.title") }} />
+      <Stack.Screen
+        name="blocked-users"
+        options={{ title: t("settings.blockedUsers") }}
+      />
+      <Stack.Screen
+        name="change-password"
+        options={{ title: t("settings.changePassword") }}
+      />
+      <Stack.Screen
+        name="messages/[id]"
+        options={{ title: t("nav.conversation") }}
+      />
+      <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
+    </Stack>
+  );
 }
 
 const configStyles = StyleSheet.create({
@@ -186,55 +230,18 @@ const configStyles = StyleSheet.create({
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ThemeProvider value={navTheme}>
-          <StatusBar style="light" />
-          <SplashGate>
-            <DeepLinkHandler />
-            <PushNotificationsBridge />
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: colors.surface },
-                headerTintColor: colors.text,
-                contentStyle: { backgroundColor: colors.bg },
-                ...GLOBAL_STACK_HEADER_OPTIONS,
-                headerLeft: () => <GlobalBackButton />,
-              }}
-            >
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="(tabs)"
-                options={{ headerShown: false, title: "" }}
-              />
-              <Stack.Screen name="profile/index" options={{ title: "Profile" }} />
-              <Stack.Screen
-                name="notifications"
-                options={{ title: "Notifications" }}
-              />
-              <Stack.Screen name="rewards" options={{ title: "Rewards" }} />
-              <Stack.Screen name="world" options={{ title: "World" }} />
-              <Stack.Screen name="settings" options={{ title: "Settings" }} />
-              <Stack.Screen
-                name="blocked-users"
-                options={{ title: "Blocked users" }}
-              />
-              <Stack.Screen
-                name="change-password"
-                options={{ title: "Change password" }}
-              />
-              <Stack.Screen
-                name="messages/[id]"
-                options={{ title: "Conversation" }}
-              />
-              <Stack.Screen
-                name="invite/[code]"
-                options={{ headerShown: false }}
-              />
-            </Stack>
-          </SplashGate>
-        </ThemeProvider>
-      </AuthProvider>
+      <I18nProvider>
+        <AuthProvider>
+          <ThemeProvider value={navTheme}>
+            <StatusBar style="light" />
+            <SplashGate>
+              <DeepLinkHandler />
+              <PushNotificationsBridge />
+              <LocalizedStack />
+            </SplashGate>
+          </ThemeProvider>
+        </AuthProvider>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }

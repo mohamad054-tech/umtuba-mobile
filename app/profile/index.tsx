@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
+import { chevronGlyph } from "@/src/lib/i18n/rtl";
 import { getProfileById, getProfileByUsername } from "@/src/lib/auth/profile";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
@@ -20,7 +22,6 @@ import {
   resolveProfileTarget,
 } from "@/src/lib/profile/resolveTarget";
 import {
-  followButtonLabel,
   getProfileFollowSnapshot,
   toggleProfileFollow,
 } from "@/src/lib/social/follows";
@@ -29,6 +30,7 @@ import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ u?: string; id?: string }>();
   const [refreshing, setRefreshing] = useState(false);
@@ -149,11 +151,11 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View
           style={styles.center}
-          accessibilityLabel="Loading profile"
+          accessibilityLabel={t("profile.loading")}
           accessibilityRole="progressbar"
         >
           <ActivityIndicator color={colors.accentCyan} size="large" />
-          <Text style={styles.muted}>Loading profile…</Text>
+          <Text style={styles.muted}>{t("profile.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -164,18 +166,18 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View style={styles.center}>
           <Text style={styles.emptyTitle} accessibilityRole="header">
-            Sign in required
+            {t("auth.required.title")}
           </Text>
           <Text style={styles.muted}>
-            Sign in to view your profile and account settings.
+            {t("auth.required.profile")}
           </Text>
           <Pressable
             style={styles.primaryBtn}
             onPress={() => router.replace("/(auth)/login")}
             accessibilityRole="button"
-            accessibilityLabel="Go to sign in"
+            accessibilityLabel={t("actions.signIn")}
           >
-            <Text style={styles.primaryBtnText}>Sign in</Text>
+            <Text style={styles.primaryBtnText}>{t("actions.signIn")}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -187,11 +189,11 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View
           style={styles.center}
-          accessibilityLabel="Loading profile"
+          accessibilityLabel={t("profile.loading")}
           accessibilityRole="progressbar"
         >
           <ActivityIndicator color={colors.accentCyan} size="large" />
-          <Text style={styles.muted}>Loading profile…</Text>
+          <Text style={styles.muted}>{t("profile.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -202,12 +204,12 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View style={styles.center}>
           <Text style={styles.emptyTitle} accessibilityRole="header">
-            Profile not found
+            {t("profile.notFound")}
           </Text>
           <Text style={styles.muted}>
             {otherStatus === "error"
-              ? "Unable to load this profile right now."
-              : "This account is no longer available."}
+              ? t("profile.loadFailed")
+              : t("profile.unavailableAccount")}
           </Text>
         </View>
       </SafeAreaView>
@@ -224,8 +226,12 @@ export default function ProfileScreen() {
           style={styles.avatar}
           accessibilityLabel={
             view.hasReliableIdentity
-              ? `Avatar for ${view.displayName || view.username || "you"}`
-              : "Profile avatar placeholder"
+              ? t("profile.avatarFor", {
+                  values: {
+                    name: view.displayName || view.username || t("profile.you"),
+                  },
+                })
+              : t("profile.avatarPlaceholder")
           }
         >
           {view.avatarUrl ? (
@@ -244,7 +250,7 @@ export default function ProfileScreen() {
         {view.hasReliableIdentity ? (
           <>
             <Text style={styles.name} accessibilityRole="header">
-              {view.displayName || view.username || "Account"}
+              {view.displayName || view.username || t("profile.account")}
             </Text>
             {view.username ? (
               <Text style={styles.username}>@{view.username}</Text>
@@ -264,9 +270,9 @@ export default function ProfileScreen() {
           </>
         ) : (
           <View style={styles.banner} accessibilityRole="alert">
-            <Text style={styles.emptyTitle}>Profile details unavailable</Text>
+            <Text style={styles.emptyTitle}>{t("profile.detailsUnavailable")}</Text>
             <Text style={styles.muted}>
-              We couldn’t load a reliable identity for this account yet.
+              {t("profile.detailsUnavailableBody")}
             </Text>
             {isOwn ? (
               <Pressable
@@ -274,12 +280,12 @@ export default function ProfileScreen() {
                 onPress={() => void onRetry()}
                 disabled={refreshing}
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading profile"
+                accessibilityLabel={t("actions.retry")}
               >
                 {refreshing ? (
                   <ActivityIndicator color={colors.accentCyan} />
                 ) : (
-                  <Text style={styles.secondaryBtnText}>Retry</Text>
+                  <Text style={styles.secondaryBtnText}>{t("actions.retry")}</Text>
                 )}
               </Pressable>
             ) : null}
@@ -292,9 +298,9 @@ export default function ProfileScreen() {
             <Pressable
               onPress={() => void onRetry()}
               accessibilityRole="button"
-              accessibilityLabel="Retry after error"
+              accessibilityLabel={t("actions.retry")}
             >
-              <Text style={styles.retryLink}>Retry</Text>
+              <Text style={styles.retryLink}>{t("actions.retry")}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -310,7 +316,9 @@ export default function ProfileScreen() {
               onPress={() => void onToggleFollow()}
               disabled={followBusy}
               accessibilityRole="button"
-              accessibilityLabel={followButtonLabel(following)}
+              accessibilityLabel={
+                following ? t("follow.following") : t("follow.follow")
+              }
               accessibilityState={{ selected: following, busy: followBusy }}
             >
               {followBusy ? (
@@ -324,7 +332,7 @@ export default function ProfileScreen() {
                     following && styles.followBtnTextOn,
                   ]}
                 >
-                  {followButtonLabel(following)}
+                  {following ? t("follow.following") : t("follow.follow")}
                 </Text>
               )}
             </Pressable>
@@ -338,17 +346,17 @@ export default function ProfileScreen() {
 
         {isOwn ? (
           <>
-            <Text style={styles.sectionLabel}>Shortcuts</Text>
+            <Text style={styles.sectionLabel}>{t("profile.shortcuts")}</Text>
             <View style={styles.links}>
               <Link href="/rewards" asChild>
                 <Pressable
                   style={styles.linkRow}
                   accessibilityRole="link"
-                  accessibilityLabel="Open rewards"
+                  accessibilityLabel={t("profile.openRewards")}
                 >
-                  <Text style={styles.linkText}>Rewards</Text>
+                  <Text style={styles.linkText}>{t("rewards.title")}</Text>
                   <Text style={styles.chevron} accessible={false}>
-                    ›
+                    {chevronGlyph(locale)}
                   </Text>
                 </Pressable>
               </Link>
@@ -356,11 +364,11 @@ export default function ProfileScreen() {
                 <Pressable
                   style={styles.linkRow}
                   accessibilityRole="link"
-                  accessibilityLabel="Open notifications"
+                  accessibilityLabel={t("profile.openNotifications")}
                 >
-                  <Text style={styles.linkText}>Notifications</Text>
+                  <Text style={styles.linkText}>{t("settings.notifications")}</Text>
                   <Text style={styles.chevron} accessible={false}>
-                    ›
+                    {chevronGlyph(locale)}
                   </Text>
                 </Pressable>
               </Link>
@@ -368,11 +376,11 @@ export default function ProfileScreen() {
                 <Pressable
                   style={styles.linkRow}
                   accessibilityRole="link"
-                  accessibilityLabel="Open settings"
+                  accessibilityLabel={t("profile.openSettings")}
                 >
-                  <Text style={styles.linkText}>Settings</Text>
+                  <Text style={styles.linkText}>{t("settings.title")}</Text>
                   <Text style={styles.chevron} accessible={false}>
-                    ›
+                    {chevronGlyph(locale)}
                   </Text>
                 </Pressable>
               </Link>

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { updatePasswordWithSession } from "@/src/lib/auth/passwordRecovery";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
@@ -21,6 +22,7 @@ import { colors } from "@/src/theme/colors";
  */
 export default function ChangePasswordScreen() {
   const { user, session } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,17 +34,17 @@ export default function ChangePasswordScreen() {
     return (
       <SafeAreaView style={styles.root} edges={["bottom"]}>
         <View style={styles.center}>
-          <Text style={styles.title}>Sign in required</Text>
+          <Text style={styles.title}>{t("auth.required.title")}</Text>
           <Text style={styles.muted}>
-            Sign in to change your account password.
+            {t("auth.change.signInBody")}
           </Text>
           <Pressable
             style={styles.primary}
             onPress={() => router.replace("/(auth)/login")}
             accessibilityRole="button"
-            accessibilityLabel="Go to sign in"
+            accessibilityLabel={t("actions.signIn")}
           >
-            <Text style={styles.primaryText}>Sign in</Text>
+            <Text style={styles.primaryText}>{t("actions.signIn")}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -68,7 +70,7 @@ export default function ChangePasswordScreen() {
       setSuccess(true);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to update password."
+        err instanceof Error ? err.message : t("auth.update.failed")
       );
     } finally {
       setBusy(false);
@@ -79,13 +81,13 @@ export default function ChangePasswordScreen() {
     <SafeAreaView style={styles.root} edges={["bottom"]}>
       <View style={styles.content}>
         <Text style={styles.title} accessibilityRole="header">
-          Change password
+          {t("auth.change.title")}
         </Text>
         <Text style={styles.muted}>
-          Choose a new password for your UMTUBA account.
+          {t("auth.change.subtitle")}
         </Text>
 
-        <Text style={styles.label}>New password</Text>
+        <Text style={styles.label}>{t("auth.update.newPassword")}</Text>
         <TextInput
           style={styles.input}
           value={password}
@@ -94,11 +96,11 @@ export default function ChangePasswordScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="newPassword"
-          accessibilityLabel="New password"
+          accessibilityLabel={t("auth.update.newPassword")}
           editable={!busy}
         />
 
-        <Text style={styles.label}>Confirm password</Text>
+        <Text style={styles.label}>{t("auth.update.confirmPassword")}</Text>
         <TextInput
           style={styles.input}
           value={confirmPassword}
@@ -107,7 +109,7 @@ export default function ChangePasswordScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           textContentType="newPassword"
-          accessibilityLabel="Confirm password"
+          accessibilityLabel={t("auth.update.confirmPassword")}
           editable={!busy}
         />
 
@@ -118,7 +120,7 @@ export default function ChangePasswordScreen() {
         ) : null}
         {success ? (
           <Text style={styles.success} accessibilityRole="text">
-            Password updated.
+            {t("auth.change.success")}
           </Text>
         ) : null}
 
@@ -127,12 +129,12 @@ export default function ChangePasswordScreen() {
           onPress={() => void onSubmit()}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Save new password"
+          accessibilityLabel={t("auth.change.save")}
         >
           {busy ? (
             <ActivityIndicator color={colors.text} />
           ) : (
-            <Text style={styles.primaryText}>Save password</Text>
+            <Text style={styles.primaryText}>{t("auth.change.save")}</Text>
           )}
         </Pressable>
       </View>

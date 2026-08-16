@@ -11,6 +11,7 @@ import type { ActivityTierProgress } from "@/src/contracts/tiers";
 import type { WalletBalance } from "@/src/contracts/wallet";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { getMyActivityTierProgress } from "@/src/lib/tiers/fetchTier";
 import { fetchUmPointsWalletBalance } from "@/src/lib/wallet/fetchBalance";
@@ -19,6 +20,7 @@ import { colors } from "@/src/theme/colors";
 
 export default function RewardsScreen() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [tier, setTier] = useState<ActivityTierProgress | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ export default function RewardsScreen() {
     } catch (err) {
       setBalance(null);
       setTier(null);
-      setError(getErrorMessage(err, "Unable to load rewards."));
+      setError(getErrorMessage(err, t("rewards.loadFailed")));
     } finally {
       setLoading(false);
     }
@@ -65,14 +67,14 @@ export default function RewardsScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.error} accessibilityRole="alert">
-          {error ?? "Unable to load rewards."}
+          {error ?? t("rewards.loadFailed")}
         </Text>
         <Pressable
           onPress={() => void load()}
           accessibilityRole="button"
-          accessibilityLabel="Retry loading rewards"
+          accessibilityLabel={t("actions.retry")}
         >
-          <Text style={styles.retry}>Retry</Text>
+          <Text style={styles.retry}>{t("actions.retry")}</Text>
         </Pressable>
       </View>
     );
@@ -80,10 +82,12 @@ export default function RewardsScreen() {
 
   return (
     <View style={styles.root}>
-      <Text style={styles.label}>UM Points</Text>
+      <Text style={styles.label}>{t("rewards.umPoints")}</Text>
       <Text
         style={styles.amount}
-        accessibilityLabel={`${formatWalletAmountExact(balance.amount)} UM Points`}
+        accessibilityLabel={t("rewards.walletA11y", {
+          values: { amount: formatWalletAmountExact(balance.amount) },
+        })}
       >
         {formatWalletAmountExact(balance.amount)}
       </Text>
@@ -91,13 +95,18 @@ export default function RewardsScreen() {
         {tier.tier.icon} {tier.tier.displayTitle}
       </Text>
       <Text style={styles.meta}>
-        Score {tier.score}
+        {t("rewards.score", { values: { score: tier.score } })}
         {tier.nextTier
-          ? ` · ${tier.pointsToNext} to ${tier.nextTier.displayLabel}`
-          : " · Max tier"}
+          ? ` · ${t("rewards.toNext", {
+              values: {
+                points: tier.pointsToNext,
+                label: tier.nextTier.displayLabel,
+              },
+            })}`
+          : ` · ${t("rewards.maxTier")}`}
       </Text>
       <Text style={styles.note}>
-        Conversion to a future UMTUBA token is not available yet.
+        {t("rewards.conversionNote")}
       </Text>
     </View>
   );

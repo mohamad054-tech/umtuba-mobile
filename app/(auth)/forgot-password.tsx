@@ -10,6 +10,7 @@ import {
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { useGlobalBack } from "@/components/GlobalBackButton";
+import { useTranslation } from "@/src/lib/i18n";
 import {
   getErrorMessage,
   isValidEmail,
@@ -21,6 +22,7 @@ import { colors } from "@/src/theme/colors";
 
 export default function ForgotPasswordScreen() {
   const { session, loading, passwordRecoveryPending } = useAuth();
+  const { t } = useTranslation();
   const goBack = useGlobalBack();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export default function ForgotPasswordScreen() {
     setSent(false);
     try {
       if (!isValidEmail(email)) {
-        throw new Error("Please enter a valid email address.");
+        throw new Error(t("auth.forgot.invalidEmail"));
       }
       const redirectTo = createAuthRedirectUrl();
       const { error: resetError } = await getSupabase().auth.resetPasswordForEmail(
@@ -50,13 +52,13 @@ export default function ForgotPasswordScreen() {
       );
       if (resetError) {
         throw new Error(
-          getErrorMessage(resetError, "Unable to send reset email.")
+          getErrorMessage(resetError, t("auth.forgot.failed"))
         );
       }
       setSent(true);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to send reset email."
+        err instanceof Error ? err.message : t("auth.forgot.failed")
       );
     } finally {
       setBusy(false);
@@ -65,13 +67,14 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScreen
-      title="Reset password"
-      subtitle="We'll email you a link to choose a new password."
+      title={t("auth.forgot.title")}
+      subtitle={t("auth.forgot.subtitle")}
       footer={
         <Link href="/(auth)/login" asChild>
-          <Pressable accessibilityRole="link" accessibilityLabel="Back to sign in">
+          <Pressable accessibilityRole="link" accessibilityLabel={t("auth.forgot.backToSignIn")}>
             <Text style={styles.link}>
-              Remembered it? <Text style={styles.linkStrong}>Sign in</Text>
+              {t("auth.forgot.remembered")}{" "}
+              <Text style={styles.linkStrong}>{t("actions.signIn")}</Text>
             </Text>
           </Pressable>
         </Link>
@@ -83,11 +86,11 @@ export default function ForgotPasswordScreen() {
         keyboardType="email-address"
         autoComplete="email"
         textContentType="emailAddress"
-        placeholder="Email"
+        placeholder={t("auth.login.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
-        accessibilityLabel="Email"
+        accessibilityLabel={t("auth.login.email")}
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
@@ -96,7 +99,7 @@ export default function ForgotPasswordScreen() {
       ) : null}
       {sent ? (
         <Text style={styles.success} accessibilityLiveRegion="polite">
-          If an account exists for that email, a reset link is on the way.
+          {t("auth.forgot.sent")}
         </Text>
       ) : null}
       <Pressable
@@ -104,16 +107,16 @@ export default function ForgotPasswordScreen() {
         onPress={() => void onSubmit()}
         disabled={busy}
         accessibilityRole="button"
-        accessibilityLabel="Send password reset email"
+        accessibilityLabel={t("auth.forgot.submit")}
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
         ) : (
-          <Text style={styles.buttonText}>Send reset link</Text>
+          <Text style={styles.buttonText}>{t("auth.forgot.submit")}</Text>
         )}
       </Pressable>
       <Pressable onPress={goBack} accessibilityRole="button">
-        <Text style={styles.back}>Cancel</Text>
+        <Text style={styles.back}>{t("actions.cancel")}</Text>
       </Pressable>
     </AuthScreen>
   );
