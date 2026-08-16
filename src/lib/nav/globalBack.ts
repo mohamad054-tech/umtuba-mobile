@@ -26,15 +26,29 @@ export const SECONDARY_PATHS = [
   "/(auth)/update-password",
 ] as const;
 
+export const GLOBAL_HEADER_LAYOUT_DIRECTION = "ltr" as const;
+
 export const GLOBAL_BACK_TITLE_OPTIONS = {
   headerBackTitle: "",
   headerBackTitleVisible: false,
+  headerBackVisible: false,
+  headerLeftContainerStyle: { direction: GLOBAL_HEADER_LAYOUT_DIRECTION },
+  headerRightContainerStyle: { direction: GLOBAL_HEADER_LAYOUT_DIRECTION },
 };
 
 export const GLOBAL_STACK_HEADER_OPTIONS = {
   ...GLOBAL_BACK_TITLE_OPTIONS,
   headerBackButtonDisplayMode: "minimal" as const,
+  // Native headerLeft/headerRight stay physically leading/trailing.
+  // I18nManager RTL must not flip those slots independently of the hitbox.
+  direction: GLOBAL_HEADER_LAYOUT_DIRECTION,
 };
+
+export type GlobalHeaderBackSlot = "left" | "right";
+
+export function globalHeaderBackSlot(rtl: boolean): GlobalHeaderBackSlot {
+  return rtl ? "right" : "left";
+}
 
 export type NavSurface = "root" | "auth-root" | "secondary" | "redirect";
 

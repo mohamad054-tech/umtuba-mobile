@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
-import { GlobalBackButton } from "@/components/GlobalBackButton";
+import { useGlobalHeaderSlots } from "@/components/GlobalBackButton";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { I18nProvider, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
@@ -150,6 +150,7 @@ function ConfigNeeded({ onRetry }: { onRetry: () => void }) {
 
 function LocalizedStack() {
   const { t } = useTranslation();
+  const headerSlots = useGlobalHeaderSlots();
   return (
     <Stack
       screenOptions={{
@@ -157,7 +158,7 @@ function LocalizedStack() {
         headerTintColor: colors.text,
         contentStyle: { backgroundColor: colors.bg },
         ...GLOBAL_STACK_HEADER_OPTIONS,
-        headerLeft: () => <GlobalBackButton />,
+        ...headerSlots,
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

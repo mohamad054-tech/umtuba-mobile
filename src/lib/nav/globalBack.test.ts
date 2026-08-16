@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  GLOBAL_HEADER_LAYOUT_DIRECTION,
   GLOBAL_STACK_HEADER_OPTIONS,
   applyGlobalBackDecision,
   classifySurface,
+  globalHeaderBackSlot,
   isInternalRouteName,
   isRedirectOnlyRoute,
   isValidHistoryPrevious,
@@ -34,6 +36,18 @@ describe("internal route labels", () => {
     expect(GLOBAL_STACK_HEADER_OPTIONS.headerBackButtonDisplayMode).toBe(
       "minimal"
     );
+    expect(GLOBAL_STACK_HEADER_OPTIONS.headerBackVisible).toBe(false);
+    expect(GLOBAL_STACK_HEADER_OPTIONS.direction).toBe(
+      GLOBAL_HEADER_LAYOUT_DIRECTION
+    );
+    expect(GLOBAL_STACK_HEADER_OPTIONS.headerLeftContainerStyle).toEqual({
+      direction: "ltr",
+    });
+    expect(GLOBAL_STACK_HEADER_OPTIONS.headerRightContainerStyle).toEqual({
+      direction: "ltr",
+    });
+    expect(globalHeaderBackSlot(false)).toBe("left");
+    expect(globalHeaderBackSlot(true)).toBe("right");
     expect(isRedirectOnlyRoute("(tabs)")).toBe(false);
     expect(isRedirectOnlyRoute("index")).toBe(true);
     expect(isValidHistoryPrevious("(tabs)", "/settings")).toBe(true);

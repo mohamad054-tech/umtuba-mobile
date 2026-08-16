@@ -5,13 +5,15 @@ import {
   useRouter,
   useSegments,
 } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, type ColorValue } from "react-native";
 
 import { useTranslation } from "@/src/lib/i18n";
+import { isRtlLocale } from "@/src/lib/i18n/locales";
 import { backGlyph } from "@/src/lib/i18n/rtl";
 import {
   applyGlobalBackDecision,
+  globalHeaderBackSlot,
   previousRouteNameFromState,
   resolveGlobalBack,
 } from "@/src/lib/nav/globalBack";
@@ -73,13 +75,36 @@ export function GlobalBackButton({
   );
 }
 
+export function useGlobalHeaderSlots(options?: {
+  companion?: () => ReactNode;
+}) {
+  const { locale } = useTranslation();
+  const rtl = isRtlLocale(locale);
+  const slot = globalHeaderBackSlot(rtl);
+  const back = () => <GlobalBackButton />;
+  const companion = options?.companion;
+
+  if (slot === "right") {
+    return {
+      headerLeft: companion ?? (() => null),
+      headerRight: back,
+    };
+  }
+
+  return {
+    headerLeft: back,
+    headerRight: companion,
+  };
+}
+
 const styles = StyleSheet.create({
   hit: {
     minWidth: 44,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    paddingRight: 4,
+    paddingHorizontal: 4,
+    direction: "ltr",
   },
   arrow: {
     fontSize: 36,
