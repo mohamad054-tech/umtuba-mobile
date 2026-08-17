@@ -10,7 +10,14 @@ import {
 } from "./activePlayerOwnership";
 import {
   detachWatchPlayerBinding,
+  isRetryHitTargetClear,
+  nextPlayerInstanceGeneration,
+  resolveRetryTargetPostId,
+  shouldApplyWatchTransport,
   shouldCallPlayerMethodsOnUnmount,
+  shouldRecreateWatchPlayer,
+  watchWindowMountedIndexes,
+  watchWindowRemounts,
 } from "./playerLifecycle";
 import {
   resolveSeekTimeOrNull,
@@ -324,5 +331,101 @@ describe("unmount detach does not touch the player", () => {
     expect(bound).toBeNull();
     expect(session.calls).toEqual(callsBefore);
     expect(session.released).toBe(false);
+  });
+});
+
+describe("A→B→C→B→A player window", () => {
+  it("keeps a bounded ±1 window and remounts only distant posts", () => {
+    const sequence = [0, 1, 2, 1, 0, 1, 2, 1, 0];
+    expect(watchWindowMountedIndexes(0, 5)).toEqual([0, 1]);
+    expect(watchWindowMountedIndexes(2, 5)).toEqual([1, 2, 3]);
+    const remounts = watchWindowRemounts(sequence, 5);
+    expect(remounts).toContain(0);
+    expect(remounts.filter((index) => index === 0).length).toBeGreaterThan(1);
+    for (const active of sequence) {
+      expect(watchWindowMountedIndexes(active, 5).length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("does not reset source identity on ownership-only changes", () => {
+    const slot = { postKey: "post-7", src: "https://cdn.example/a.mp4", instanceGeneration: 0 };
+    expect(
+      shouldRecreateWatchPlayer(slot, {
+        postKey: "post-7",
+        src: "https://cdn.example/a.mp4",
+        instanceGeneration: 0,
+      })
+    ).toBe(false);
+    expect(
+      shouldRecreateWatchPlayer(slot, {
+        postKey: "post-7",
+        src: "https://cdn.example/a.mp4",
+        instanceGeneration: 1,
+      })
+    ).toBe(true);
+  });
+});
+
+describe("iOS transport waits until item ready", () => {
+  it("blocks play/pause/seek on iOS before ready and allows chrome", () => {
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: false,
+        kind: "pause",
+        platform: "ios",
+      })
+    ).toBe(false);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: false,
+        kind: "play",
+        platform: "ios",
+      })
+    ).toBe(false);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: false,
+        kind: "chrome",
+        platform: "ios",
+      })
+    ).toBe(true);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: false,
+        kind: "pause",
+        platform: "android",
+      })
+    ).toBe(true);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: true,
+        kind: "play",
+        platform: "ios",
+      })
+    ).toBe(true);
+  });
+});
+
+describe("Retry recovery generation and hit target", () => {
+  it("retries only the current active post and remounts a new generation", () => {
+    expect(
+      resolveRetryTargetPostId({ activePostId: 9, overlayPostId: 9 })
+    ).toBe(9);
+    expect(
+      resolveRetryTargetPostId({ activePostId: 9, overlayPostId: 3 })
+    ).toBeNull();
+    expect(nextPlayerInstanceGeneration(0)).toBe(1);
+    expect(nextPlayerInstanceGeneration(4)).toBe(5);
+    expect(
+      isRetryHitTargetClear({ errorVisible: true, tapLayerBlocksRetry: true })
+    ).toBe(false);
+    expect(
+      isRetryHitTargetClear({ errorVisible: true, tapLayerBlocksRetry: false })
+    ).toBe(true);
   });
 });

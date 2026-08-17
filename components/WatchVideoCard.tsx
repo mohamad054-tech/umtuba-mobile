@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import {
   ActivityIndicator,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -40,7 +41,13 @@ import {
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
 } from "@/src/lib/watch/activePlayerOwnership";
-import { detachWatchPlayerBinding } from "@/src/lib/watch/playerLifecycle";
+import {
+  detachWatchPlayerBinding,
+  nextPlayerInstanceGeneration,
+  resolveRetryTargetPostId,
+  resolveWatchNativePlatform,
+  shouldApplyWatchTransport,
+} from "@/src/lib/watch/playerLifecycle";
 import {
   applyInactiveAudioTeardown,
   applyPlaybackIntent,
@@ -117,7 +124,10 @@ type PlayerPaneProps = {
   seekRequest: { token: number; ratio: number } | null;
   onTimeline: (state: TimelineState) => void;
   onEnded?: () => void;
-  onRefreshSrc?: () => Promise<string | null>;
+  onPlayerStatus?: (
+    status: "idle" | "loading" | "ready" | "error",
+    message?: string | null
+  ) => void;
 };
 
 type ScrubBarProps = {
@@ -287,15 +297,16 @@ function WatchPlayerPane({
   seekRequest,
   onTimeline,
   onEnded,
-  onRefreshSrc,
+  onPlayerStatus,
 }: PlayerPaneProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     "loading"
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [retryToken, setRetryToken] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
   const lastSeekToken = useRef<number | null>(null);
+  const nativePlatform = resolveWatchNativePlatform(Platform.OS);
+  const statusRef = useRef(status);
+  statusRef.current = status;
   const isActiveRef = useRef(isActive);
   const shouldPlayRef = useRef(shouldPlay);
   const ownershipGenerationRef = useRef(ownershipGeneration);
@@ -304,6 +315,10 @@ function WatchPlayerPane({
   isActiveRef.current = isActive;
   shouldPlayRef.current = shouldPlay;
   ownershipGenerationRef.current = ownershipGeneration;
+
+  useEffect(() => {
+    onPlayerStatus?.(status, errorMessage);
+  }, [errorMessage, onPlayerStatus, status]);
 
   const player = useVideoPlayer(src, (p) => {
     // New SharedObject starts silent. Ownership effect unmutes only the active post.
@@ -333,14 +348,26 @@ function WatchPlayerPane({
     if (next === "readyToPlay") {
       setStatus("ready");
       setErrorMessage(null);
-      if (
-        !canProduceWatchAudio({
-          isActive: isActiveRef.current,
-          shouldPlay: shouldPlayRef.current,
-          ownerGeneration: ownershipGenerationRef.current,
-          commandGeneration: playGenerationRef.current ?? -1,
-        })
-      ) {
+      const allowed = canProduceWatchAudio({
+        isActive: isActiveRef.current,
+        shouldPlay: shouldPlayRef.current,
+        ownerGeneration: ownershipGenerationRef.current,
+        commandGeneration: ownershipGenerationRef.current,
+      });
+      if (allowed) {
+        playGenerationRef.current = ownershipGenerationRef.current;
+        applyPlaybackIntent(
+          player,
+          resolveWatchPlaybackIntent({
+            isActive: true,
+            shouldPlay: true,
+            muted,
+            volume,
+            loop,
+          })
+        );
+      } else {
+        playGenerationRef.current = null;
         applyInactiveAudioTeardown(player, { resetPosition: false });
       }
       return;
@@ -387,6 +414,16 @@ function WatchPlayerPane({
 
   useEventListener(player, "playingChange", ({ isPlaying }) => {
     if (!canTouchBoundPlayer()) return;
+    if (
+      !shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: statusRef.current === "ready",
+        kind: "pause",
+        platform: nativePlatform,
+      })
+    ) {
+      return;
+    }
     if (
       shouldTeardownUnexpectedPlay({
         isPlaying,
@@ -435,12 +472,28 @@ function WatchPlayerPane({
 
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;
+    const itemReady = status === "ready";
     const allowed = canProduceWatchAudio({
       isActive,
       shouldPlay,
       ownerGeneration: ownershipGeneration,
       commandGeneration: ownershipGeneration,
     });
+    if (
+      !shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady,
+        kind: allowed ? "play" : "pause",
+        platform: nativePlatform,
+      })
+    ) {
+      runAlivePlayerOp(player, (alive) => {
+        alive.muted = true;
+        alive.volume = 0;
+        alive.loop = false;
+      });
+      return;
+    }
     if (
       allowed &&
       shouldApplyWatchPlayerOp({
@@ -487,7 +540,8 @@ function WatchPlayerPane({
     loop,
     isActive,
     ownershipGeneration,
-    retryToken,
+    status,
+    nativePlatform,
     onTimeline,
   ]);
 
@@ -495,6 +549,16 @@ function WatchPlayerPane({
     if (!seekRequest) return;
     if (lastSeekToken.current === seekRequest.token) return;
     if (!canTouchBoundPlayer()) return;
+    if (
+      !shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: statusRef.current === "ready",
+        kind: "seek",
+        platform: nativePlatform,
+      })
+    ) {
+      return;
+    }
     lastSeekToken.current = seekRequest.token;
     let duration = 0;
     const read = runAlivePlayerOp(player, (alive) => {
@@ -512,50 +576,6 @@ function WatchPlayerPane({
       ratio: seekRequest.ratio,
     });
   }, [seekRequest, player, onTimeline]);
-
-  const onRetry = useCallback(async () => {
-    setRefreshing(true);
-    setErrorMessage(null);
-    setStatus("loading");
-    try {
-      if (!canTouchBoundPlayer()) return;
-      let nextSrc = src;
-      if (onRefreshSrc) {
-        const refreshed = await onRefreshSrc();
-        if (refreshed) {
-          nextSrc = refreshed;
-        }
-      }
-      if (!canTouchBoundPlayer() || typeof player.replaceAsync !== "function") {
-        return;
-      }
-      await player.replaceAsync(nextSrc);
-      if (!canTouchBoundPlayer()) return;
-      setRetryToken((n) => n + 1);
-      if (
-        shouldHonorLatePlayerEvent({
-          isActive: isActiveRef.current,
-          shouldPlay: shouldPlayRef.current,
-          ownerGeneration: ownershipGenerationRef.current,
-          eventGeneration: ownershipGenerationRef.current,
-          playerAlive: true,
-        })
-      ) {
-        playGenerationRef.current = ownershipGenerationRef.current;
-        runAlivePlayerOp(player, (alive) => {
-          alive.play();
-        });
-      } else {
-        applyInactiveAudioTeardown(player, { resetPosition: false });
-      }
-    } catch (err) {
-      if (!playerAliveRef.current || !isPlayerAlive(player)) return;
-      setStatus("error");
-      setErrorMessage(sanitizePlaybackError(err));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [onRefreshSrc, player, src]);
 
   const { t } = useTranslation();
 
@@ -575,32 +595,12 @@ function WatchPlayerPane({
         importantForAccessibility="no-hide-descendants"
       />
 
-      {(status === "loading" || refreshing) && (
+      {status === "loading" && (
         <View style={styles.centerOverlay} pointerEvents="none">
           <ActivityIndicator
             color={colors.accentCyan}
             accessibilityLabel={t("watch.loadingVideo")}
           />
-        </View>
-      )}
-
-      {status === "error" && (
-        <View style={styles.centerOverlay} accessibilityRole="alert">
-          <Text style={styles.errorText}>
-            {errorMessage ?? t("watch.playbackFailed")}
-          </Text>
-          <Pressable
-            style={styles.retryBtn}
-            onPress={() => void onRetry()}
-            disabled={refreshing}
-            accessibilityRole="button"
-            accessibilityLabel={t("watch.retryPlayback")}
-            accessibilityState={{ busy: refreshing, disabled: refreshing }}
-          >
-            <Text style={styles.retryText}>
-              {refreshing ? t("status.retrying") : t("actions.retry")}
-            </Text>
-          </Pressable>
         </View>
       )}
     </View>
@@ -651,6 +651,18 @@ function WatchVideoCardComponent({
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekTokenRef = useRef(0);
   const scrubTargetRatioRef = useRef<number | null>(null);
+  const [playerEpoch, setPlayerEpoch] = useState(0);
+  const [epochSrc, setEpochSrc] = useState(video.src);
+  const [paneStatus, setPaneStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("loading");
+  const [paneError, setPaneError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const retryInFlightRef = useRef(false);
+
+  useEffect(() => {
+    setEpochSrc(video.src);
+  }, [video.src]);
 
   const feedShouldPlay = shouldPlayVideo({
     isActive,
@@ -695,14 +707,49 @@ function WatchVideoCardComponent({
     }, PLAY_PAUSE_FEEDBACK_MS);
   }, []);
 
+  const onPlayerStatus = useCallback(
+    (
+      next: "idle" | "loading" | "ready" | "error",
+      message?: string | null
+    ) => {
+      setPaneStatus(next);
+      setPaneError(message ?? null);
+    },
+    []
+  );
+
+  const onRetryPlayback = useCallback(async () => {
+    const target = resolveRetryTargetPostId({
+      activePostId: video.postId ?? null,
+      overlayPostId: isActive ? video.postId ?? null : null,
+    });
+    if (target == null && video.postId != null) return;
+    if (!isActive || retryInFlightRef.current) return;
+    retryInFlightRef.current = true;
+    setRetrying(true);
+    setPaneStatus("loading");
+    setPaneError(null);
+    try {
+      const refreshed = onRefreshSrc ? await onRefreshSrc() : null;
+      if (refreshed) {
+        setEpochSrc(refreshed);
+      }
+      setPlayerEpoch((prev) => nextPlayerInstanceGeneration(prev));
+    } finally {
+      retryInFlightRef.current = false;
+      setRetrying(false);
+    }
+  }, [isActive, onRefreshSrc, video.postId]);
+
   const onTogglePlayPause = useCallback(() => {
+    if (paneStatus === "error") return;
     if (!isActive || !feedShouldPlay) return;
     setUserPaused((paused) => {
       const next = !paused;
       showFeedback(next ? "pause" : "play");
       return next;
     });
-  }, [feedShouldPlay, isActive, showFeedback]);
+  }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
 
   const onTimeline = useCallback((state: TimelineState) => {
     const target = scrubTargetRatioRef.current;
@@ -773,7 +820,8 @@ function WatchVideoCardComponent({
     >
       {loadPlayer ? (
         <WatchPlayerPane
-          src={video.src}
+          key={`watch-player-${video.id}-${playerEpoch}`}
+          src={epochSrc}
           isActive={isActive}
           shouldPlay={shouldPlay}
           ownershipGeneration={ownershipGeneration}
@@ -783,7 +831,7 @@ function WatchVideoCardComponent({
           seekRequest={isActive ? seekRequest : null}
           onTimeline={onTimeline}
           onEnded={onEnded}
-          onRefreshSrc={onRefreshSrc}
+          onPlayerStatus={onPlayerStatus}
         />
       ) : (
         <View style={styles.placeholder} accessibilityElementsHidden>
@@ -791,14 +839,19 @@ function WatchVideoCardComponent({
         </View>
       )}
 
-      <View style={styles.overlay} pointerEvents="box-none">
-        <Pressable
-          style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
-          onPress={onTogglePlayPause}
-          accessibilityRole="button"
-          accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
-          accessibilityHint={t("watch.playPauseHint")}
-        />
+      <View
+        style={styles.overlay}
+        pointerEvents={paneStatus === "error" ? "none" : "box-none"}
+      >
+        {paneStatus === "error" ? null : (
+          <Pressable
+            style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
+            onPress={onTogglePlayPause}
+            accessibilityRole="button"
+            accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
+            accessibilityHint={t("watch.playPauseHint")}
+          />
+        )}
 
         {feedback ? (
           <View
@@ -1027,6 +1080,32 @@ function WatchVideoCardComponent({
           />
         </View>
       </View>
+      {paneStatus === "error" ? (
+        <View
+          style={styles.retryOverlay}
+          accessibilityRole="alert"
+          pointerEvents="auto"
+          testID="watch-retry-overlay"
+        >
+          <Text style={styles.errorText}>
+            {paneError ?? t("watch.playbackFailed")}
+          </Text>
+          <Pressable
+            style={styles.retryBtn}
+            onPress={() => void onRetryPlayback()}
+            disabled={retrying || !isActive}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t("watch.retryPlayback")}
+            accessibilityState={{ busy: retrying, disabled: retrying || !isActive }}
+            testID="watch-retry-playback"
+          >
+            <Text style={styles.retryText}>
+              {retrying ? t("status.retrying") : t("actions.retry")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1086,6 +1165,16 @@ const styles = StyleSheet.create({
   },
   tapLayer: {
     ...StyleSheet.absoluteFill,
+  },
+  retryOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 30,
+    elevation: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(5,5,16,0.45)",
+    paddingHorizontal: 24,
+    gap: 12,
   },
   feedbackBadge: {
     position: "absolute",
