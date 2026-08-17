@@ -22,6 +22,9 @@ import {
   resolvePlayPauseFeedbackLabel,
   resolveProgressRatio,
   resolveScrubRatioFromPageX,
+  scrubFillWidthPercent,
+  scrubThumbLeftPercent,
+  WATCH_SCRUB_LAYOUT_DIRECTION,
   resolveSeekTime,
   resolveSeekTimeOrNull,
   resolveWatchScrollOffset,
@@ -207,6 +210,15 @@ describe("scrub pageX ratio math", () => {
     expect(resolveScrubRatioFromPageX(50, 100, 200)).toBe(0);
     expect(resolveScrubRatioFromPageX(400, 100, 200)).toBe(1);
     expect(resolveScrubRatioFromPageX(150, 100, 0)).toBe(0);
+  });
+
+  it("keeps fill and thumb on the same physical-left origin in LTR and RTL", () => {
+    expect(WATCH_SCRUB_LAYOUT_DIRECTION).toBe("ltr");
+    expect(scrubFillWidthPercent(0.25)).toBe("25%");
+    expect(scrubThumbLeftPercent(0.25)).toBe("25%");
+    expect(scrubFillWidthPercent(0.25)).toBe(scrubThumbLeftPercent(0.25));
+    expect(scrubFillWidthPercent(1.4)).toBe("100%");
+    expect(scrubThumbLeftPercent(-0.2)).toBe("0%");
   });
 });
 

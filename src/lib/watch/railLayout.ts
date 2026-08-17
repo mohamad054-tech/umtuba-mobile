@@ -1,7 +1,15 @@
 /** Compact enough for small iPhones; still meets 44pt hit targets. */
 export const WATCH_RAIL_ACTION_MIN_HEIGHT = 44;
 export const WATCH_RAIL_GAP = 8;
-export const WATCH_RAIL_BOTTOM_EXTRA = 52;
+/**
+ * Clears the timeline clock row + tall scrub hit. 52px sat the last rail
+ * label (Delete / Supprimer / Eliminar) on top of the duration clock.
+ */
+export const WATCH_RAIL_BOTTOM_EXTRA = 84;
+/** Keeps long action labels inside the rail column, not over the clock. */
+export const WATCH_RAIL_ACTION_LABEL_MAX_WIDTH = 72;
+/** Physical-right gutter so the duration clock stays left of the rail. */
+export const WATCH_TIMELINE_TRAILING_GUTTER = 56;
 export const WATCH_VOLUME_RIGHT_CLEARANCE = 68;
 
 export function watchRailHeight(actionCount: number): number {

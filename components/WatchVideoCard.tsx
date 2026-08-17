@@ -25,6 +25,9 @@ import {
   resolveScrubRatioFromPageX,
   resolveSeekTimeOrNull,
   sanitizePlaybackError,
+  scrubFillWidthPercent,
+  scrubThumbLeftPercent,
+  WATCH_SCRUB_LAYOUT_DIRECTION,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldPlayWithUserPause,
@@ -35,8 +38,11 @@ import {
   applySeekTime,
 } from "@/src/lib/watch/playerSession";
 import {
+  WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
   WATCH_RAIL_ACTION_MIN_HEIGHT,
   WATCH_RAIL_GAP,
+  WATCH_TIMELINE_TRAILING_GUTTER,
+  watchRailBottomOffset,
 } from "@/src/lib/watch/railLayout";
 import { colors } from "@/src/theme/colors";
 
@@ -212,6 +218,7 @@ function ScrubBar({
       style={[
         styles.scrubHit,
         tall && styles.scrubHitTall,
+        { direction: WATCH_SCRUB_LAYOUT_DIRECTION },
       ]}
       onLayout={onLayout}
       collapsable={false}
@@ -224,18 +231,29 @@ function ScrubBar({
       }}
       {...panResponder.panHandlers}
     >
-      <View style={[styles.scrubTrack, { backgroundColor: trackColor }]}>
+      <View
+        style={[
+          styles.scrubTrack,
+          {
+            backgroundColor: trackColor,
+            direction: WATCH_SCRUB_LAYOUT_DIRECTION,
+          },
+        ]}
+      >
         <View
           style={[
             styles.scrubFill,
-            { width: `${localRatio * 100}%`, backgroundColor: fillColor },
+            {
+              width: scrubFillWidthPercent(localRatio),
+              backgroundColor: fillColor,
+            },
           ]}
         />
         <View
           style={[
             styles.scrubThumb,
             tall && styles.scrubThumbTall,
-            { left: `${localRatio * 100}%` },
+            { left: scrubThumbLeftPercent(localRatio) },
           ]}
         />
       </View>
@@ -680,7 +698,7 @@ function WatchVideoCardComponent({
 
         <View
           key={`rail-${video.postId ?? video.id}-${video.likedByMe === true ? 1 : 0}`}
-          style={[styles.rail, { bottom: timelineBottom + 52 }]}
+          style={[styles.rail, { bottom: watchRailBottomOffset(bottomInset) }]}
         >
           <Pressable
             style={styles.action}
@@ -699,7 +717,9 @@ function WatchVideoCardComponent({
             >
               {video.likedByMe === true ? "♥" : "♡"}
             </Text>
-            <Text style={styles.actionCount}>{video.stats.likes}</Text>
+            <Text style={styles.actionCount} numberOfLines={1}>
+              {video.stats.likes}
+            </Text>
           </Pressable>
           <Pressable
             style={styles.action}
@@ -711,7 +731,9 @@ function WatchVideoCardComponent({
             <Text style={[styles.actionIcon, video.savedByMe && styles.on]}>
               ★
             </Text>
-            <Text style={styles.actionCount}>{video.stats.saves}</Text>
+            <Text style={styles.actionCount} numberOfLines={1}>
+              {video.stats.saves}
+            </Text>
           </Pressable>
           <Pressable
             style={styles.action}
@@ -729,7 +751,9 @@ function WatchVideoCardComponent({
             >
               ◌
             </Text>
-            <Text style={styles.actionCount}>{video.stats.comments}</Text>
+            <Text style={styles.actionCount} numberOfLines={1}>
+              {video.stats.comments}
+            </Text>
           </Pressable>
           <Pressable
             style={styles.action}
@@ -744,7 +768,9 @@ function WatchVideoCardComponent({
             >
               ↗
             </Text>
-            <Text style={styles.actionCount}>{video.stats.shares}</Text>
+            <Text style={styles.actionCount} numberOfLines={1}>
+              {video.stats.shares}
+            </Text>
           </Pressable>
           {onDeleteOwn ? (
             <Pressable
@@ -797,7 +823,12 @@ function WatchVideoCardComponent({
           collapsable={false}
           pointerEvents="box-none"
         >
-          <View style={styles.timelineTimes}>
+          <View
+            style={[
+              styles.timelineTimes,
+              { paddingRight: WATCH_TIMELINE_TRAILING_GUTTER },
+            ]}
+          >
             <Text style={styles.timeText}>
               {formatPlaybackClock(timeline.currentTime)}
             </Text>
@@ -979,6 +1010,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     marginTop: 2,
+    maxWidth: WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
+    textAlign: "center",
   },
   timeline: {
     position: "absolute",
@@ -1016,8 +1049,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: "visible",
     justifyContent: "center",
+    direction: WATCH_SCRUB_LAYOUT_DIRECTION,
   },
   scrubFill: {
+    position: "absolute",
+    left: 0,
     height: 5,
     borderRadius: 999,
   },
