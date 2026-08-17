@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { Share } from "react-native";
+import { Platform, Share } from "react-native";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createVideoSignedUrl } from "@/src/lib/feed/watchFeed";
@@ -215,31 +215,75 @@ function isUserCancel(message: string): boolean {
   return /user.?cancel|dismiss|aborted/i.test(message);
 }
 
+function isMediaUnavailableMessage(message: string): boolean {
+  return /media.?unavailable/i.test(message);
+}
+
+async function expoSharingAvailable(): Promise<boolean> {
+  try {
+    return await Sharing.isAvailableAsync();
+  } catch {
+    return false;
+  }
+}
+
+/** iOS UIActivity / Android ACTION_SEND text. `url` is iOS-only. */
 export const defaultShareLinkPort: ShareLinkPort = {
   async share(payload) {
-    const result = await Share.share(
-      {
-        title: payload.title,
-        message: payload.message,
-        url: payload.url,
-      },
-      { dialogTitle: payload.title, subject: payload.title }
-    );
+    const content =
+      Platform.OS === "android"
+        ? { title: payload.title, message: payload.message }
+        : {
+            title: payload.title,
+            message: payload.message,
+            url: payload.url,
+          };
+    const result = await Share.share(content, {
+      dialogTitle: payload.title,
+      subject: payload.title,
+    });
     const dismissed =
       "dismissedAction" in Share && result.action === Share.dismissedAction;
     return { dismissed };
   },
 };
 
+/** Android ACTION_SEND + FileProvider (expo-sharing). Used only after the shared menu. */
+export async function shareAndroidFileIntent(payload: {
+  fileUri: string;
+  mimeType: string;
+  dialogTitle: string;
+}): Promise<{ dismissed: boolean }> {
+  await Sharing.shareAsync(payload.fileUri, {
+    mimeType: payload.mimeType,
+    dialogTitle: payload.dialogTitle,
+  });
+  return { dismissed: false };
+}
+
 export const defaultShareFilePort: ShareFilePort = {
-  isAvailable: () => Sharing.isAvailableAsync(),
+  async isAvailable() {
+    if (await expoSharingAvailable()) return true;
+    // Do not hide the Share entry. Android can still attempt the Intent adapter.
+    return Platform.OS === "android";
+  },
   async shareFile(payload) {
-    await Sharing.shareAsync(payload.fileUri, {
-      mimeType: payload.mimeType,
-      UTI: "public.movie",
-      dialogTitle: payload.dialogTitle,
-    });
-    return { dismissed: false };
+    if (await expoSharingAvailable()) {
+      await Sharing.shareAsync(payload.fileUri, {
+        mimeType: payload.mimeType,
+        UTI: "public.movie",
+        dialogTitle: payload.dialogTitle,
+      });
+      return { dismissed: false };
+    }
+    if (Platform.OS === "android") {
+      try {
+        return await shareAndroidFileIntent(payload);
+      } catch {
+        throw new Error("MEDIA_UNAVAILABLE");
+      }
+    }
+    throw new Error("MEDIA_UNAVAILABLE");
   },
 };
 
@@ -402,8 +446,14 @@ export async function shareWatchPostFile(
 
   const filePort = input.filePort ?? defaultShareFilePort;
   const downloadPort = input.downloadPort ?? defaultShareDownloadPort;
-  if (!(await filePort.isAvailable())) {
-    return failed();
+  let fileShareAvailable = false;
+  try {
+    fileShareAvailable = await filePort.isAvailable();
+  } catch {
+    fileShareAvailable = false;
+  }
+  if (!fileShareAvailable) {
+    return unavailable;
   }
 
   const cacheDir = downloadPort.cacheDirectory();
@@ -438,6 +488,9 @@ export async function shareWatchPostFile(
         err instanceof Error ? err.message : input.labels?.shareFailed || "Share failed";
       if (isUserCancel(messageText)) {
         return { ok: true, shared: false, shares: 0, url, mode: "file" };
+      }
+      if (isMediaUnavailableMessage(messageText)) {
+        return unavailable;
       }
       return failed(messageText);
     }

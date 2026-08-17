@@ -42,6 +42,7 @@ import {
   WATCH_RAIL_ACTION_MIN_HEIGHT,
   WATCH_RAIL_GAP,
   WATCH_TIMELINE_TRAILING_GUTTER,
+  WATCH_VOLUME_RIGHT_CLEARANCE,
   watchRailBottomOffset,
 } from "@/src/lib/watch/railLayout";
 import { colors } from "@/src/theme/colors";
@@ -614,7 +615,7 @@ function WatchVideoCardComponent({
 
       <View style={styles.overlay} pointerEvents="box-none">
         <Pressable
-          style={styles.tapLayer}
+          style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
           onPress={onTogglePlayPause}
           accessibilityRole="button"
           accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
@@ -699,6 +700,8 @@ function WatchVideoCardComponent({
         <View
           key={`rail-${video.postId ?? video.id}-${video.likedByMe === true ? 1 : 0}`}
           style={[styles.rail, { bottom: watchRailBottomOffset(bottomInset) }]}
+          pointerEvents="box-none"
+          collapsable={false}
         >
           <Pressable
             style={styles.action}
@@ -762,6 +765,7 @@ function WatchVideoCardComponent({
             accessibilityRole="button"
             accessibilityLabel={t("watch.share")}
             accessibilityState={{ disabled: !onShare }}
+            testID="watch-share-entry"
           >
             <Text
               style={[styles.actionIcon, !onShare && styles.disabledIcon]}
@@ -980,6 +984,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: WATCH_RAIL_GAP,
     zIndex: 5,
+    elevation: 6,
   },
   action: {
     alignItems: "center",

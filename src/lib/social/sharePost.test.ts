@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
   Share: {
     share: vi.fn(),
     dismissedAction: "dismissedAction",
@@ -19,12 +20,15 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(),
 }));
 
-import { Share } from "react-native";
+import * as Sharing from "expo-sharing";
+import { Platform, Share } from "react-native";
 
 import {
   WATCH_SHARE_CHOICES,
   buildMobilePostShareUrl,
   createShareAttempt,
+  defaultShareFilePort,
+  defaultShareLinkPort,
   isCanonicalMobilePostShareUrl,
   isLocalOrCreateAssetUri,
   isSafeShareFileUri,
@@ -41,6 +45,10 @@ import {
   type ShareFilePort,
   type ShareLinkPort,
 } from "./sharePost";
+
+function setMockOs(os: "ios" | "android") {
+  (Platform as { OS: string }).OS = os;
+}
 
 describe("WATCH_SHARE_CHOICES", () => {
   it("exposes exactly two shared catalog modes", () => {
@@ -180,6 +188,7 @@ describe("resolveShareableStoragePath", () => {
 describe("shareWatchPost", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setMockOs("ios");
   });
 
   it("shares the current post URL and records that post id", async () => {
@@ -435,5 +444,92 @@ describe("shareWatchPostFile", () => {
     expect(shareFile).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("share_failed");
+  });
+
+  it("returns media_unavailable when the file adapter is not available", async () => {
+    const { downloadPort, deleted } = filePorts();
+    const result = await shareWatchPostFile(
+      supabaseForPost({
+        id: 4,
+        post_type: "video",
+        media_status: "ready",
+        video_path: "owner/clip.mp4",
+        video_url: null,
+        media_pipeline: null,
+      }) as never,
+      {
+        attempt: createShareAttempt(4)!,
+        filePort: {
+          isAvailable: async () => false,
+          shareFile: vi.fn(),
+        },
+        downloadPort,
+        labels: { mediaUnavailable: "Media unavailable" },
+      }
+    );
+    expect(result).toEqual({
+      ok: false,
+      code: "media_unavailable",
+      message: "Media unavailable",
+    });
+    expect(deleted).toEqual([]);
+  });
+});
+
+describe("native share adapters after the shared entry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setMockOs("ios");
+  });
+
+  it("shares the Android link via message only so the entry is not iOS-shaped", async () => {
+    setMockOs("android");
+    vi.mocked(Share.share).mockResolvedValue({
+      action: Share.sharedAction,
+    } as never);
+    await defaultShareLinkPort.share({
+      title: "UMTUBA",
+      message: "Check out this post on UMTUBA\nhttps://umtuba.com/watch?post=42",
+      url: "https://umtuba.com/watch?post=42",
+    });
+    expect(Share.share).toHaveBeenCalledWith(
+      {
+        title: "UMTUBA",
+        message: "Check out this post on UMTUBA\nhttps://umtuba.com/watch?post=42",
+      },
+      expect.any(Object)
+    );
+    expect(vi.mocked(Share.share).mock.calls[0]?.[0]).not.toHaveProperty("url");
+  });
+
+  it("keeps Android file-share available when expo-sharing reports false", async () => {
+    setMockOs("android");
+    vi.mocked(Sharing.isAvailableAsync).mockResolvedValue(false);
+    expect(await defaultShareFilePort.isAvailable()).toBe(true);
+    await defaultShareFilePort.shareFile({
+      fileUri: "file:///cache/umtuba-share-1.mp4",
+      mimeType: "video/mp4",
+      dialogTitle: "UMTUBA",
+    });
+    expect(Sharing.shareAsync).toHaveBeenCalledWith(
+      "file:///cache/umtuba-share-1.mp4",
+      expect.objectContaining({
+        mimeType: "video/mp4",
+        dialogTitle: "UMTUBA",
+      })
+    );
+  });
+
+  it("reports media_unavailable when the Android file Intent cannot run", async () => {
+    setMockOs("android");
+    vi.mocked(Sharing.isAvailableAsync).mockResolvedValue(false);
+    vi.mocked(Sharing.shareAsync).mockRejectedValue(new Error("not available"));
+    await expect(
+      defaultShareFilePort.shareFile({
+        fileUri: "file:///cache/umtuba-share-1.mp4",
+        mimeType: "video/mp4",
+        dialogTitle: "UMTUBA",
+      })
+    ).rejects.toThrow(/MEDIA_UNAVAILABLE/i);
   });
 });

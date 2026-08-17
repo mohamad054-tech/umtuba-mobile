@@ -41,7 +41,10 @@ import {
   togglePostSave,
 } from "@/src/lib/social/interactions";
 import {
-  createShareAttempt,
+  isWatchShareEntryEnabled,
+  openWatchShareEntry,
+} from "@/src/lib/social/shareEntry";
+import {
   shareWatchPostFile,
   shareWatchPostLink,
   type ShareAttempt,
@@ -387,20 +390,15 @@ export default function WatchScreen() {
 
   const onShare = useCallback(
     (video: WatchVideo) => {
-      if (!video.postId) return;
-      const attempt = createShareAttempt(video.postId);
-      if (!attempt) return;
+      const entry = openWatchShareEntry({ postId: video.postId });
+      if (!entry) return;
       const title = video.title;
       const text = video.caption || video.title;
       Alert.alert(t("watch.share"), undefined, [
-        {
-          text: t("watch.shareVideoLink"),
-          onPress: () => void runShare(attempt, "link", title, text),
-        },
-        {
-          text: t("watch.shareVideoFile"),
-          onPress: () => void runShare(attempt, "file", title, text),
-        },
+        ...entry.choices.map((choice) => ({
+          text: t(choice.key),
+          onPress: () => void runShare(entry.attempt, choice.mode, title, text),
+        })),
         { text: t("actions.cancel"), style: "cancel" },
       ]);
     },
@@ -699,7 +697,11 @@ export default function WatchScreen() {
             ? () => setCommentPostId(item.postId as number)
             : undefined
         }
-        onShare={item.postId ? () => void onShare(item) : undefined}
+        onShare={
+          isWatchShareEntryEnabled({ postId: item.postId })
+            ? () => void onShare(item)
+            : undefined
+        }
         onDeleteOwn={
           viewerMaySeeDeleteControl(user?.id, item.author.id)
             ? () => onDeleteOwn(item)
