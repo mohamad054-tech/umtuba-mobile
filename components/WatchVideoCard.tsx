@@ -1,6 +1,6 @@
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   PanResponder,
@@ -34,6 +34,13 @@ import {
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
 import {
+  canProduceWatchAudio,
+  resolveWatchPlaybackIntent,
+  shouldHonorLatePlayerEvent,
+  shouldTeardownUnexpectedPlay,
+} from "@/src/lib/watch/activePlayerOwnership";
+import {
+  applyInactiveAudioTeardown,
   applyPlaybackIntent,
   applySeekTime,
 } from "@/src/lib/watch/playerSession";
@@ -56,6 +63,8 @@ export type WatchVideoCardProps = {
   isActive: boolean;
   /** Mount native player only for current + adjacent cards. */
   shouldLoadPlayer: boolean;
+  /** Bumps on every active-index change so late play cannot revive the previous card. */
+  ownershipGeneration: number;
   muted: boolean;
   /** In-app VideoPlayer.volume 0–1. */
   volume: number;
@@ -97,6 +106,7 @@ type PlayerPaneProps = {
   src: string;
   isActive: boolean;
   shouldPlay: boolean;
+  ownershipGeneration: number;
   muted: boolean;
   volume: number;
   loop: boolean;
@@ -266,6 +276,7 @@ function WatchPlayerPane({
   src,
   isActive,
   shouldPlay,
+  ownershipGeneration,
   muted,
   volume,
   loop,
@@ -281,11 +292,19 @@ function WatchPlayerPane({
   const [retryToken, setRetryToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const lastSeekToken = useRef<number | null>(null);
+  const isActiveRef = useRef(isActive);
+  const shouldPlayRef = useRef(shouldPlay);
+  const ownershipGenerationRef = useRef(ownershipGeneration);
+  const playGenerationRef = useRef<number | null>(null);
+  isActiveRef.current = isActive;
+  shouldPlayRef.current = shouldPlay;
+  ownershipGenerationRef.current = ownershipGeneration;
 
   const player = useVideoPlayer(src, (p) => {
-    p.loop = loop;
-    p.muted = muted;
-    p.volume = volume;
+    // Start silent. Ownership layout effect is the only path that may unmute/play.
+    p.loop = false;
+    p.muted = true;
+    p.volume = 0;
     p.audioMixingMode = "auto";
     p.staysActiveInBackground = false;
     p.showNowPlayingNotification = false;
@@ -302,6 +321,16 @@ function WatchPlayerPane({
     if (next === "readyToPlay") {
       setStatus("ready");
       setErrorMessage(null);
+      if (
+        !canProduceWatchAudio({
+          isActive: isActiveRef.current,
+          shouldPlay: shouldPlayRef.current,
+          ownerGeneration: ownershipGenerationRef.current,
+          commandGeneration: playGenerationRef.current ?? -1,
+        })
+      ) {
+        applyInactiveAudioTeardown(player, { resetPosition: false });
+      }
       return;
     }
     if (next === "error") {
@@ -322,22 +351,86 @@ function WatchPlayerPane({
   });
 
   useEventListener(player, "playToEnd", () => {
-    if (!isActive || loop) return;
+    if (
+      !shouldHonorLatePlayerEvent({
+        isActive: isActiveRef.current,
+        shouldPlay: shouldPlayRef.current,
+        ownerGeneration: ownershipGenerationRef.current,
+        eventGeneration: playGenerationRef.current,
+      })
+    ) {
+      applyInactiveAudioTeardown(player, { resetPosition: false });
+      return;
+    }
+    if (loop) return;
     onEnded?.();
   });
 
-  useEffect(() => {
-    applyPlaybackIntent(player, {
+  useEventListener(player, "playingChange", ({ isPlaying }) => {
+    if (
+      shouldTeardownUnexpectedPlay({
+        isPlaying,
+        isActive: isActiveRef.current,
+        shouldPlay: shouldPlayRef.current,
+      })
+    ) {
+      applyInactiveAudioTeardown(player, { resetPosition: false });
+    }
+  });
+
+  useLayoutEffect(() => {
+    const allowed = canProduceWatchAudio({
+      isActive,
       shouldPlay,
-      muted,
-      volume,
-      loop,
-      resetPosition: !isActive,
+      ownerGeneration: ownershipGeneration,
+      commandGeneration: ownershipGeneration,
     });
+    if (allowed) {
+      playGenerationRef.current = ownershipGeneration;
+      applyPlaybackIntent(
+        player,
+        resolveWatchPlaybackIntent({
+          isActive: true,
+          shouldPlay: true,
+          muted,
+          volume,
+          loop,
+        })
+      );
+      return;
+    }
+    playGenerationRef.current = null;
+    applyPlaybackIntent(
+      player,
+      resolveWatchPlaybackIntent({
+        isActive,
+        shouldPlay: false,
+        muted,
+        volume,
+        loop,
+      })
+    );
     if (!isActive) {
       onTimeline({ currentTime: 0, duration: 0, ratio: 0 });
     }
-  }, [player, shouldPlay, muted, volume, loop, isActive, retryToken, onTimeline]);
+  }, [
+    player,
+    shouldPlay,
+    muted,
+    volume,
+    loop,
+    isActive,
+    ownershipGeneration,
+    retryToken,
+    onTimeline,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      playGenerationRef.current = null;
+      applyInactiveAudioTeardown(player, { resetPosition: false });
+    };
+  }, [player]);
 
   useEffect(() => {
     if (!seekRequest) return;
@@ -370,8 +463,18 @@ function WatchPlayerPane({
       }
       await player.replaceAsync(nextSrc);
       setRetryToken((n) => n + 1);
-      if (shouldPlay) {
+      if (
+        shouldHonorLatePlayerEvent({
+          isActive: isActiveRef.current,
+          shouldPlay: shouldPlayRef.current,
+          ownerGeneration: ownershipGenerationRef.current,
+          eventGeneration: ownershipGenerationRef.current,
+        })
+      ) {
+        playGenerationRef.current = ownershipGenerationRef.current;
         player.play();
+      } else {
+        applyInactiveAudioTeardown(player, { resetPosition: false });
       }
     } catch (err) {
       setStatus("error");
@@ -379,7 +482,7 @@ function WatchPlayerPane({
     } finally {
       setRefreshing(false);
     }
-  }, [onRefreshSrc, player, shouldPlay, src]);
+  }, [onRefreshSrc, player, src]);
 
   const { t } = useTranslation();
 
@@ -435,6 +538,7 @@ function WatchVideoCardComponent({
   video,
   isActive,
   shouldLoadPlayer: loadPlayer,
+  ownershipGeneration,
   muted,
   volume,
   autoNext,
@@ -599,6 +703,7 @@ function WatchVideoCardComponent({
           src={video.src}
           isActive={isActive}
           shouldPlay={shouldPlay}
+          ownershipGeneration={ownershipGeneration}
           muted={audio.muted}
           volume={audio.volume}
           loop={loop}

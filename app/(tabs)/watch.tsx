@@ -83,6 +83,7 @@ import {
   watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
+import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { colors } from "@/src/theme/colors";
 
 const { height: WINDOW_HEIGHT } = Dimensions.get("window");
@@ -110,6 +111,7 @@ export default function WatchScreen() {
   const [videos, setVideos] = useState<WatchVideo[]>([]);
   const [cursor, setCursor] = useState<WatchFeedCursor | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [playbackGeneration, setPlaybackGeneration] = useState(0);
   const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
   const [volume, setVolume] = useState(DEFAULT_WATCH_VOLUME);
   const [autoNext, setAutoNext] = useState(DEFAULT_WATCH_AUTO_NEXT);
@@ -136,9 +138,28 @@ export default function WatchScreen() {
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
   const activeIndexRef = useRef(0);
+  const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
   const programmaticAdvanceUntilRef = useRef(0);
+
+  const claimActiveIndex = useCallback((nextIndex: number) => {
+    if (!Number.isFinite(nextIndex) || nextIndex < 0) return;
+    const nextGeneration = bumpWatchOwnerGeneration(
+      playbackGenerationRef.current,
+      activeIndexRef.current,
+      nextIndex
+    );
+    if (nextGeneration !== playbackGenerationRef.current) {
+      playbackGenerationRef.current = nextGeneration;
+      setPlaybackGeneration(nextGeneration);
+    }
+    activeIndexRef.current = nextIndex;
+    setActiveIndex(nextIndex);
+  }, []);
+
+  const claimActiveIndexRef = useRef(claimActiveIndex);
+  claimActiveIndexRef.current = claimActiveIndex;
 
   useEffect(() => {
     itemHeightRef.current = itemHeight;
@@ -183,10 +204,6 @@ export default function WatchScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    activeIndexRef.current = activeIndex;
-  }, [activeIndex]);
-
   const visibleVideos = useMemo(
     () =>
       filterWatchItemsForViewer(videos, {
@@ -212,8 +229,7 @@ export default function WatchScreen() {
           programmaticAdvanceUntilRef.current =
             Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
           listRef.current?.scrollToOffset({ offset, animated: true });
-          activeIndexRef.current = prev;
-          setActiveIndex(prev);
+          claimActiveIndexRef.current(prev);
         }
         return true;
       }
@@ -243,7 +259,7 @@ export default function WatchScreen() {
         setVideos(page.videos);
         setCursor(page.nextCursor);
         setEndReached(!page.nextCursor);
-        setActiveIndex(0);
+        claimActiveIndex(0);
       } catch (err) {
         setError(getErrorMessage(err, t("watch.loadFailed")));
       } finally {
@@ -252,7 +268,7 @@ export default function WatchScreen() {
         initialInFlight.current = false;
       }
     },
-    [focusPostId, t, user?.id]
+    [claimActiveIndex, focusPostId, t, user?.id]
   );
 
   useEffect(() => {
@@ -294,7 +310,7 @@ export default function WatchScreen() {
         (item) => item.isViewable && item.index != null
       );
       if (first?.index != null) {
-        setActiveIndex(first.index);
+        claimActiveIndexRef.current(first.index);
       }
     }
   ).current;
@@ -610,8 +626,7 @@ export default function WatchScreen() {
 
     programmaticAdvanceUntilRef.current =
       Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
-    activeIndexRef.current = nextIndex;
-    setActiveIndex(nextIndex);
+    claimActiveIndex(nextIndex);
 
     const run = () => {
       listRef.current?.scrollToOffset({
@@ -640,7 +655,7 @@ export default function WatchScreen() {
         }
       }, 120);
     }
-  }, []);
+  }, [claimActiveIndex]);
 
   const onActiveEnded = useCallback(() => {
     const nextIndex = resolveNextWatchIndex({
@@ -679,6 +694,7 @@ export default function WatchScreen() {
         video={item}
         isActive={index === activeIndex}
         shouldLoadPlayer={shouldLoadPlayer(index, activeIndex)}
+        ownershipGeneration={playbackGeneration}
         muted={muted}
         volume={volume}
         autoNext={autoNext}
@@ -731,6 +747,7 @@ export default function WatchScreen() {
     ),
     [
       activeIndex,
+      playbackGeneration,
       appState,
       autoNext,
       insets.bottom,
@@ -866,7 +883,7 @@ export default function WatchScreen() {
         }}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${watchInteractionSignature(visibleVideos)}`}
+        extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

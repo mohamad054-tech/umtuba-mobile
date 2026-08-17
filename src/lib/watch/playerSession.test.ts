@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyInactiveAudioTeardown,
   applyPlaybackIntent,
   applySeekTime,
   createPlayerSession,
@@ -28,11 +29,13 @@ describe("applyPlaybackIntent", () => {
       loop: true,
       resetPosition: true,
     });
-    expect(session.calls).toContain("pause");
+    expect(session.calls.filter((c) => c === "pause").length).toBeGreaterThanOrEqual(
+      2
+    );
     expect(session.player.currentTime).toBe(0);
     expect(session.player.muted).toBe(true);
     expect(session.player.volume).toBe(0);
-    expect(session.player.loop).toBe(true);
+    expect(session.player.loop).toBe(false);
   });
 
   it("background pause keeps position", () => {
@@ -70,6 +73,20 @@ describe("applyPlaybackIntent", () => {
     expect(session.player.currentTime).toBe(4.5);
     expect(applySeekTime(session.player, Number.NaN)).toBe(false);
     expect(session.player.currentTime).toBe(4.5);
+  });
+
+  it("inactive teardown mutes, disables loop, and double-pauses after seek", () => {
+    const session = createPlayerSession();
+    session.player.loop = true;
+    session.player.muted = false;
+    session.player.volume = 1;
+    session.player.currentTime = 8;
+    applyInactiveAudioTeardown(session.player, { resetPosition: true });
+    expect(session.player.muted).toBe(true);
+    expect(session.player.volume).toBe(0);
+    expect(session.player.loop).toBe(false);
+    expect(session.player.currentTime).toBe(0);
+    expect(session.calls.filter((c) => c === "pause")).toEqual(["pause", "pause"]);
   });
 
   it("release cleans up and blocks further play", () => {

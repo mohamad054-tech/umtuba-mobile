@@ -24,21 +24,39 @@ export type PlaybackIntent = {
   resetPosition?: boolean;
 };
 
+/**
+ * Silence + stop. Mute and disable loop BEFORE pause so a native
+ * play-to-end handler cannot restart audio. Seek-to-0 can resume
+ * AVPlayer; pause again after reset.
+ */
+export function applyInactiveAudioTeardown(
+  player: PlayerLike,
+  options?: { resetPosition?: boolean }
+): void {
+  player.muted = true;
+  player.volume = 0;
+  player.loop = false;
+  player.pause();
+  if (options?.resetPosition) {
+    player.currentTime = 0;
+    player.pause();
+  }
+}
+
 export function applyPlaybackIntent(
   player: PlayerLike,
   intent: PlaybackIntent
 ): void {
+  if (!intent.shouldPlay) {
+    applyInactiveAudioTeardown(player, {
+      resetPosition: intent.resetPosition === true,
+    });
+    return;
+  }
   player.muted = intent.muted;
   player.volume = intent.volume;
   player.loop = intent.loop;
-  if (intent.shouldPlay) {
-    player.play();
-  } else {
-    player.pause();
-    if (intent.resetPosition) {
-      player.currentTime = 0;
-    }
-  }
+  player.play();
 }
 
 export function applySeekTime(player: PlayerLike, seconds: number): boolean {
