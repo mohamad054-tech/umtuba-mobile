@@ -154,7 +154,9 @@ export async function resolvePickedVideoByteSize(input: {
  */
 export function pickerDurationToMs(duration: number): number | null {
   if (!Number.isFinite(duration) || duration <= 0) {
-    return null;
+    // Explicit 0 / NaN / negative is invalid metadata, not "picker omitted".
+    // validateVideoDuration accepts null and rejects <= 0.
+    return 0;
   }
   if (duration < 1000) {
     return Math.round(duration * 1000);

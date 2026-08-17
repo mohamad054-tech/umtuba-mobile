@@ -379,9 +379,9 @@ describe("pickerDurationToMs", () => {
     expect(formatPickedDurationSecondsLabel(12500)).toBe("13s");
   });
 
-  it("rejects non-finite or non-positive picker duration", () => {
-    expect(pickerDurationToMs(0)).toBeNull();
-    expect(pickerDurationToMs(-4)).toBeNull();
-    expect(pickerDurationToMs(Number.NaN)).toBeNull();
+  it("maps non-positive picker duration to 0 so Create can reject it", () => {
+    expect(pickerDurationToMs(0)).toBe(0);
+    expect(pickerDurationToMs(-4)).toBe(0);
+    expect(pickerDurationToMs(Number.NaN)).toBe(0);
   });
 });
