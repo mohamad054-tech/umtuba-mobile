@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.umtuba.app",
-    buildNumber: "9",
+    buildNumber: "10",
     // Same Team ID already published in live AASA (M6HDH86Z55.com.umtuba.app).
     appleTeamId: "M6HDH86Z55",
     associatedDomains: [
@@ -61,7 +61,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.umtuba.app",
-    versionCode: 11,
+    versionCode: 12,
     adaptiveIcon: {
       backgroundColor: "#050510",
       foregroundImage: "./assets/images/android-icon-foreground.png",
