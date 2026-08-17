@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -38,6 +38,17 @@ import {
   retryFromError,
   type CreateJourneyState,
 } from "@/src/lib/video/createJourney";
+import {
+  applyAcceptedPick,
+  applyRejectedPick,
+  bindRetryToCurrentAsset,
+  canPublishCreateDraft,
+  evaluateCreateAsset,
+  isStaleCreateAttempt,
+  nextCreateAttemptId,
+  resetCreateDraftAfterPublish,
+  shouldResetCreateOnBlur,
+} from "@/src/lib/video/createUploadState";
 import { isAbortError } from "@/src/lib/video/createProgress";
 import { deleteOwnedVideoObject } from "@/src/lib/video/deleteOwnedVideo";
 import {
@@ -69,9 +80,17 @@ export default function CreateScreen() {
   const abortRef = useRef<AbortController | null>(null);
   const journeyRef = useRef(journey);
   journeyRef.current = journey;
+  const attemptNonceRef = useRef(0);
+  const activeAttemptRef = useRef<string | null>(null);
 
   const hashtags = useMemo(() => extractHashtags(caption), [caption]);
   const busy = journey.uploadBusy || journey.publishBusy;
+  const publishable = canPublishCreateDraft({
+    asset,
+    journey,
+    ugcAck,
+    caption,
+  });
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -86,11 +105,23 @@ export default function CreateScreen() {
   const resetSelection = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    attemptNonceRef.current += 1;
+    activeAttemptRef.current = null;
     setAsset(null);
     setCaption("");
     setUgcAck(false);
     setJourney(initialCreateJourneyState());
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (shouldResetCreateOnBlur(journeyRef.current.phase)) {
+          resetSelection();
+        }
+      };
+    }, [resetSelection])
+  );
 
   const onPick = useCallback(async () => {
     if (!canStartUpload(journeyRef.current) || busy) return;
@@ -101,22 +132,18 @@ export default function CreateScreen() {
         setJourney((s) => ({ ...s, phase: "ready", error: null }));
         return;
       }
-      setJourney((s) => ({
-        ...s,
-        phase: "error",
-        error: result.message,
-      }));
+      attemptNonceRef.current += 1;
+      activeAttemptRef.current = null;
+      setAsset(null);
+      setJourney((s) =>
+        applyRejectedPick(s, result.message, result.rejected?.fileName)
+      );
       return;
     }
+    attemptNonceRef.current += 1;
+    activeAttemptRef.current = null;
     setAsset(result.asset);
-    setJourney((s) => ({
-      ...s,
-      phase: "ready",
-      error: null,
-      message: null,
-      uploadPercent: 0,
-      uploadedPath: null,
-    }));
+    setJourney((s) => applyAcceptedPick(s));
   }, [busy]);
 
   const onCancelUpload = useCallback(() => {
@@ -132,7 +159,29 @@ export default function CreateScreen() {
         return;
       }
 
-      const started = beginUpload(journeyRef.current);
+      const evaluation = evaluateCreateAsset(picked);
+      if (!evaluation.ok) {
+        setAsset(null);
+        setJourney((s) =>
+          applyRejectedPick(
+            s,
+            evaluation.message ?? t("create.pickFailed"),
+            picked.fileName
+          )
+        );
+        return;
+      }
+
+      const attemptId = nextCreateAttemptId(
+        picked.id,
+        ++attemptNonceRef.current
+      );
+      activeAttemptRef.current = attemptId;
+
+      const started = beginUpload(journeyRef.current, {
+        attemptId,
+        assetId: picked.id,
+      });
       if (!started) return;
       setJourney(started);
 
@@ -161,9 +210,20 @@ export default function CreateScreen() {
           accessToken: liveSession.access_token,
           signal: controller.signal,
           onProgress: (progress) => {
+            if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+              return;
+            }
             setJourney((s) => applyUploadProgress(s, progress.percent));
           },
         });
+
+        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+          if (uploaded.path) {
+            await deleteOwnedVideoObject(getSupabase(), user.id, uploaded.path);
+            await clearPendingVideoUpload(uploaded.path);
+          }
+          return;
+        }
 
         uploadedPath = uploaded.path;
         setJourney((s) => completeUpload(s, uploaded.path));
@@ -200,6 +260,22 @@ export default function CreateScreen() {
           }
         );
 
+        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+          if (
+            !result.ok &&
+            result.videoPath &&
+            result.code !== "auth_required"
+          ) {
+            await deleteOwnedVideoObject(
+              getSupabase(),
+              user.id,
+              result.videoPath
+            );
+            await clearPendingVideoUpload(result.videoPath);
+          }
+          return;
+        }
+
         if (!result.ok) {
           if (result.code === "auth_required" && result.videoPath) {
             await queuePendingVideoUpload(result.videoPath);
@@ -216,8 +292,16 @@ export default function CreateScreen() {
         }
 
         await clearPendingVideoUpload(uploaded.path);
+        const cleared = resetCreateDraftAfterPublish();
+        setAsset(cleared.asset);
+        setCaption(cleared.caption);
+        setUgcAck(cleared.ugcAck);
         setJourney((s) => completePublish(s, result.postId));
       } catch (error) {
+        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+          return;
+        }
+
         if (isAbortError(error)) {
           if (uploadedPath) {
             await deleteOwnedVideoObject(getSupabase(), user.id, uploadedPath);
@@ -257,7 +341,7 @@ export default function CreateScreen() {
   );
 
   const onPublish = useCallback(async () => {
-    if (!asset || busy) return;
+    if (!asset || busy || !publishable) return;
     if (!canPublishWithUgcAck(ugcAck)) {
       setJourney((s) => ({
         ...s,
@@ -276,13 +360,19 @@ export default function CreateScreen() {
       return;
     }
     await runPublishPipeline(asset, caption);
-  }, [asset, busy, caption, runPublishPipeline, t, ugcAck]);
+  }, [asset, busy, caption, publishable, runPublishPipeline, t, ugcAck]);
 
   const onRetry = useCallback(() => {
-    setJourney((s) => retryFromError(s));
-    if (asset) {
-      void runPublishPipeline(asset, caption);
+    const bound = bindRetryToCurrentAsset({
+      asset,
+      journey: journeyRef.current,
+      nonce: attemptNonceRef.current + 1,
+    });
+    if (!bound.ok) {
+      return;
     }
+    setJourney((s) => retryFromError(s));
+    void runPublishPipeline(bound.asset, caption);
   }, [asset, caption, runPublishPipeline]);
 
   if (authLoading) {
@@ -357,6 +447,9 @@ export default function CreateScreen() {
               accessibilityLiveRegion="assertive"
             >
               <Text style={styles.errorTitle}>{t("create.pickFailed")}</Text>
+              {journey.rejectedAssetLabel ? (
+                <Text style={styles.cardMeta}>{journey.rejectedAssetLabel}</Text>
+              ) : null}
               <Text style={styles.errorText}>{journey.error}</Text>
               <View style={styles.row}>
                 <Pressable
@@ -543,10 +636,12 @@ export default function CreateScreen() {
                 <Pressable
                   style={styles.secondary}
                   onPress={onRetry}
-                  disabled={!asset}
+                  disabled={!asset || !evaluateCreateAsset(asset).ok}
                   accessibilityRole="button"
                   accessibilityLabel={t("actions.retry")}
-                  accessibilityState={{ disabled: !asset }}
+                  accessibilityState={{
+                    disabled: !asset || !evaluateCreateAsset(asset).ok,
+                  }}
                 >
                   <Text style={styles.secondaryText}>{t("actions.retry")}</Text>
                 </Pressable>
@@ -588,30 +683,14 @@ export default function CreateScreen() {
           </Pressable>
 
           <Pressable
-            style={[
-              styles.primary,
-              (!asset ||
-                busy ||
-                journey.phase === "success" ||
-                !canPublishWithUgcAck(ugcAck)) &&
-                styles.disabled,
-            ]}
+            style={[styles.primary, !publishable && styles.disabled]}
             onPress={() => void onPublish()}
-            disabled={
-              !asset ||
-              busy ||
-              journey.phase === "success" ||
-              !canPublishWithUgcAck(ugcAck)
-            }
+            disabled={!publishable}
             accessibilityRole="button"
             accessibilityLabel={t("create.publish")}
             accessibilityHint={t("create.publishHint")}
             accessibilityState={{
-              disabled:
-                !asset ||
-                busy ||
-                journey.phase === "success" ||
-                !canPublishWithUgcAck(ugcAck),
+              disabled: !publishable,
               busy,
             }}
           >

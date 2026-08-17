@@ -205,9 +205,10 @@ describe("pickVideoFromLibrary (Android content://)", () => {
 
     const result = await pickVideoFromLibrary();
 
-    expect(result).toEqual({
-      ok: true,
-      asset: {
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.asset.id).toEqual(expect.any(String));
+      expect(result.asset).toMatchObject({
         uri: "content://media/external/video/media/55",
         fileName: "video.mp4",
         mimeType: "video/mp4",
@@ -215,8 +216,38 @@ describe("pickVideoFromLibrary (Android content://)", () => {
         durationMs: 12500,
         width: 1080,
         height: 1920,
-      },
+      });
+    }
+  });
+
+  it("rejects invalid duration and exposes the rejected clip label", async () => {
+    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: true,
+      canAskAgain: true,
+      explanation: "test",
     });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: false,
+      assets: [
+        {
+          uri: "content://media/external/video/media/12",
+          fileName: "zero.mp4",
+          mimeType: "video/mp4",
+          fileSize: 1_000_000,
+          duration: 0,
+          width: 1,
+          height: 1,
+        },
+      ],
+    } as never);
+
+    const result = await pickVideoFromLibrary();
+    expect(result.ok).toBe(false);
+    if (!result.ok && !result.cancelled) {
+      expect(result.message).toMatch(/duration/i);
+      expect(result.rejected?.fileName).toBe("zero.mp4");
+    }
   });
 
   it("still enforces the 50 MB limit after size resolution", async () => {
@@ -252,6 +283,8 @@ describe("pickVideoFromLibrary (Android content://)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok && !result.cancelled) {
       expect(result.message).toMatch(/50 MB/i);
+      expect(result.rejected?.fileName).toBe("huge.mp4");
+      expect(result.rejected?.byteSize).toBe(51 * 1024 * 1024);
     }
   });
 
@@ -285,11 +318,14 @@ describe("pickVideoFromLibrary (Android content://)", () => {
     );
 
     const result = await pickVideoFromLibrary();
-    expect(result).toEqual({
-      ok: false,
-      cancelled: false,
-      message:
-        "Could not determine the video file size after selection. Try another clip or re-export the file.",
-    });
+    expect(result.ok).toBe(false);
+    if (!result.ok && !result.cancelled) {
+      expect(result.message).toBe(
+        "Could not determine the video file size after selection. Try another clip or re-export the file."
+      );
+      expect(result.rejected?.uri).toBe(
+        "content://media/external/video/media/7"
+      );
+    }
   });
 });

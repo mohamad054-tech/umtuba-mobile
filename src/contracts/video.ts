@@ -118,6 +118,7 @@ export function validateCaption(caption: string): CaptionValidationResult {
 /**
  * Duration is optional (Android pickers sometimes omit it).
  * When present, reject empty / invalid values. No hard max — matches web.
+ * This validator is the same gate the Create UI uses to warn and disable Publish.
  */
 export function validateVideoDuration(
   durationMs: number | null | undefined

@@ -10,6 +10,11 @@ import {
   type CreateProgressPhase,
 } from "@/src/lib/video/createProgress";
 
+export type CreateAttemptBinding = {
+  attemptId: string;
+  assetId: string;
+};
+
 export type CreateJourneyState = {
   phase: CreateProgressPhase;
   uploadPercent: number;
@@ -20,6 +25,9 @@ export type CreateJourneyState = {
   publishedPostId: number | null;
   publishBusy: boolean;
   uploadBusy: boolean;
+  attemptId: string | null;
+  boundAssetId: string | null;
+  rejectedAssetLabel: string | null;
 };
 
 export function normalizePublishedPostId(
@@ -50,6 +58,9 @@ export function initialCreateJourneyState(): CreateJourneyState {
     publishedPostId: null,
     publishBusy: false,
     uploadBusy: false,
+    attemptId: null,
+    boundAssetId: null,
+    rejectedAssetLabel: null,
   };
 }
 
@@ -62,7 +73,10 @@ export function canStartPublish(state: CreateJourneyState): boolean {
   return !state.uploadBusy && !state.publishBusy;
 }
 
-export function beginUpload(state: CreateJourneyState): CreateJourneyState | null {
+export function beginUpload(
+  state: CreateJourneyState,
+  binding?: CreateAttemptBinding
+): CreateJourneyState | null {
   if (!canStartUpload(state)) return null;
   return {
     ...state,
@@ -75,6 +89,9 @@ export function beginUpload(state: CreateJourneyState): CreateJourneyState | nul
     message: "Uploading…",
     uploadedPath: null,
     publishedPostId: null,
+    attemptId: binding?.attemptId ?? null,
+    boundAssetId: binding?.assetId ?? null,
+    rejectedAssetLabel: null,
   };
 }
 
@@ -131,6 +148,10 @@ export function completePublish(
     uploadBusy: false,
     message: "Video published.",
     error: null,
+    uploadedPath: null,
+    attemptId: null,
+    boundAssetId: null,
+    rejectedAssetLabel: null,
     publishedPostId: normalizePublishedPostId(postId),
   };
 }
@@ -176,6 +197,9 @@ export function retryFromError(state: CreateJourneyState): CreateJourneyState {
   return {
     ...initialCreateJourneyState(),
     uploadedPath: null,
+    publishedPostId: null,
+    attemptId: null,
+    boundAssetId: state.boundAssetId,
     error: null,
   };
 }

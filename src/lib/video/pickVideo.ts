@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 import {
   isAllowedVideoMimeType,
+  newUploadFileId,
   resolveVideoMimeType,
   validateVideoDuration,
   validateVideoFile,
@@ -12,6 +13,7 @@ import {
 import { requestMediaLibraryPermission } from "@/src/lib/permissions/foundation";
 
 export type PickedVideoAsset = {
+  id: string;
   uri: string;
   fileName: string;
   mimeType: AllowedVideoMimeType;
@@ -21,10 +23,22 @@ export type PickedVideoAsset = {
   height: number | null;
 };
 
+export type RejectedVideoPick = {
+  fileName: string | null;
+  uri: string | null;
+  byteSize: number | null;
+  durationMs: number | null;
+};
+
 export type PickVideoResult =
   | { ok: true; asset: PickedVideoAsset }
   | { ok: false; cancelled: true }
-  | { ok: false; cancelled: false; message: string };
+  | {
+      ok: false;
+      cancelled: false;
+      message: string;
+      rejected?: RejectedVideoPick;
+    };
 
 function fileNameFromUri(uri: string, mimeType: string): string {
   const last = uri.split("/").pop() || uri.split("\\").pop() || "video";
@@ -181,12 +195,19 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
     reportedSize: asset.fileSize,
   });
 
+  // ImagePicker duration is seconds on native.
+  const durationMs =
+    typeof asset.duration === "number" && Number.isFinite(asset.duration)
+      ? Math.round(asset.duration * 1000)
+      : null;
+
   if (byteSize == null) {
     return {
       ok: false,
       cancelled: false,
       message:
         "Could not determine the video file size after selection. Try another clip or re-export the file.",
+      rejected: { fileName, uri, byteSize: null, durationMs },
     };
   }
 
@@ -197,23 +218,28 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
   });
 
   if (!fileCheck.ok) {
-    return { ok: false, cancelled: false, message: fileCheck.message };
+    return {
+      ok: false,
+      cancelled: false,
+      message: fileCheck.message,
+      rejected: { fileName, uri, byteSize, durationMs },
+    };
   }
-
-  // ImagePicker duration is seconds on native.
-  const durationMs =
-    typeof asset.duration === "number" && Number.isFinite(asset.duration)
-      ? Math.round(asset.duration * 1000)
-      : null;
 
   const durationCheck = validateVideoDuration(durationMs);
   if (!durationCheck.ok) {
-    return { ok: false, cancelled: false, message: durationCheck.message };
+    return {
+      ok: false,
+      cancelled: false,
+      message: durationCheck.message,
+      rejected: { fileName, uri, byteSize, durationMs },
+    };
   }
 
   return {
     ok: true,
     asset: {
+      id: newUploadFileId(),
       uri,
       fileName,
       mimeType: fileCheck.mimeType,

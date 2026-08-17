@@ -110,7 +110,10 @@ describe("upload journey", () => {
 describe("publish journey", () => {
   it("prevents double publish while busy", () => {
     let state = completeUpload(
-      beginUpload(initialCreateJourneyState())!,
+      beginUpload(initialCreateJourneyState(), {
+        attemptId: "asset-1:1",
+        assetId: "asset-1",
+      })!,
       "uid/file.mp4"
     );
     expect(canStartPublish(state)).toBe(false);
@@ -118,6 +121,21 @@ describe("publish journey", () => {
     expect(state.phase).toBe("success");
     expect(state.publishBusy).toBe(false);
     expect(state.publishedPostId).toBe(42);
+    expect(state.uploadedPath).toBeNull();
+    expect(state.attemptId).toBeNull();
+    expect(state.boundAssetId).toBeNull();
+  });
+
+  it("beginUpload binds the attempt to the current asset and drops the previous path", () => {
+    const started = beginUpload(initialCreateJourneyState(), {
+      attemptId: "asset-2:3",
+      assetId: "asset-2",
+    });
+    expect(started).not.toBeNull();
+    expect(started?.attemptId).toBe("asset-2:3");
+    expect(started?.boundAssetId).toBe("asset-2");
+    expect(started?.uploadedPath).toBeNull();
+    expect(started?.publishedPostId).toBeNull();
   });
 
   it("Open Watch deep-links to the published post, not the bare feed", () => {
