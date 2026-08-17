@@ -3,11 +3,14 @@ import * as Notifications from "expo-notifications";
 
 export type PermissionKind = "mediaLibrary" | "notifications";
 
+export type MediaLibraryAccessPrivileges = "all" | "limited" | "none";
+
 export type PermissionOutcome = {
   kind: PermissionKind;
   granted: boolean;
   canAskAgain: boolean;
   explanation: string;
+  accessPrivileges?: MediaLibraryAccessPrivileges;
 };
 
 const EXPLANATIONS: Record<PermissionKind, string> = {
@@ -17,28 +20,37 @@ const EXPLANATIONS: Record<PermissionKind, string> = {
     "UMTUBA can notify you about likes, rewards, and account activity you care about.",
 };
 
-/**
- * Aligns with expo-image-picker (Create gallery flow).
- * On Android 13+, the system photo picker often works without a broad media grant;
- * callers may still open the picker when granted is false on Android.
- */
-export async function requestMediaLibraryPermission(): Promise<PermissionOutcome> {
-  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
-  if (current.granted) {
-    return {
-      kind: "mediaLibrary",
-      granted: true,
-      canAskAgain: current.canAskAgain,
-      explanation: EXPLANATIONS.mediaLibrary,
-    };
-  }
-  const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+function toOutcome(
+  result: Awaited<ReturnType<typeof ImagePicker.getMediaLibraryPermissionsAsync>>
+): PermissionOutcome {
   return {
     kind: "mediaLibrary",
     granted: result.granted,
     canAskAgain: result.canAskAgain,
     explanation: EXPLANATIONS.mediaLibrary,
+    accessPrivileges: result.accessPrivileges,
   };
+}
+
+/**
+ * Inspect-only. Does not prompt. Create's system photo picker does not need a
+ * prior grant; requesting one on iOS can create LIMITED/SELECTED access and
+ * restrict expo-image-picker's PHPicker (bound to PHPhotoLibrary.shared()).
+ */
+export async function inspectMediaLibraryPermission(): Promise<PermissionOutcome> {
+  return toOutcome(await ImagePicker.getMediaLibraryPermissionsAsync());
+}
+
+/**
+ * Prompts for a media-library grant. Do not call this to open the Create
+ * gallery picker — use inspect + the system photo picker instead.
+ */
+export async function requestMediaLibraryPermission(): Promise<PermissionOutcome> {
+  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (current.granted) {
+    return toOutcome(current);
+  }
+  return toOutcome(await ImagePicker.requestMediaLibraryPermissionsAsync());
 }
 
 export async function requestNotificationsPermission(): Promise<PermissionOutcome> {

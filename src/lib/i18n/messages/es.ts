@@ -295,6 +295,13 @@ export const esMessages: MobileMessages = {
   "create.chooseAnother": "Elegir otro",
   "create.chooseA11y": "Elegir video de la biblioteca",
   "create.chooseHint": "Abre la biblioteca del dispositivo para elegir un video",
+  "create.limitedLibrary":
+    "Solo están disponibles los videos que seleccionaste. Puedes añadir más desde tu biblioteca.",
+  "create.manageLibraryAccess": "Añadir más videos",
+  "create.manageLibraryAccessA11y":
+    "Abrir el selector del sistema para añadir más videos de la biblioteca",
+  "create.libraryAccessDenied":
+    "El acceso a la biblioteca de fotos está desactivado. Actívalo en Ajustes para elegir un video.",
   "create.pickFailed": "No se pudo usar ese video",
   "create.noVideo": "Aún no hay un video seleccionado.",
   "create.noVideoAfterError":

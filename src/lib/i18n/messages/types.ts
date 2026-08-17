@@ -277,6 +277,10 @@ export type MobileMessages = {
   "create.chooseAnother": string;
   "create.chooseA11y": string;
   "create.chooseHint": string;
+  "create.limitedLibrary": string;
+  "create.manageLibraryAccess": string;
+  "create.manageLibraryAccessA11y": string;
+  "create.libraryAccessDenied": string;
   "create.pickFailed": string;
   "create.noVideo": string;
   "create.noVideoAfterError": string;

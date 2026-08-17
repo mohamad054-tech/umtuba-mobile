@@ -58,8 +58,11 @@ import {
   queuePendingVideoUpload,
 } from "@/src/lib/video/orphanUploads";
 import {
+  expandLimitedVideoLibraryAccess,
   formatPickedDurationSecondsLabel,
+  inspectVideoLibraryAccess,
   pickVideoFromLibrary,
+  type LibraryAccessState,
   type PickedVideoAsset,
 } from "@/src/lib/video/pickVideo";
 import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
@@ -86,6 +89,8 @@ export default function CreateScreen() {
   const attemptNonceRef = useRef(0);
   const activeAttemptRef = useRef<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [libraryAccess, setLibraryAccess] =
+    useState<LibraryAccessState>("undetermined");
 
   const hashtags = useMemo(() => extractHashtags(caption), [caption]);
   const busy = journey.uploadBusy || journey.publishBusy;
@@ -119,6 +124,7 @@ export default function CreateScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      void inspectVideoLibraryAccess().then(setLibraryAccess);
       return () => {
         if (shouldResetCreateOnBlur(journeyRef.current.phase)) {
           resetSelection();
@@ -127,12 +133,18 @@ export default function CreateScreen() {
     }, [resetSelection])
   );
 
+  const onExpandLibraryAccess = useCallback(async () => {
+    const next = await expandLimitedVideoLibraryAccess();
+    setLibraryAccess(next.access);
+  }, []);
+
   const onPick = useCallback(async () => {
     if (!canStartUpload(journeyRef.current) || busy || pickerOpen) return;
     // NEW_PICK_START: do not mutate asset, caption, retry, or journey yet.
     setPickerOpen(true);
     const result = await pickVideoFromLibrary();
     setPickerOpen(false);
+    setLibraryAccess(result.access);
     if (!result.ok) {
       if (result.cancelled) {
         return;
@@ -140,8 +152,12 @@ export default function CreateScreen() {
       attemptNonceRef.current += 1;
       activeAttemptRef.current = null;
       setAsset(null);
+      const message =
+        result.reason === "library_denied"
+          ? t("create.libraryAccessDenied")
+          : result.message;
       setJourney((s) =>
-        applyRejectedPick(s, result.message, result.rejected?.fileName)
+        applyRejectedPick(s, message, result.rejected?.fileName)
       );
       return;
     }
@@ -149,7 +165,7 @@ export default function CreateScreen() {
     activeAttemptRef.current = null;
     setAsset(result.asset);
     setJourney((s) => applyAcceptedPick(s));
-  }, [busy, pickerOpen]);
+  }, [busy, pickerOpen, t]);
 
   const onCancelUpload = useCallback(() => {
     abortRef.current?.abort();
@@ -531,6 +547,23 @@ export default function CreateScreen() {
               {asset ? t("create.chooseDifferent") : t("create.chooseVideo")}
             </Text>
           </Pressable>
+
+          {libraryAccess === "limited" ? (
+            <View
+              accessibilityRole="text"
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={t("create.limitedLibrary")}
+            >
+              <Text style={styles.hint}>{t("create.limitedLibrary")}</Text>
+              <Pressable
+                onPress={() => void onExpandLibraryAccess()}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.manageLibraryAccessA11y")}
+              >
+                <Text style={styles.link}>{t("create.manageLibraryAccess")}</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {journey.error && !asset ? (
             <View

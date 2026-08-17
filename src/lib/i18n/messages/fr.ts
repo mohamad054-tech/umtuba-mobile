@@ -294,6 +294,13 @@ export const frMessages: MobileMessages = {
   "create.chooseAnother": "En choisir une autre",
   "create.chooseA11y": "Choisir une vidéo dans la bibliothèque",
   "create.chooseHint": "Ouvre la bibliothèque de l’appareil pour choisir une vidéo",
+  "create.limitedLibrary":
+    "Seules les vidéos que vous avez sélectionnées sont disponibles. Vous pouvez en ajouter d’autres depuis votre bibliothèque.",
+  "create.manageLibraryAccess": "Ajouter d’autres vidéos",
+  "create.manageLibraryAccessA11y":
+    "Ouvrir le sélecteur système pour ajouter d’autres vidéos de la bibliothèque",
+  "create.libraryAccessDenied":
+    "L’accès à la photothèque est désactivé. Activez-le dans Réglages pour choisir une vidéo.",
   "create.pickFailed": "Cette vidéo n’a pas pu être utilisée",
   "create.noVideo": "Aucune vidéo sélectionnée.",
   "create.noVideoAfterError":

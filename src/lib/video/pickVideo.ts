@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
 
 import {
   isAllowedVideoMimeType,
@@ -10,7 +10,7 @@ import {
   validateVideoFile,
   type AllowedVideoMimeType,
 } from "@/src/contracts/video";
-import { requestMediaLibraryPermission } from "@/src/lib/permissions/foundation";
+import { inspectMediaLibraryPermission } from "@/src/lib/permissions/foundation";
 
 export type PickedVideoAsset = {
   id: string;
@@ -30,15 +30,49 @@ export type RejectedVideoPick = {
   durationMs: number | null;
 };
 
+export type LibraryAccessState =
+  | "all"
+  | "limited"
+  | "denied"
+  | "undetermined"
+  | "not_required";
+
+export type PickVideoReason = "library_denied";
+
 export type PickVideoResult =
-  | { ok: true; asset: PickedVideoAsset }
-  | { ok: false; cancelled: true }
+  | { ok: true; asset: PickedVideoAsset; access: LibraryAccessState }
+  | { ok: false; cancelled: true; access: LibraryAccessState }
   | {
       ok: false;
       cancelled: false;
       message: string;
+      reason?: PickVideoReason;
+      access: LibraryAccessState;
       rejected?: RejectedVideoPick;
     };
+
+export const DENIED_LIBRARY_ACCESS_MESSAGE =
+  "Photo library access is turned off. Enable it in Settings to choose a video.";
+
+export const LIMITED_LIBRARY_ACCESS_MESSAGE =
+  "Only the videos you selected are available. You can add more from your library.";
+
+/**
+ * System photo picker: iOS PHPicker (full library, no camera/mic) and
+ * Android 13+ Photo Picker (VideoOnly, albums tab). `legacy: false` avoids
+ * ACTION_GET_CONTENT Recents-only / single-album fallbacks.
+ * `allowsEditing: false` keeps iOS on PHPicker instead of UIImagePickerController.
+ */
+export const VIDEO_LIBRARY_PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ["videos"],
+  allowsEditing: false,
+  allowsMultipleSelection: false,
+  quality: 1,
+  legacy: false,
+  defaultTab: "albums",
+  preferredAssetRepresentationMode: "current" as ImagePicker.ImagePickerOptions["preferredAssetRepresentationMode"],
+  shouldDownloadFromNetwork: true,
+};
 
 function fileNameFromUri(uri: string, mimeType: string): string {
   const last = uri.split("/").pop() || uri.split("\\").pop() || "video";
@@ -168,38 +202,124 @@ export function formatPickedDurationSecondsLabel(durationMs: number): string {
   return `${Math.round(durationMs / 1000)}s`;
 }
 
-/** iOS requires a media-library grant; Android 13+ photo picker may not. */
-export function mediaLibraryGrantRequiredForPicker(
-  os: typeof Platform.OS = Platform.OS
-): boolean {
-  return os !== "android";
+export function classifyLibraryAccess(input: {
+  granted: boolean;
+  canAskAgain?: boolean;
+  accessPrivileges?: "all" | "limited" | "none";
+  os?: typeof Platform.OS;
+}): LibraryAccessState {
+  const os = input.os ?? Platform.OS;
+  if (input.accessPrivileges === "limited") {
+    return "limited";
+  }
+  if (os === "android") {
+    return "not_required";
+  }
+  if (input.granted || input.accessPrivileges === "all") {
+    return "all";
+  }
+  // notDetermined: granted=false, canAskAgain=true — PHPicker still shows the library
+  if (input.canAskAgain !== false) {
+    return "undetermined";
+  }
+  return "denied";
+}
+
+export function libraryAccessMessage(
+  access: LibraryAccessState
+): string | null {
+  if (access === "limited") {
+    return LIMITED_LIBRARY_ACCESS_MESSAGE;
+  }
+  if (access === "denied") {
+    return DENIED_LIBRARY_ACCESS_MESSAGE;
+  }
+  return null;
 }
 
 /**
- * Native media-library picker for Create (iOS and Android).
- * Requests library permission first, then opens the system video picker.
- * Android 13+ system photo picker may work without a broad media grant.
+ * Modern system pickers do not need a prior media grant. Requesting one on
+ * iOS can create LIMITED/SELECTED access and hide the rest of the library.
+ */
+export function mediaLibraryGrantRequiredForPicker(
+  _os: typeof Platform.OS = Platform.OS
+): boolean {
+  return false;
+}
+
+export function shouldBlockVideoLibraryPicker(
+  access: LibraryAccessState,
+  os: typeof Platform.OS = Platform.OS
+): boolean {
+  return os !== "android" && access === "denied";
+}
+
+export async function inspectVideoLibraryAccess(
+  os: typeof Platform.OS = Platform.OS
+): Promise<LibraryAccessState> {
+  const permission = await inspectMediaLibraryPermission();
+  return classifyLibraryAccess({
+    granted: permission.granted,
+    canAskAgain: permission.canAskAgain,
+    accessPrivileges: permission.accessPrivileges,
+    os,
+  });
+}
+
+/**
+ * iOS LIMITED/SELECTED: PHPhotoLibrary presentLimitedLibraryPicker via
+ * expo-media-library. Denied (or picker unavailable): Settings.
+ * Does not request camera/mic and does not bypass privacy.
+ */
+export async function expandLimitedVideoLibraryAccess(): Promise<{
+  opened: boolean;
+  access: LibraryAccessState;
+}> {
+  const access = await inspectVideoLibraryAccess();
+  if (access === "limited") {
+    try {
+      const MediaLibrary = await import("expo-media-library");
+      if (typeof MediaLibrary.presentPermissionsPicker === "function") {
+        await MediaLibrary.presentPermissionsPicker(["video"]);
+      } else {
+        await MediaLibrary.presentPermissionsPickerAsync(["video"]);
+      }
+      return { opened: true, access: await inspectVideoLibraryAccess() };
+    } catch {
+      await Linking.openSettings();
+      return { opened: true, access: await inspectVideoLibraryAccess() };
+    }
+  }
+  if (access === "denied") {
+    await Linking.openSettings();
+    return { opened: true, access: await inspectVideoLibraryAccess() };
+  }
+  return { opened: false, access };
+}
+
+/**
+ * Native system video library picker for Create (iOS and Android).
+ * Inspects access only — does not request camera, microphone, or a gallery
+ * grant just to open the picker. Android 13+ Photo Picker needs no grant.
  */
 export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
-  const permission = await requestMediaLibraryPermission();
-  if (!permission.granted && mediaLibraryGrantRequiredForPicker()) {
+  const access = await inspectVideoLibraryAccess();
+  if (shouldBlockVideoLibraryPicker(access)) {
     return {
       ok: false,
       cancelled: false,
-      message:
-        "Media library access is required to choose a video. You can enable it in Settings.",
+      reason: "library_denied",
+      message: DENIED_LIBRARY_ACCESS_MESSAGE,
+      access,
     };
   }
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ["videos"],
-    allowsEditing: false,
-    quality: 1,
-    videoMaxDuration: undefined,
-  });
+  const result = await ImagePicker.launchImageLibraryAsync(
+    VIDEO_LIBRARY_PICKER_OPTIONS
+  );
 
   if (result.canceled || !result.assets?.[0]) {
-    return { ok: false, cancelled: true };
+    return { ok: false, cancelled: true, access };
   }
 
   const asset = result.assets[0];
@@ -209,6 +329,7 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
       ok: false,
       cancelled: false,
       message: "Could not read the selected video. Try another clip.",
+      access,
     };
   }
 
@@ -233,6 +354,7 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
       cancelled: false,
       message:
         "Could not determine the video file size after selection. Try another clip or re-export the file.",
+      access,
       rejected: { fileName, uri, byteSize: null, durationMs },
     };
   }
@@ -248,6 +370,7 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
       ok: false,
       cancelled: false,
       message: fileCheck.message,
+      access,
       rejected: { fileName, uri, byteSize, durationMs },
     };
   }
@@ -258,12 +381,14 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
       ok: false,
       cancelled: false,
       message: durationCheck.message,
+      access,
       rejected: { fileName, uri, byteSize, durationMs },
     };
   }
 
   return {
     ok: true,
+    access,
     asset: {
       id: newUploadFileId(),
       uri,

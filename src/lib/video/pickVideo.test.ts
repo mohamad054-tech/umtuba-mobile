@@ -8,32 +8,61 @@ vi.mock("expo-file-system/legacy", () => ({
 
 vi.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: vi.fn(),
+  launchCameraAsync: vi.fn(),
   getMediaLibraryPermissionsAsync: vi.fn(),
   requestMediaLibraryPermissionsAsync: vi.fn(),
+  requestCameraPermissionsAsync: vi.fn(),
+  getCameraPermissionsAsync: vi.fn(),
+}));
+
+vi.mock("expo-media-library", () => ({
+  presentPermissionsPicker: vi.fn(async () => undefined),
+  presentPermissionsPickerAsync: vi.fn(async () => undefined),
 }));
 
 vi.mock("react-native", () => ({
   Platform: { OS: "android" },
+  Linking: { openSettings: vi.fn(async () => undefined) },
 }));
 
 vi.mock("@/src/lib/permissions/foundation", () => ({
+  inspectMediaLibraryPermission: vi.fn(async () => ({
+    kind: "mediaLibrary",
+    granted: true,
+    canAskAgain: true,
+    explanation: "test",
+    accessPrivileges: "all",
+  })),
   requestMediaLibraryPermission: vi.fn(async () => ({
     kind: "mediaLibrary",
     granted: true,
     canAskAgain: true,
     explanation: "test",
+    accessPrivileges: "all",
   })),
 }));
 
 import * as ImagePicker from "expo-image-picker";
-import { requestMediaLibraryPermission } from "@/src/lib/permissions/foundation";
+import * as MediaLibrary from "expo-media-library";
+import { Linking, Platform } from "react-native";
 import {
+  inspectMediaLibraryPermission,
+  requestMediaLibraryPermission,
+} from "@/src/lib/permissions/foundation";
+import {
+  classifyLibraryAccess,
+  DENIED_LIBRARY_ACCESS_MESSAGE,
+  expandLimitedVideoLibraryAccess,
   formatPickedDurationSecondsLabel,
   inferPickedVideoMimeType,
+  libraryAccessMessage,
+  LIMITED_LIBRARY_ACCESS_MESSAGE,
   mediaLibraryGrantRequiredForPicker,
   pickerDurationToMs,
   pickVideoFromLibrary,
   resolvePickedVideoByteSize,
+  shouldBlockVideoLibraryPicker,
+  VIDEO_LIBRARY_PICKER_OPTIONS,
 } from "@/src/lib/video/pickVideo";
 
 describe("inferPickedVideoMimeType", () => {
@@ -178,11 +207,12 @@ describe("pickVideoFromLibrary (Android content://)", () => {
   });
 
   it("does not multiply iOS millisecond duration into 8200s", async () => {
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: true,
       canAskAgain: true,
       explanation: "test",
+      accessPrivileges: "all",
     });
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: false,
@@ -210,11 +240,12 @@ describe("pickVideoFromLibrary (Android content://)", () => {
   });
 
   it("persists a content:// selection with missing fileSize and MIME", async () => {
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: false,
       canAskAgain: true,
       explanation: "test",
+      accessPrivileges: "none",
     });
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: false,
@@ -256,11 +287,12 @@ describe("pickVideoFromLibrary (Android content://)", () => {
   });
 
   it("rejects invalid duration and exposes the rejected clip label", async () => {
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: true,
       canAskAgain: true,
       explanation: "test",
+      accessPrivileges: "all",
     });
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: false,
@@ -286,11 +318,12 @@ describe("pickVideoFromLibrary (Android content://)", () => {
   });
 
   it("still enforces the 50 MB limit after size resolution", async () => {
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: true,
       canAskAgain: true,
       explanation: "test",
+      accessPrivileges: "all",
     });
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: false,
@@ -324,11 +357,12 @@ describe("pickVideoFromLibrary (Android content://)", () => {
   });
 
   it("returns a visible failure message when size cannot be resolved", async () => {
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: true,
       canAskAgain: true,
       explanation: "test",
+      accessPrivileges: "all",
     });
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: false,
@@ -390,31 +424,240 @@ describe("pickerDurationToMs", () => {
 describe("TEST_8 iOS picker adapter", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    (Platform as { OS: string }).OS = "android";
   });
 
-  it("classifies iOS permission as native-adapter-specific and cancel as shared", async () => {
-    expect(mediaLibraryGrantRequiredForPicker("ios")).toBe(true);
+  it("does not require a prior media grant on either platform", async () => {
+    expect(mediaLibraryGrantRequiredForPicker("ios")).toBe(false);
     expect(mediaLibraryGrantRequiredForPicker("android")).toBe(false);
 
-    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
       granted: false,
-      canAskAgain: false,
-      explanation: "denied",
+      canAskAgain: true,
+      explanation: "undetermined",
+      accessPrivileges: "none",
     });
 
-    // Android mock platform still proceeds without a grant (shared picker).
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
       canceled: true,
       assets: [],
     } as never);
 
     const cancelled = await pickVideoFromLibrary();
-    expect(cancelled).toEqual({ ok: false, cancelled: true });
+    expect(cancelled).toEqual({
+      ok: false,
+      cancelled: true,
+      access: "not_required",
+    });
+    expect(requestMediaLibraryPermission).not.toHaveBeenCalled();
   });
 
   it("keeps iOS millisecond duration on the shared Create contract", () => {
     expect(pickerDurationToMs(8200)).toBe(8200);
     expect(formatPickedDurationSecondsLabel(8200)).toBe("8s");
+  });
+});
+
+describe("full video library picker access", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    (Platform as { OS: string }).OS = "android";
+  });
+
+  it("classifies limited / denied / undetermined access truthfully", () => {
+    expect(
+      classifyLibraryAccess({
+        granted: true,
+        canAskAgain: true,
+        accessPrivileges: "limited",
+        os: "ios",
+      })
+    ).toBe("limited");
+    expect(
+      classifyLibraryAccess({
+        granted: false,
+        canAskAgain: false,
+        accessPrivileges: "none",
+        os: "ios",
+      })
+    ).toBe("denied");
+    expect(
+      classifyLibraryAccess({
+        granted: false,
+        canAskAgain: true,
+        accessPrivileges: "none",
+        os: "ios",
+      })
+    ).toBe("undetermined");
+    expect(
+      classifyLibraryAccess({
+        granted: false,
+        canAskAgain: true,
+        accessPrivileges: "none",
+        os: "android",
+      })
+    ).toBe("not_required");
+    expect(libraryAccessMessage("limited")).toBe(LIMITED_LIBRARY_ACCESS_MESSAGE);
+    expect(libraryAccessMessage("denied")).toBe(DENIED_LIBRARY_ACCESS_MESSAGE);
+    expect(shouldBlockVideoLibraryPicker("denied", "ios")).toBe(true);
+    expect(shouldBlockVideoLibraryPicker("limited", "ios")).toBe(false);
+    expect(shouldBlockVideoLibraryPicker("denied", "android")).toBe(false);
+  });
+
+  it("opens the system video library and never requests camera or a gallery grant", async () => {
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: false,
+      canAskAgain: true,
+      explanation: "test",
+      accessPrivileges: "none",
+    });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: true,
+      assets: [],
+    } as never);
+
+    await pickVideoFromLibrary();
+
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaTypes: ["videos"],
+        allowsEditing: false,
+        allowsMultipleSelection: false,
+        legacy: false,
+        defaultTab: "albums",
+      })
+    );
+    expect(VIDEO_LIBRARY_PICKER_OPTIONS.mediaTypes).toEqual(["videos"]);
+    expect(requestMediaLibraryPermission).not.toHaveBeenCalled();
+    expect(ImagePicker.requestCameraPermissionsAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("returns cancelled without an asset so Create can keep A", async () => {
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: true,
+      canAskAgain: true,
+      explanation: "test",
+      accessPrivileges: "all",
+    });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: true,
+      assets: null,
+    } as never);
+
+    const cancelled = await pickVideoFromLibrary();
+    expect(cancelled).toEqual({
+      ok: false,
+      cancelled: true,
+      access: "not_required",
+    });
+    expect("asset" in cancelled).toBe(false);
+  });
+
+  it("replace B returns only the exact selected video identity", async () => {
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: true,
+      canAskAgain: true,
+      explanation: "test",
+      accessPrivileges: "all",
+    });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: false,
+      assets: [
+        {
+          uri: "file:///tmp/b.mp4",
+          fileName: "b.mp4",
+          mimeType: "video/mp4",
+          fileSize: 2_000_000,
+          duration: 4000,
+          width: 720,
+          height: 1280,
+        },
+      ],
+    } as never);
+
+    const result = await pickVideoFromLibrary();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.asset.uri).toBe("file:///tmp/b.mp4");
+      expect(result.asset.fileName).toBe("b.mp4");
+      expect(result.asset.durationMs).toBe(4000);
+      expect(result.asset.byteSize).toBe(2_000_000);
+      expect(result.asset.id).toEqual(expect.any(String));
+    }
+  });
+
+  it("still opens the picker when iOS access is LIMITED and reports limited state", async () => {
+    (Platform as { OS: string }).OS = "ios";
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: true,
+      canAskAgain: true,
+      explanation: "limited",
+      accessPrivileges: "limited",
+    });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: true,
+      assets: [],
+    } as never);
+
+    const result = await pickVideoFromLibrary();
+    expect(result).toEqual({
+      ok: false,
+      cancelled: true,
+      access: "limited",
+    });
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalled();
+    expect(libraryAccessMessage("limited")).toMatch(/selected/i);
+  });
+
+  it("blocks iOS denied access without opening an empty picker", async () => {
+    (Platform as { OS: string }).OS = "ios";
+    vi.mocked(inspectMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: false,
+      canAskAgain: false,
+      explanation: "denied",
+      accessPrivileges: "none",
+    });
+
+    const result = await pickVideoFromLibrary();
+    expect(result.ok).toBe(false);
+    if (!result.ok && !result.cancelled) {
+      expect(result.reason).toBe("library_denied");
+      expect(result.message).toBe(DENIED_LIBRARY_ACCESS_MESSAGE);
+      expect(result.access).toBe("denied");
+    }
+    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestCameraPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  it("expands LIMITED access through the system limited-library picker", async () => {
+    (Platform as { OS: string }).OS = "ios";
+    vi.mocked(inspectMediaLibraryPermission)
+      .mockResolvedValueOnce({
+        kind: "mediaLibrary",
+        granted: true,
+        canAskAgain: true,
+        explanation: "limited",
+        accessPrivileges: "limited",
+      })
+      .mockResolvedValueOnce({
+        kind: "mediaLibrary",
+        granted: true,
+        canAskAgain: true,
+        explanation: "all",
+        accessPrivileges: "all",
+      });
+
+    const expanded = await expandLimitedVideoLibraryAccess();
+    expect(MediaLibrary.presentPermissionsPicker).toHaveBeenCalledWith(["video"]);
+    expect(Linking.openSettings).not.toHaveBeenCalled();
+    expect(expanded).toEqual({ opened: true, access: "all" });
   });
 });

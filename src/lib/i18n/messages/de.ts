@@ -299,6 +299,13 @@ export const deMessages: MobileMessages = {
   "create.chooseAnother": "Anderes wählen",
   "create.chooseA11y": "Video aus der Mediathek wählen",
   "create.chooseHint": "Öffnet die Mediathek, um ein Video zu wählen",
+  "create.limitedLibrary":
+    "Nur die von Ihnen ausgewählten Videos sind verfügbar. Sie können weitere aus Ihrer Mediathek hinzufügen.",
+  "create.manageLibraryAccess": "Weitere Videos hinzufügen",
+  "create.manageLibraryAccessA11y":
+    "Systemauswahl öffnen, um weitere Videos aus der Mediathek hinzuzufügen",
+  "create.libraryAccessDenied":
+    "Der Zugriff auf die Mediathek ist ausgeschaltet. Aktivieren Sie ihn in den Einstellungen, um ein Video zu wählen.",
   "create.pickFailed": "Dieses Video konnte nicht verwendet werden",
   "create.noVideo": "Noch kein Video ausgewählt.",
   "create.noVideoAfterError":

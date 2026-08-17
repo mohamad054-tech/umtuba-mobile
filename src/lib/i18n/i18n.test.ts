@@ -207,6 +207,18 @@ describe("catalog completeness", () => {
     expect(leaks).toEqual([]);
   });
 
+  it("localizes Create limited-library access copy", () => {
+    expect(enMessages["create.limitedLibrary"]).toMatch(/selected/i);
+    expect(enMessages["create.manageLibraryAccess"]).toBe("Add more videos");
+    expect(enMessages["create.libraryAccessDenied"]).toMatch(/Settings/i);
+    expect(MESSAGE_CATALOGS.ar["create.limitedLibrary"]).not.toBe(
+      enMessages["create.limitedLibrary"]
+    );
+    expect(MESSAGE_CATALOGS.fr["create.manageLibraryAccess"]).toBe(
+      "Ajouter d’autres vidéos"
+    );
+  });
+
   it("adds shared Watch share-mode catalog keys", () => {
     expect(enMessages["watch.shareVideoLink"]).toBe("Share video link");
     expect(enMessages["watch.shareVideoFile"]).toBe("Share video");

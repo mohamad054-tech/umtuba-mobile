@@ -276,6 +276,13 @@ export const arMessages: MobileMessages = {
   "create.chooseAnother": "اختيار غيره",
   "create.chooseA11y": "اختيار فيديو من المكتبة",
   "create.chooseHint": "يفتح مكتبة الوسائط لاختيار فيديو",
+  "create.limitedLibrary":
+    "تتوفر فقط الفيديوهات التي اخترتها. يمكنك إضافة المزيد من مكتبتك.",
+  "create.manageLibraryAccess": "إضافة المزيد من الفيديوهات",
+  "create.manageLibraryAccessA11y":
+    "فتح منتقي النظام لإضافة المزيد من الفيديوهات من المكتبة",
+  "create.libraryAccessDenied":
+    "الوصول إلى مكتبة الصور متوقف. فعّله من الإعدادات لاختيار فيديو.",
   "create.pickFailed": "تعذّر استخدام هذا الفيديو",
   "create.noVideo": "لم يُختر فيديو بعد.",
   "create.noVideoAfterError": "لم يُختر فيديو — اختر مقطعًا آخر للمتابعة.",

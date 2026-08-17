@@ -286,6 +286,13 @@ export const enMessages: MobileMessages = {
   "create.chooseAnother": "Choose another",
   "create.chooseA11y": "Choose video from library",
   "create.chooseHint": "Opens the device media library to choose a video",
+  "create.limitedLibrary":
+    "Only the videos you selected are available. You can add more from your library.",
+  "create.manageLibraryAccess": "Add more videos",
+  "create.manageLibraryAccessA11y":
+    "Open the system picker to add more videos from the library",
+  "create.libraryAccessDenied":
+    "Photo library access is turned off. Enable it in Settings to choose a video.",
   "create.pickFailed": "Could not use that video",
   "create.noVideo": "No video selected yet.",
   "create.noVideoAfterError":

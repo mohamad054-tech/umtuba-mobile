@@ -297,6 +297,13 @@ export const ptMessages: MobileMessages = {
   "create.chooseAnother": "Escolher outro",
   "create.chooseA11y": "Escolher vídeo da biblioteca",
   "create.chooseHint": "Abre a biblioteca do dispositivo para escolher um vídeo",
+  "create.limitedLibrary":
+    "Só os vídeos que você selecionou estão disponíveis. Você pode adicionar mais da sua biblioteca.",
+  "create.manageLibraryAccess": "Adicionar mais vídeos",
+  "create.manageLibraryAccessA11y":
+    "Abrir o seletor do sistema para adicionar mais vídeos da biblioteca",
+  "create.libraryAccessDenied":
+    "O acesso à biblioteca de fotos está desativado. Ative-o em Ajustes para escolher um vídeo.",
   "create.pickFailed": "Não foi possível usar esse vídeo",
   "create.noVideo": "Nenhum vídeo selecionado ainda.",
   "create.noVideoAfterError":

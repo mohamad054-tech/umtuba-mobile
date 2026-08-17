@@ -121,6 +121,19 @@ const config: ExpoConfig = {
       {
         photosPermission:
           "UMTUBA needs photo library access so you can choose a video to publish.",
+        // Gallery pick uses the system photo picker — do not add camera/mic.
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
+    [
+      "expo-media-library",
+      {
+        photosPermission:
+          "UMTUBA needs photo library access so you can choose a video to publish.",
+        savePhotosPermission: false,
+        granularPermissions: ["video"],
+        preventAutomaticLimitedAccessAlert: true,
       },
     ],
     [
