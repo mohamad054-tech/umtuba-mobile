@@ -66,7 +66,9 @@ export function shouldHonorLatePlayerEvent(input: {
   shouldPlay: boolean;
   ownerGeneration: number;
   eventGeneration: number | null;
+  playerAlive?: boolean;
 }): boolean {
+  if (input.playerAlive === false) return false;
   if (input.eventGeneration == null) return false;
   return canProduceWatchAudio({
     isActive: input.isActive,
@@ -74,6 +76,34 @@ export function shouldHonorLatePlayerEvent(input: {
     ownerGeneration: input.ownerGeneration,
     commandGeneration: input.eventGeneration,
   });
+}
+
+/**
+ * Guard for play/pause/mute/loop/seek. Released SharedObjects and stale
+ * generations must never be touched. Inactive teardown still requires alive.
+ */
+export function shouldApplyWatchPlayerOp(input: {
+  playerAlive: boolean;
+  ownerGeneration: number;
+  commandGeneration: number | null;
+  requireOwner?: boolean;
+  isActive?: boolean;
+  shouldPlay?: boolean;
+}): boolean {
+  if (!input.playerAlive) return false;
+  if (input.commandGeneration == null) return false;
+  if (!Number.isFinite(input.ownerGeneration)) return false;
+  if (!Number.isFinite(input.commandGeneration)) return false;
+  if (input.ownerGeneration !== input.commandGeneration) return false;
+  if (input.requireOwner) {
+    return canProduceWatchAudio({
+      isActive: input.isActive === true,
+      shouldPlay: input.shouldPlay === true,
+      ownerGeneration: input.ownerGeneration,
+      commandGeneration: input.commandGeneration,
+    });
+  }
+  return true;
 }
 
 /**

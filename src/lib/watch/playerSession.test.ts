@@ -5,6 +5,8 @@ import {
   applyPlaybackIntent,
   applySeekTime,
   createPlayerSession,
+  isPlayerAlive,
+  runAlivePlayerOp,
 } from "./playerSession";
 import { shouldPlayVideo } from "./playbackPolicy";
 
@@ -100,6 +102,40 @@ describe("applyPlaybackIntent", () => {
     session.release();
     expect(session.released).toBe(true);
     expect(session.calls).toContain("release");
+    expect(isPlayerAlive(session.player)).toBe(false);
     expect(() => session.player.play()).toThrow(/after release/);
+  });
+
+  it("does not call play/pause/mute/loop/seek after release", () => {
+    const session = createPlayerSession();
+    applyPlaybackIntent(session.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: true,
+    });
+    session.release();
+    const callsAfterRelease = session.calls.slice();
+
+    expect(
+      applyPlaybackIntent(session.player, {
+        shouldPlay: true,
+        muted: false,
+        volume: 1,
+        loop: true,
+      })
+    ).toBe(false);
+    expect(applyInactiveAudioTeardown(session.player)).toBe(false);
+    expect(applySeekTime(session.player, 3)).toBe(false);
+    expect(
+      runAlivePlayerOp(session.player, (alive) => {
+        alive.play();
+        alive.pause();
+        alive.muted = true;
+        alive.loop = true;
+        alive.currentTime = 1;
+      })
+    ).toBe(false);
+    expect(session.calls).toEqual(callsAfterRelease);
   });
 });

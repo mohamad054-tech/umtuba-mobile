@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   applyInactiveAudioTeardown,
   applyPlaybackIntent,
+  applySeekTime,
   createPlayerSession,
+  isPlayerAlive,
 } from "./playerSession";
 import {
   bumpWatchOwnerGeneration,
@@ -13,6 +15,7 @@ import {
   isWatchAudioOwner,
   resolveActivePlayerKey,
   resolveWatchPlaybackIntent,
+  shouldApplyWatchPlayerOp,
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
 } from "./activePlayerOwnership";
@@ -232,9 +235,124 @@ describe("ONLY_ACTIVE_WATCH_POST_CAN_PLAY_AUDIO", () => {
       })
     );
     expect(adjacent.released).toBe(false);
+    expect(isPlayerAlive(adjacent.player)).toBe(true);
     expect(adjacent.player.muted).toBe(true);
     expect(adjacent.player.volume).toBe(0);
     expect(adjacent.player.loop).toBe(false);
     expect(adjacent.calls).not.toContain("release");
+  });
+
+  it("late callback after release is a no-op and ownership stays exclusive", () => {
+    const previous = createPlayerSession();
+    const next = createPlayerSession();
+    const genA = 0;
+    const genB = bumpWatchOwnerGeneration(genA, 0, 1);
+
+    applyPlaybackIntent(
+      previous.player,
+      resolveWatchPlaybackIntent({
+        isActive: true,
+        shouldPlay: true,
+        muted: false,
+        volume: 1,
+        loop: false,
+      })
+    );
+    applyPlaybackIntent(
+      previous.player,
+      resolveWatchPlaybackIntent({
+        isActive: false,
+        shouldPlay: false,
+        muted: false,
+        volume: 1,
+        loop: true,
+      })
+    );
+    applyPlaybackIntent(
+      next.player,
+      resolveWatchPlaybackIntent({
+        isActive: true,
+        shouldPlay: true,
+        muted: false,
+        volume: 1,
+        loop: false,
+      })
+    );
+    previous.release();
+
+    expect(isPlayerAlive(previous.player)).toBe(false);
+    expect(isPlayerAlive(next.player)).toBe(true);
+    expect(
+      shouldHonorLatePlayerEvent({
+        isActive: true,
+        shouldPlay: true,
+        ownerGeneration: genB,
+        eventGeneration: genA,
+        playerAlive: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldApplyWatchPlayerOp({
+        playerAlive: false,
+        ownerGeneration: genB,
+        commandGeneration: genB,
+        requireOwner: true,
+        isActive: true,
+        shouldPlay: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldApplyWatchPlayerOp({
+        playerAlive: true,
+        ownerGeneration: genB,
+        commandGeneration: genB,
+        requireOwner: true,
+        isActive: true,
+        shouldPlay: true,
+      })
+    ).toBe(true);
+
+    const previousCalls = previous.calls.slice();
+    expect(() => {
+      if (
+        shouldHonorLatePlayerEvent({
+          isActive: false,
+          shouldPlay: false,
+          ownerGeneration: genB,
+          eventGeneration: genA,
+          playerAlive: isPlayerAlive(previous.player),
+        })
+      ) {
+        applyPlaybackIntent(previous.player, {
+          shouldPlay: true,
+          muted: false,
+          volume: 1,
+          loop: true,
+        });
+      }
+      applyInactiveAudioTeardown(previous.player);
+      applySeekTime(previous.player, 1);
+    }).not.toThrow();
+    expect(previous.calls).toEqual(previousCalls);
+    expect(next.calls).toContain("play");
+    expect(next.player.muted).toBe(false);
+    expect(
+      countAudibleWatchPlayers([
+        {
+          isActive: false,
+          shouldPlay: false,
+          muted: true,
+          volume: 0,
+          playing: false,
+        },
+        {
+          isActive: true,
+          shouldPlay: true,
+          muted: next.player.muted,
+          volume: next.player.volume,
+          playing: true,
+        },
+      ])
+    ).toBe(1);
   });
 });

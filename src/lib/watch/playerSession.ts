@@ -2,6 +2,9 @@
  * Imperative playback intent applied to an expo-video player-like object.
  * Kept framework-light so unit tests can verify play/pause/cleanup contracts
  * without mounting native views.
+ *
+ * expo-video VideoPlayer is a SharedObject. After useReleasingSharedObject
+ * calls release(), play/pause/mute/loop/seek throw. Every op must no-op.
  */
 export type PlayerLike = {
   play: () => void;
@@ -10,7 +13,11 @@ export type PlayerLike = {
   volume: number;
   loop: boolean;
   currentTime: number;
+  duration?: number;
   replay?: () => void;
+  replaceAsync?: (src: string) => Promise<unknown>;
+  /** Present on our test double; native SharedObject throws instead. */
+  isReleased?: boolean;
 };
 
 export type PlaybackIntent = {
@@ -24,70 +31,147 @@ export type PlaybackIntent = {
   resetPosition?: boolean;
 };
 
+export function isPlayerAlive(
+  player: PlayerLike | null | undefined
+): boolean {
+  if (player == null) return false;
+  if (player.isReleased === true) return false;
+  try {
+    void player.muted;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run a player mutation only when the SharedObject is still bound.
+ * Never throws to JS after native release.
+ */
+export function runAlivePlayerOp(
+  player: PlayerLike | null | undefined,
+  op: (alive: PlayerLike) => void
+): boolean {
+  if (!isPlayerAlive(player) || player == null) return false;
+  try {
+    op(player);
+    return isPlayerAlive(player);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Silence + stop. Mute and disable loop BEFORE pause so a native
  * play-to-end handler cannot restart audio. Seek-to-0 can resume
  * AVPlayer; pause again after reset.
+ *
+ * No-ops if the SharedObject is already released.
  */
 export function applyInactiveAudioTeardown(
   player: PlayerLike,
   options?: { resetPosition?: boolean }
-): void {
-  player.muted = true;
-  player.volume = 0;
-  player.loop = false;
-  player.pause();
-  if (options?.resetPosition) {
-    player.currentTime = 0;
-    player.pause();
-  }
+): boolean {
+  return runAlivePlayerOp(player, (alive) => {
+    alive.muted = true;
+    alive.volume = 0;
+    alive.loop = false;
+    alive.pause();
+    if (options?.resetPosition) {
+      alive.currentTime = 0;
+      alive.pause();
+    }
+  });
 }
 
 export function applyPlaybackIntent(
   player: PlayerLike,
   intent: PlaybackIntent
-): void {
+): boolean {
+  if (!isPlayerAlive(player)) return false;
   if (!intent.shouldPlay) {
-    applyInactiveAudioTeardown(player, {
+    return applyInactiveAudioTeardown(player, {
       resetPosition: intent.resetPosition === true,
     });
-    return;
   }
-  player.muted = intent.muted;
-  player.volume = intent.volume;
-  player.loop = intent.loop;
-  player.play();
+  return runAlivePlayerOp(player, (alive) => {
+    alive.muted = intent.muted;
+    alive.volume = intent.volume;
+    alive.loop = intent.loop;
+    alive.play();
+  });
 }
 
 export function applySeekTime(player: PlayerLike, seconds: number): boolean {
   if (!Number.isFinite(seconds) || seconds < 0) {
     return false;
   }
-  player.currentTime = seconds;
-  return true;
+  return runAlivePlayerOp(player, (alive) => {
+    alive.currentTime = seconds;
+  });
 }
 
 /** Mark a session cleaned up (mirrors unmount release expectations). */
 export function createPlayerSession() {
   let released = false;
+  let muted = false;
+  let volume = 1;
+  let loop = false;
+  let currentTime = 0;
   const calls: string[] = [];
+
+  const assertAlive = (op: string) => {
+    if (released) throw new Error(`${op} after release`);
+  };
+
   const player: PlayerLike = {
-    muted: false,
-    volume: 1,
-    loop: false,
-    currentTime: 0,
+    get isReleased() {
+      return released;
+    },
+    get muted() {
+      assertAlive("muted");
+      return muted;
+    },
+    set muted(value) {
+      assertAlive("mute");
+      muted = value;
+    },
+    get volume() {
+      assertAlive("volume");
+      return volume;
+    },
+    set volume(value) {
+      assertAlive("volume");
+      volume = value;
+    },
+    get loop() {
+      assertAlive("loop");
+      return loop;
+    },
+    set loop(value) {
+      assertAlive("loop");
+      loop = value;
+    },
+    get currentTime() {
+      assertAlive("seek");
+      return currentTime;
+    },
+    set currentTime(value) {
+      assertAlive("seek");
+      currentTime = value;
+    },
     play: () => {
-      if (released) throw new Error("play after release");
+      assertAlive("play");
       calls.push("play");
     },
     pause: () => {
-      if (released) throw new Error("pause after release");
+      assertAlive("pause");
       calls.push("pause");
     },
     replay: () => {
-      if (released) throw new Error("replay after release");
+      assertAlive("replay");
       calls.push("replay");
-      player.currentTime = 0;
+      currentTime = 0;
     },
   };
   return {

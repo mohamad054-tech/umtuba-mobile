@@ -36,6 +36,7 @@ import {
 import {
   canProduceWatchAudio,
   resolveWatchPlaybackIntent,
+  shouldApplyWatchPlayerOp,
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
 } from "@/src/lib/watch/activePlayerOwnership";
@@ -43,6 +44,8 @@ import {
   applyInactiveAudioTeardown,
   applyPlaybackIntent,
   applySeekTime,
+  isPlayerAlive,
+  runAlivePlayerOp,
 } from "@/src/lib/watch/playerSession";
 import {
   WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
@@ -296,12 +299,13 @@ function WatchPlayerPane({
   const shouldPlayRef = useRef(shouldPlay);
   const ownershipGenerationRef = useRef(ownershipGeneration);
   const playGenerationRef = useRef<number | null>(null);
+  const playerAliveRef = useRef(true);
   isActiveRef.current = isActive;
   shouldPlayRef.current = shouldPlay;
   ownershipGenerationRef.current = ownershipGeneration;
 
   const player = useVideoPlayer(src, (p) => {
-    // Start silent. Ownership layout effect is the only path that may unmute/play.
+    // Start silent on a NEW SharedObject. Never reuse a previous instance.
     p.loop = false;
     p.muted = true;
     p.volume = 0;
@@ -311,8 +315,15 @@ function WatchPlayerPane({
     p.keepScreenOnWhilePlaying = true;
     p.timeUpdateEventInterval = TIME_UPDATE_INTERVAL_SEC;
   });
+  const boundPlayerRef = useRef<typeof player | null>(null);
+
+  const canTouchBoundPlayer = () =>
+    playerAliveRef.current &&
+    boundPlayerRef.current === player &&
+    isPlayerAlive(player);
 
   useEventListener(player, "statusChange", ({ status: next, error }) => {
+    if (!canTouchBoundPlayer()) return;
     if (next === "loading") {
       setStatus("loading");
       setErrorMessage(null);
@@ -342,21 +353,28 @@ function WatchPlayerPane({
   });
 
   useEventListener(player, "timeUpdate", ({ currentTime }) => {
-    const duration = player.duration;
+    if (!canTouchBoundPlayer()) return;
+    let duration = 0;
+    const read = runAlivePlayerOp(player, (alive) => {
+      duration = Number.isFinite(alive.duration) ? (alive.duration as number) : 0;
+    });
+    if (!read) return;
     onTimeline({
       currentTime,
-      duration: Number.isFinite(duration) ? duration : 0,
+      duration,
       ratio: resolveProgressRatio(currentTime, duration),
     });
   });
 
   useEventListener(player, "playToEnd", () => {
+    if (!canTouchBoundPlayer()) return;
     if (
       !shouldHonorLatePlayerEvent({
         isActive: isActiveRef.current,
         shouldPlay: shouldPlayRef.current,
         ownerGeneration: ownershipGenerationRef.current,
         eventGeneration: playGenerationRef.current,
+        playerAlive: true,
       })
     ) {
       applyInactiveAudioTeardown(player, { resetPosition: false });
@@ -367,6 +385,7 @@ function WatchPlayerPane({
   });
 
   useEventListener(player, "playingChange", ({ isPlaying }) => {
+    if (!canTouchBoundPlayer()) return;
     if (
       shouldTeardownUnexpectedPlay({
         isPlaying,
@@ -378,14 +397,45 @@ function WatchPlayerPane({
     }
   });
 
+  // Bind this SharedObject only. Unmount/swap: mark dead first, then silence
+  // only if still natively alive. Never call into a released object.
   useLayoutEffect(() => {
+    const previous = boundPlayerRef.current;
+    if (previous && previous !== player) {
+      playerAliveRef.current = false;
+      applyInactiveAudioTeardown(previous, { resetPosition: false });
+    }
+    boundPlayerRef.current = player;
+    playerAliveRef.current = true;
+    return () => {
+      playerAliveRef.current = false;
+      playGenerationRef.current = null;
+      if (boundPlayerRef.current === player) {
+        applyInactiveAudioTeardown(player, { resetPosition: false });
+        boundPlayerRef.current = null;
+      }
+    };
+  }, [player]);
+
+  useLayoutEffect(() => {
+    if (!canTouchBoundPlayer()) return;
     const allowed = canProduceWatchAudio({
       isActive,
       shouldPlay,
       ownerGeneration: ownershipGeneration,
       commandGeneration: ownershipGeneration,
     });
-    if (allowed) {
+    if (
+      allowed &&
+      shouldApplyWatchPlayerOp({
+        playerAlive: true,
+        ownerGeneration: ownershipGeneration,
+        commandGeneration: ownershipGeneration,
+        requireOwner: true,
+        isActive,
+        shouldPlay,
+      })
+    ) {
       playGenerationRef.current = ownershipGeneration;
       applyPlaybackIntent(
         player,
@@ -426,17 +476,15 @@ function WatchPlayerPane({
   ]);
 
   useEffect(() => {
-    return () => {
-      playGenerationRef.current = null;
-      applyInactiveAudioTeardown(player, { resetPosition: false });
-    };
-  }, [player]);
-
-  useEffect(() => {
     if (!seekRequest) return;
     if (lastSeekToken.current === seekRequest.token) return;
+    if (!canTouchBoundPlayer()) return;
     lastSeekToken.current = seekRequest.token;
-    const duration = player.duration;
+    let duration = 0;
+    const read = runAlivePlayerOp(player, (alive) => {
+      duration = Number.isFinite(alive.duration) ? (alive.duration as number) : 0;
+    });
+    if (!read) return;
     const seconds = resolveSeekTimeOrNull(seekRequest.ratio, duration);
     if (seconds == null) {
       return;
@@ -444,7 +492,7 @@ function WatchPlayerPane({
     applySeekTime(player, seconds);
     onTimeline({
       currentTime: seconds,
-      duration: Number.isFinite(duration) ? duration : 0,
+      duration,
       ratio: seekRequest.ratio,
     });
   }, [seekRequest, player, onTimeline]);
@@ -454,6 +502,7 @@ function WatchPlayerPane({
     setErrorMessage(null);
     setStatus("loading");
     try {
+      if (!canTouchBoundPlayer()) return;
       let nextSrc = src;
       if (onRefreshSrc) {
         const refreshed = await onRefreshSrc();
@@ -461,7 +510,11 @@ function WatchPlayerPane({
           nextSrc = refreshed;
         }
       }
+      if (!canTouchBoundPlayer() || typeof player.replaceAsync !== "function") {
+        return;
+      }
       await player.replaceAsync(nextSrc);
+      if (!canTouchBoundPlayer()) return;
       setRetryToken((n) => n + 1);
       if (
         shouldHonorLatePlayerEvent({
@@ -469,14 +522,18 @@ function WatchPlayerPane({
           shouldPlay: shouldPlayRef.current,
           ownerGeneration: ownershipGenerationRef.current,
           eventGeneration: ownershipGenerationRef.current,
+          playerAlive: true,
         })
       ) {
         playGenerationRef.current = ownershipGenerationRef.current;
-        player.play();
+        runAlivePlayerOp(player, (alive) => {
+          alive.play();
+        });
       } else {
         applyInactiveAudioTeardown(player, { resetPosition: false });
       }
     } catch (err) {
+      if (!playerAliveRef.current || !isPlayerAlive(player)) return;
       setStatus("error");
       setErrorMessage(sanitizePlaybackError(err));
     } finally {
