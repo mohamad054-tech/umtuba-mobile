@@ -22,7 +22,10 @@ export default function LanguageScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={[styles.subtitle, rtl && styles.rtlText]}>
           {t("language.subtitle")}
         </Text>

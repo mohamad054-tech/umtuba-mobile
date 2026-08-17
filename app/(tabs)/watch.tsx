@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CommentsSheet } from "@/components/CommentsSheet";
 import { IdentityHeader } from "@/components/IdentityHeader";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
@@ -39,6 +40,7 @@ import {
   togglePostLike,
   togglePostSave,
 } from "@/src/lib/social/interactions";
+import { shareWatchPost } from "@/src/lib/social/sharePost";
 import {
   blockUserLocally,
   filterWatchItemsForViewer,
@@ -68,6 +70,7 @@ import {
   saveWatchVolumePreference,
   shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
+  watchInteractionSignature,
   watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
@@ -118,6 +121,7 @@ export default function WatchScreen() {
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<number>>(
     () => new Set()
   );
+  const [commentPostId, setCommentPostId] = useState<number | null>(null);
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -238,7 +242,7 @@ export default function WatchScreen() {
         initialInFlight.current = false;
       }
     },
-    [focusPostId, t]
+    [focusPostId, t, user?.id]
   );
 
   useEffect(() => {
@@ -317,6 +321,27 @@ export default function WatchScreen() {
         likedByMe: result.liked,
         stats: { ...video.stats, likes: result.likes },
       });
+    },
+    [patchVideo, t]
+  );
+
+  const onShare = useCallback(
+    async (video: WatchVideo) => {
+      if (!video.postId) return;
+      const result = await shareWatchPost(getSupabase(), {
+        postId: video.postId,
+        title: video.title,
+        text: video.caption || video.title,
+      });
+      if (!result.ok) {
+        Alert.alert(t("watch.shareFailed"), result.message);
+        return;
+      }
+      if (result.shared && result.shares > 0) {
+        patchVideo(video.id, {
+          stats: { ...video.stats, shares: result.shares },
+        });
+      }
     },
     [patchVideo, t]
   );
@@ -608,6 +633,12 @@ export default function WatchScreen() {
         onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
         onToggleSave={() => void onToggleSave(item)}
+        onOpenComments={
+          item.postId
+            ? () => setCommentPostId(item.postId as number)
+            : undefined
+        }
+        onShare={item.postId ? () => void onShare(item) : undefined}
         onDeleteOwn={
           viewerMaySeeDeleteControl(user?.id, item.author.id)
             ? () => onDeleteOwn(item)
@@ -649,6 +680,7 @@ export default function WatchScreen() {
       onBlockUser,
       onDeleteOwn,
       onReport,
+      onShare,
       onToggleLike,
       onToggleMute,
       onToggleSave,
@@ -771,6 +803,7 @@ export default function WatchScreen() {
         }}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
+        extraData={`${activeIndex}:${watchInteractionSignature(visibleVideos)}`}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}
@@ -798,6 +831,19 @@ export default function WatchScreen() {
               animated: false,
             });
           }, 100);
+        }}
+      />
+      <CommentsSheet
+        visible={commentPostId != null}
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
+        onCountChange={(count) => {
+          if (commentPostId == null) return;
+          const target = videos.find((row) => row.postId === commentPostId);
+          if (!target) return;
+          patchVideo(target.id, {
+            stats: { ...target.stats, comments: count },
+          });
         }}
       />
     </View>

@@ -35,6 +35,26 @@ function asBoolean(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Accept bigint-as-string post ids from PostgREST without leaking across keys. */
+export function normalizePostId(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const n = Number(value.trim());
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Viewer like is explicit boolean only. Global like_count / undefined / "true"
+ * must never render the heart as liked.
+ */
+export function viewerLikedFromState(likedByMe: unknown): boolean {
+  return likedByMe === true;
+}
+
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -76,14 +96,18 @@ export async function loadViewerInteractionState(
 
   if (!likesResult.error) {
     for (const row of likesResult.data ?? []) {
-      const current = state.get(row.post_id);
+      const postId = normalizePostId(row.post_id);
+      if (postId == null) continue;
+      const current = state.get(postId);
       if (current) current.likedByMe = true;
     }
   }
 
   if (!savesResult.error) {
     for (const row of savesResult.data ?? []) {
-      const current = state.get(row.post_id);
+      const postId = normalizePostId(row.post_id);
+      if (postId == null) continue;
+      const current = state.get(postId);
       if (current) current.savedByMe = true;
     }
   }

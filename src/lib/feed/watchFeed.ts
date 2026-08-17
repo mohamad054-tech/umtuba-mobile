@@ -10,7 +10,10 @@ import {
   type WatchFeedPage,
   type WatchVideo,
 } from "@/src/contracts/watch";
-import { loadViewerInteractionState } from "@/src/lib/social/interactions";
+import {
+  loadViewerInteractionState,
+  viewerLikedFromState,
+} from "@/src/lib/social/interactions";
 
 export type VideoPostRow = {
   id: number;
@@ -89,8 +92,8 @@ export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
       saves: row.saves ?? 0,
       views: row.views ?? 0,
     },
-    likedByMe,
-    savedByMe,
+    likedByMe: viewerLikedFromState(likedByMe),
+    savedByMe: savedByMe === true,
     source: "supabase",
   };
 }
@@ -231,8 +234,8 @@ export async function fetchWatchFeedPage(
       mapRowToWatchVideo({
         row,
         playbackUrl,
-        likedByMe: state?.likedByMe ?? false,
-        savedByMe: state?.savedByMe ?? false,
+        likedByMe: viewerLikedFromState(state?.likedByMe),
+        savedByMe: state?.savedByMe === true,
       })
     );
   }

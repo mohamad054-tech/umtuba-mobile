@@ -17,6 +17,8 @@ import type { TranslationKey } from "./messages/types";
 import {
   LOCALE_OVERRIDE_STORAGE_KEY,
   clearLocaleOverride,
+  commitLocaleOverride,
+  commitLocaleReset,
   loadLocaleOverride,
   resolveEffectiveLocale,
   saveLocaleOverride,
@@ -114,6 +116,29 @@ describe("locale selection policy", () => {
     expect(store.data[LOCALE_OVERRIDE_STORAGE_KEY]).toBeUndefined();
     expect(resolveEffectiveLocale(null, "ar-SA")).toBe("ar");
     expect(resolveEffectiveLocale(null, "zh-CN")).toBe("en");
+  });
+
+  it("applies the override even when persist throws", async () => {
+    setLocaleStorageForTests({
+      async getItem() {
+        return null;
+      },
+      async setItem() {
+        throw new Error("storage unavailable");
+      },
+      async removeItem() {
+        throw new Error("storage unavailable");
+      },
+    });
+    let applied: string | null = "en";
+    await commitLocaleOverride("fr", (next) => {
+      applied = next;
+    });
+    expect(applied).toBe("fr");
+    await commitLocaleReset(() => {
+      applied = null;
+    });
+    expect(applied).toBeNull();
   });
 
   it("new install without override uses device, not forced English", () => {

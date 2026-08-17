@@ -14,7 +14,7 @@ import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { getMyActivityTierProgress } from "@/src/lib/tiers/fetchTier";
-import { fetchUmPointsWalletBalance } from "@/src/lib/wallet/fetchBalance";
+import { loadWalletAfterWelcomeClaim } from "@/src/lib/wallet/claimWelcomeBonus";
 import { formatWalletAmountExact } from "@/src/lib/wallet/format";
 import { colors } from "@/src/theme/colors";
 
@@ -36,7 +36,7 @@ export default function RewardsScreen() {
     try {
       const supabase = getSupabase();
       const [wallet, progress] = await Promise.all([
-        fetchUmPointsWalletBalance(supabase, user.id),
+        loadWalletAfterWelcomeClaim(supabase, user.id),
         getMyActivityTierProgress(supabase, user.id),
       ]);
       setBalance(wallet);

@@ -9,7 +9,7 @@ import "react-native-reanimated";
 
 import { useGlobalHeaderSlots } from "@/components/GlobalBackButton";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
-import { I18nProvider, useTranslation } from "@/src/lib/i18n";
+import { I18nProvider, useI18n, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import { GLOBAL_STACK_HEADER_OPTIONS } from "@/src/lib/nav/globalBack";
@@ -111,14 +111,15 @@ function DeepLinkHandler() {
 
 function SplashGate({ children }: { children: ReactNode }) {
   const { loading, configError, restore } = useAuth();
+  const { ready } = useI18n();
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && ready) {
       void SplashScreen.hideAsync();
     }
-  }, [loading]);
+  }, [loading, ready]);
 
-  if (loading) {
+  if (loading || !ready) {
     return null;
   }
 

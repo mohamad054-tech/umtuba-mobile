@@ -14,6 +14,7 @@ export const PRIMARY_TAB_PATHS = [
 
 export const SECONDARY_PATHS = [
   "/settings",
+  "/language",
   "/notifications",
   "/rewards",
   "/world",
@@ -180,12 +181,13 @@ export function parentFallbackHref(path: string, segments?: readonly string[]): 
   }
   if (
     n === "/settings" ||
+    n === "/language" ||
     n === "/blocked-users" ||
     n === "/change-password" ||
     n === "/notifications" ||
     n === "/rewards"
   ) {
-    return "/(tabs)/profile";
+    return n === "/language" ? "/settings" : "/(tabs)/profile";
   }
   if (n === "/world") return "/(tabs)/discover";
   if (n === "/profile" || leaf === "profile" || leaf === "profile/index") {

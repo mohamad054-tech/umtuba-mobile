@@ -67,6 +67,8 @@ export type WatchVideoCardProps = {
   onEnded?: () => void;
   onToggleLike: () => void;
   onToggleSave: () => void;
+  onOpenComments?: () => void;
+  onShare?: () => void;
   /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
   onDeleteOwn?: () => void;
   /** Other people's content only — Guideline 1.2 report. */
@@ -433,6 +435,8 @@ function WatchVideoCardComponent({
   onEnded,
   onToggleLike,
   onToggleSave,
+  onOpenComments,
+  onShare,
   onDeleteOwn,
   onReport,
   onBlockUser,
@@ -695,16 +699,26 @@ function WatchVideoCardComponent({
           </Text>
         </View>
 
-        <View style={[styles.rail, { bottom: timelineBottom + 52 }]}>
+        <View
+          key={`rail-${video.postId ?? video.id}-${video.likedByMe === true ? 1 : 0}`}
+          style={[styles.rail, { bottom: timelineBottom + 52 }]}
+        >
           <Pressable
             style={styles.action}
             onPress={onToggleLike}
             accessibilityRole="button"
-            accessibilityLabel={video.likedByMe ? t("watch.unlike") : t("watch.like")}
-            accessibilityState={{ selected: video.likedByMe }}
+            accessibilityLabel={
+              video.likedByMe === true ? t("watch.unlike") : t("watch.like")
+            }
+            accessibilityState={{ selected: video.likedByMe === true }}
           >
-            <Text style={[styles.actionIcon, video.likedByMe && styles.on]}>
-              ♥
+            <Text
+              style={[
+                styles.actionIcon,
+                video.likedByMe === true ? styles.liked : styles.unliked,
+              ]}
+            >
+              {video.likedByMe === true ? "♥" : "♡"}
             </Text>
             <Text style={styles.actionCount}>{video.stats.likes}</Text>
           </Pressable>
@@ -722,22 +736,35 @@ function WatchVideoCardComponent({
           </Pressable>
           <Pressable
             style={styles.action}
-            disabled
+            onPress={onOpenComments}
+            disabled={!onOpenComments}
             accessibilityRole="button"
-            accessibilityLabel={t("watch.commentsSoon")}
-            accessibilityState={{ disabled: true }}
+            accessibilityLabel={t("watch.comments")}
+            accessibilityState={{ disabled: !onOpenComments }}
           >
-            <Text style={[styles.actionIcon, styles.disabledIcon]}>◌</Text>
+            <Text
+              style={[
+                styles.actionIcon,
+                !onOpenComments && styles.disabledIcon,
+              ]}
+            >
+              ◌
+            </Text>
             <Text style={styles.actionCount}>{video.stats.comments}</Text>
           </Pressable>
           <Pressable
             style={styles.action}
-            disabled
+            onPress={onShare}
+            disabled={!onShare}
             accessibilityRole="button"
-            accessibilityLabel={t("watch.shareSoon")}
-            accessibilityState={{ disabled: true }}
+            accessibilityLabel={t("watch.share")}
+            accessibilityState={{ disabled: !onShare }}
           >
-            <Text style={[styles.actionIcon, styles.disabledIcon]}>↗</Text>
+            <Text
+              style={[styles.actionIcon, !onShare && styles.disabledIcon]}
+            >
+              ↗
+            </Text>
             <Text style={styles.actionCount}>{video.stats.shares}</Text>
           </Pressable>
           {onDeleteOwn ? (
@@ -975,6 +1002,12 @@ const styles = StyleSheet.create({
   },
   on: {
     color: colors.accentViolet,
+  },
+  liked: {
+    color: colors.danger,
+  },
+  unliked: {
+    color: colors.text,
   },
   actionCount: {
     color: colors.text,

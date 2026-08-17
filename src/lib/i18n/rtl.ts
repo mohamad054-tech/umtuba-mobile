@@ -9,9 +9,13 @@ import {
 
 export function applyRtl(locale: AppLocale): void {
   const rtl = isRtlLocale(locale);
-  I18nManager.allowRTL(true);
-  if (I18nManager.isRTL !== rtl) {
-    I18nManager.forceRTL(rtl);
+  try {
+    I18nManager.allowRTL(true);
+    if (I18nManager.isRTL !== rtl) {
+      I18nManager.forceRTL(rtl);
+    }
+  } catch {
+    // Native RTL flip is best-effort. Catalog + direction style still apply.
   }
 }
 

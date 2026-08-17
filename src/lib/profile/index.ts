@@ -10,3 +10,8 @@ export {
   type ProfileTarget,
 } from "@/src/lib/profile/resolveTarget";
 export { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
+export {
+  listProfileVideos,
+  mapProfileVideoRow,
+  type ProfileVideoItem,
+} from "@/src/lib/profile/listProfileVideos";

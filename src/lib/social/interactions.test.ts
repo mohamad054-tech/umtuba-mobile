@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   loadViewerInteractionState,
+  normalizePostId,
   togglePostLike,
   togglePostSave,
+  viewerLikedFromState,
 } from "./interactions";
 
 const VIEWER = "11111111-1111-4111-8111-111111111111";
@@ -287,6 +289,48 @@ describe("loadViewerInteractionState — save persistence after reload", () => {
       likedByMe: false,
       savedByMe: false,
     });
+  });
+});
+
+describe("viewer like contract", () => {
+  it("normalizes numeric and string post ids and rejects junk", () => {
+    expect(normalizePostId(12)).toBe(12);
+    expect(normalizePostId("12")).toBe(12);
+    expect(normalizePostId(" 9 ")).toBe(9);
+    expect(normalizePostId(0)).toBeNull();
+    expect(normalizePostId("abc")).toBeNull();
+  });
+
+  it("never treats like_count or stale truthy values as liked", () => {
+    expect(viewerLikedFromState(true)).toBe(true);
+    expect(viewerLikedFromState(false)).toBe(false);
+    expect(viewerLikedFromState(undefined)).toBe(false);
+    expect(viewerLikedFromState(1)).toBe(false);
+    expect(viewerLikedFromState("true")).toBe(false);
+    expect(viewerLikedFromState({ likes: 99 })).toBe(false);
+  });
+
+  it("hydrates only the viewer's liked rows, including string post_id", async () => {
+    const from = vi.fn((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          in: vi.fn(async () => ({
+            data:
+              table === "post_likes"
+                ? [{ post_id: "7" }]
+                : [],
+            error: null,
+          })),
+        })),
+      })),
+    }));
+    const state = await loadViewerInteractionState(
+      { from } as never,
+      VIEWER,
+      [7, 8]
+    );
+    expect(state.get(7)).toEqual({ likedByMe: true, savedByMe: false });
+    expect(state.get(8)).toEqual({ likedByMe: false, savedByMe: false });
   });
 });
 

@@ -199,6 +199,15 @@ export type MobileMessages = {
   "watch.unsave": string;
   "watch.commentsSoon": string;
   "watch.shareSoon": string;
+  "watch.comments": string;
+  "watch.share": string;
+  "watch.shareFailed": string;
+  "watch.commentFailed": string;
+  "comments.title": string;
+  "comments.empty": string;
+  "comments.placeholder": string;
+  "comments.signIn": string;
+  "comments.loadFailed": string;
   "watch.deleteOwn": string;
   "watch.reportVideo": string;
   "watch.blockAccount": string;
@@ -352,6 +361,12 @@ export type MobileMessages = {
   "profile.openNotifications": string;
   "profile.openSettings": string;
   "profile.emailA11y": string;
+  "profile.videos": string;
+  "profile.videosEmpty": string;
+  "profile.videosFailed": string;
+  "profile.followers": string;
+  "profile.following": string;
+  "profile.openVideo": string;
 
   "follow.follow": string;
   "follow.following": string;

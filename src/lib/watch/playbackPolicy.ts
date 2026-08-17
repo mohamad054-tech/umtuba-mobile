@@ -66,6 +66,18 @@ export function watchItemKey(video: WatchVideo): string {
   return video.id;
 }
 
+/** Viewer interaction signature so recycled cells cannot keep a stale heart. */
+export function watchInteractionSignature(
+  videos: readonly WatchVideo[]
+): string {
+  return videos
+    .map(
+      (video) =>
+        `${watchItemKey(video)}:${video.likedByMe === true ? 1 : 0}:${video.savedByMe === true ? 1 : 0}`
+    )
+    .join("|");
+}
+
 export function sanitizePlaybackError(error: unknown): string {
   return getErrorMessage(error, "Unable to play this video. Try again.");
 }

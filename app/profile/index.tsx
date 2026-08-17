@@ -18,6 +18,10 @@ import { getProfileById, getProfileByUsername } from "@/src/lib/auth/profile";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
 import {
+  listProfileVideos,
+  type ProfileVideoItem,
+} from "@/src/lib/profile/listProfileVideos";
+import {
   planOtherProfileLookup,
   resolveProfileTarget,
 } from "@/src/lib/profile/resolveTarget";
@@ -39,8 +43,13 @@ export default function ProfileScreen() {
     "idle" | "loading" | "missing" | "error"
   >("idle");
   const [following, setFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState<number | null>(null);
+  const [followingCount, setFollowingCount] = useState<number | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
+  const [videos, setVideos] = useState<ProfileVideoItem[]>([]);
+  const [videosFailed, setVideosFailed] = useState(false);
+  const [videosLoading, setVideosLoading] = useState(false);
 
   const target = useMemo(
     () =>
@@ -91,6 +100,8 @@ export default function ProfileScreen() {
         if (cancelled) return;
         if (snap.ok) {
           setFollowing(snap.following);
+          setFollowersCount(snap.followersCount);
+          setFollowingCount(snap.followingCount);
         }
       } catch {
         if (!cancelled) {
@@ -104,6 +115,48 @@ export default function ProfileScreen() {
       cancelled = true;
     };
   }, [target]);
+
+  const contentUserId = isOwn
+    ? user?.id ?? profile?.id ?? null
+    : otherProfile?.id ?? null;
+
+  useEffect(() => {
+    if (!contentUserId) {
+      setVideos([]);
+      setVideosFailed(false);
+      setVideosLoading(false);
+      if (isOwn) {
+        setFollowersCount(null);
+        setFollowingCount(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setVideosLoading(true);
+    setVideosFailed(false);
+
+    void (async () => {
+      const supabase = getSupabase();
+      const [page, snap] = await Promise.all([
+        listProfileVideos(supabase, contentUserId),
+        getProfileFollowSnapshot(supabase, contentUserId),
+      ]);
+      if (cancelled) return;
+      setVideos(page.videos);
+      setVideosFailed(Boolean(page.failed));
+      setVideosLoading(false);
+      if (snap.ok) {
+        if (isOwn) setFollowing(false);
+        setFollowersCount(snap.followersCount);
+        setFollowingCount(snap.followingCount);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contentUserId, isOwn]);
 
   const view = buildProfilePresentation(
     isOwn ? profile : otherProfile,
@@ -141,6 +194,8 @@ export default function ProfileScreen() {
         return;
       }
       setFollowing(result.following);
+      setFollowersCount(result.followersCount);
+      setFollowingCount(result.followingCount);
     } finally {
       setFollowBusy(false);
     }
@@ -346,6 +401,71 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
+        {followersCount != null || followingCount != null ? (
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{followersCount ?? 0}</Text>
+              <Text style={styles.statLabel}>{t("profile.followers")}</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{followingCount ?? 0}</Text>
+              <Text style={styles.statLabel}>{t("profile.following")}</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{videos.length}</Text>
+              <Text style={styles.statLabel}>{t("profile.videos")}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionLabel}>{t("profile.videos")}</Text>
+        {videosLoading ? (
+          <ActivityIndicator
+            color={colors.accentCyan}
+            accessibilityLabel={t("profile.loading")}
+          />
+        ) : videosFailed ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            {t("profile.videosFailed")}
+          </Text>
+        ) : videos.length === 0 ? (
+          <Text style={styles.muted}>{t("profile.videosEmpty")}</Text>
+        ) : (
+          <View style={styles.videoGrid}>
+            {videos.map((item) => (
+              <Pressable
+                key={item.postId}
+                style={styles.videoCell}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(tabs)/watch",
+                    params: { post: String(item.postId) },
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`${t("profile.openVideo")}: ${item.title}`}
+              >
+                {item.posterUrl ? (
+                  <Image
+                    source={{ uri: item.posterUrl }}
+                    style={styles.videoPoster}
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : (
+                  <View style={styles.videoPosterFallback}>
+                    <Text style={styles.videoPosterText} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.videoMeta} numberOfLines={1}>
+                  {item.title}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {isOwn ? (
           <>
             <Text style={styles.sectionLabel}>{t("profile.shortcuts")}</Text>
@@ -488,6 +608,68 @@ const styles = StyleSheet.create({
   retryLink: {
     color: colors.accentCyan,
     fontWeight: "600",
+  },
+  statsRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  stat: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  statValue: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  statLabel: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  videoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  videoCell: {
+    width: "31%",
+    flexGrow: 1,
+    maxWidth: "32%",
+  },
+  videoPoster: {
+    width: "100%",
+    aspectRatio: 9 / 16,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceElevated,
+  },
+  videoPosterFallback: {
+    width: "100%",
+    aspectRatio: 9 / 16,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+  },
+  videoPosterText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: "center",
+  },
+  videoMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 6,
   },
   followBlock: {
     marginTop: 16,

@@ -299,9 +299,9 @@ export default function SettingsScreen() {
     {
       id: "language",
       label: t("settings.language"),
-      kind: "link",
-      href: "/language" as Href,
+      kind: "action",
       value: getLocaleDefinition(locale).nativeName,
+      onPress: () => onNavigate("/language" as Href),
       accessibilityHint: t("settings.languageDescription"),
     },
     {

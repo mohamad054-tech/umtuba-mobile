@@ -21,6 +21,7 @@ import {
   type AppNotification,
 } from "@/src/lib/notifications";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { claimVerifiedWelcomeBonus } from "@/src/lib/wallet/claimWelcomeBonus";
 import { colors } from "@/src/theme/colors";
 
 type InboxPhase = "loading" | "ready" | "unavailable" | "error";
@@ -113,7 +114,9 @@ export default function NotificationsScreen() {
       else setPhase("loading");
       setError(null);
       try {
-        const result = await listMyNotifications(getSupabase(), { limit: 40 });
+        const supabase = getSupabase();
+        void claimVerifiedWelcomeBonus(supabase);
+        const result = await listMyNotifications(supabase, { limit: 40 });
         if (!result.ok) {
           if (result.unavailable) {
             setItems([]);

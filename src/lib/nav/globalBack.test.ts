@@ -274,6 +274,7 @@ describe("resolveGlobalBack", () => {
 describe("parentFallbackHref", () => {
   it("maps secondary screens to a stable in-app parent", () => {
     expect(parentFallbackHref("/settings")).toBe("/(tabs)/profile");
+    expect(parentFallbackHref("/language")).toBe("/settings");
     expect(parentFallbackHref("/world")).toBe("/(tabs)/discover");
     expect(parentFallbackHref("/messages/xyz")).toBe("/(tabs)/messages");
     expect(parentFallbackHref("/(auth)/forgot-password")).toBe("/(auth)/login");

@@ -44,6 +44,17 @@ describe("mapRowToWatchVideo", () => {
     expect(video.source).toBe("supabase");
   });
 
+  it("does not mark liked from a global like count", () => {
+    const video = mapRowToWatchVideo({
+      row: { ...baseRow, likes: 99 },
+      playbackUrl: "https://cdn.example/signed.mp4",
+      likedByMe: false,
+      savedByMe: false,
+    });
+    expect(video.likedByMe).toBe(false);
+    expect(video.stats.likes).toBe(99);
+  });
+
   it("prefixes username with @ when missing", () => {
     const video = mapRowToWatchVideo({
       row: { ...baseRow, author_username: "@already" },

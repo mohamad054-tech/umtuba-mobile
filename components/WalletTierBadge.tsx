@@ -7,7 +7,7 @@ import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { getMyActivityTierProgress } from "@/src/lib/tiers/fetchTier";
-import { fetchUmPointsWalletBalance } from "@/src/lib/wallet/fetchBalance";
+import { loadWalletAfterWelcomeClaim } from "@/src/lib/wallet/claimWelcomeBonus";
 import { formatWalletAmount } from "@/src/lib/wallet/format";
 import { colors } from "@/src/theme/colors";
 
@@ -32,7 +32,7 @@ export function WalletTierBadge() {
       try {
         const supabase = getSupabase();
         const [wallet, tier] = await Promise.all([
-          fetchUmPointsWalletBalance(supabase, user.id),
+          loadWalletAfterWelcomeClaim(supabase, user.id),
           getMyActivityTierProgress(supabase, user.id),
         ]);
         if (cancelled) return;

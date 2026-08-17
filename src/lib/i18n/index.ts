@@ -23,6 +23,8 @@ export {
 export {
   LOCALE_OVERRIDE_STORAGE_KEY,
   clearLocaleOverride,
+  commitLocaleOverride,
+  commitLocaleReset,
   loadLocaleOverride,
   parseLocaleOverride,
   resolveEffectiveLocale,

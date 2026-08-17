@@ -34,6 +34,7 @@ import {
   shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldPlayWithUserPause,
+  watchInteractionSignature,
   watchItemKey,
 } from "./playbackPolicy";
 
@@ -124,6 +125,17 @@ describe("watchItemKey", () => {
   it("prefers post id", () => {
     expect(watchItemKey(video("x", 7))).toBe("post-7");
     expect(watchItemKey(video("legacy"))).toBe("legacy");
+  });
+});
+
+describe("watchInteractionSignature", () => {
+  it("changes when viewer like state changes and stays per-post", () => {
+    const a = video("post-1", 1);
+    const b = { ...video("post-2", 2), likedByMe: true };
+    expect(watchInteractionSignature([a, b])).toBe("post-1:0:0|post-2:1:0");
+    expect(watchInteractionSignature([{ ...a, likedByMe: true }, b])).toBe(
+      "post-1:1:0|post-2:1:0"
+    );
   });
 });
 

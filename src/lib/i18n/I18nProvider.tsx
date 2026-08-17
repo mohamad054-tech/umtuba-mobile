@@ -19,10 +19,10 @@ import {
 } from "./locales";
 import { applyRtl, localeRootStyle } from "./rtl";
 import {
-  clearLocaleOverride,
+  commitLocaleOverride,
+  commitLocaleReset,
   loadLocaleOverride,
   resolveEffectiveLocale,
-  saveLocaleOverride,
 } from "./storage";
 import { createTranslator, type TranslateOptions } from "./translate";
 import type { TranslationKey } from "./messages/types";
@@ -67,13 +67,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
 
   const setOverride = useCallback(async (next: AppLocale) => {
-    await saveLocaleOverride(next);
-    setOverrideState(next);
+    await commitLocaleOverride(next, setOverrideState);
   }, []);
 
   const resetToDevice = useCallback(async () => {
-    await clearLocaleOverride();
-    setOverrideState(null);
+    await commitLocaleReset(() => setOverrideState(null));
   }, []);
 
   const value = useMemo<I18nContextValue>(
