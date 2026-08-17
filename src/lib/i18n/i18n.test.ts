@@ -206,4 +206,19 @@ describe("catalog completeness", () => {
     }
     expect(leaks).toEqual([]);
   });
+
+  it("adds shared Watch share-mode catalog keys", () => {
+    expect(enMessages["watch.shareVideoLink"]).toBe("Share video link");
+    expect(enMessages["watch.shareVideoFile"]).toBe("Share video");
+    expect(enMessages["watch.copyLink"]).toBe("Copy link");
+    expect(enMessages["watch.preparingVideo"]).toBe("Preparing video");
+    expect(enMessages["watch.shareFailed"]).toBe("Share failed");
+    expect(enMessages["watch.mediaUnavailable"]).toBe("Media unavailable");
+    expect(MESSAGE_CATALOGS.ar["watch.shareVideoLink"]).toBe(
+      "مشاركة رابط الفيديو"
+    );
+    expect(MESSAGE_CATALOGS.ar["watch.shareVideoFile"]).toBe(
+      "مشاركة الفيديو كفيديو"
+    );
+  });
 });

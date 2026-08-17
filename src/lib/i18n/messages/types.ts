@@ -201,7 +201,12 @@ export type MobileMessages = {
   "watch.shareSoon": string;
   "watch.comments": string;
   "watch.share": string;
+  "watch.shareVideoLink": string;
+  "watch.shareVideoFile": string;
+  "watch.copyLink": string;
+  "watch.preparingVideo": string;
   "watch.shareFailed": string;
+  "watch.mediaUnavailable": string;
   "watch.commentFailed": string;
   "comments.title": string;
   "comments.empty": string;

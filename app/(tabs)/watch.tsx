@@ -40,7 +40,13 @@ import {
   togglePostLike,
   togglePostSave,
 } from "@/src/lib/social/interactions";
-import { shareWatchPost } from "@/src/lib/social/sharePost";
+import {
+  createShareAttempt,
+  shareWatchPostFile,
+  shareWatchPostLink,
+  type ShareAttempt,
+  type WatchShareMode,
+} from "@/src/lib/social/sharePost";
 import {
   blockUserLocally,
   filterWatchItemsForViewer,
@@ -122,6 +128,7 @@ export default function WatchScreen() {
     () => new Set()
   );
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [preparingShare, setPreparingShare] = useState(false);
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -325,25 +332,79 @@ export default function WatchScreen() {
     [patchVideo, t]
   );
 
-  const onShare = useCallback(
-    async (video: WatchVideo) => {
-      if (!video.postId) return;
-      const result = await shareWatchPost(getSupabase(), {
-        postId: video.postId,
-        title: video.title,
-        text: video.caption || video.title,
-      });
-      if (!result.ok) {
-        Alert.alert(t("watch.shareFailed"), result.message);
-        return;
-      }
-      if (result.shared && result.shares > 0) {
-        patchVideo(video.id, {
-          stats: { ...video.stats, shares: result.shares },
-        });
+  const runShare = useCallback(
+    async (
+      attempt: ShareAttempt,
+      mode: WatchShareMode,
+      title: string,
+      text: string
+    ) => {
+      const visiblePostId = videos[activeIndexRef.current]?.postId ?? null;
+      const labels = {
+        mediaUnavailable: t("watch.mediaUnavailable"),
+        shareFailed: t("watch.shareFailed"),
+      };
+      if (mode === "file") setPreparingShare(true);
+      try {
+        const result =
+          mode === "link"
+            ? await shareWatchPostLink(getSupabase(), {
+                attempt,
+                title,
+                text,
+                visiblePostId,
+                labels,
+              })
+            : await shareWatchPostFile(getSupabase(), {
+                attempt,
+                title,
+                visiblePostId,
+                labels,
+              });
+        if (!result.ok) {
+          Alert.alert(
+            result.code === "media_unavailable"
+              ? t("watch.mediaUnavailable")
+              : t("watch.shareFailed"),
+            result.message
+          );
+          return;
+        }
+        if (result.shared && result.shares > 0) {
+          const target = videos.find((row) => row.postId === attempt.postId);
+          if (target) {
+            patchVideo(target.id, {
+              stats: { ...target.stats, shares: result.shares },
+            });
+          }
+        }
+      } finally {
+        setPreparingShare(false);
       }
     },
-    [patchVideo, t]
+    [patchVideo, t, videos]
+  );
+
+  const onShare = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId) return;
+      const attempt = createShareAttempt(video.postId);
+      if (!attempt) return;
+      const title = video.title;
+      const text = video.caption || video.title;
+      Alert.alert(t("watch.share"), undefined, [
+        {
+          text: t("watch.shareVideoLink"),
+          onPress: () => void runShare(attempt, "link", title, text),
+        },
+        {
+          text: t("watch.shareVideoFile"),
+          onPress: () => void runShare(attempt, "file", title, text),
+        },
+        { text: t("actions.cancel"), style: "cancel" },
+      ]);
+    },
+    [runShare, t]
   );
 
   const onToggleSave = useCallback(
@@ -833,6 +894,15 @@ export default function WatchScreen() {
           }, 100);
         }}
       />
+      {preparingShare ? (
+        <View style={styles.preparing} pointerEvents="none">
+          <ActivityIndicator
+            color={colors.accentCyan}
+            accessibilityLabel={t("watch.preparingVideo")}
+          />
+          <Text style={styles.preparingText}>{t("watch.preparingVideo")}</Text>
+        </View>
+      ) : null}
       <CommentsSheet
         visible={commentPostId != null}
         postId={commentPostId}
@@ -919,5 +989,27 @@ const styles = StyleSheet.create({
     color: colors.textSubtle,
     paddingVertical: 28,
     fontSize: 13,
+  },
+  preparing: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 28,
+    zIndex: 4,
+    borderRadius: 12,
+    backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  preparingText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
   },
 });

@@ -8,6 +8,12 @@ describe("parseDeepLink", () => {
     expect(parsed.target).toEqual({ type: "watch", postId: 42 });
   });
 
+  it("opens the exact post from the canonical web share URL", () => {
+    const parsed = parseDeepLink("https://umtuba.com/watch?post=88");
+    expect(parsed.target).toEqual({ type: "watch", postId: 88 });
+    expect(deepLinkToHref(parsed.target)).toBe("/(tabs)/watch?post=88");
+  });
+
   it("parses https invite and extracts referral", () => {
     const parsed = parseDeepLink("https://umtuba.com/invite/ABC123XY");
     expect(parsed.target).toEqual({ type: "invite", code: "ABC123XY" });
