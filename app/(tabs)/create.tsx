@@ -45,6 +45,7 @@ import {
   queuePendingVideoUpload,
 } from "@/src/lib/video/orphanUploads";
 import {
+  formatPickedDurationSecondsLabel,
   pickVideoFromLibrary,
   type PickedVideoAsset,
 } from "@/src/lib/video/pickVideo";
@@ -399,7 +400,7 @@ export default function CreateScreen() {
               <Text style={styles.cardMeta}>
                 {(asset.byteSize / (1024 * 1024)).toFixed(1)} MB
                 {asset.durationMs != null
-                  ? ` · ${Math.round(asset.durationMs / 1000)}s`
+                  ? ` · ${formatPickedDurationSecondsLabel(asset.durationMs)}`
                   : ` · ${t("create.durationUnavailable")}`}
                 {asset.mimeType ? ` · ${asset.mimeType}` : ""}
               </Text>

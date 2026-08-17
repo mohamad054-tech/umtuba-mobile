@@ -288,6 +288,21 @@ export function resolveScrubRatioFromPageX(
   return clampUnitRatio((pageX - trackX) / trackWidth);
 }
 
+/**
+ * Seek uses physical pageX (left → right). The fill/thumb must share that
+ * origin. Yoga `width%` otherwise grows from the RTL start edge while
+ * `left%` stays physical-left — a second cyan segment on Arabic Watch.
+ */
+export const WATCH_SCRUB_LAYOUT_DIRECTION = "ltr" as const;
+
+export function scrubFillWidthPercent(ratio: number): `${number}%` {
+  return `${clampUnitRatio(ratio) * 100}%`;
+}
+
+export function scrubThumbLeftPercent(ratio: number): `${number}%` {
+  return `${clampUnitRatio(ratio) * 100}%`;
+}
+
 export function canSeekWithDuration(duration: number): boolean {
   return Number.isFinite(duration) && duration > 0;
 }

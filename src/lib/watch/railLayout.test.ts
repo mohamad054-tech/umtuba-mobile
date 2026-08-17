@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  watchRailBottomOffset,
   watchRailFitsCell,
   watchRailHeight,
+  WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
   WATCH_RAIL_ACTION_MIN_HEIGHT,
+  WATCH_RAIL_BOTTOM_EXTRA,
+  WATCH_TIMELINE_TRAILING_GUTTER,
 } from "./railLayout";
 
 describe("watchRailLayout", () => {
@@ -33,5 +37,12 @@ describe("watchRailLayout", () => {
         topReserved: 120,
       })
     ).toBe(true);
+  });
+
+  it("lifts the rail above the timeline clock and keeps labels in-column", () => {
+    expect(WATCH_RAIL_BOTTOM_EXTRA).toBeGreaterThanOrEqual(84);
+    expect(watchRailBottomOffset(0)).toBe(12 + WATCH_RAIL_BOTTOM_EXTRA);
+    expect(WATCH_RAIL_ACTION_LABEL_MAX_WIDTH).toBeLessThanOrEqual(72);
+    expect(WATCH_TIMELINE_TRAILING_GUTTER).toBeGreaterThanOrEqual(56);
   });
 });

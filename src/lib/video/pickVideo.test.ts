@@ -28,7 +28,9 @@ vi.mock("@/src/lib/permissions/foundation", () => ({
 import * as ImagePicker from "expo-image-picker";
 import { requestMediaLibraryPermission } from "@/src/lib/permissions/foundation";
 import {
+  formatPickedDurationSecondsLabel,
   inferPickedVideoMimeType,
+  pickerDurationToMs,
   pickVideoFromLibrary,
   resolvePickedVideoByteSize,
 } from "@/src/lib/video/pickVideo";
@@ -174,6 +176,38 @@ describe("pickVideoFromLibrary (Android content://)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not multiply iOS millisecond duration into 8200s", async () => {
+    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: true,
+      canAskAgain: true,
+      explanation: "test",
+    });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: false,
+      assets: [
+        {
+          uri: "file:///tmp/IMG_0008.MOV",
+          fileName: "IMG_0008.MOV",
+          mimeType: "video/quicktime",
+          fileSize: 9.5 * 1024 * 1024,
+          duration: 8200,
+          width: 1920,
+          height: 1080,
+        },
+      ],
+    } as never);
+
+    const result = await pickVideoFromLibrary();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.asset.durationMs).toBe(8200);
+      expect(formatPickedDurationSecondsLabel(result.asset.durationMs!)).toBe(
+        "8s"
+      );
+    }
+  });
+
   it("persists a content:// selection with missing fileSize and MIME", async () => {
     vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
       kind: "mediaLibrary",
@@ -291,5 +325,27 @@ describe("pickVideoFromLibrary (Android content://)", () => {
       message:
         "Could not determine the video file size after selection. Try another clip or re-export the file.",
     });
+  });
+});
+
+describe("pickerDurationToMs", () => {
+  it("keeps ImagePicker millisecond values (IMG_0008.MOV 8200 → 8s)", () => {
+    expect(pickerDurationToMs(8200)).toBe(8200);
+    expect(formatPickedDurationSecondsLabel(8200)).toBe("8s");
+    expect(formatPickedDurationSecondsLabel(pickerDurationToMs(8200)!)).not.toBe(
+      "8200s"
+    );
+  });
+
+  it("still treats sub-1000 values as seconds for legacy Android mocks", () => {
+    expect(pickerDurationToMs(12.5)).toBe(12500);
+    expect(pickerDurationToMs(30)).toBe(30000);
+    expect(formatPickedDurationSecondsLabel(12500)).toBe("13s");
+  });
+
+  it("rejects non-finite or non-positive picker duration", () => {
+    expect(pickerDurationToMs(0)).toBeNull();
+    expect(pickerDurationToMs(-4)).toBeNull();
+    expect(pickerDurationToMs(Number.NaN)).toBeNull();
   });
 });

@@ -133,6 +133,26 @@ export async function resolvePickedVideoByteSize(input: {
 }
 
 /**
+ * expo-image-picker documents `duration` in milliseconds. Older Android
+ * mocks / some native paths still emit seconds (12.5). Values below 1000
+ * are treated as seconds; 8200 (IMG_0008.MOV ~8.2s) is already ms and must
+ * not be multiplied again — that displayed as 8200s on Create.
+ */
+export function pickerDurationToMs(duration: number): number | null {
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return null;
+  }
+  if (duration < 1000) {
+    return Math.round(duration * 1000);
+  }
+  return Math.round(duration);
+}
+
+export function formatPickedDurationSecondsLabel(durationMs: number): string {
+  return `${Math.round(durationMs / 1000)}s`;
+}
+
+/**
  * Native media-library picker for Create (iOS and Android).
  * Requests library permission first, then opens the system video picker.
  * Android 13+ system photo picker may work without a broad media grant.
@@ -200,11 +220,8 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
     return { ok: false, cancelled: false, message: fileCheck.message };
   }
 
-  // ImagePicker duration is seconds on native.
   const durationMs =
-    typeof asset.duration === "number" && Number.isFinite(asset.duration)
-      ? Math.round(asset.duration * 1000)
-      : null;
+    typeof asset.duration === "number" ? pickerDurationToMs(asset.duration) : null;
 
   const durationCheck = validateVideoDuration(durationMs);
   if (!durationCheck.ok) {
