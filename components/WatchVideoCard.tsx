@@ -14,13 +14,12 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
 import { useTranslation } from "@/src/lib/i18n";
 import {
   canSeekWithDuration,
-  clampWatchVolume,
   formatPlaybackClock,
-  quantizeWatchVolume,
   resolveEffectiveAudio,
   resolveProgressRatio,
   resolveScrubRatioFromPageX,
@@ -38,7 +37,6 @@ import {
 import {
   WATCH_RAIL_ACTION_MIN_HEIGHT,
   WATCH_RAIL_GAP,
-  WATCH_VOLUME_RIGHT_CLEARANCE,
 } from "@/src/lib/watch/railLayout";
 import { colors } from "@/src/theme/colors";
 
@@ -110,8 +108,6 @@ type ScrubBarProps = {
   fillColor?: string;
   /** Larger hit target for timeline seeking. */
   tall?: boolean;
-  /** Extra-wide volume control. */
-  wide?: boolean;
 };
 
 function ScrubBar({
@@ -122,7 +118,6 @@ function ScrubBar({
   trackColor = "rgba(255,255,255,0.28)",
   fillColor = colors.accentCyan,
   tall = false,
-  wide = false,
 }: ScrubBarProps) {
   const trackRef = useRef<View>(null);
   const frameRef = useRef({ x: 0, width: 1 });
@@ -217,7 +212,6 @@ function ScrubBar({
       style={[
         styles.scrubHit,
         tall && styles.scrubHitTall,
-        wide && styles.scrubHitWide,
       ]}
       onLayout={onLayout}
       collapsable={false}
@@ -552,13 +546,6 @@ function WatchVideoCardComponent({
     [timeline.duration]
   );
 
-  const onVolumeSeek = useCallback(
-    (ratio: number) => {
-      onVolumeChange(quantizeWatchVolume(clampWatchVolume(ratio)));
-    },
-    [onVolumeChange]
-  );
-
   const onScrubActive = useCallback(
     (active: boolean) => {
       onScrubGestureChange?.(active);
@@ -659,22 +646,14 @@ function WatchVideoCardComponent({
           </Pressable>
         </View>
 
-        <View
-          style={[styles.volumeBlock, { top: Math.max(72, topInset + 64) }]}
-          pointerEvents="box-none"
-        >
-          <Text style={styles.volumeLabel}>
-            {t("watch.volume", { values: { percent: Math.round(volume * 100) } })}
-          </Text>
-          <ScrubBar
-            ratio={volume}
-            accessibilityLabel={t("watch.volumeA11y")}
-            onSeekRatio={onVolumeSeek}
-            onGestureActiveChange={onScrubActive}
-            tall
-            wide
-          />
-        </View>
+        <WatchSideVolumeControl
+          volume={volume}
+          muted={muted}
+          topInset={topInset}
+          bottomInset={bottomInset}
+          onVolumeChange={onVolumeChange}
+          onGestureActiveChange={onScrubActive}
+        />
 
         <View
           style={[styles.meta, { marginBottom: timelineBottom + 36 }]}
@@ -949,19 +928,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  volumeBlock: {
-    position: "absolute",
-    right: WATCH_VOLUME_RIGHT_CLEARANCE,
-    width: 180,
-    gap: 8,
-    zIndex: 6,
-  },
-  volumeLabel: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "right",
-  },
   meta: {
     maxWidth: "72%",
     zIndex: 5,
@@ -1044,10 +1010,6 @@ const styles = StyleSheet.create({
   scrubHitTall: {
     minHeight: 48,
     paddingVertical: 14,
-  },
-  scrubHitWide: {
-    minHeight: 52,
-    paddingVertical: 16,
   },
   scrubTrack: {
     height: 5,
