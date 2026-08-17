@@ -1,10 +1,12 @@
 /**
- * Exclusive Watch audio ownership.
+ * Exclusive Watch audio ownership — SHARED PRODUCT CONTRACT.
+ *
+ * ONLY_ACTIVE_WATCH_POST_CAN_PRODUCE_AUDIO
  *
  * Adjacent expo-video players stay mounted for preload. Only the active post
- * may emit audio. Inactive / stale-generation commands must mute+pause and
- * disable native loop so iOS onPlayedToEnd / Android REPEAT_MODE cannot
- * restart the previous clip.
+ * may emit audio. Non-active mounted players are paused, muted, and loop-disabled.
+ * Native release is owned by useVideoPlayer; JS detaches and never calls methods
+ * after release (see playerLifecycle.detachWatchPlayerBinding).
  */
 
 import type { PlaybackIntent } from "./playerSession";
@@ -132,7 +134,9 @@ export function resolveWatchPlaybackIntent(input: {
       muted: true,
       volume: 0,
       loop: false,
-      resetPosition: true,
+      // Do not seek during A→B. Seek races useReleasingSharedObject and
+      // can throw Android integer/long casts on a dying ExoPlayer.
+      resetPosition: false,
     };
   }
   if (!input.shouldPlay) {

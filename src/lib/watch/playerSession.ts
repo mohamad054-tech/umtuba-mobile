@@ -3,8 +3,9 @@
  * Kept framework-light so unit tests can verify play/pause/cleanup contracts
  * without mounting native views.
  *
- * expo-video VideoPlayer is a SharedObject. After useReleasingSharedObject
- * calls release(), play/pause/mute/loop/seek throw. Every op must no-op.
+ * expo-video VideoPlayer is a SharedObject on both platforms. After
+ * useReleasingSharedObject release(), play/pause/mute/loop/seek throw.
+ * Every JS op must no-op once the object is dead.
  */
 export type PlayerLike = {
   play: () => void;

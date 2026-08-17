@@ -257,14 +257,30 @@ export function resolveNextWatchIndex(input: {
   return next;
 }
 
+/** Android RecyclerView/getInt requires whole pixels. Fold6 heights are fractional. */
+export function toWatchListPixels(value: number): number | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const pixels = Math.round(value);
+  return pixels > 0 ? pixels : null;
+}
+
+/** Viewability / claimActiveIndex must be a whole list index. */
+export function sanitizeWatchListIndex(index: number): number | null {
+  if (!Number.isFinite(index) || index < 0) return null;
+  const whole = Math.trunc(index);
+  if (Math.abs(index - whole) > 1e-6) return null;
+  return whole;
+}
+
 /** Pixel offset for FlatList scrollToOffset (index * measured item height). */
 export function resolveWatchScrollOffset(
   index: number,
   itemHeight: number
 ): number | null {
-  if (!Number.isFinite(index) || index < 0) return null;
-  if (!Number.isFinite(itemHeight) || itemHeight <= 0) return null;
-  return index * itemHeight;
+  const safeIndex = sanitizeWatchListIndex(index);
+  const pixels = toWatchListPixels(itemHeight);
+  if (safeIndex == null || pixels == null) return null;
+  return safeIndex * pixels;
 }
 
 /**

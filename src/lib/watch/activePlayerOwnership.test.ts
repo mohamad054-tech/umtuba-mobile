@@ -85,7 +85,7 @@ describe("ONLY_ACTIVE_WATCH_POST_CAN_PLAY_AUDIO", () => {
       muted: true,
       volume: 0,
       loop: false,
-      resetPosition: true,
+      resetPosition: false,
     });
     expect(INACTIVE_WATCH_AUDIO.loop).toBe(false);
     expect(INACTIVE_WATCH_AUDIO.muted).toBe(true);

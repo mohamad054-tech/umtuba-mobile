@@ -40,6 +40,7 @@ import {
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
 } from "@/src/lib/watch/activePlayerOwnership";
+import { detachWatchPlayerBinding } from "@/src/lib/watch/playerLifecycle";
 import {
   applyInactiveAudioTeardown,
   applyPlaybackIntent,
@@ -305,7 +306,7 @@ function WatchPlayerPane({
   ownershipGenerationRef.current = ownershipGeneration;
 
   const player = useVideoPlayer(src, (p) => {
-    // Start silent on a NEW SharedObject. Never reuse a previous instance.
+    // New SharedObject starts silent. Ownership effect unmutes only the active post.
     p.loop = false;
     p.muted = true;
     p.volume = 0;
@@ -397,23 +398,38 @@ function WatchPlayerPane({
     }
   });
 
-  // Bind this SharedObject only. Unmount/swap: mark dead first, then silence
-  // only if still natively alive. Never call into a released object.
+  // Bind this SharedObject only. Unmount/swap: detach JS binding and never
+  // call play/pause/mute — useReleasingSharedObject owns native release.
   useLayoutEffect(() => {
-    const previous = boundPlayerRef.current;
-    if (previous && previous !== player) {
-      playerAliveRef.current = false;
-      applyInactiveAudioTeardown(previous, { resetPosition: false });
+    if (boundPlayerRef.current && boundPlayerRef.current !== player) {
+      detachWatchPlayerBinding({
+        markDead: () => {
+          playerAliveRef.current = false;
+        },
+        clearPlayGeneration: () => {
+          playGenerationRef.current = null;
+        },
+        dropBoundRef: () => {
+          boundPlayerRef.current = null;
+        },
+      });
     }
     boundPlayerRef.current = player;
     playerAliveRef.current = true;
     return () => {
-      playerAliveRef.current = false;
-      playGenerationRef.current = null;
-      if (boundPlayerRef.current === player) {
-        applyInactiveAudioTeardown(player, { resetPosition: false });
-        boundPlayerRef.current = null;
-      }
+      detachWatchPlayerBinding({
+        markDead: () => {
+          playerAliveRef.current = false;
+        },
+        clearPlayGeneration: () => {
+          playGenerationRef.current = null;
+        },
+        dropBoundRef: () => {
+          if (boundPlayerRef.current === player) {
+            boundPlayerRef.current = null;
+          }
+        },
+      });
     };
   }, [player]);
 

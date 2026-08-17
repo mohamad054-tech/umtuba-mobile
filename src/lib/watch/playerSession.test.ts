@@ -10,7 +10,7 @@ import {
 } from "./playerSession";
 import { shouldPlayVideo } from "./playbackPolicy";
 
-describe("applyPlaybackIntent", () => {
+describe("applyPlaybackIntent (alive-guarded shared apply)", () => {
   it("plays active unmuted session and pauses inactive", () => {
     const session = createPlayerSession();
     applyPlaybackIntent(session.player, {

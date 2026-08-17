@@ -74,11 +74,13 @@ import {
   quantizeWatchVolume,
   resolveNextWatchIndex,
   resolveWatchScrollOffset,
+  sanitizeWatchListIndex,
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
   shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
+  toWatchListPixels,
   watchInteractionSignature,
   watchItemKey,
   type AppLifecycleState,
@@ -86,7 +88,10 @@ import {
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { colors } from "@/src/theme/colors";
 
-const { height: WINDOW_HEIGHT } = Dimensions.get("window");
+const { height: RAW_WINDOW_HEIGHT } = Dimensions.get("window");
+const WINDOW_HEIGHT =
+  toWatchListPixels(RAW_WINDOW_HEIGHT) ??
+  (Math.round(RAW_WINDOW_HEIGHT) || 1);
 const PROGRAMMATIC_ADVANCE_LOCK_MS = 750;
 
 function toLifecycleState(state: AppStateStatus): AppLifecycleState {
@@ -144,7 +149,9 @@ export default function WatchScreen() {
   const programmaticAdvanceUntilRef = useRef(0);
 
   const claimActiveIndex = useCallback((nextIndex: number) => {
-    if (!Number.isFinite(nextIndex) || nextIndex < 0) return;
+    const safeIndex = sanitizeWatchListIndex(nextIndex);
+    if (safeIndex == null) return;
+    nextIndex = safeIndex;
     const nextGeneration = bumpWatchOwnerGeneration(
       playbackGenerationRef.current,
       activeIndexRef.current,
@@ -876,8 +883,8 @@ export default function WatchScreen() {
         decelerationRate="fast"
         getItemLayout={getItemLayout}
         onLayout={(event) => {
-          const nextHeight = event.nativeEvent.layout.height;
-          if (Number.isFinite(nextHeight) && nextHeight > 0) {
+          const nextHeight = toWatchListPixels(event.nativeEvent.layout.height);
+          if (nextHeight != null) {
             setItemHeight(nextHeight);
           }
         }}

@@ -277,6 +277,8 @@ describe("auto-next preference and end-of-clip policy", () => {
     expect(resolveWatchScrollOffset(0, 800)).toBe(0);
     expect(resolveWatchScrollOffset(1, 0)).toBeNull();
     expect(resolveWatchScrollOffset(-1, 800)).toBeNull();
+    expect(resolveWatchScrollOffset(2, 873.333)).toBe(1746);
+    expect(resolveWatchScrollOffset(1.25, 800)).toBeNull();
   });
 
   it("locks viewability updates during programmatic advance", () => {
