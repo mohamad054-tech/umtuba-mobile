@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.umtuba.app",
-    buildNumber: "10",
+    buildNumber: "11",
     // Same Team ID already published in live AASA (M6HDH86Z55.com.umtuba.app).
     appleTeamId: "M6HDH86Z55",
     associatedDomains: [
