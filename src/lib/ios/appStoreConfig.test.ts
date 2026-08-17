@@ -8,7 +8,7 @@ describe("iOS App Store build config", () => {
     expect(config.ios?.bundleIdentifier).toBe("com.umtuba.app");
     expect(config.ios?.appleTeamId).toBe("M6HDH86Z55");
     expect(config.version).toBe("1.0.0");
-    expect(config.ios?.buildNumber).toBe("11");
+    expect(config.ios?.buildNumber).toBe("12");
     expect(config.name).toBe("UMTUBA");
     expect(config.scheme).toBe("umtuba");
     expect(eas.submit.production.ios.appleTeamId).toBe("M6HDH86Z55");
@@ -71,5 +71,6 @@ describe("iOS App Store build config", () => {
       ])
     );
     expect(config.android?.package).toBe("com.umtuba.app");
+    expect(config.android?.versionCode).toBe(13);
   });
 });

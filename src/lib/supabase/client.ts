@@ -4,61 +4,23 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 import { getEnv } from "@/src/lib/env";
+import { createAuthStorageAdapter } from "@/src/lib/supabase/authStorage";
+
+const ExpoSecureStoreAdapter = createAuthStorageAdapter({
+  platform: Platform.OS,
+  secureGet: (key) => SecureStore.getItemAsync(key),
+  secureSet: (key, value) => SecureStore.setItemAsync(key, value),
+  secureRemove: (key) => SecureStore.deleteItemAsync(key),
+  asyncGet: (key) => AsyncStorage.getItem(key),
+  asyncSet: (key, value) => AsyncStorage.setItem(key, value),
+  asyncRemove: (key) => AsyncStorage.removeItem(key),
+});
 
 /**
- * Auth session storage:
- * - Native: Expo SecureStore (encrypted keychain / Keystore)
- * - Web / SecureStore failures: AsyncStorage fallback
- *
- * SecureStore values are capped (~2KB). If a session payload exceeds that,
- * setItem falls back to AsyncStorage automatically.
- *
+ * Auth session storage lives in authStorage.ts.
+ * Persist session/refresh token only — never email/password.
  * Never use a service-role key in the mobile client.
  */
-const ExpoSecureStoreAdapter = {
-  getItem: async (key: string): Promise<string | null> => {
-    if (Platform.OS === "web") {
-      return AsyncStorage.getItem(key);
-    }
-
-    try {
-      const value = await SecureStore.getItemAsync(key);
-      if (value != null) {
-        return value;
-      }
-      return AsyncStorage.getItem(key);
-    } catch {
-      return AsyncStorage.getItem(key);
-    }
-  },
-  setItem: async (key: string, value: string): Promise<void> => {
-    if (Platform.OS === "web") {
-      await AsyncStorage.setItem(key, value);
-      return;
-    }
-
-    try {
-      await SecureStore.setItemAsync(key, value);
-      await AsyncStorage.removeItem(key);
-    } catch {
-      // SecureStore size / availability limits → AsyncStorage fallback
-      await AsyncStorage.setItem(key, value);
-    }
-  },
-  removeItem: async (key: string): Promise<void> => {
-    if (Platform.OS === "web") {
-      await AsyncStorage.removeItem(key);
-      return;
-    }
-
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {
-      // ignore
-    }
-    await AsyncStorage.removeItem(key);
-  },
-};
 
 let client: SupabaseClient | null = null;
 

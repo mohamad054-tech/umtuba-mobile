@@ -30,6 +30,7 @@ import {
   getOrCreateVisitorId,
   getReferralAttribution,
 } from "@/src/lib/auth/referralAttribution";
+import { shouldSkipInitialSessionClobber } from "@/src/lib/auth/sessionHydration";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { unregisterPushOnLogout } from "@/src/lib/push/service";
 import { getSupabase } from "@/src/lib/supabase/client";
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [configError, setConfigError] = useState<string | null>(null);
   const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const hydratingRef = useRef(true);
 
   const applySession = useCallback(async (next: Session | null) => {
     setSession(next);
@@ -151,7 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    void restore();
+    void restore().finally(() => {
+      hydratingRef.current = false;
+    });
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const supabase = getSupabase();
@@ -161,6 +165,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (event === "SIGNED_OUT") {
           setPasswordRecoveryPending(false);
+        }
+        // INITIAL_SESSION(null) on a storage/decrypt error must not wipe a
+        // session that restore() already applied from the durable copy.
+        if (
+          shouldSkipInitialSessionClobber({
+            hydrating: hydratingRef.current,
+            event,
+            nextSession,
+          })
+        ) {
+          return;
         }
         void applySession(nextSession);
       });
