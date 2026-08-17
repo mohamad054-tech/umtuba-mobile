@@ -30,6 +30,7 @@ import { requestMediaLibraryPermission } from "@/src/lib/permissions/foundation"
 import {
   formatPickedDurationSecondsLabel,
   inferPickedVideoMimeType,
+  mediaLibraryGrantRequiredForPicker,
   pickerDurationToMs,
   pickVideoFromLibrary,
   resolvePickedVideoByteSize,
@@ -383,5 +384,37 @@ describe("pickerDurationToMs", () => {
     expect(pickerDurationToMs(0)).toBe(0);
     expect(pickerDurationToMs(-4)).toBe(0);
     expect(pickerDurationToMs(Number.NaN)).toBe(0);
+  });
+});
+
+describe("TEST_8 iOS picker adapter", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("classifies iOS permission as native-adapter-specific and cancel as shared", async () => {
+    expect(mediaLibraryGrantRequiredForPicker("ios")).toBe(true);
+    expect(mediaLibraryGrantRequiredForPicker("android")).toBe(false);
+
+    vi.mocked(requestMediaLibraryPermission).mockResolvedValue({
+      kind: "mediaLibrary",
+      granted: false,
+      canAskAgain: false,
+      explanation: "denied",
+    });
+
+    // Android mock platform still proceeds without a grant (shared picker).
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({
+      canceled: true,
+      assets: [],
+    } as never);
+
+    const cancelled = await pickVideoFromLibrary();
+    expect(cancelled).toEqual({ ok: false, cancelled: true });
+  });
+
+  it("keeps iOS millisecond duration on the shared Create contract", () => {
+    expect(pickerDurationToMs(8200)).toBe(8200);
+    expect(formatPickedDurationSecondsLabel(8200)).toBe("8s");
   });
 });

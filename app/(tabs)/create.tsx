@@ -44,9 +44,11 @@ import {
   bindRetryToCurrentAsset,
   canPublishCreateDraft,
   evaluateCreateAsset,
-  isStaleCreateAttempt,
+  isCreatePublishActionAllowed,
+  isCreateUploadStartAllowed,
   nextCreateAttemptId,
   resetCreateDraftAfterPublish,
+  shouldIgnoreStaleCreateCallback,
   shouldResetCreateOnBlur,
 } from "@/src/lib/video/createUploadState";
 import { isAbortError } from "@/src/lib/video/createProgress";
@@ -83,6 +85,7 @@ export default function CreateScreen() {
   journeyRef.current = journey;
   const attemptNonceRef = useRef(0);
   const activeAttemptRef = useRef<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const hashtags = useMemo(() => extractHashtags(caption), [caption]);
   const busy = journey.uploadBusy || journey.publishBusy;
@@ -125,12 +128,13 @@ export default function CreateScreen() {
   );
 
   const onPick = useCallback(async () => {
-    if (!canStartUpload(journeyRef.current) || busy) return;
-    setJourney((s) => ({ ...s, phase: "picking", error: null, message: null }));
+    if (!canStartUpload(journeyRef.current) || busy || pickerOpen) return;
+    // NEW_PICK_START: do not mutate asset, caption, retry, or journey yet.
+    setPickerOpen(true);
     const result = await pickVideoFromLibrary();
+    setPickerOpen(false);
     if (!result.ok) {
       if (result.cancelled) {
-        setJourney((s) => ({ ...s, phase: "ready", error: null }));
         return;
       }
       attemptNonceRef.current += 1;
@@ -145,7 +149,7 @@ export default function CreateScreen() {
     activeAttemptRef.current = null;
     setAsset(result.asset);
     setJourney((s) => applyAcceptedPick(s));
-  }, [busy]);
+  }, [busy, pickerOpen]);
 
   const onCancelUpload = useCallback(() => {
     abortRef.current?.abort();
@@ -160,16 +164,27 @@ export default function CreateScreen() {
         return;
       }
 
-      const evaluation = evaluateCreateAsset(picked);
-      if (!evaluation.ok) {
-        setAsset(null);
-        setJourney((s) =>
-          applyRejectedPick(
-            s,
-            evaluation.message ?? t("create.pickFailed"),
-            picked.fileName
-          )
-        );
+      if (
+        !isCreateUploadStartAllowed({
+          asset: picked,
+          journey: journeyRef.current,
+          ugcAck,
+          caption: captionText,
+        })
+      ) {
+        const evaluation = evaluateCreateAsset(picked);
+        if (!evaluation.ok) {
+          attemptNonceRef.current += 1;
+          activeAttemptRef.current = null;
+          setAsset(null);
+          setJourney((s) =>
+            applyRejectedPick(
+              s,
+              evaluation.message ?? t("create.pickFailed"),
+              picked.fileName
+            )
+          );
+        }
         return;
       }
 
@@ -211,14 +226,28 @@ export default function CreateScreen() {
           accessToken: liveSession.access_token,
           signal: controller.signal,
           onProgress: (progress) => {
-            if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
-              return;
-            }
-            setJourney((s) => applyUploadProgress(s, progress.percent));
+            setJourney((s) => {
+              if (
+                shouldIgnoreStaleCreateCallback(
+                  activeAttemptRef.current,
+                  s.attemptId,
+                  attemptId
+                )
+              ) {
+                return s;
+              }
+              return applyUploadProgress(s, progress.percent);
+            });
           },
         });
 
-        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+        if (
+          shouldIgnoreStaleCreateCallback(
+            activeAttemptRef.current,
+            journeyRef.current.attemptId,
+            attemptId
+          )
+        ) {
           if (uploaded.path) {
             await deleteOwnedVideoObject(getSupabase(), user.id, uploaded.path);
             await clearPendingVideoUpload(uploaded.path);
@@ -227,7 +256,15 @@ export default function CreateScreen() {
         }
 
         uploadedPath = uploaded.path;
-        setJourney((s) => completeUpload(s, uploaded.path));
+        setJourney((s) =>
+          shouldIgnoreStaleCreateCallback(
+            activeAttemptRef.current,
+            s.attemptId,
+            attemptId
+          )
+            ? s
+            : completeUpload(s, uploaded.path)
+        );
 
         const {
           data: { user: liveUser },
@@ -261,7 +298,13 @@ export default function CreateScreen() {
           }
         );
 
-        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+        if (
+          shouldIgnoreStaleCreateCallback(
+            activeAttemptRef.current,
+            journeyRef.current.attemptId,
+            attemptId
+          )
+        ) {
           if (
             !result.ok &&
             result.videoPath &&
@@ -288,18 +331,42 @@ export default function CreateScreen() {
             );
             await clearPendingVideoUpload(result.videoPath);
           }
-          setJourney((s) => failPublish(s, new Error(result.message)));
+          setJourney((s) =>
+            shouldIgnoreStaleCreateCallback(
+              activeAttemptRef.current,
+              s.attemptId,
+              attemptId
+            )
+              ? s
+              : failPublish(s, new Error(result.message))
+          );
           return;
         }
 
         await clearPendingVideoUpload(uploaded.path);
         const cleared = resetCreateDraftAfterPublish();
+        activeAttemptRef.current = cleared.activeAttemptId;
+        attemptNonceRef.current += 1;
         setAsset(cleared.asset);
         setCaption(cleared.caption);
         setUgcAck(cleared.ugcAck);
-        setJourney((s) => completePublish(s, result.postId));
+        setJourney((s) =>
+          shouldIgnoreStaleCreateCallback(
+            attemptId,
+            s.attemptId,
+            attemptId
+          )
+            ? s
+            : completePublish(s, result.postId)
+        );
       } catch (error) {
-        if (isStaleCreateAttempt(activeAttemptRef.current, attemptId)) {
+        if (
+          shouldIgnoreStaleCreateCallback(
+            activeAttemptRef.current,
+            journeyRef.current.attemptId,
+            attemptId
+          )
+        ) {
           return;
         }
 
@@ -308,7 +375,15 @@ export default function CreateScreen() {
             await deleteOwnedVideoObject(getSupabase(), user.id, uploadedPath);
             await clearPendingVideoUpload(uploadedPath);
           }
-          setJourney((s) => failUpload(s, error));
+          setJourney((s) =>
+            shouldIgnoreStaleCreateCallback(
+              activeAttemptRef.current,
+              s.attemptId,
+              attemptId
+            )
+              ? s
+              : failUpload(s, error)
+          );
           return;
         }
 
@@ -324,25 +399,41 @@ export default function CreateScreen() {
         }
 
         setJourney((s) =>
-          failUpload(
-            s,
-            new Error(
-              getErrorMessage(
-                error,
-                t("create.uploadFailed")
-              )
-            )
+          shouldIgnoreStaleCreateCallback(
+            activeAttemptRef.current,
+            s.attemptId,
+            attemptId
           )
+            ? s
+            : failUpload(
+                s,
+                new Error(
+                  getErrorMessage(
+                    error,
+                    t("create.uploadFailed")
+                  )
+                )
+              )
         );
       } finally {
         abortRef.current = null;
       }
     },
-    [profile, session, t, user]
+    [profile, session, t, ugcAck, user]
   );
 
   const onPublish = useCallback(async () => {
-    if (!asset || busy || !publishable) return;
+    if (
+      !isCreatePublishActionAllowed({
+        asset,
+        journey: journeyRef.current,
+        ugcAck,
+        caption,
+      })
+    ) {
+      return;
+    }
+    if (!asset) return;
     if (!canPublishWithUgcAck(ugcAck)) {
       setJourney((s) => ({
         ...s,
@@ -361,7 +452,7 @@ export default function CreateScreen() {
       return;
     }
     await runPublishPipeline(asset, caption);
-  }, [asset, busy, caption, publishable, runPublishPipeline, t, ugcAck]);
+  }, [asset, caption, runPublishPipeline, t, ugcAck]);
 
   const onRetry = useCallback(() => {
     const bound = bindRetryToCurrentAsset({
@@ -434,7 +525,7 @@ export default function CreateScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("create.chooseA11y")}
             accessibilityHint={t("create.chooseHint")}
-            accessibilityState={{ disabled: busy, busy: journey.phase === "picking" }}
+            accessibilityState={{ disabled: busy, busy: pickerOpen }}
           >
             <Text style={styles.secondaryText}>
               {asset ? t("create.chooseDifferent") : t("create.chooseVideo")}

@@ -49,6 +49,86 @@ export function isStaleCreateAttempt(
   return activeAttemptId !== callbackAttemptId;
 }
 
+/** Ignore callbacks that no longer match the live ref or the journey binding. */
+export function shouldIgnoreStaleCreateCallback(
+  activeAttemptId: string | null,
+  stateAttemptId: string | null,
+  callbackAttemptId: string
+): boolean {
+  return (
+    isStaleCreateAttempt(activeAttemptId, callbackAttemptId) ||
+    isStaleCreateAttempt(stateAttemptId, callbackAttemptId)
+  );
+}
+
+export type CreateDraftSnapshot<T extends CreateBoundAsset | null> = {
+  asset: T;
+  caption: string;
+  ugcAck: boolean;
+  journey: CreateJourneyState;
+  activeAttemptId: string | null;
+};
+
+export function initialCreateDraft(): CreateDraftSnapshot<null> {
+  return {
+    asset: null,
+    caption: "",
+    ugcAck: false,
+    journey: initialCreateJourneyState(),
+    activeAttemptId: null,
+  };
+}
+
+/** Opening the picker must not mutate the current valid selection. */
+export function beginCreatePick<T extends CreateBoundAsset | null>(
+  draft: CreateDraftSnapshot<T>
+): CreateDraftSnapshot<T> {
+  return draft;
+}
+
+/** Cancel leaves the previous valid asset, caption, retry, and journey intact. */
+export function applyPickerCancel<T extends CreateBoundAsset | null>(
+  draft: CreateDraftSnapshot<T>
+): CreateDraftSnapshot<T> {
+  return draft;
+}
+
+export function applyAtomicAcceptedPick<T extends CreateBoundAsset>(
+  draft: CreateDraftSnapshot<CreateBoundAsset | null>,
+  nextAsset: T
+): CreateDraftSnapshot<T> {
+  return {
+    asset: nextAsset,
+    caption: draft.caption,
+    ugcAck: draft.ugcAck,
+    journey: applyAcceptedPick(draft.journey),
+    activeAttemptId: null,
+  };
+}
+
+export function applyAtomicRejectedPick(
+  draft: CreateDraftSnapshot<CreateBoundAsset | null>,
+  message: string,
+  rejectedAssetLabel?: string | null
+): CreateDraftSnapshot<null> {
+  return {
+    asset: null,
+    caption: draft.caption,
+    ugcAck: draft.ugcAck,
+    journey: applyRejectedPick(draft.journey, message, rejectedAssetLabel),
+    activeAttemptId: null,
+  };
+}
+
+export function reopenCreateAfterSuccess(
+  phase: CreateJourneyState["phase"]
+): CreateDraftSnapshot<null> | null {
+  if (!shouldResetCreateOnBlur(phase)) {
+    return null;
+  }
+  return initialCreateDraft();
+}
+
 export function evaluateCreateAsset(
   asset: CreateBoundAsset | null
 ): { ok: true } | { ok: false; message: string | null } {
@@ -86,6 +166,28 @@ export function canPublishCreateDraft(input: {
   return validateCaption(input.caption).ok;
 }
 
+/**
+ * Hard publish / upload-start gate. Visual disabled styling is not enough —
+ * direct invocation must also refuse an invalid current selection.
+ */
+export function isCreatePublishActionAllowed(input: {
+  asset: CreateBoundAsset | null;
+  journey: CreateJourneyState;
+  ugcAck: boolean;
+  caption: string;
+}): boolean {
+  return canPublishCreateDraft(input);
+}
+
+export function isCreateUploadStartAllowed(input: {
+  asset: CreateBoundAsset | null;
+  journey: CreateJourneyState;
+  ugcAck: boolean;
+  caption: string;
+}): boolean {
+  return isCreatePublishActionAllowed(input);
+}
+
 export function applyRejectedPick(
   _state: CreateJourneyState,
   message: string,
@@ -110,11 +212,13 @@ export function resetCreateDraftAfterPublish(): {
   asset: null;
   caption: "";
   ugcAck: false;
+  activeAttemptId: null;
 } {
   return {
     asset: null,
     caption: "",
     ugcAck: false,
+    activeAttemptId: null,
   };
 }
 

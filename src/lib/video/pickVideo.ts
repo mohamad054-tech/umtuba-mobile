@@ -168,6 +168,13 @@ export function formatPickedDurationSecondsLabel(durationMs: number): string {
   return `${Math.round(durationMs / 1000)}s`;
 }
 
+/** iOS requires a media-library grant; Android 13+ photo picker may not. */
+export function mediaLibraryGrantRequiredForPicker(
+  os: typeof Platform.OS = Platform.OS
+): boolean {
+  return os !== "android";
+}
+
 /**
  * Native media-library picker for Create (iOS and Android).
  * Requests library permission first, then opens the system video picker.
@@ -175,7 +182,7 @@ export function formatPickedDurationSecondsLabel(durationMs: number): string {
  */
 export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
   const permission = await requestMediaLibraryPermission();
-  if (!permission.granted && Platform.OS !== "android") {
+  if (!permission.granted && mediaLibraryGrantRequiredForPicker()) {
     return {
       ok: false,
       cancelled: false,
