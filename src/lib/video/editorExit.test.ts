@@ -85,7 +85,39 @@ describe("EDITOR_EXIT", () => {
       expect(MESSAGE_CATALOGS[locale]["create.editorContinueHint"].trim().length).toBeGreaterThan(
         0
       );
+      expect(MESSAGE_CATALOGS[locale]["create.editorTextDone"].trim().length).toBeGreaterThan(0);
+      expect(MESSAGE_CATALOGS[locale]["create.editorTextDoneHint"].trim().length).toBeGreaterThan(
+        0
+      );
     }
+  });
+
+  it("FOOTER_CONTINUE_PRESERVED + LOCALIZATION_13: Continue and keyboard Done resolve for all 13 tags", () => {
+    const thirteen = [
+      "ar",
+      "en",
+      "fr",
+      "es",
+      "de",
+      "pt-BR",
+      "id",
+      "hi",
+      "ru",
+      "tr",
+      "zh-CN",
+      "ja",
+      "ko",
+    ] as const;
+    expect(thirteen).toHaveLength(13);
+    for (const tag of thirteen) {
+      const locale = detectDeviceLocale(tag);
+      const catalog = MESSAGE_CATALOGS[locale];
+      expect(catalog["create.editorContinue"].trim().length).toBeGreaterThan(0);
+      expect(catalog["create.editorTextDone"].trim().length).toBeGreaterThan(0);
+      expect(catalog["create.editorTextDone"]).not.toBe("create.editorTextDone");
+    }
+    expect(MESSAGE_CATALOGS.ar["create.editorTextDone"]).toBe("تم");
+    expect(MESSAGE_CATALOGS.en["create.editorTextDone"]).toBe("Done");
   });
 
   it("preserves the existing 6-locale mobile contract for the extra web locales", () => {
@@ -98,5 +130,6 @@ describe("EDITOR_EXIT", () => {
     expect(detectDeviceLocale("ja")).toBe("en");
     expect(detectDeviceLocale("ko")).toBe("en");
     expect(MESSAGE_CATALOGS.en["create.editorContinue"]).toBe("Continue");
+    expect(MESSAGE_CATALOGS.en["create.editorTextDone"]).toBe("Done");
   });
 });

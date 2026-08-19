@@ -321,6 +321,8 @@ export const arMessages: MobileMessages = {
   "create.editorDone": "تم",
   "create.editorContinue": "متابعة",
   "create.editorContinueHint": "احفظ التعديلات وتابع إلى النشر",
+  "create.editorTextDone": "تم",
+  "create.editorTextDoneHint": "أغلق لوحة المفاتيح وابقَ في تحرير الفيديو",
   "create.editorDiscardTitle": "مغادرة المحرر؟",
   "create.editorDiscardBody": "تبقى تعديلاتك على هذه المسودة حتى تنشر أو تمسح الفيديو.",
   "create.editorKeep": "متابعة التحرير",

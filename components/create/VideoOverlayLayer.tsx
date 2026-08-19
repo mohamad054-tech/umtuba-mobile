@@ -3,8 +3,11 @@ import { PanResponder, Text, View } from "react-native";
 
 import {
   applyOverlayDrag,
+  overlayCanvasStyle,
+  overlayElementTransform,
   overlayHitSize,
 } from "@/src/lib/video/overlayDrag";
+import { overlayTextStyle } from "@/src/lib/video/overlayText";
 import type { VideoOverlayElement } from "@/src/lib/video/videoOverlays";
 import { colors } from "@/src/theme/colors";
 
@@ -25,13 +28,15 @@ type OverlayGlyphProps = {
 };
 
 function OverlayGlyph({ el, fontSize }: OverlayGlyphProps) {
+  const textStyle = overlayTextStyle(el.kind === "text" ? el.text : undefined);
   return (
     <Text
       style={{
         color: el.kind === "text" ? el.color || "#fff" : "#fff",
         fontSize,
         fontWeight: "800",
-        textAlign: "center",
+        textAlign: textStyle.textAlign,
+        writingDirection: textStyle.writingDirection,
         textShadowColor: "rgba(0,0,0,0.75)",
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
@@ -107,17 +112,20 @@ function DraggableOverlay({
       accessibilityLabel={el.kind === "text" ? el.text : el.emoji}
       style={{
         position: "absolute",
-        left: el.x * width,
-        top: el.y * height,
+        left: 0,
+        top: 0,
         minWidth: hit,
         minHeight: hit,
         alignItems: "center",
         justifyContent: "center",
-        transform: [
-          { translateX: -hit / 2 },
-          { translateY: -hit / 2 },
-          { rotate: `${el.rotation}deg` },
-        ],
+        transform: overlayElementTransform(
+          el.x,
+          el.y,
+          el.rotation,
+          width,
+          height,
+          hit / 2
+        ),
         maxWidth: width * 0.9,
         borderWidth: selected ? 2 : 0,
         borderColor: colors.accentCyan,
@@ -142,13 +150,11 @@ export function VideoOverlayLayer({
     return null;
   }
   const edge = Math.min(width, height);
+  const canvas = overlayCanvasStyle(width, height);
 
   if (!editable) {
     return (
-      <View
-        pointerEvents="none"
-        style={{ position: "absolute", left: 0, top: 0, width, height }}
-      >
+      <View pointerEvents="none" style={canvas}>
         {elements.map((el) => {
           const size = el.scale * edge;
           const fontSize = el.kind === "sticker" ? size : Math.max(14, size * 0.85);
@@ -157,13 +163,16 @@ export function VideoOverlayLayer({
               key={el.id}
               style={{
                 position: "absolute",
-                left: el.x * width,
-                top: el.y * height,
-                transform: [
-                  { translateX: -size / 2 },
-                  { translateY: -size / 2 },
-                  { rotate: `${el.rotation}deg` },
-                ],
+                left: 0,
+                top: 0,
+                transform: overlayElementTransform(
+                  el.x,
+                  el.y,
+                  el.rotation,
+                  width,
+                  height,
+                  size / 2
+                ),
                 maxWidth: width * 0.9,
               }}
             >
@@ -176,11 +185,7 @@ export function VideoOverlayLayer({
   }
 
   return (
-    <View
-      collapsable={false}
-      pointerEvents="box-none"
-      style={{ position: "absolute", left: 0, top: 0, width, height }}
-    >
+    <View collapsable={false} pointerEvents="box-none" style={canvas}>
       {elements.map((el) => (
         <DraggableOverlay
           key={el.id}

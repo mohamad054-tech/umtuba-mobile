@@ -317,6 +317,8 @@ export type MobileMessages = {
   "create.editorDone": string;
   "create.editorContinue": string;
   "create.editorContinueHint": string;
+  "create.editorTextDone": string;
+  "create.editorTextDoneHint": string;
   "create.editorDiscardTitle": string;
   "create.editorDiscardBody": string;
   "create.editorKeep": string;

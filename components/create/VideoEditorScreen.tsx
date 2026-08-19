@@ -2,6 +2,8 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  InputAccessoryView,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,7 +17,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
-import { localeTextAlign, useTranslation } from "@/src/lib/i18n";
+import {
+  localeTextAlign,
+  localeWritingDirection,
+  useTranslation,
+} from "@/src/lib/i18n";
 import type { SocialSound } from "@/src/lib/sounds/socialSounds";
 import {
   createEditorExitGuard,
@@ -23,6 +29,11 @@ import {
   EDITOR_HEADER_ACTION_MIN_HEIGHT,
   editorFooterPaddingBottom,
 } from "@/src/lib/video/editorExit";
+import {
+  commitEditorTextOnDismiss,
+  EDITOR_TEXT_INPUT_ACCESSORY_ID,
+} from "@/src/lib/video/editorKeyboard";
+import { OVERLAY_INTERACTION_LAYOUT_DIRECTION } from "@/src/lib/video/overlayDrag";
 import {
   clampTrimWindow,
   type VideoEditState,
@@ -64,11 +75,13 @@ export function VideoEditorScreen({
   const insets = useSafeAreaInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [textDraft, setTextDraft] = useState("");
+  const [textFocused, setTextFocused] = useState(false);
   const [stage, setStage] = useState({ width: 0, height: 0 });
   const [closing, setClosing] = useState(false);
   const exitGuard = useRef(createEditorExitGuard()).current;
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const textInputRef = useRef<TextInput>(null);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = draft.mix.originalAudioEnabled === false;
@@ -89,6 +102,13 @@ export function VideoEditorScreen({
     }
   }, [visible, exitGuard]);
 
+  useEffect(() => {
+    const current = draftRef.current.overlays.find((el) => el.id === selectedId);
+    if (current?.kind === "text") {
+      setTextDraft(current.text ?? "");
+    }
+  }, [selectedId]);
+
   function commit(next: VideoEditState) {
     onChange(next);
   }
@@ -98,6 +118,23 @@ export function VideoEditorScreen({
     setClosing(true);
     onChange(draftRef.current);
     onClose();
+  }
+
+  function finishTextEdit() {
+    const result = commitEditorTextOnDismiss({
+      textDraft,
+      selected,
+      overlays: draftRef.current.overlays,
+    });
+    commit({
+      ...draftRef.current,
+      overlays: result.overlays,
+    });
+    setSelectedId(result.selectedId);
+    setTextDraft(result.textDraft);
+    setTextFocused(false);
+    textInputRef.current?.blur();
+    Keyboard.dismiss();
   }
 
   function askClose() {
@@ -139,7 +176,10 @@ export function VideoEditorScreen({
           </View>
 
           <View
-            style={styles.stage}
+            style={[
+              styles.stage,
+              { direction: OVERLAY_INTERACTION_LAYOUT_DIRECTION },
+            ]}
             onLayout={(event) => {
               const { width, height } = event.nativeEvent.layout;
               setStage({ width, height });
@@ -215,13 +255,37 @@ export function VideoEditorScreen({
 
             <Text style={styles.section}>{t("create.addText")}</Text>
             <TextInput
+              ref={textInputRef}
               value={textDraft}
               onChangeText={setTextDraft}
               placeholder={t("create.textPlaceholder")}
               placeholderTextColor={colors.textSubtle}
-              style={[styles.input, { textAlign: localeTextAlign(locale) }]}
+              style={[
+                styles.input,
+                {
+                  textAlign: localeTextAlign(locale),
+                  writingDirection: localeWritingDirection(locale),
+                },
+              ]}
               accessibilityLabel={t("create.addText")}
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={finishTextEdit}
+              onFocus={() => setTextFocused(true)}
+              onBlur={() => setTextFocused(false)}
+              inputAccessoryViewID={
+                Platform.OS === "ios" ? EDITOR_TEXT_INPUT_ACCESSORY_ID : undefined
+              }
             />
+            <Pressable
+              style={[styles.localDone, textFocused && styles.localDoneActive]}
+              onPress={finishTextEdit}
+              accessibilityRole="button"
+              accessibilityLabel={t("create.editorTextDone")}
+              accessibilityHint={t("create.editorTextDoneHint")}
+            >
+              <Text style={styles.localDoneText}>{t("create.editorTextDone")}</Text>
+            </Pressable>
             <View style={styles.row}>
               <Pressable
                 style={styles.primary}
@@ -233,6 +297,8 @@ export function VideoEditorScreen({
                   commit({ ...draft, overlays: addOverlay(draft.overlays, el) });
                   setSelectedId(el.id);
                   setTextDraft("");
+                  textInputRef.current?.blur();
+                  Keyboard.dismiss();
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={t("create.addText")}
@@ -407,6 +473,23 @@ export function VideoEditorScreen({
               </Text>
             </Pressable>
           </View>
+          {Platform.OS === "ios" ? (
+            <InputAccessoryView nativeID={EDITOR_TEXT_INPUT_ACCESSORY_ID}>
+              <View style={styles.accessory}>
+                <Pressable
+                  onPress={finishTextEdit}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("create.editorTextDone")}
+                  accessibilityHint={t("create.editorTextDoneHint")}
+                  style={styles.accessoryBtn}
+                >
+                  <Text style={styles.accessoryBtnText}>
+                    {t("create.editorTextDone")}
+                  </Text>
+                </Pressable>
+              </View>
+            </InputAccessoryView>
+          ) : null}
         </SafeAreaView>
       </KeyboardAvoidingView>
     </Modal>
@@ -481,6 +564,30 @@ const styles = StyleSheet.create({
     color: colors.text,
     minHeight: 48,
   },
+  localDone: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.accentCyan,
+    borderRadius: 12,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+  },
+  localDoneActive: { opacity: 1 },
+  localDoneText: { color: colors.bg, fontWeight: "800" },
+  accessory: {
+    backgroundColor: colors.bg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: "flex-end",
+  },
+  accessoryBtn: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  accessoryBtnText: { color: colors.accentCyan, fontWeight: "800", fontSize: 17 },
   swatch: { width: 28, height: 28, borderRadius: 14 },
   emoji: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
   emojiText: { fontSize: 28 },

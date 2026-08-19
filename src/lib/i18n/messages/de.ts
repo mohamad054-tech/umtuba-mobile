@@ -350,6 +350,8 @@ export const deMessages: MobileMessages = {
   "create.editorDone": "Fertig",
   "create.editorContinue": "Weiter",
   "create.editorContinueHint": "Bearbeitungen speichern und zum Veröffentlichen weitergehen",
+  "create.editorTextDone": "Fertig",
+  "create.editorTextDoneHint": "Tastatur schließen und im Editor bleiben",
   "create.editorDiscardTitle": "Editor verlassen?",
   "create.editorDiscardBody": "Ihre Bearbeitungen bleiben in diesem Entwurf, bis Sie veröffentlichen oder das Video entfernen.",
   "create.editorKeep": "Weiter bearbeiten",

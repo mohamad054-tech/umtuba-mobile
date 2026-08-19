@@ -345,6 +345,8 @@ export const esMessages: MobileMessages = {
   "create.editorDone": "Listo",
   "create.editorContinue": "Continuar",
   "create.editorContinueHint": "Guardar las ediciones y continuar a publicar",
+  "create.editorTextDone": "Listo",
+  "create.editorTextDoneHint": "Cerrar el teclado y seguir editando el video",
   "create.editorDiscardTitle": "¿Salir del editor?",
   "create.editorDiscardBody": "Tus ediciones se quedan en este borrador hasta que publiques o borres el video.",
   "create.editorKeep": "Seguir editando",
