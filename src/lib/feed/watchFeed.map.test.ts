@@ -42,6 +42,7 @@ describe("mapRowToWatchVideo", () => {
     expect(video.savedByMe).toBe(false);
     expect(video.stats.likes).toBe(3);
     expect(video.source).toBe("supabase");
+    expect(video.publishedAt).toBe("2026-01-01T00:00:00Z");
   });
 
   it("does not mark liked from a global like count", () => {

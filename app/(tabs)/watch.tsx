@@ -932,6 +932,9 @@ export default function WatchScreen() {
       <CommentsSheet
         visible={commentPostId != null}
         postId={commentPostId}
+        publishedAt={
+          videos.find((row) => row.postId === commentPostId)?.publishedAt ?? null
+        }
         onClose={() => setCommentPostId(null)}
         onCountChange={(count) => {
           if (commentPostId == null) return;

@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,6 +16,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { SoundLibrarySheet } from "@/components/create/SoundLibrarySheet";
+import { VideoEditorScreen } from "@/components/create/VideoEditorScreen";
+
 import {
   extractHashtags,
   MAX_CAPTION_LENGTH,
@@ -23,7 +26,7 @@ import {
 } from "@/src/contracts/video";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import { useTranslation } from "@/src/lib/i18n";
+import { localeTextAlign, useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   applyUploadProgress,
@@ -67,19 +70,46 @@ import {
 } from "@/src/lib/video/pickVideo";
 import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
 import { uploadPostVideo } from "@/src/lib/video/uploadPostVideo";
-import { UGC_TERMS_URL, canPublishWithUgcAck } from "@/src/lib/video/ugcSafety";
+import {
+  fetchSocialSoundById,
+  type SocialSound,
+} from "@/src/lib/sounds/socialSounds";
+import {
+  createInitialEditState,
+  editedDurationMs,
+  serializeEditIntoMediaPipeline,
+  type VideoEditState,
+} from "@/src/lib/video/videoEditState";
+import {
+  CREATE_ACK_CHECK_MARK,
+  CREATE_ACK_CHECKBOX_BORDER_WIDTH,
+  CREATE_ACK_CHECKBOX_SIZE,
+  CREATE_ACK_TOUCH_MIN_HEIGHT,
+  UGC_TERMS_URL,
+  canPublishWithUgcAck,
+} from "@/src/lib/video/ugcSafety";
 import { colors } from "@/src/theme/colors";
 
 export default function CreateScreen() {
   const { session, user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { t } = useTranslation();
+  const params = useLocalSearchParams<{ sound?: string | string[] }>();
+  const incomingSoundId = Array.isArray(params.sound)
+    ? params.sound[0]
+    : params.sound;
+  const { t, locale } = useTranslation();
   const [asset, setAsset] = useState<PickedVideoAsset | null>(null);
   const [caption, setCaption] = useState("");
   const [journey, setJourney] = useState<CreateJourneyState>(
     initialCreateJourneyState()
   );
   const [ugcAck, setUgcAck] = useState(false);
+  const [editState, setEditState] = useState<VideoEditState>(
+    createInitialEditState(null)
+  );
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [soundLibraryOpen, setSoundLibraryOpen] = useState(false);
+  const [selectedSound, setSelectedSound] = useState<SocialSound | null>(null);
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState
   );
@@ -102,6 +132,23 @@ export default function CreateScreen() {
   });
 
   useEffect(() => {
+    if (!incomingSoundId) return;
+    let cancelled = false;
+    void fetchSocialSoundById(
+      getSupabase(),
+      incomingSoundId,
+      user?.id ?? null
+    ).then((sound) => {
+      if (cancelled || !sound) return;
+      setSelectedSound(sound);
+      setEditState((prev) => ({ ...prev, soundId: sound.id }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [incomingSoundId, user?.id]);
+
+  useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
       setAppState(next);
     });
@@ -119,8 +166,15 @@ export default function CreateScreen() {
     setAsset(null);
     setCaption("");
     setUgcAck(false);
+    setSelectedSound(null);
+    setEditState(createInitialEditState(null));
     setJourney(initialCreateJourneyState());
   }, []);
+
+  useEffect(() => {
+    setEditState(createInitialEditState(asset?.durationMs ?? null));
+    setSelectedSound(null);
+  }, [asset?.id, asset?.durationMs]);
 
   useFocusEffect(
     useCallback(() => {
@@ -307,10 +361,13 @@ export default function CreateScreen() {
             byteSize: uploaded.byteSize,
             uploadStartedAt,
             metadata: {
-              durationMs: picked.durationMs,
+              durationMs: editedDurationMs(editState, picked.durationMs),
               width: picked.width,
               height: picked.height,
             },
+            soundId: editState.soundId,
+            soundMix: editState.mix,
+            mediaPipeline: serializeEditIntoMediaPipeline(null, editState),
           }
         );
 
@@ -435,7 +492,7 @@ export default function CreateScreen() {
         abortRef.current = null;
       }
     },
-    [profile, session, t, ugcAck, user]
+    [editState, profile, session, t, ugcAck, user]
   );
 
   const onPublish = useCallback(async () => {
@@ -622,6 +679,15 @@ export default function CreateScreen() {
                 {asset.mimeType ? ` · ${asset.mimeType}` : ""}
               </Text>
               <Pressable
+                onPress={() => setEditorOpen(true)}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.editVideo")}
+                accessibilityState={{ disabled: busy }}
+              >
+                <Text style={styles.link}>{t("create.editVideo")}</Text>
+              </Pressable>
+              <Pressable
                 onPress={resetSelection}
                 disabled={busy}
                 accessibilityRole="button"
@@ -785,19 +851,42 @@ export default function CreateScreen() {
           ) : null}
 
           <Pressable
-            style={styles.ackRow}
+            style={({ pressed }) => [
+              styles.ackRow,
+              ugcAck ? styles.ackRowChecked : styles.ackRowUnchecked,
+              pressed && styles.ackRowPressed,
+            ]}
             onPress={() => setUgcAck((value) => !value)}
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: ugcAck }}
+            accessibilityState={{ checked: ugcAck, disabled: false }}
             accessibilityLabel={t("create.ack")}
+            accessibilityHint={t("create.ackRequired")}
+            hitSlop={6}
           >
             <View
               style={[styles.checkbox, ugcAck && styles.checkboxChecked]}
               accessible={false}
+              importantForAccessibility="no"
             >
-              {ugcAck ? <Text style={styles.checkboxMark}>✓</Text> : null}
+              {ugcAck ? (
+                <Text style={styles.checkboxMark}>{CREATE_ACK_CHECK_MARK}</Text>
+              ) : null}
             </View>
-            <Text style={styles.ackText}>{t("create.ack")}</Text>
+            <View style={styles.ackCopy} accessible={false}>
+              <Text
+                style={[styles.ackText, { textAlign: localeTextAlign(locale) }]}
+              >
+                {t("create.ack")}
+              </Text>
+              <Text
+                style={[
+                  styles.ackRequired,
+                  { textAlign: localeTextAlign(locale) },
+                ]}
+              >
+                {t("create.ackRequired")}
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             onPress={() => void Linking.openURL(UGC_TERMS_URL)}
@@ -813,7 +902,9 @@ export default function CreateScreen() {
             disabled={!publishable}
             accessibilityRole="button"
             accessibilityLabel={t("create.publish")}
-            accessibilityHint={t("create.publishHint")}
+            accessibilityHint={
+              !ugcAck ? t("create.ackRequired") : t("create.publishHint")
+            }
             accessibilityState={{
               disabled: !publishable,
               busy,
@@ -829,6 +920,30 @@ export default function CreateScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      {asset ? (
+        <VideoEditorScreen
+          visible={editorOpen}
+          uri={asset.uri}
+          durationMs={asset.durationMs}
+          draft={editState}
+          selectedSound={selectedSound}
+          onChange={setEditState}
+          onClose={() => setEditorOpen(false)}
+          onOpenSounds={() => setSoundLibraryOpen(true)}
+        />
+      ) : null}
+      <SoundLibrarySheet
+        visible={soundLibraryOpen}
+        onClose={() => setSoundLibraryOpen(false)}
+        onSelect={(sound) => {
+          setSelectedSound(sound);
+          setEditState((current) => ({
+            ...current,
+            soundId: sound.id,
+            mix: { ...current.mix, addedSoundVolume: current.mix.addedSoundVolume || 1 },
+          }));
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1016,35 +1131,60 @@ const styles = StyleSheet.create({
   },
   ackRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
+    alignItems: "center",
+    gap: 12,
     marginTop: 8,
+    minHeight: CREATE_ACK_TOUCH_MIN_HEIGHT,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 2,
+  },
+  ackRowUnchecked: {
+    borderColor: colors.text,
+    backgroundColor: colors.surfaceElevated,
+  },
+  ackRowChecked: {
+    borderColor: colors.accentCyan,
+    backgroundColor: "rgba(34,211,238,0.12)",
+  },
+  ackRowPressed: {
+    opacity: 0.88,
   },
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    width: CREATE_ACK_CHECKBOX_SIZE,
+    height: CREATE_ACK_CHECKBOX_SIZE,
+    borderRadius: 8,
+    borderWidth: CREATE_ACK_CHECKBOX_BORDER_WIDTH,
+    borderColor: colors.text,
+    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
   },
   checkboxChecked: {
-    backgroundColor: colors.accentCyan,
-    borderColor: colors.accentCyan,
+    backgroundColor: colors.text,
+    borderColor: colors.text,
   },
   checkboxMark: {
     color: colors.bg,
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "800",
-    lineHeight: 16,
+    lineHeight: 20,
+  },
+  ackCopy: {
+    flex: 1,
+    gap: 4,
   },
   ackText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "600",
+  },
+  ackRequired: {
+    color: colors.accentAmber,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
   },
 });

@@ -14,6 +14,7 @@ import {
   loadViewerInteractionState,
   viewerLikedFromState,
 } from "@/src/lib/social/interactions";
+import { resolveAuthoritativePublishedAt } from "@/src/lib/time/publishedAt";
 
 export type VideoPostRow = {
   id: number;
@@ -32,6 +33,8 @@ export type VideoPostRow = {
   saves: number | null;
   views: number | null;
   created_at: string;
+  media_pipeline?: unknown;
+  media_duration_ms?: number | null;
 };
 
 const postColumns = `
@@ -50,7 +53,9 @@ const postColumns = `
   shares,
   saves,
   views,
-  created_at
+  created_at,
+  media_pipeline,
+  media_duration_ms
 `;
 
 export type MappedPlaybackRow = {
@@ -95,6 +100,14 @@ export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
     likedByMe: viewerLikedFromState(likedByMe),
     savedByMe: savedByMe === true,
     source: "supabase",
+    publishedAt: resolveAuthoritativePublishedAt({
+      created_at: row.created_at,
+    }),
+    durationMs:
+      typeof row.media_duration_ms === "number" && row.media_duration_ms >= 0
+        ? row.media_duration_ms
+        : null,
+    mediaPipeline: row.media_pipeline ?? null,
   };
 }
 

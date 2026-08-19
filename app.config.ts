@@ -10,9 +10,11 @@ const config: ExpoConfig = {
   scheme: "umtuba",
   userInterfaceStyle: "dark",
   ios: {
-    supportsTablet: true,
+    // iPhone-only: Build 16 advertised iPad and triggered Apple's 13" screenshot.
+    // supportsTablet: false → Expo emits UIDeviceFamily = [1].
+    supportsTablet: false,
     bundleIdentifier: "com.umtuba.app",
-    buildNumber: "16",
+    buildNumber: "17",
     // Same Team ID already published in live AASA (M6HDH86Z55.com.umtuba.app).
     appleTeamId: "M6HDH86Z55",
     associatedDomains: [
@@ -61,7 +63,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.umtuba.app",
-    versionCode: 17,
+    versionCode: 18,
     adaptiveIcon: {
       backgroundColor: "#050510",
       foregroundImage: "./assets/images/android-icon-foreground.png",

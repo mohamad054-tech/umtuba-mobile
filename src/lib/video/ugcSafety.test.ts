@@ -7,6 +7,10 @@ import {
 } from "@/src/lib/settings/supportLinks";
 
 import {
+  CREATE_ACK_CHECKBOX_BORDER_WIDTH,
+  CREATE_ACK_CHECKBOX_SIZE,
+  CREATE_ACK_CHECK_MARK,
+  CREATE_ACK_TOUCH_MIN_HEIGHT,
   UGC_PUBLISH_ACK_LABEL,
   UGC_TERMS_URL,
   canPublishWithUgcAck,
@@ -18,6 +22,13 @@ describe("Create terms gate (ugcSafety)", () => {
     expect(canPublishWithUgcAck(true)).toBe(true);
     expect(UGC_PUBLISH_ACK_LABEL).toMatch(/Terms/);
     expect(UGC_PUBLISH_ACK_LABEL).toMatch(/objectionable content/i);
+  });
+
+  it("keeps the confirmation control large enough to see and tap", () => {
+    expect(CREATE_ACK_CHECKBOX_SIZE).toBeGreaterThanOrEqual(28);
+    expect(CREATE_ACK_CHECKBOX_BORDER_WIDTH).toBeGreaterThanOrEqual(2);
+    expect(CREATE_ACK_TOUCH_MIN_HEIGHT).toBeGreaterThanOrEqual(48);
+    expect(CREATE_ACK_CHECK_MARK).toBe("✓");
   });
 
   it("points the Create gate at the allowlisted public Terms URL", () => {

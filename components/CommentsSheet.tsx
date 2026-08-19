@@ -19,11 +19,13 @@ import {
   type PostCommentDTO,
 } from "@/src/lib/social/comments";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import { colors } from "@/src/theme/colors";
 
 type CommentsSheetProps = {
   visible: boolean;
   postId: number | null;
+  publishedAt?: string | null;
   onClose: () => void;
   onCountChange?: (count: number) => void;
 };
@@ -31,12 +33,14 @@ type CommentsSheetProps = {
 export function CommentsSheet({
   visible,
   postId,
+  publishedAt,
   onClose,
   onCountChange,
 }: CommentsSheetProps) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const publishedLabel = formatPublishedAt(publishedAt, locale);
   const [comments, setComments] = useState<PostCommentDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +113,12 @@ export function CommentsSheet({
           style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>{t("comments.title")}</Text>
+            <View>
+              <Text style={styles.title}>{t("comments.title")}</Text>
+              {publishedLabel ? (
+                <Text style={styles.publishedAt}>{publishedLabel}</Text>
+              ) : null}
+            </View>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
@@ -207,6 +216,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: "700",
+  },
+  publishedAt: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    marginTop: 2,
   },
   close: {
     color: colors.accentCyan,

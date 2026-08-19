@@ -22,6 +22,7 @@ export const SECONDARY_PATHS = [
   "/change-password",
   "/profile",
   "/messages/[id]",
+  "/sound/[id]",
   "/(auth)/signup",
   "/(auth)/forgot-password",
   "/(auth)/update-password",

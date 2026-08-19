@@ -30,6 +30,7 @@ import {
   toggleProfileFollow,
 } from "@/src/lib/social/follows";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
@@ -432,7 +433,9 @@ export default function ProfileScreen() {
           <Text style={styles.muted}>{t("profile.videosEmpty")}</Text>
         ) : (
           <View style={styles.videoGrid}>
-            {videos.map((item) => (
+            {videos.map((item) => {
+              const published = formatPublishedAt(item.createdAt, locale);
+              return (
               <Pressable
                 key={item.postId}
                 style={styles.videoCell}
@@ -443,7 +446,7 @@ export default function ProfileScreen() {
                   })
                 }
                 accessibilityRole="button"
-                accessibilityLabel={`${t("profile.openVideo")}: ${item.title}`}
+                accessibilityLabel={`${t("profile.openVideo")}: ${item.title}${published ? ` · ${published}` : ""}`}
               >
                 {item.posterUrl ? (
                   <Image
@@ -461,8 +464,14 @@ export default function ProfileScreen() {
                 <Text style={styles.videoMeta} numberOfLines={1}>
                   {item.title}
                 </Text>
+                {published ? (
+                  <Text style={styles.videoPublished} numberOfLines={1}>
+                    {published}
+                  </Text>
+                ) : null}
               </Pressable>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -670,6 +679,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginTop: 6,
+  },
+  videoPublished: {
+    color: colors.textSubtle,
+    fontSize: 11,
+    marginTop: 2,
   },
   followBlock: {
     marginTop: 16,

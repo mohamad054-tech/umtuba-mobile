@@ -1,4 +1,5 @@
 import { useEventListener } from "expo";
+import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,9 +16,18 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
 import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
 import { useTranslation } from "@/src/lib/i18n";
+import { formatPublishedAt } from "@/src/lib/time/publishedAt";
+import {
+  resolveWatchTrimBounds,
+  shouldEndAtTrim,
+  shouldSeekToTrimStart,
+  watchEditAudioScale,
+  watchEditFromPipeline,
+} from "@/src/lib/video/watchEditPlayback";
 import {
   canSeekWithDuration,
   formatPlaybackClock,
@@ -636,8 +646,17 @@ function WatchVideoCardComponent({
   topInset = 0,
   bottomInset = 0,
 }: WatchVideoCardProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const router = useRouter();
+  const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const [userPaused, setUserPaused] = useState(false);
+  const trimEndedRef = useRef(false);
+  const edit = useMemo(
+    () => watchEditFromPipeline(video.mediaPipeline, video.durationMs ?? null),
+    [video.durationMs, video.mediaPipeline]
+  );
+  const publishedLabel = formatPublishedAt(video.publishedAt, locale);
+  const editAudioScale = watchEditAudioScale(edit);
   const [timeline, setTimeline] = useState<TimelineState>({
     currentTime: 0,
     duration: 0,
@@ -677,7 +696,11 @@ function WatchVideoCardComponent({
   });
 
   const loop = shouldLoopCurrentVideo({ autoNext, isLastItem });
-  const audio = resolveEffectiveAudio({ isActive, muted, volume });
+  const audio = resolveEffectiveAudio({
+    isActive,
+    muted: muted || editAudioScale <= 0.001,
+    volume: volume * editAudioScale,
+  });
 
   useEffect(() => {
     if (!isActive) {
@@ -685,8 +708,13 @@ function WatchVideoCardComponent({
       setFeedback(null);
       setTimeline({ currentTime: 0, duration: 0, ratio: 0 });
       setSeekRequest(null);
+      trimEndedRef.current = false;
     }
   }, [isActive]);
+
+  useEffect(() => {
+    trimEndedRef.current = false;
+  }, [video.id]);
 
   useEffect(() => {
     return () => {
@@ -752,6 +780,40 @@ function WatchVideoCardComponent({
   }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
 
   const onTimeline = useCallback((state: TimelineState) => {
+    const durationMs =
+      video.durationMs ??
+      (state.duration > 0 ? Math.round(state.duration * 1000) : null);
+    const bounds = resolveWatchTrimBounds(edit, durationMs);
+    if (bounds && shouldSeekToTrimStart(state.currentTime, bounds)) {
+      const duration = state.duration || bounds.endSec;
+      if (duration > 0) {
+        seekTokenRef.current += 1;
+        setSeekRequest({
+          token: seekTokenRef.current,
+          ratio: bounds.startSec / duration,
+        });
+      }
+    }
+    if (
+      bounds &&
+      shouldEndAtTrim(state.currentTime, bounds) &&
+      !trimEndedRef.current
+    ) {
+      trimEndedRef.current = true;
+      if (loop) {
+        const duration = state.duration || bounds.endSec;
+        if (duration > 0) {
+          seekTokenRef.current += 1;
+          setSeekRequest({
+            token: seekTokenRef.current,
+            ratio: bounds.startSec / duration,
+          });
+        }
+        trimEndedRef.current = false;
+      } else {
+        onEnded?.();
+      }
+    }
     const target = scrubTargetRatioRef.current;
     if (target != null) {
       if (Math.abs(state.ratio - target) > SCRUB_CATCHUP_EPSILON) {
@@ -769,7 +831,7 @@ function WatchVideoCardComponent({
       scrubTargetRatioRef.current = null;
     }
     setTimeline(state);
-  }, []);
+  }, [edit, loop, onEnded, video.durationMs]);
 
   const onSeekRatio = useCallback(
     (ratio: number) => {
@@ -817,6 +879,14 @@ function WatchVideoCardComponent({
       style={[styles.cell, style]}
       accessibilityLabel={a11ySummary}
       accessibilityRole="text"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setPaneSize((prev) =>
+          prev.width === width && prev.height === height
+            ? prev
+            : { width, height }
+        );
+      }}
     >
       {loadPlayer ? (
         <WatchPlayerPane
@@ -838,6 +908,14 @@ function WatchVideoCardComponent({
           <View />
         </View>
       )}
+
+      {edit.overlays.length > 0 ? (
+        <VideoOverlayLayer
+          elements={edit.overlays}
+          width={paneSize.width}
+          height={paneSize.height}
+        />
+      ) : null}
 
       <View
         style={styles.overlay}
@@ -926,6 +1004,34 @@ function WatchVideoCardComponent({
           <Text style={styles.caption} numberOfLines={3}>
             {video.caption || video.title}
           </Text>
+          {publishedLabel ? (
+            <Text
+              style={styles.publishedAt}
+              numberOfLines={1}
+              accessibilityRole="text"
+              accessibilityLabel={publishedLabel}
+            >
+              {publishedLabel}
+            </Text>
+          ) : null}
+          {edit.soundId ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/sound/[id]",
+                  params: { id: edit.soundId as string },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t("sound.original")}
+              hitSlop={8}
+              style={styles.soundChip}
+            >
+              <Text style={styles.soundChipText} numberOfLines={1}>
+                {t("sound.original")}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View
@@ -1244,6 +1350,23 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  publishedAt: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  soundChip: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    minHeight: 32,
+    justifyContent: "center",
+  },
+  soundChipText: {
+    color: colors.accentCyan,
+    fontSize: 13,
+    fontWeight: "700",
   },
   rail: {
     position: "absolute",

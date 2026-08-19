@@ -10,6 +10,7 @@ import {
 import { getErrorMessage } from "@/src/contracts/validation";
 import { createVideoSignedUrl } from "@/src/lib/feed/watchFeed";
 import { deleteOwnedVideoObject } from "@/src/lib/video/deleteOwnedVideo";
+import { clientWriteOmitsPublishClock } from "@/src/lib/time/publishedAt";
 
 export type PublishVideoMetadata = {
   durationMs?: number | null;
@@ -24,6 +25,14 @@ export type PublishVideoPostInput = {
   byteSize: number;
   metadata?: PublishVideoMetadata | null;
   uploadStartedAt?: string | null;
+  soundId?: string | null;
+  soundMix?: {
+    originalAudioEnabled: boolean;
+    originalAudioVolume: number;
+    addedSoundVolume: number;
+    soundStartOffsetMs: number;
+  } | null;
+  mediaPipeline?: Record<string, unknown> | null;
 };
 
 export type PublishVideoPostResult =
@@ -180,9 +189,7 @@ async function insertVideoPostForUser(
       : `t-${Date.now()}`;
   const thumbnailPath = buildMockThumbnailPath(userId, thumbAssetId);
 
-  const { data: queued, error: insertError } = await supabase
-    .from("posts")
-    .insert({
+  const queuedInsert = {
       user_id: userId,
       content: caption,
       post_type: "video",
@@ -217,13 +224,28 @@ async function insertVideoPostForUser(
         ai_enhancement: null,
         ai_translation: null,
         ai_dubbing: null,
+        ...(input.mediaPipeline ?? {}),
+        sound_id: input.soundId ?? null,
+        sound_mix: input.soundMix ?? {
+          originalAudioEnabled: true,
+          originalAudioVolume: 1,
+          addedSoundVolume: 1,
+          soundStartOffsetMs: 0,
+        },
       },
       likes: 0,
       comments: 0,
       shares: 0,
       saves: 0,
       views: 0,
-    })
+  };
+  if (!clientWriteOmitsPublishClock(queuedInsert)) {
+    await failAndCleanup("Publication time is assigned by the server.");
+  }
+
+  const { data: queued, error: insertError } = await supabase
+    .from("posts")
+    .insert(queuedInsert)
     .select(READY_COLUMNS)
     .single();
 
@@ -286,7 +308,24 @@ async function insertVideoPostForUser(
     );
   }
 
-  return { id: (ready as { id: number }).id };
+  const readyId = (ready as { id: number }).id;
+  if (input.soundId) {
+    await supabase
+      .from("posts")
+      .update({
+        sound_id: input.soundId,
+        sound_mix: input.soundMix ?? {
+          originalAudioEnabled: true,
+          originalAudioVolume: 1,
+          addedSoundVolume: 1,
+          soundStartOffsetMs: 0,
+        },
+      })
+      .eq("id", readyId)
+      .eq("user_id", userId);
+  }
+
+  return { id: readyId };
 }
 
 async function insertVideoPostLegacy(

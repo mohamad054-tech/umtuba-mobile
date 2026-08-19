@@ -16,7 +16,7 @@ Use the EAS preview or production binary. Do not screenshot Expo Go.
 
 ## iPad
 
-`supportsTablet` is **true** in `app.config.ts`. If that stays true, ASC will require **13" iPad** screenshots (2064 × 2752 or 2048 × 2732 portrait). Owner may set `supportsTablet: false` in a later change to drop iPad if they do not want tablet listing.
+`supportsTablet` is **false** in `app.config.ts` (iPhone-only from Build 17). Do not capture or upload iPad screenshots.
 
 ## Scenes to capture (same set on each required size)
 

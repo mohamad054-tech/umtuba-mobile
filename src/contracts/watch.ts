@@ -32,6 +32,10 @@ export type WatchVideo = {
   likedByMe: boolean;
   savedByMe: boolean;
   source: WatchVideoSource;
+  /** Server created_at (authoritative publish time). Never device clock. */
+  publishedAt?: string | null;
+  durationMs?: number | null;
+  mediaPipeline?: unknown;
 };
 
 export type WatchFeedCursor = {
