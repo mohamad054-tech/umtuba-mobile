@@ -315,6 +315,8 @@ export type MobileMessages = {
   "create.editVideo": string;
   "create.editorTitle": string;
   "create.editorDone": string;
+  "create.editorContinue": string;
+  "create.editorContinueHint": string;
   "create.editorDiscardTitle": string;
   "create.editorDiscardBody": string;
   "create.editorKeep": string;

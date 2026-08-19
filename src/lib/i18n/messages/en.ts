@@ -333,6 +333,8 @@ export const enMessages: MobileMessages = {
   "create.editVideo": "Edit video",
   "create.editorTitle": "Edit video",
   "create.editorDone": "Done",
+  "create.editorContinue": "Continue",
+  "create.editorContinueHint": "Save edits and continue to publish",
   "create.editorDiscardTitle": "Leave editor?",
   "create.editorDiscardBody": "Your current edits stay on this draft until you publish or clear the video.",
   "create.editorKeep": "Keep editing",

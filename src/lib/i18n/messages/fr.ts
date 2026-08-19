@@ -342,6 +342,8 @@ export const frMessages: MobileMessages = {
   "create.editVideo": "Modifier la vidéo",
   "create.editorTitle": "Modifier la vidéo",
   "create.editorDone": "Terminé",
+  "create.editorContinue": "Continuer",
+  "create.editorContinueHint": "Enregistrer les modifications et continuer vers la publication",
   "create.editorDiscardTitle": "Quitter l’éditeur ?",
   "create.editorDiscardBody": "Vos modifications restent sur ce brouillon jusqu’à la publication ou la suppression de la vidéo.",
   "create.editorKeep": "Continuer",

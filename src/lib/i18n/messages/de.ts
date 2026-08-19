@@ -348,6 +348,8 @@ export const deMessages: MobileMessages = {
   "create.editVideo": "Video bearbeiten",
   "create.editorTitle": "Video bearbeiten",
   "create.editorDone": "Fertig",
+  "create.editorContinue": "Weiter",
+  "create.editorContinueHint": "Bearbeitungen speichern und zum Veröffentlichen weitergehen",
   "create.editorDiscardTitle": "Editor verlassen?",
   "create.editorDiscardBody": "Ihre Bearbeitungen bleiben in diesem Entwurf, bis Sie veröffentlichen oder das Video entfernen.",
   "create.editorKeep": "Weiter bearbeiten",

@@ -345,6 +345,8 @@ export const ptMessages: MobileMessages = {
   "create.editVideo": "Editar vídeo",
   "create.editorTitle": "Editar vídeo",
   "create.editorDone": "Concluído",
+  "create.editorContinue": "Continuar",
+  "create.editorContinueHint": "Salvar as edições e continuar para publicar",
   "create.editorDiscardTitle": "Sair do editor?",
   "create.editorDiscardBody": "Suas edições ficam neste rascunho até você publicar ou limpar o vídeo.",
   "create.editorKeep": "Continuar editando",

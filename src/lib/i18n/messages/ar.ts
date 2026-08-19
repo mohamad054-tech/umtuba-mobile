@@ -319,6 +319,8 @@ export const arMessages: MobileMessages = {
   "create.editVideo": "تحرير الفيديو",
   "create.editorTitle": "تحرير الفيديو",
   "create.editorDone": "تم",
+  "create.editorContinue": "متابعة",
+  "create.editorContinueHint": "احفظ التعديلات وتابع إلى النشر",
   "create.editorDiscardTitle": "مغادرة المحرر؟",
   "create.editorDiscardBody": "تبقى تعديلاتك على هذه المسودة حتى تنشر أو تمسح الفيديو.",
   "create.editorKeep": "متابعة التحرير",

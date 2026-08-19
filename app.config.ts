@@ -14,7 +14,7 @@ const config: ExpoConfig = {
     // supportsTablet: false → Expo emits UIDeviceFamily = [1].
     supportsTablet: false,
     bundleIdentifier: "com.umtuba.app",
-    buildNumber: "17",
+    buildNumber: "18",
     // Same Team ID already published in live AASA (M6HDH86Z55.com.umtuba.app).
     appleTeamId: "M6HDH86Z55",
     associatedDomains: [
