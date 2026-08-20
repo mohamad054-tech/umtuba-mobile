@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,9 +19,18 @@ import { getProfileById, getProfileByUsername } from "@/src/lib/auth/profile";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
 import {
+  buildProfileTimeline,
+  type ProfileTimelineItem,
+} from "@/src/lib/profile/buildProfileTimeline";
+import {
+  listProfilePosts,
+  type ProfilePostItem,
+} from "@/src/lib/profile/listProfilePosts";
+import {
   listProfileVideos,
   type ProfileVideoItem,
 } from "@/src/lib/profile/listProfileVideos";
+import { resolveProfileContentWidth } from "@/src/lib/profile/profileLayout";
 import {
   planOtherProfileLookup,
   resolveProfileTarget,
@@ -36,6 +46,8 @@ import { colors } from "@/src/theme/colors";
 export default function ProfileScreen() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const { t, locale } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const columnWidth = resolveProfileContentWidth(windowWidth);
   const router = useRouter();
   const params = useLocalSearchParams<{ u?: string; id?: string }>();
   const [refreshing, setRefreshing] = useState(false);
@@ -50,7 +62,9 @@ export default function ProfileScreen() {
   const [followError, setFollowError] = useState<string | null>(null);
   const [videos, setVideos] = useState<ProfileVideoItem[]>([]);
   const [videosFailed, setVideosFailed] = useState(false);
-  const [videosLoading, setVideosLoading] = useState(false);
+  const [posts, setPosts] = useState<ProfilePostItem[]>([]);
+  const [postsFailed, setPostsFailed] = useState(false);
+  const [contentLoading, setContentLoading] = useState(false);
 
   const target = useMemo(
     () =>
@@ -124,8 +138,10 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!contentUserId) {
       setVideos([]);
+      setPosts([]);
       setVideosFailed(false);
-      setVideosLoading(false);
+      setPostsFailed(false);
+      setContentLoading(false);
       if (isOwn) {
         setFollowersCount(null);
         setFollowingCount(null);
@@ -134,19 +150,23 @@ export default function ProfileScreen() {
     }
 
     let cancelled = false;
-    setVideosLoading(true);
+    setContentLoading(true);
     setVideosFailed(false);
+    setPostsFailed(false);
 
     void (async () => {
       const supabase = getSupabase();
-      const [page, snap] = await Promise.all([
+      const [videoPage, postPage, snap] = await Promise.all([
         listProfileVideos(supabase, contentUserId),
+        listProfilePosts(supabase, contentUserId),
         getProfileFollowSnapshot(supabase, contentUserId),
       ]);
       if (cancelled) return;
-      setVideos(page.videos);
-      setVideosFailed(Boolean(page.failed));
-      setVideosLoading(false);
+      setVideos(videoPage.videos);
+      setVideosFailed(Boolean(videoPage.failed));
+      setPosts(postPage.posts);
+      setPostsFailed(Boolean(postPage.failed));
+      setContentLoading(false);
       if (snap.ok) {
         if (isOwn) setFollowing(false);
         setFollowersCount(snap.followersCount);
@@ -162,6 +182,10 @@ export default function ProfileScreen() {
   const view = buildProfilePresentation(
     isOwn ? profile : otherProfile,
     isOwn ? user : null
+  );
+  const timeline = useMemo(
+    () => buildProfileTimeline(posts, videos),
+    [posts, videos]
   );
 
   const onRetry = useCallback(async () => {
@@ -201,6 +225,15 @@ export default function ProfileScreen() {
       setFollowBusy(false);
     }
   }, [following, otherProfile?.id, router, user]);
+
+  function openTimelineItem(item: ProfileTimelineItem) {
+    if (item.kind === "video") {
+      router.push({
+        pathname: "/(tabs)/watch",
+        params: { post: String(item.postId) },
+      });
+    }
+  }
 
   if (loading && !user && isOwn) {
     return (
@@ -279,6 +312,14 @@ export default function ProfileScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View
+          style={[styles.cover, { width: windowWidth }]}
+          accessibilityLabel={t("profile.cover")}
+          accessible
+        />
+
+        <View style={[styles.columnHost, { width: windowWidth }]}>
+        <View style={[styles.column, { width: columnWidth }]}>
+        <View
           style={styles.avatar}
           accessibilityLabel={
             view.hasReliableIdentity
@@ -303,52 +344,54 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {view.hasReliableIdentity ? (
-          <>
-            <Text style={styles.name} accessibilityRole="header">
-              {view.displayName || view.username || t("profile.account")}
-            </Text>
-            {view.username ? (
-              <Text style={styles.username}>@{view.username}</Text>
-            ) : null}
-            {view.bio ? <Text style={styles.bio}>{view.bio}</Text> : null}
-            {view.locationLine ? (
-              <Text style={styles.meta}>{view.locationLine}</Text>
-            ) : null}
-            {isOwn && view.email ? (
-              <Text
-                style={styles.meta}
-                accessibilityLabel={t("profile.emailA11y", {
-                  values: { email: view.email },
-                })}
-              >
-                {view.email}
+        <View style={styles.identity}>
+          {view.hasReliableIdentity ? (
+            <>
+              <Text style={styles.name} accessibilityRole="header">
+                {view.displayName || view.username || t("profile.account")}
               </Text>
-            ) : null}
-          </>
-        ) : (
-          <View style={styles.banner} accessibilityRole="alert">
-            <Text style={styles.emptyTitle}>{t("profile.detailsUnavailable")}</Text>
-            <Text style={styles.muted}>
-              {t("profile.detailsUnavailableBody")}
-            </Text>
-            {isOwn ? (
-              <Pressable
-                style={styles.secondaryBtn}
-                onPress={() => void onRetry()}
-                disabled={refreshing}
-                accessibilityRole="button"
-                accessibilityLabel={t("actions.retry")}
-              >
-                {refreshing ? (
-                  <ActivityIndicator color={colors.accentCyan} />
-                ) : (
-                  <Text style={styles.secondaryBtnText}>{t("actions.retry")}</Text>
-                )}
-              </Pressable>
-            ) : null}
-          </View>
-        )}
+              {view.username ? (
+                <Text style={styles.username}>@{view.username}</Text>
+              ) : null}
+              {view.bio ? <Text style={styles.bio}>{view.bio}</Text> : null}
+              {view.locationLine ? (
+                <Text style={styles.meta}>{view.locationLine}</Text>
+              ) : null}
+              {isOwn && view.email ? (
+                <Text
+                  style={styles.meta}
+                  accessibilityLabel={t("profile.emailA11y", {
+                    values: { email: view.email },
+                  })}
+                >
+                  {view.email}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <View style={styles.banner} accessibilityRole="alert">
+              <Text style={styles.emptyTitle}>{t("profile.detailsUnavailable")}</Text>
+              <Text style={styles.muted}>
+                {t("profile.detailsUnavailableBody")}
+              </Text>
+              {isOwn ? (
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => void onRetry()}
+                  disabled={refreshing}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("actions.retry")}
+                >
+                  {refreshing ? (
+                    <ActivityIndicator color={colors.accentCyan} />
+                  ) : (
+                    <Text style={styles.secondaryBtnText}>{t("actions.retry")}</Text>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+        </View>
 
         {isOwn && error ? (
           <View style={styles.errorBox} accessibilityRole="alert">
@@ -361,6 +404,17 @@ export default function ProfileScreen() {
               <Text style={styles.retryLink}>{t("actions.retry")}</Text>
             </Pressable>
           </View>
+        ) : null}
+
+        {isOwn ? (
+          <Pressable
+            style={styles.editBtn}
+            onPress={() => router.push("/settings")}
+            accessibilityRole="button"
+            accessibilityLabel={t("profile.editProfile")}
+          >
+            <Text style={styles.editBtnText}>{t("profile.editProfile")}</Text>
+          </Pressable>
         ) : null}
 
         {!isOwn && otherProfile ? (
@@ -402,7 +456,7 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        {followersCount != null || followingCount != null ? (
+        {followersCount != null || followingCount != null || timeline.length > 0 ? (
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>{followersCount ?? 0}</Text>
@@ -413,63 +467,95 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>{t("profile.following")}</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statValue}>{videos.length}</Text>
-              <Text style={styles.statLabel}>{t("profile.videos")}</Text>
+              <Text style={styles.statValue}>{timeline.length}</Text>
+              <Text style={styles.statLabel}>{t("profile.posts")}</Text>
             </View>
           </View>
         ) : null}
 
-        <Text style={styles.sectionLabel}>{t("profile.videos")}</Text>
-        {videosLoading ? (
+        <Text style={styles.sectionLabel}>{t("profile.posts")}</Text>
+        {contentLoading ? (
           <ActivityIndicator
             color={colors.accentCyan}
             accessibilityLabel={t("profile.loading")}
           />
-        ) : videosFailed ? (
+        ) : postsFailed && videosFailed ? (
           <Text style={styles.errorText} accessibilityRole="alert">
-            {t("profile.videosFailed")}
+            {t("profile.postsFailed")}
           </Text>
-        ) : videos.length === 0 ? (
-          <Text style={styles.muted}>{t("profile.videosEmpty")}</Text>
+        ) : timeline.length === 0 ? (
+          <Text style={styles.muted}>{t("profile.postsEmpty")}</Text>
         ) : (
-          <View style={styles.videoGrid}>
-            {videos.map((item) => {
+          <View style={styles.timeline}>
+            {postsFailed ? (
+              <Text style={styles.errorText} accessibilityRole="alert">
+                {t("profile.postsFailed")}
+              </Text>
+            ) : null}
+            {videosFailed ? (
+              <Text style={styles.errorText} accessibilityRole="alert">
+                {t("profile.videosFailed")}
+              </Text>
+            ) : null}
+            {timeline.map((item) => {
               const published = formatPublishedAt(item.createdAt, locale);
+              const kindLabel =
+                item.kind === "video"
+                  ? t("profile.videoPost")
+                  : item.kind === "image"
+                    ? t("profile.imagePost")
+                    : t("profile.textPost");
+              const title =
+                item.kind === "video"
+                  ? item.title
+                  : item.content || kindLabel;
+              const canOpen = item.kind === "video";
               return (
-              <Pressable
-                key={item.postId}
-                style={styles.videoCell}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(tabs)/watch",
-                    params: { post: String(item.postId) },
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`${t("profile.openVideo")}: ${item.title}${published ? ` · ${published}` : ""}`}
-              >
-                {item.posterUrl ? (
-                  <Image
-                    source={{ uri: item.posterUrl }}
-                    style={styles.videoPoster}
-                    accessibilityIgnoresInvertColors
-                  />
-                ) : (
-                  <View style={styles.videoPosterFallback}>
-                    <Text style={styles.videoPosterText} numberOfLines={2}>
+                <Pressable
+                  key={`${item.kind}-${item.postId}`}
+                  style={styles.postCard}
+                  onPress={canOpen ? () => openTimelineItem(item) : undefined}
+                  disabled={!canOpen}
+                  accessibilityRole={canOpen ? "button" : "text"}
+                  accessibilityLabel={
+                    canOpen
+                      ? `${t("profile.openVideo")}: ${title}${published ? ` · ${published}` : ""}`
+                      : `${kindLabel}: ${title}${published ? ` · ${published}` : ""}`
+                  }
+                >
+                  <Text style={styles.postKind}>{kindLabel}</Text>
+                  {item.kind === "video" ? (
+                    item.posterUrl ? (
+                      <Image
+                        source={{ uri: item.posterUrl }}
+                        style={styles.postMedia}
+                        accessibilityIgnoresInvertColors
+                      />
+                    ) : (
+                      <View style={styles.postMediaFallback}>
+                        <Text style={styles.postMediaText} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                      </View>
+                    )
+                  ) : item.kind === "image" && item.imageUrl ? (
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.postMedia}
+                      accessibilityIgnoresInvertColors
+                    />
+                  ) : null}
+                  {item.kind !== "video" && item.content ? (
+                    <Text style={styles.postBody}>{item.content}</Text>
+                  ) : item.kind === "video" ? (
+                    <Text style={styles.postBody} numberOfLines={2}>
                       {item.title}
                     </Text>
-                  </View>
-                )}
-                <Text style={styles.videoMeta} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                {published ? (
-                  <Text style={styles.videoPublished} numberOfLines={1}>
-                    {published}
-                  </Text>
-                ) : null}
-              </Pressable>
+                  ) : null}
+                  {published ? (
+                    <Text style={styles.postPublished}>{published}</Text>
+                  ) : null}
+                </Pressable>
               );
             })}
           </View>
@@ -518,6 +604,8 @@ export default function ProfileScreen() {
             </View>
           </>
         ) : null}
+        </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -529,9 +617,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   scroll: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
     paddingBottom: 32,
+  },
+  columnHost: {
+    alignItems: "center",
+  },
+  column: {
+    maxWidth: "100%",
   },
   center: {
     flex: 1,
@@ -540,16 +632,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
   },
+  cover: {
+    height: 148,
+    backgroundColor: colors.accentViolet,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 4,
+    borderColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginTop: -46,
+    marginHorizontal: 20,
     overflow: "hidden",
   },
   avatarImage: {
@@ -558,12 +657,16 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: colors.text,
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: "700",
+  },
+  identity: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   name: {
     color: colors.text,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "700",
   },
   username: {
@@ -585,6 +688,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
     lineHeight: 20,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
     color: colors.text,
@@ -603,6 +707,7 @@ const styles = StyleSheet.create({
   },
   errorBox: {
     marginTop: 12,
+    marginHorizontal: 20,
     marginBottom: 8,
     padding: 12,
     borderRadius: 10,
@@ -613,6 +718,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     marginBottom: 8,
+    paddingHorizontal: 20,
   },
   retryLink: {
     color: colors.accentCyan,
@@ -620,6 +726,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     marginTop: 18,
+    marginHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
@@ -643,50 +750,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  videoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+  timeline: {
+    paddingHorizontal: 20,
+    gap: 12,
   },
-  videoCell: {
-    width: "31%",
-    flexGrow: 1,
-    maxWidth: "32%",
+  postCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
   },
-  videoPoster: {
+  postKind: {
+    color: colors.textSubtle,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  postBody: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  postPublished: {
+    color: colors.textSubtle,
+    fontSize: 12,
+  },
+  postMedia: {
     width: "100%",
-    aspectRatio: 9 / 16,
-    borderRadius: 10,
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
     backgroundColor: colors.surfaceElevated,
   },
-  videoPosterFallback: {
+  postMediaFallback: {
     width: "100%",
-    aspectRatio: 9 / 16,
-    borderRadius: 10,
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    padding: 8,
+    padding: 12,
   },
-  videoPosterText: {
+  postMediaText: {
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
     textAlign: "center",
-  },
-  videoMeta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: 6,
-  },
-  videoPublished: {
-    color: colors.textSubtle,
-    fontSize: 11,
-    marginTop: 2,
   },
   followBlock: {
     marginTop: 16,
+    marginHorizontal: 20,
     gap: 8,
   },
   followBtn: {
@@ -711,9 +827,25 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   buttonDisabled: { opacity: 0.7 },
+  editBtn: {
+    marginTop: 16,
+    marginHorizontal: 20,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: colors.text,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  editBtnText: {
+    color: colors.bg,
+    fontWeight: "700",
+    fontSize: 16,
+  },
   sectionLabel: {
     marginTop: 24,
     marginBottom: 10,
+    marginHorizontal: 20,
     color: colors.textSubtle,
     fontSize: 12,
     fontWeight: "700",
@@ -722,6 +854,7 @@ const styles = StyleSheet.create({
   },
   links: {
     gap: 10,
+    paddingHorizontal: 20,
   },
   linkRow: {
     minHeight: 48,

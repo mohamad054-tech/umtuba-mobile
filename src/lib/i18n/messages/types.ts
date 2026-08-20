@@ -411,6 +411,15 @@ export type MobileMessages = {
   "profile.followers": string;
   "profile.following": string;
   "profile.openVideo": string;
+  "profile.editProfile": string;
+  "profile.posts": string;
+  "profile.postsEmpty": string;
+  "profile.postsFailed": string;
+  "profile.openPost": string;
+  "profile.textPost": string;
+  "profile.imagePost": string;
+  "profile.videoPost": string;
+  "profile.cover": string;
 
   "follow.follow": string;
   "follow.following": string;

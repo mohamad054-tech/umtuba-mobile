@@ -72,6 +72,6 @@ describe("iOS App Store build config", () => {
       ])
     );
     expect(config.android?.package).toBe("com.umtuba.app");
-    expect(config.android?.versionCode).toBe(18);
+    expect(config.android?.versionCode).toBe(19);
   });
 });
