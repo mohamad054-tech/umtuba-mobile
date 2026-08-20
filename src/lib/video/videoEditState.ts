@@ -96,14 +96,20 @@ export function sanitizeVideoEditState(
     Number(raw.trimEndMs) || fallback.trimEndMs,
     durationMs
   );
-  const mix = sanitizeVideoSoundMix(raw.mix ?? raw);
+  const mix = sanitizeVideoSoundMix(raw.mix ?? raw.sound_mix ?? raw);
+  const soundId =
+    typeof raw.soundId === "string" && raw.soundId
+      ? raw.soundId
+      : typeof raw.sound_id === "string" && raw.sound_id
+        ? raw.sound_id
+        : null;
   return {
     version: VIDEO_EDIT_STATE_VERSION,
     trimStartMs: trim.trimStartMs,
     trimEndMs: trim.trimEndMs,
     overlays: sanitizeOverlayElements(raw.overlays),
     originalAudioVolume: mix.originalAudioVolume,
-    soundId: typeof raw.soundId === "string" && raw.soundId ? raw.soundId : null,
+    soundId,
     soundTrack: null,
     soundStartMs: mix.soundStartOffsetMs,
     soundVolume: mix.addedSoundVolume,
@@ -145,5 +151,13 @@ export function parseEditFromMediaPipeline(
   const raw = mediaPipeline as Record<string, unknown>;
   const overlays = parseOverlays(raw.overlays);
   const edit = raw.edit && typeof raw.edit === "object" ? raw.edit : raw;
-  return sanitizeVideoEditState({ ...(edit as object), overlays }, durationMs);
+  return sanitizeVideoEditState(
+    {
+      sound_id: raw.sound_id,
+      sound_mix: raw.sound_mix,
+      ...(edit as object),
+      overlays,
+    },
+    durationMs
+  );
 }

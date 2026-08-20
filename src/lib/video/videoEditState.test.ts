@@ -50,4 +50,22 @@ describe("VIDEO_EDIT_STATE", () => {
       "11111111-1111-4111-8111-111111111111"
     );
   });
+
+  it("reads snake_case sound_id from media_pipeline for Watch", () => {
+    const state = sanitizeVideoEditState(
+      {
+        sound_id: "11111111-1111-4111-8111-111111111111",
+        sound_mix: {
+          originalAudioEnabled: true,
+          originalAudioVolume: 0.25,
+          addedSoundVolume: 1,
+          soundStartOffsetMs: 0,
+        },
+      },
+      5_000
+    );
+    expect(state.soundId).toBe("11111111-1111-4111-8111-111111111111");
+    expect(state.mix.originalAudioVolume).toBe(0.25);
+    expect(state.mix.addedSoundVolume).toBe(1);
+  });
 });

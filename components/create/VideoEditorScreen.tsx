@@ -18,13 +18,24 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { SoundLibrarySheet } from "@/components/create/SoundLibrarySheet";
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
+import { SelectedSoundPlayer } from "@/components/sounds/SelectedSoundPlayer";
 import {
   localeTextAlign,
   localeWritingDirection,
   useTranslation,
 } from "@/src/lib/i18n";
+import {
+  resolveEditorAddedSoundAudio,
+  resolveEditorOriginalAudio,
+  resolveSocialSoundPlaybackUri,
+} from "@/src/lib/sounds/socialSoundPlayback";
 import { shouldInterceptEditorBackForSoundLibrary } from "@/src/lib/sounds/soundLibraryEscape";
 import type { SocialSound } from "@/src/lib/sounds/socialSounds";
+import { getSupabase } from "@/src/lib/supabase/client";
+import {
+  applyPlaybackIntent,
+  isPlayerAlive,
+} from "@/src/lib/watch/playerSession";
 import {
   createEditorExitGuard,
   EDITOR_FOOTER_CTA_MIN_HEIGHT,
@@ -90,11 +101,15 @@ export function VideoEditorScreen({
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const textInputRef = useRef<TextInput>(null);
+  const [selectedSoundUri, setSelectedSoundUri] = useState<string | null>(null);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
     p.muted = draft.mix.originalAudioEnabled === false;
     p.volume = draft.originalAudioVolume;
+    p.audioMixingMode = "mixWithOthers";
   });
+  const originalAudio = resolveEditorOriginalAudio(draft.mix);
+  const addedSoundAudio = resolveEditorAddedSoundAudio(draft.mix);
 
   const selected = draft.overlays.find((el) => el.id === selectedId) ?? null;
   const durationLabel = useMemo(() => {
@@ -116,6 +131,49 @@ export function VideoEditorScreen({
       setTextDraft(current.text ?? "");
     }
   }, [selectedId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const storagePath = selectedSound?.storagePath ?? null;
+    if (!storagePath) {
+      setSelectedSoundUri(null);
+      return;
+    }
+    void resolveSocialSoundPlaybackUri(getSupabase(), selectedSound).then(
+      (nextUri) => {
+        if (!cancelled) setSelectedSoundUri(nextUri);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSound]);
+
+  useEffect(() => {
+    if (!isPlayerAlive(player)) return;
+    try {
+      player.audioMixingMode = "mixWithOthers";
+    } catch {
+      return;
+    }
+    if (!visible) {
+      applyPlaybackIntent(player, {
+        shouldPlay: false,
+        muted: true,
+        volume: 0,
+        loop: false,
+        resetPosition: false,
+      });
+      return;
+    }
+    applyPlaybackIntent(player, {
+      shouldPlay: true,
+      muted: originalAudio.muted,
+      volume: originalAudio.volume,
+      loop: true,
+      resetPosition: false,
+    });
+  }, [originalAudio.muted, originalAudio.volume, player, visible]);
 
   function commit(next: VideoEditState) {
     onChange(next);
@@ -208,6 +266,16 @@ export function VideoEditorScreen({
               contentFit="contain"
               pointerEvents="none"
             />
+            {selectedSoundUri ? (
+              <SelectedSoundPlayer
+                uri={selectedSoundUri}
+                shouldPlay={visible}
+                muted={addedSoundAudio.muted}
+                volume={addedSoundAudio.volume}
+                loop
+                startOffsetMs={draft.mix.soundStartOffsetMs}
+              />
+            ) : null}
             <VideoOverlayLayer
               elements={draft.overlays}
               width={stage.width}

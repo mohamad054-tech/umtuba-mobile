@@ -37,6 +37,11 @@ export function watchEditAudioScale(edit: VideoEditState | null | undefined): nu
   return edit.originalAudioVolume;
 }
 
+export function watchAddedSoundScale(edit: VideoEditState | null | undefined): number {
+  if (!edit || !edit.soundId) return 0;
+  return edit.mix.addedSoundVolume;
+}
+
 export function shouldSeekToTrimStart(
   currentTime: number,
   bounds: WatchTrimBounds

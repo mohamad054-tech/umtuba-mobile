@@ -9,7 +9,7 @@ describe("iOS App Store build config", () => {
     expect(config.ios?.appleTeamId).toBe("M6HDH86Z55");
     expect(config.version).toBe("1.0.0");
     expect(config.ios?.supportsTablet).toBe(false);
-    expect(config.ios?.buildNumber).toBe("19");
+    expect(config.ios?.buildNumber).toBe("20");
     expect(config.name).toBe("UMTUBA");
     expect(config.scheme).toBe("umtuba");
     expect(eas.submit.production.ios.appleTeamId).toBe("M6HDH86Z55");

@@ -69,6 +69,7 @@ import {
 } from "@/src/lib/video/pickVideo";
 import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
 import { uploadPostVideo } from "@/src/lib/video/uploadPostVideo";
+import { applySelectedSoundToEditState } from "@/src/lib/sounds/socialSoundPlayback";
 import {
   fetchSocialSoundById,
   type SocialSound,
@@ -140,7 +141,7 @@ export default function CreateScreen() {
     ).then((sound) => {
       if (cancelled || !sound) return;
       setSelectedSound(sound);
-      setEditState((prev) => ({ ...prev, soundId: sound.id }));
+      setEditState((prev) => applySelectedSoundToEditState(prev, sound));
     });
     return () => {
       cancelled = true;
@@ -933,14 +934,9 @@ export default function CreateScreen() {
           onCloseSounds={() => setSoundLibraryOpen(false)}
           onSelectSound={(sound) => {
             setSelectedSound(sound);
-            setEditState((current) => ({
-              ...current,
-              soundId: sound.id,
-              mix: {
-                ...current.mix,
-                addedSoundVolume: current.mix.addedSoundVolume || 1,
-              },
-            }));
+            setEditState((current) =>
+              applySelectedSoundToEditState(current, sound)
+            );
           }}
         />
       ) : null}

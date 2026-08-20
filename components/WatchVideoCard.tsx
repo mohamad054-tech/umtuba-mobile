@@ -17,14 +17,22 @@ import {
 } from "react-native";
 
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
+import { SelectedSoundPlayer } from "@/components/sounds/SelectedSoundPlayer";
 import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
+import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
+import {
+  resolveSelectedSoundWatchAudio,
+  resolveSocialSoundPlaybackUriById,
+} from "@/src/lib/sounds/socialSoundPlayback";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import {
   resolveWatchTrimBounds,
   shouldEndAtTrim,
   shouldSeekToTrimStart,
+  watchAddedSoundScale,
   watchEditAudioScale,
   watchEditFromPipeline,
 } from "@/src/lib/video/watchEditPlayback";
@@ -335,7 +343,7 @@ function WatchPlayerPane({
     p.loop = false;
     p.muted = true;
     p.volume = 0;
-    p.audioMixingMode = "auto";
+    p.audioMixingMode = "mixWithOthers";
     p.staysActiveInBackground = false;
     p.showNowPlayingNotification = false;
     p.keepScreenOnWhilePlaying = true;
@@ -648,7 +656,9 @@ function WatchVideoCardComponent({
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
   const router = useRouter();
+  const { user } = useAuth();
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
+  const [selectedSoundUri, setSelectedSoundUri] = useState<string | null>(null);
   const [userPaused, setUserPaused] = useState(false);
   const trimEndedRef = useRef(false);
   const edit = useMemo(
@@ -701,6 +711,33 @@ function WatchVideoCardComponent({
     muted: muted || editAudioScale <= 0.001,
     volume: volume * editAudioScale,
   });
+  const addedSoundScale = watchAddedSoundScale(edit);
+  const selectedSoundAudio = resolveSelectedSoundWatchAudio({
+    isActive,
+    shouldPlay,
+    watchMuted: muted,
+    watchVolume: volume,
+    addedSoundVolume: addedSoundScale,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const soundId = edit.soundId;
+    if (!soundId || !loadPlayer) {
+      setSelectedSoundUri(null);
+      return;
+    }
+    void resolveSocialSoundPlaybackUriById(
+      getSupabase(),
+      soundId,
+      user?.id ?? null
+    ).then((uri) => {
+      if (!cancelled) setSelectedSoundUri(uri);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [edit.soundId, loadPlayer, user?.id]);
 
   useEffect(() => {
     if (!isActive) {
@@ -908,6 +945,17 @@ function WatchVideoCardComponent({
           <View />
         </View>
       )}
+
+      {loadPlayer && selectedSoundUri ? (
+        <SelectedSoundPlayer
+          uri={selectedSoundUri}
+          shouldPlay={selectedSoundAudio.shouldPlay}
+          muted={selectedSoundAudio.muted}
+          volume={selectedSoundAudio.volume}
+          loop={loop}
+          startOffsetMs={edit.mix.soundStartOffsetMs}
+        />
+      ) : null}
 
       {edit.overlays.length > 0 ? (
         <VideoOverlayLayer
