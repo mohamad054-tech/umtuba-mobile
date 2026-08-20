@@ -16,7 +16,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { SoundLibrarySheet } from "@/components/create/SoundLibrarySheet";
 import { VideoEditorScreen } from "@/components/create/VideoEditorScreen";
 
 import {
@@ -927,23 +926,24 @@ export default function CreateScreen() {
           durationMs={asset.durationMs}
           draft={editState}
           selectedSound={selectedSound}
+          soundLibraryOpen={soundLibraryOpen}
           onChange={setEditState}
           onClose={() => setEditorOpen(false)}
           onOpenSounds={() => setSoundLibraryOpen(true)}
+          onCloseSounds={() => setSoundLibraryOpen(false)}
+          onSelectSound={(sound) => {
+            setSelectedSound(sound);
+            setEditState((current) => ({
+              ...current,
+              soundId: sound.id,
+              mix: {
+                ...current.mix,
+                addedSoundVolume: current.mix.addedSoundVolume || 1,
+              },
+            }));
+          }}
         />
       ) : null}
-      <SoundLibrarySheet
-        visible={soundLibraryOpen}
-        onClose={() => setSoundLibraryOpen(false)}
-        onSelect={(sound) => {
-          setSelectedSound(sound);
-          setEditState((current) => ({
-            ...current,
-            soundId: sound.id,
-            mix: { ...current.mix, addedSoundVolume: current.mix.addedSoundVolume || 1 },
-          }));
-        }}
-      />
     </SafeAreaView>
   );
 }

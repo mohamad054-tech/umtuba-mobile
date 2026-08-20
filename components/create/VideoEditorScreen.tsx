@@ -16,12 +16,14 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SoundLibrarySheet } from "@/components/create/SoundLibrarySheet";
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
 import {
   localeTextAlign,
   localeWritingDirection,
   useTranslation,
 } from "@/src/lib/i18n";
+import { shouldInterceptEditorBackForSoundLibrary } from "@/src/lib/sounds/soundLibraryEscape";
 import type { SocialSound } from "@/src/lib/sounds/socialSounds";
 import {
   createEditorExitGuard,
@@ -56,9 +58,12 @@ type VideoEditorScreenProps = {
   durationMs: number | null;
   draft: VideoEditState;
   selectedSound: SocialSound | null;
+  soundLibraryOpen: boolean;
   onChange: (next: VideoEditState) => void;
   onClose: () => void;
   onOpenSounds: () => void;
+  onCloseSounds: () => void;
+  onSelectSound: (sound: SocialSound) => void;
 };
 
 export function VideoEditorScreen({
@@ -67,9 +72,12 @@ export function VideoEditorScreen({
   durationMs,
   draft,
   selectedSound,
+  soundLibraryOpen,
   onChange,
   onClose,
   onOpenSounds,
+  onCloseSounds,
+  onSelectSound,
 }: VideoEditorScreenProps) {
   const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -144,8 +152,16 @@ export function VideoEditorScreen({
     ]);
   }
 
+  function requestModalClose() {
+    if (shouldInterceptEditorBackForSoundLibrary(soundLibraryOpen)) {
+      onCloseSounds();
+      return;
+    }
+    askClose();
+  }
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={askClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={requestModalClose}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -491,6 +507,11 @@ export function VideoEditorScreen({
             </InputAccessoryView>
           ) : null}
         </SafeAreaView>
+        <SoundLibrarySheet
+          visible={soundLibraryOpen}
+          onClose={onCloseSounds}
+          onSelect={onSelectSound}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );

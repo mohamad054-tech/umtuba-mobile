@@ -157,11 +157,58 @@ export function mapSoundRow(row: Record<string, unknown> | null): SocialSound | 
 const SOUND_SELECT =
   "id,owner_user_id,source_type,source_video_id,parent_sound_id,title,storage_path,duration_ms,created_at,visibility,reuse_permission,rights_status,rights_confirmed_at,moderation_status,usage_count";
 
+export const PUBLIC_REUSABLE_RIGHTS_STATUSES = [
+  "owner_confirmed",
+  "platform_licensed",
+] as const;
+
+export function publicSoundSearchQuery(query: string, limit = 20): {
+  query: string;
+  limit: number;
+  visibility: "public_reusable";
+  rightsStatuses: typeof PUBLIC_REUSABLE_RIGHTS_STATUSES;
+} {
+  return {
+    query: query.trim(),
+    limit: Math.max(1, Math.min(limit, 50)),
+    visibility: "public_reusable",
+    rightsStatuses: PUBLIC_REUSABLE_RIGHTS_STATUSES,
+  };
+}
+
 function mapSoundRows(data: unknown): SocialSound[] {
   if (!Array.isArray(data)) return [];
   return data
     .map((row) => mapSoundRow(row as Record<string, unknown>))
     .filter((row): row is SocialSound => row != null);
+}
+
+async function searchPublicSocialSoundsTable(
+  supabase: SupabaseClient,
+  query: string,
+  limit: number
+): Promise<{ sounds: SocialSound[]; unavailable: boolean }> {
+  const spec = publicSoundSearchQuery(query, limit);
+  try {
+    let request = supabase
+      .from("social_sounds")
+      .select(SOUND_SELECT)
+      .eq("visibility", spec.visibility)
+      .eq("reuse_permission", "public")
+      .in("rights_status", [...spec.rightsStatuses])
+      .neq("moderation_status", "blocked")
+      .not("rights_confirmed_at", "is", null)
+      .order("usage_count", { ascending: false })
+      .limit(spec.limit);
+    if (spec.query) {
+      request = request.ilike("title", `%${spec.query}%`);
+    }
+    const { data, error } = await request;
+    if (error) return { sounds: [], unavailable: true };
+    return { sounds: mapSoundRows(data), unavailable: false };
+  } catch {
+    return { sounds: [], unavailable: true };
+  }
 }
 
 export async function fetchSocialSoundById(
@@ -199,15 +246,16 @@ export async function searchPublicSocialSounds(
   query: string,
   limit = 20
 ): Promise<{ sounds: SocialSound[]; unavailable: boolean }> {
+  const spec = publicSoundSearchQuery(query, limit);
   try {
     const { data, error } = await supabase.rpc("search_social_sounds", {
-      p_query: query,
-      p_limit: limit,
+      p_query: spec.query,
+      p_limit: spec.limit,
     });
-    if (error) return { sounds: [], unavailable: true };
-    return { sounds: mapSoundRows(data), unavailable: false };
+    if (!error) return { sounds: mapSoundRows(data), unavailable: false };
+    return searchPublicSocialSoundsTable(supabase, spec.query, spec.limit);
   } catch {
-    return { sounds: [], unavailable: true };
+    return searchPublicSocialSoundsTable(supabase, spec.query, spec.limit);
   }
 }
 
