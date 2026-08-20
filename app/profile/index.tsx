@@ -30,7 +30,13 @@ import {
   listProfileVideos,
   type ProfileVideoItem,
 } from "@/src/lib/profile/listProfileVideos";
-import { resolveProfileContentWidth } from "@/src/lib/profile/profileLayout";
+import {
+  PROFILE_MEDIA_RESIZE_MODE,
+  PROFILE_POST_CARD_PADDING_DP,
+  PROFILE_TIMELINE_GUTTER_DP,
+  resolveProfileContentWidth,
+  resolveProfileMediaBox,
+} from "@/src/lib/profile/profileLayout";
 import {
   planOtherProfileLookup,
   resolveProfileTarget,
@@ -48,6 +54,8 @@ export default function ProfileScreen() {
   const { t, locale } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const columnWidth = resolveProfileContentWidth(windowWidth);
+  const mediaBox = resolveProfileMediaBox(windowWidth, columnWidth);
+  const postMediaStyle = [styles.postMedia, { aspectRatio: mediaBox.aspectRatio }];
   const router = useRouter();
   const params = useLocalSearchParams<{ u?: string; id?: string }>();
   const [refreshing, setRefreshing] = useState(false);
@@ -528,11 +536,12 @@ export default function ProfileScreen() {
                     item.posterUrl ? (
                       <Image
                         source={{ uri: item.posterUrl }}
-                        style={styles.postMedia}
+                        style={postMediaStyle}
+                        resizeMode={PROFILE_MEDIA_RESIZE_MODE}
                         accessibilityIgnoresInvertColors
                       />
                     ) : (
-                      <View style={styles.postMediaFallback}>
+                      <View style={[styles.postMediaFallback, { aspectRatio: mediaBox.aspectRatio }]}>
                         <Text style={styles.postMediaText} numberOfLines={2}>
                           {item.title}
                         </Text>
@@ -541,7 +550,8 @@ export default function ProfileScreen() {
                   ) : item.kind === "image" && item.imageUrl ? (
                     <Image
                       source={{ uri: item.imageUrl }}
-                      style={styles.postMedia}
+                      style={postMediaStyle}
+                      resizeMode={PROFILE_MEDIA_RESIZE_MODE}
                       accessibilityIgnoresInvertColors
                     />
                   ) : null}
@@ -751,7 +761,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   timeline: {
-    paddingHorizontal: 20,
+    paddingHorizontal: PROFILE_TIMELINE_GUTTER_DP,
     gap: 12,
   },
   postCard: {
@@ -759,7 +769,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 14,
+    padding: PROFILE_POST_CARD_PADDING_DP,
     gap: 8,
   },
   postKind: {
@@ -780,13 +790,14 @@ const styles = StyleSheet.create({
   },
   postMedia: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    maxWidth: "100%",
     borderRadius: 12,
     backgroundColor: colors.surfaceElevated,
+    overflow: "hidden",
   },
   postMediaFallback: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    maxWidth: "100%",
     borderRadius: 12,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
@@ -794,6 +805,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
+    overflow: "hidden",
   },
   postMediaText: {
     color: colors.textMuted,
