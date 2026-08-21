@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FOLD6_FOLDED_WIDTH_DP,
   FOLD6_UNFOLDED_WIDTH_DP,
+  PROFILE_COVER_HEIGHT_DP,
   PROFILE_LARGE_SCREEN_MIN_WIDTH,
   PROFILE_MEDIA_MAX_HEIGHT_DP,
   PROFILE_MEDIA_NARROW_ASPECT,
@@ -47,6 +48,10 @@ describe("profile large-screen layout", () => {
 });
 
 describe("profile post media contain box", () => {
+  it("keeps the decorative cover as a layout container only", () => {
+    expect(PROFILE_COVER_HEIGHT_DP).toBe(148);
+  });
+
   it("does not force a 16:9 cover crop on folded or phone widths", () => {
     expect(PROFILE_MEDIA_RESIZE_MODE).toBe("contain");
     expect(resolveProfileMediaAspect(FOLD6_FOLDED_WIDTH_DP)).toBe(

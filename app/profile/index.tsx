@@ -2,7 +2,6 @@ import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,9 +11,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import ProfileAboutBlock from "@/components/profile/ProfileAboutBlock";
+import ProfileActionsRow from "@/components/profile/ProfileActionsRow";
+import ProfileHero from "@/components/profile/ProfileHero";
+import ProfileLoadingSkeleton from "@/components/profile/ProfileLoadingSkeleton";
+import ProfileStatsRow from "@/components/profile/ProfileStatsRow";
+import ProfileTabStrip from "@/components/profile/ProfileTabStrip";
+import ProfileTimeline from "@/components/profile/ProfileTimeline";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
-import { chevronGlyph } from "@/src/lib/i18n/rtl";
+import { chevronGlyph, localeRootStyle, localeTextAlign } from "@/src/lib/i18n/rtl";
 import { getProfileById, getProfileByUsername } from "@/src/lib/auth/profile";
 import type { UserProfile } from "@/src/lib/auth/types";
 import { buildProfilePresentation } from "@/src/lib/profile";
@@ -30,13 +36,17 @@ import {
   listProfileVideos,
   type ProfileVideoItem,
 } from "@/src/lib/profile/listProfileVideos";
+import { emptyProfileAboutExtras } from "@/src/lib/profile/profileAbout";
 import {
-  PROFILE_MEDIA_RESIZE_MODE,
-  PROFILE_POST_CARD_PADDING_DP,
-  PROFILE_TIMELINE_GUTTER_DP,
   resolveProfileContentWidth,
   resolveProfileMediaBox,
 } from "@/src/lib/profile/profileLayout";
+import { buildProfileShareUrl } from "@/src/lib/profile/profileShareUrl";
+import {
+  getVisibleMobileProfileTabs,
+  resolveActiveMobileProfileTab,
+  type MobileProfileTabId,
+} from "@/src/lib/profile/profileTabs";
 import {
   planOtherProfileLookup,
   resolveProfileTarget,
@@ -45,8 +55,8 @@ import {
   getProfileFollowSnapshot,
   toggleProfileFollow,
 } from "@/src/lib/social/follows";
+import { defaultShareLinkPort } from "@/src/lib/social/sharePost";
 import { getSupabase } from "@/src/lib/supabase/client";
-import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
@@ -55,9 +65,8 @@ export default function ProfileScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const columnWidth = resolveProfileContentWidth(windowWidth);
   const mediaBox = resolveProfileMediaBox(windowWidth, columnWidth);
-  const postMediaStyle = [styles.postMedia, { aspectRatio: mediaBox.aspectRatio }];
   const router = useRouter();
-  const params = useLocalSearchParams<{ u?: string; id?: string }>();
+  const params = useLocalSearchParams<{ u?: string; id?: string; tab?: string }>();
   const [refreshing, setRefreshing] = useState(false);
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
   const [otherStatus, setOtherStatus] = useState<
@@ -68,11 +77,16 @@ export default function ProfileScreen() {
   const [followingCount, setFollowingCount] = useState<number | null>(null);
   const [followBusy, setFollowBusy] = useState(false);
   const [followError, setFollowError] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
   const [videos, setVideos] = useState<ProfileVideoItem[]>([]);
   const [videosFailed, setVideosFailed] = useState(false);
   const [posts, setPosts] = useState<ProfilePostItem[]>([]);
   const [postsFailed, setPostsFailed] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
+  const [requestedTab, setRequestedTab] = useState<string | null>(
+    typeof params.tab === "string" ? params.tab : null
+  );
 
   const target = useMemo(
     () =>
@@ -85,6 +99,7 @@ export default function ProfileScreen() {
     [params.id, params.u, profile?.id, profile?.username, user?.id]
   );
   const isOwn = target.kind === "own";
+  const aboutExtras = useMemo(() => emptyProfileAboutExtras(), []);
 
   useEffect(() => {
     if (target.kind !== "other") {
@@ -195,6 +210,24 @@ export default function ProfileScreen() {
     () => buildProfileTimeline(posts, videos),
     [posts, videos]
   );
+  const postOnlyTimeline = useMemo(
+    () => timeline.filter((item) => item.kind !== "video"),
+    [timeline]
+  );
+  const videoOnlyTimeline = useMemo(
+    () => timeline.filter((item) => item.kind === "video"),
+    [timeline]
+  );
+  const visibleTabs = useMemo(
+    () =>
+      getVisibleMobileProfileTabs({
+        isOwner: isOwn,
+        postCount: posts.length,
+        videoCount: videos.length,
+      }),
+    [isOwn, posts.length, videos.length]
+  );
+  const activeTab = resolveActiveMobileProfileTab(requestedTab, visibleTabs);
 
   const onRetry = useCallback(async () => {
     clearError();
@@ -234,6 +267,24 @@ export default function ProfileScreen() {
     }
   }, [following, otherProfile?.id, router, user]);
 
+  const onShare = useCallback(async () => {
+    const url = buildProfileShareUrl(view.username);
+    if (!url) return;
+    setShareBusy(true);
+    setShareError(null);
+    try {
+      await defaultShareLinkPort.share({
+        title: t("profile.share"),
+        message: `${view.displayName || view.username || t("profile.account")}\n${url}`,
+        url,
+      });
+    } catch {
+      setShareError(t("profile.shareFailed"));
+    } finally {
+      setShareBusy(false);
+    }
+  }, [t, view.displayName, view.username]);
+
   function openTimelineItem(item: ProfileTimelineItem) {
     if (item.kind === "video") {
       router.push({
@@ -243,9 +294,12 @@ export default function ProfileScreen() {
     }
   }
 
+  const textAlign = localeTextAlign(locale);
+  const rootDirection = localeRootStyle(locale);
+
   if (loading && !user && isOwn) {
     return (
-      <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
         <View
           style={styles.center}
           accessibilityLabel={t("profile.loading")}
@@ -260,14 +314,12 @@ export default function ProfileScreen() {
 
   if (isOwn && !user) {
     return (
-      <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
         <View style={styles.center}>
           <Text style={styles.emptyTitle} accessibilityRole="header">
             {t("auth.required.title")}
           </Text>
-          <Text style={styles.muted}>
-            {t("auth.required.profile")}
-          </Text>
+          <Text style={styles.muted}>{t("auth.required.profile")}</Text>
           <Pressable
             style={styles.primaryBtn}
             onPress={() => router.replace("/(auth)/login")}
@@ -283,7 +335,7 @@ export default function ProfileScreen() {
 
   if (!isOwn && otherStatus === "loading") {
     return (
-      <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
         <View
           style={styles.center}
           accessibilityLabel={t("profile.loading")}
@@ -298,7 +350,7 @@ export default function ProfileScreen() {
 
   if (!isOwn && (otherStatus === "missing" || otherStatus === "error")) {
     return (
-      <SafeAreaView style={styles.root} edges={["bottom"]}>
+      <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
         <View style={styles.center}>
           <Text style={styles.emptyTitle} accessibilityRole="header">
             {t("profile.notFound")}
@@ -314,307 +366,190 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.root} edges={["bottom"]}>
+    <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
-        <View
-          style={[styles.cover, { width: windowWidth }]}
-          accessibilityLabel={t("profile.cover")}
-          accessible
+        <ProfileHero
+          view={view}
+          locale={locale}
+          t={t}
+          about={aboutExtras}
+          windowWidth={windowWidth}
+          isOwn={isOwn}
+          onOpenAbout={() => setRequestedTab("about")}
         />
 
         <View style={[styles.columnHost, { width: windowWidth }]}>
-        <View style={[styles.column, { width: columnWidth }]}>
-        <View
-          style={styles.avatar}
-          accessibilityLabel={
-            view.hasReliableIdentity
-              ? t("profile.avatarFor", {
-                  values: {
-                    name: view.displayName || view.username || t("profile.you"),
-                  },
-                })
-              : t("profile.avatarPlaceholder")
-          }
-        >
-          {view.avatarUrl ? (
-            <Image
-              source={{ uri: view.avatarUrl }}
-              style={styles.avatarImage}
-              accessibilityIgnoresInvertColors
-            />
-          ) : (
-            <Text style={styles.avatarText} accessible={false}>
-              {view.avatarInitial}
-            </Text>
-          )}
-        </View>
+          <View style={[styles.column, { width: columnWidth }]}>
+            {view.hasReliableIdentity ? null : (
+              <View style={styles.identityPad}>
+                <View style={styles.banner} accessibilityRole="alert">
+                  <Text style={[styles.emptyTitle, { textAlign }]}>
+                    {t("profile.detailsUnavailable")}
+                  </Text>
+                  <Text style={[styles.bannerBody, { textAlign }]}>
+                    {t("profile.detailsUnavailableBody")}
+                  </Text>
+                  {isOwn ? (
+                    <Pressable
+                      style={styles.secondaryBtn}
+                      onPress={() => void onRetry()}
+                      disabled={refreshing}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("actions.retry")}
+                    >
+                      {refreshing ? (
+                        <ActivityIndicator color={colors.accentCyan} />
+                      ) : (
+                        <Text style={styles.secondaryBtnText}>
+                          {t("actions.retry")}
+                        </Text>
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            )}
 
-        <View style={styles.identity}>
-          {view.hasReliableIdentity ? (
-            <>
-              <Text style={styles.name} accessibilityRole="header">
-                {view.displayName || view.username || t("profile.account")}
-              </Text>
-              {view.username ? (
-                <Text style={styles.username}>@{view.username}</Text>
-              ) : null}
-              {view.bio ? <Text style={styles.bio}>{view.bio}</Text> : null}
-              {view.locationLine ? (
-                <Text style={styles.meta}>{view.locationLine}</Text>
-              ) : null}
-              {isOwn && view.email ? (
-                <Text
-                  style={styles.meta}
-                  accessibilityLabel={t("profile.emailA11y", {
-                    values: { email: view.email },
-                  })}
-                >
-                  {view.email}
-                </Text>
-              ) : null}
-            </>
-          ) : (
-            <View style={styles.banner} accessibilityRole="alert">
-              <Text style={styles.emptyTitle}>{t("profile.detailsUnavailable")}</Text>
-              <Text style={styles.muted}>
-                {t("profile.detailsUnavailableBody")}
-              </Text>
-              {isOwn ? (
+            {isOwn && error ? (
+              <View style={styles.errorBox} accessibilityRole="alert">
+                <Text style={styles.errorText}>{error}</Text>
                 <Pressable
-                  style={styles.secondaryBtn}
                   onPress={() => void onRetry()}
-                  disabled={refreshing}
                   accessibilityRole="button"
                   accessibilityLabel={t("actions.retry")}
                 >
-                  {refreshing ? (
-                    <ActivityIndicator color={colors.accentCyan} />
-                  ) : (
-                    <Text style={styles.secondaryBtnText}>{t("actions.retry")}</Text>
-                  )}
+                  <Text style={styles.retryLink}>{t("actions.retry")}</Text>
                 </Pressable>
-              ) : null}
-            </View>
-          )}
-        </View>
-
-        {isOwn && error ? (
-          <View style={styles.errorBox} accessibilityRole="alert">
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable
-              onPress={() => void onRetry()}
-              accessibilityRole="button"
-              accessibilityLabel={t("actions.retry")}
-            >
-              <Text style={styles.retryLink}>{t("actions.retry")}</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {isOwn ? (
-          <Pressable
-            style={styles.editBtn}
-            onPress={() => router.push("/settings")}
-            accessibilityRole="button"
-            accessibilityLabel={t("profile.editProfile")}
-          >
-            <Text style={styles.editBtnText}>{t("profile.editProfile")}</Text>
-          </Pressable>
-        ) : null}
-
-        {!isOwn && otherProfile ? (
-          <View style={styles.followBlock}>
-            <Pressable
-              style={[
-                styles.followBtn,
-                following && styles.followBtnOn,
-                followBusy && styles.buttonDisabled,
-              ]}
-              onPress={() => void onToggleFollow()}
-              disabled={followBusy}
-              accessibilityRole="button"
-              accessibilityLabel={
-                following ? t("follow.following") : t("follow.follow")
-              }
-              accessibilityState={{ selected: following, busy: followBusy }}
-            >
-              {followBusy ? (
-                <ActivityIndicator
-                  color={following ? colors.accentCyan : colors.bg}
-                />
-              ) : (
-                <Text
-                  style={[
-                    styles.followBtnText,
-                    following && styles.followBtnTextOn,
-                  ]}
-                >
-                  {following ? t("follow.following") : t("follow.follow")}
-                </Text>
-              )}
-            </Pressable>
-            {followError ? (
-              <Text style={styles.errorText} accessibilityRole="alert">
-                {followError}
-              </Text>
+              </View>
             ) : null}
-          </View>
-        ) : null}
 
-        {followersCount != null || followingCount != null || timeline.length > 0 ? (
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{followersCount ?? 0}</Text>
-              <Text style={styles.statLabel}>{t("profile.followers")}</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{followingCount ?? 0}</Text>
-              <Text style={styles.statLabel}>{t("profile.following")}</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{timeline.length}</Text>
-              <Text style={styles.statLabel}>{t("profile.posts")}</Text>
-            </View>
-          </View>
-        ) : null}
+            {view.hasReliableIdentity || isOwn || otherProfile ? (
+              <ProfileActionsRow
+                t={t}
+                isOwn={isOwn}
+                following={following}
+                followBusy={followBusy}
+                followError={followError ?? shareError}
+                canShare={Boolean(view.username)}
+                shareBusy={shareBusy}
+                onEdit={() => router.push("/settings")}
+                onFollow={() => void onToggleFollow()}
+                onShare={() => void onShare()}
+              />
+            ) : null}
 
-        <Text style={styles.sectionLabel}>{t("profile.posts")}</Text>
-        {contentLoading ? (
-          <ActivityIndicator
-            color={colors.accentCyan}
-            accessibilityLabel={t("profile.loading")}
-          />
-        ) : postsFailed && videosFailed ? (
-          <Text style={styles.errorText} accessibilityRole="alert">
-            {t("profile.postsFailed")}
-          </Text>
-        ) : timeline.length === 0 ? (
-          <Text style={styles.muted}>{t("profile.postsEmpty")}</Text>
-        ) : (
-          <View style={styles.timeline}>
-            {postsFailed ? (
+            <ProfileStatsRow
+              locale={locale}
+              t={t}
+              followersCount={followersCount}
+              followingCount={followingCount}
+              postsCount={timeline.length}
+            />
+
+            <ProfileTabStrip
+              locale={locale}
+              t={t}
+              tabs={visibleTabs}
+              active={activeTab}
+              onChange={(tab: MobileProfileTabId) => setRequestedTab(tab)}
+            />
+
+            <Text style={[styles.sectionLabel, { textAlign }]}>
+              {activeTab === "about"
+                ? t("profile.about")
+                : activeTab === "videos"
+                  ? t("profile.videos")
+                  : t("profile.posts")}
+            </Text>
+
+            {activeTab === "about" ? (
+              <ProfileAboutBlock
+                view={view}
+                locale={locale}
+                t={t}
+                about={aboutExtras}
+                isOwn={isOwn}
+              />
+            ) : contentLoading ? (
+              <ProfileLoadingSkeleton t={t} />
+            ) : postsFailed && videosFailed && activeTab === "all" ? (
               <Text style={styles.errorText} accessibilityRole="alert">
                 {t("profile.postsFailed")}
               </Text>
-            ) : null}
-            {videosFailed ? (
-              <Text style={styles.errorText} accessibilityRole="alert">
-                {t("profile.videosFailed")}
-              </Text>
-            ) : null}
-            {timeline.map((item) => {
-              const published = formatPublishedAt(item.createdAt, locale);
-              const kindLabel =
-                item.kind === "video"
-                  ? t("profile.videoPost")
-                  : item.kind === "image"
-                    ? t("profile.imagePost")
-                    : t("profile.textPost");
-              const title =
-                item.kind === "video"
-                  ? item.title
-                  : item.content || kindLabel;
-              const canOpen = item.kind === "video";
-              return (
-                <Pressable
-                  key={`${item.kind}-${item.postId}`}
-                  style={styles.postCard}
-                  onPress={canOpen ? () => openTimelineItem(item) : undefined}
-                  disabled={!canOpen}
-                  accessibilityRole={canOpen ? "button" : "text"}
-                  accessibilityLabel={
-                    canOpen
-                      ? `${t("profile.openVideo")}: ${title}${published ? ` · ${published}` : ""}`
-                      : `${kindLabel}: ${title}${published ? ` · ${published}` : ""}`
-                  }
-                >
-                  <Text style={styles.postKind}>{kindLabel}</Text>
-                  {item.kind === "video" ? (
-                    item.posterUrl ? (
-                      <Image
-                        source={{ uri: item.posterUrl }}
-                        style={postMediaStyle}
-                        resizeMode={PROFILE_MEDIA_RESIZE_MODE}
-                        accessibilityIgnoresInvertColors
-                      />
-                    ) : (
-                      <View style={[styles.postMediaFallback, { aspectRatio: mediaBox.aspectRatio }]}>
-                        <Text style={styles.postMediaText} numberOfLines={2}>
-                          {item.title}
-                        </Text>
-                      </View>
-                    )
-                  ) : item.kind === "image" && item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={postMediaStyle}
-                      resizeMode={PROFILE_MEDIA_RESIZE_MODE}
-                      accessibilityIgnoresInvertColors
-                    />
-                  ) : null}
-                  {item.kind !== "video" && item.content ? (
-                    <Text style={styles.postBody}>{item.content}</Text>
-                  ) : item.kind === "video" ? (
-                    <Text style={styles.postBody} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                  ) : null}
-                  {published ? (
-                    <Text style={styles.postPublished}>{published}</Text>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+            ) : (
+              <ProfileTimeline
+                locale={locale}
+                t={t}
+                items={
+                  activeTab === "posts"
+                    ? postOnlyTimeline
+                    : activeTab === "videos"
+                      ? videoOnlyTimeline
+                      : timeline
+                }
+                mediaBox={mediaBox}
+                emptyLabel={
+                  activeTab === "videos"
+                    ? t("profile.videosEmpty")
+                    : t("profile.postsEmpty")
+                }
+                postsFailed={activeTab !== "videos" ? postsFailed : false}
+                videosFailed={activeTab !== "posts" ? videosFailed : false}
+                onOpenVideo={openTimelineItem}
+              />
+            )}
 
-        {isOwn ? (
-          <>
-            <Text style={styles.sectionLabel}>{t("profile.shortcuts")}</Text>
-            <View style={styles.links}>
-              <Link href="/rewards" asChild>
-                <Pressable
-                  style={styles.linkRow}
-                  accessibilityRole="link"
-                  accessibilityLabel={t("profile.openRewards")}
-                >
-                  <Text style={styles.linkText}>{t("rewards.title")}</Text>
-                  <Text style={styles.chevron} accessible={false}>
-                    {chevronGlyph(locale)}
-                  </Text>
-                </Pressable>
-              </Link>
-              <Link href="/notifications" asChild>
-                <Pressable
-                  style={styles.linkRow}
-                  accessibilityRole="link"
-                  accessibilityLabel={t("profile.openNotifications")}
-                >
-                  <Text style={styles.linkText}>{t("settings.notifications")}</Text>
-                  <Text style={styles.chevron} accessible={false}>
-                    {chevronGlyph(locale)}
-                  </Text>
-                </Pressable>
-              </Link>
-              <Link href="/settings" asChild>
-                <Pressable
-                  style={styles.linkRow}
-                  accessibilityRole="link"
-                  accessibilityLabel={t("profile.openSettings")}
-                >
-                  <Text style={styles.linkText}>{t("settings.title")}</Text>
-                  <Text style={styles.chevron} accessible={false}>
-                    {chevronGlyph(locale)}
-                  </Text>
-                </Pressable>
-              </Link>
-            </View>
-          </>
-        ) : null}
-        </View>
+            {isOwn ? (
+              <>
+                <Text style={[styles.sectionLabel, { textAlign }]}>
+                  {t("profile.shortcuts")}
+                </Text>
+                <View style={styles.links}>
+                  <Link href="/rewards" asChild>
+                    <Pressable
+                      style={styles.linkRow}
+                      accessibilityRole="link"
+                      accessibilityLabel={t("profile.openRewards")}
+                    >
+                      <Text style={styles.linkText}>{t("rewards.title")}</Text>
+                      <Text style={styles.chevron} accessible={false}>
+                        {chevronGlyph(locale)}
+                      </Text>
+                    </Pressable>
+                  </Link>
+                  <Link href="/notifications" asChild>
+                    <Pressable
+                      style={styles.linkRow}
+                      accessibilityRole="link"
+                      accessibilityLabel={t("profile.openNotifications")}
+                    >
+                      <Text style={styles.linkText}>
+                        {t("settings.notifications")}
+                      </Text>
+                      <Text style={styles.chevron} accessible={false}>
+                        {chevronGlyph(locale)}
+                      </Text>
+                    </Pressable>
+                  </Link>
+                  <Link href="/settings" asChild>
+                    <Pressable
+                      style={styles.linkRow}
+                      accessibilityRole="link"
+                      accessibilityLabel={t("profile.openSettings")}
+                    >
+                      <Text style={styles.linkText}>{t("settings.title")}</Text>
+                      <Text style={styles.chevron} accessible={false}>
+                        {chevronGlyph(locale)}
+                      </Text>
+                    </Pressable>
+                  </Link>
+                </View>
+              </>
+            ) : null}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -642,63 +577,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
   },
-  cover: {
-    height: 148,
-    backgroundColor: colors.accentViolet,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 4,
-    borderColor: colors.bg,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -46,
-    marginHorizontal: 20,
-    overflow: "hidden",
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  avatarText: {
-    color: colors.text,
-    fontSize: 32,
-    fontWeight: "700",
-  },
-  identity: {
+  identityPad: {
     paddingHorizontal: 20,
     paddingTop: 12,
-  },
-  name: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  username: {
-    color: colors.accentCyan,
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  bio: {
-    color: colors.textMuted,
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  meta: {
-    color: colors.textSubtle,
-    fontSize: 13,
-    marginBottom: 4,
   },
   muted: {
     color: colors.textMuted,
     textAlign: "center",
     lineHeight: 20,
     paddingHorizontal: 20,
+  },
+  bannerBody: {
+    color: colors.textMuted,
+    lineHeight: 20,
   },
   emptyTitle: {
     color: colors.text,
@@ -733,126 +624,6 @@ const styles = StyleSheet.create({
   retryLink: {
     color: colors.accentCyan,
     fontWeight: "600",
-  },
-  statsRow: {
-    marginTop: 18,
-    marginHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  stat: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  statValue: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  statLabel: {
-    color: colors.textSubtle,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  timeline: {
-    paddingHorizontal: PROFILE_TIMELINE_GUTTER_DP,
-    gap: 12,
-  },
-  postCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: PROFILE_POST_CARD_PADDING_DP,
-    gap: 8,
-  },
-  postKind: {
-    color: colors.textSubtle,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  postBody: {
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  postPublished: {
-    color: colors.textSubtle,
-    fontSize: 12,
-  },
-  postMedia: {
-    width: "100%",
-    maxWidth: "100%",
-    borderRadius: 12,
-    backgroundColor: colors.surfaceElevated,
-    overflow: "hidden",
-  },
-  postMediaFallback: {
-    width: "100%",
-    maxWidth: "100%",
-    borderRadius: 12,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    overflow: "hidden",
-  },
-  postMediaText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    textAlign: "center",
-  },
-  followBlock: {
-    marginTop: 16,
-    marginHorizontal: 20,
-    gap: 8,
-  },
-  followBtn: {
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: colors.text,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  followBtnOn: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  followBtnText: {
-    color: colors.bg,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  followBtnTextOn: {
-    color: colors.text,
-  },
-  buttonDisabled: { opacity: 0.7 },
-  editBtn: {
-    marginTop: 16,
-    marginHorizontal: 20,
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: colors.text,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  editBtnText: {
-    color: colors.bg,
-    fontWeight: "700",
-    fontSize: 16,
   },
   sectionLabel: {
     marginTop: 24,

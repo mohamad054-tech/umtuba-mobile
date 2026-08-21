@@ -10,6 +10,8 @@ export type UserProfile = {
   country: string | null;
   avatar_url: string | null;
   avatar_initial: string;
+  /** Existing `profiles.created_at`. Omitted when the row has no safe value. */
+  created_at?: string | null;
 };
 
 export type AuthState = {

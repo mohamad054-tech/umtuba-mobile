@@ -7,6 +7,10 @@ export const colors = {
   textMuted: "rgba(255,255,255,0.55)",
   textSubtle: "rgba(255,255,255,0.35)",
   accentViolet: "#8b5cf6",
+  /** Brand blue — Profile cover container only. Do not restyle Watch. */
+  accent: "#2563eb",
+  /** Indigo stop for Profile cover container only. */
+  accentIndigo: "#4f46e5",
   accentCyan: "#22d3ee",
   accentAmber: "#fbbf24",
   border: "rgba(255,255,255,0.10)",

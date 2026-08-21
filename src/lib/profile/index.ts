@@ -27,6 +27,8 @@ export {
 export {
   FOLD6_FOLDED_WIDTH_DP,
   FOLD6_UNFOLDED_WIDTH_DP,
+  PROFILE_AVATAR_SIZE_DP,
+  PROFILE_COVER_HEIGHT_DP,
   PROFILE_LARGE_SCREEN_MIN_WIDTH,
   PROFILE_MEDIA_MAX_HEIGHT_DP,
   PROFILE_MEDIA_NARROW_ASPECT,
@@ -43,3 +45,16 @@ export {
   resolveProfileMediaInnerWidth,
   type ProfileMediaBox,
 } from "@/src/lib/profile/profileLayout";
+export {
+  formatAboutJoinedBody,
+  formatJoinedMonthYear,
+  stripJoinedPrefix,
+} from "@/src/lib/profile/profileJoinedLabel";
+export {
+  getVisibleMobileProfileTabs,
+  parseMobileProfileTab,
+  resolveActiveMobileProfileTab,
+  type MobileProfileTabId,
+} from "@/src/lib/profile/profileTabs";
+export { emptyProfileAboutExtras } from "@/src/lib/profile/profileAbout";
+export { buildProfileShareUrl } from "@/src/lib/profile/profileShareUrl";

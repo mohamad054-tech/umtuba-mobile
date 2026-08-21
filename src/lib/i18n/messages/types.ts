@@ -420,6 +420,21 @@ export type MobileMessages = {
   "profile.imagePost": string;
   "profile.videoPost": string;
   "profile.cover": string;
+  "profile.creatorSpace": string;
+  "profile.tabAll": string;
+  "profile.tabAbout": string;
+  "profile.tablistA11y": string;
+  "profile.bioMore": string;
+  "profile.bioLess": string;
+  "profile.joinedLine": string;
+  "profile.about": string;
+  "profile.aboutEmpty": string;
+  "profile.socialLinks": string;
+  "profile.achievements": string;
+  "profile.specialties": string;
+  "profile.identityRoles": string;
+  "profile.share": string;
+  "profile.shareFailed": string;
 
   "follow.follow": string;
   "follow.following": string;

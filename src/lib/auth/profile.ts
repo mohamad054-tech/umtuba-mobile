@@ -6,7 +6,15 @@ import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { getSupabase } from "@/src/lib/supabase/client";
 
 const PROFILE_COLUMNS =
-  "id, username, display_name, full_name, bio, city, country, avatar_url, avatar_initial";
+  "id, username, display_name, full_name, bio, city, country, avatar_url, avatar_initial, created_at";
+
+function parseCreatedAt(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const ms = Date.parse(trimmed);
+  return Number.isFinite(ms) ? trimmed : null;
+}
 
 function mapProfileRow(row: {
   id: string;
@@ -18,6 +26,7 @@ function mapProfileRow(row: {
   country: string | null;
   avatar_url: string | null;
   avatar_initial: string | null;
+  created_at?: unknown;
 }): UserProfile {
   const displayName =
     (row.display_name && row.display_name.trim()) ||
@@ -35,6 +44,7 @@ function mapProfileRow(row: {
     avatar_url: row.avatar_url,
     avatar_initial:
       row.avatar_initial || displayName.charAt(0).toUpperCase() || "U",
+    created_at: parseCreatedAt(row.created_at),
   };
 }
 
@@ -115,5 +125,6 @@ export async function getProfileForUser(user: User): Promise<UserProfile> {
     country: null,
     avatar_url: null,
     avatar_initial: fullName.charAt(0).toUpperCase() || "U",
+    created_at: parseCreatedAt(user.created_at),
   };
 }

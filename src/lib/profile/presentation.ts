@@ -10,6 +10,7 @@ export type ProfilePresentation = {
   bio: string | null;
   email: string | null;
   locationLine: string | null;
+  createdAt: string | null;
   /** True when we have a profile row or trustworthy metadata identity. */
   hasReliableIdentity: boolean;
 };
@@ -81,6 +82,7 @@ export function buildProfilePresentation(
       bio: null,
       email,
       locationLine: null,
+      createdAt: cleanText(user?.created_at ?? null),
       hasReliableIdentity: Boolean(metaName || metaUsername || email),
     };
   }
@@ -103,6 +105,7 @@ export function buildProfilePresentation(
     bio,
     email,
     locationLine: locationLine(profile.city, profile.country),
+    createdAt: cleanText(profile.created_at ?? user?.created_at ?? null),
     hasReliableIdentity: Boolean(displayName || username || email),
   };
 }

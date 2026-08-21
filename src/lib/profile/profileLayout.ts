@@ -34,6 +34,12 @@ export const PROFILE_MEDIA_MAX_HEIGHT_DP = 420;
 /** Never cover-crop Profile post media; letterbox/pillarbox instead. */
 export const PROFILE_MEDIA_RESIZE_MODE = "contain" as const;
 
+/** Decorative cover band height (layout container only — no branded bitmap). */
+export const PROFILE_COVER_HEIGHT_DP = 148;
+
+/** Overlapping circular avatar. */
+export const PROFILE_AVATAR_SIZE_DP = 92;
+
 export type ProfileMediaBox = {
   width: number;
   height: number;

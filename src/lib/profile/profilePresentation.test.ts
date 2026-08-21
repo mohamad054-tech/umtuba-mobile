@@ -25,6 +25,7 @@ describe("buildProfilePresentation", () => {
     expect(view.displayName).toBeNull();
     expect(view.username).toBeNull();
     expect(view.email).toBe("sam@example.com");
+    expect(view.createdAt).toBeNull();
     expect(view.hasReliableIdentity).toBe(true);
     expect(view.avatarInitial).toBe("?");
   });
@@ -41,6 +42,7 @@ describe("buildProfilePresentation", () => {
         country: "JO",
         avatar_url: "https://cdn.example/a.png",
         avatar_initial: "S",
+        created_at: "2024-03-12T00:00:00.000Z",
       },
       { id: "u1", email: "sam@example.com" } as never
     );
@@ -51,6 +53,7 @@ describe("buildProfilePresentation", () => {
     expect(view.locationLine).toBe("Amman, JO");
     expect(view.avatarUrl).toBe("https://cdn.example/a.png");
     expect(view.avatarInitial).toBe("S");
+    expect(view.createdAt).toBe("2024-03-12T00:00:00.000Z");
     expect(view.hasReliableIdentity).toBe(true);
   });
 
