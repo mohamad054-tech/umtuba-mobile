@@ -130,6 +130,8 @@ export const enMessages: MobileMessages = {
   "auth.login.noAccount": "New here?",
   "auth.login.createOne": "Create an account",
   "auth.login.failed": "Unable to sign in.",
+  "auth.password.show": "Show password",
+  "auth.password.hide": "Hide password",
   "auth.signup.title": "Join UMTUBA",
   "auth.signup.subtitle": "Create your account to watch, create, and earn.",
   "auth.signup.fullName": "Full name",

@@ -5,11 +5,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { PasswordField } from "@/components/auth/PasswordField";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
 import { updatePasswordWithSession } from "@/src/lib/auth/passwordRecovery";
@@ -88,29 +88,27 @@ export default function ChangePasswordScreen() {
         </Text>
 
         <Text style={styles.label}>{t("auth.update.newPassword")}</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordField
+          purpose="new"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="newPassword"
+          placeholder={t("auth.update.newPassword")}
           accessibilityLabel={t("auth.update.newPassword")}
           editable={!busy}
+          containerStyle={styles.passwordField}
+          testID="change-password"
         />
 
         <Text style={styles.label}>{t("auth.update.confirmPassword")}</Text>
-        <TextInput
-          style={styles.input}
+        <PasswordField
+          purpose="new"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="newPassword"
+          placeholder={t("auth.update.confirmPassword")}
           accessibilityLabel={t("auth.update.confirmPassword")}
           editable={!busy}
+          containerStyle={styles.passwordField}
+          testID="change-password-confirm"
         />
 
         {error ? (
@@ -178,14 +176,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    color: colors.text,
+  passwordField: {
     marginBottom: 14,
   },
   error: {

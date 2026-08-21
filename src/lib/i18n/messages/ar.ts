@@ -126,6 +126,8 @@ export const arMessages: MobileMessages = {
   "auth.login.noAccount": "جديد هنا؟",
   "auth.login.createOne": "أنشئ حسابًا",
   "auth.login.failed": "تعذّر تسجيل الدخول.",
+  "auth.password.show": "إظهار كلمة المرور",
+  "auth.password.hide": "إخفاء كلمة المرور",
   "auth.signup.title": "انضم إلى UMTUBA",
   "auth.signup.subtitle": "أنشئ حسابك للمشاهدة والإنشاء والربح.",
   "auth.signup.fullName": "الاسم الكامل",

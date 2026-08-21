@@ -10,6 +10,7 @@ import {
 
 import { AuthScreen } from "@/components/AuthScreen";
 import { useGlobalBack } from "@/components/GlobalBackButton";
+import { forgotEmailAutofillProps } from "@/src/lib/auth/authInput";
 import { useTranslation } from "@/src/lib/i18n";
 import {
   getErrorMessage,
@@ -82,10 +83,7 @@ export default function ForgotPasswordScreen() {
     >
       <TextInput
         style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-        textContentType="emailAddress"
+        {...forgotEmailAutofillProps()}
         placeholder={t("auth.login.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}

@@ -129,6 +129,8 @@ export type MobileMessages = {
   "auth.login.noAccount": string;
   "auth.login.createOne": string;
   "auth.login.failed": string;
+  "auth.password.show": string;
+  "auth.password.hide": string;
   "auth.signup.title": string;
   "auth.signup.subtitle": string;
   "auth.signup.fullName": string;

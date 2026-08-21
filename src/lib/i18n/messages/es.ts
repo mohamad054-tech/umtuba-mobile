@@ -133,6 +133,8 @@ export const esMessages: MobileMessages = {
   "auth.login.noAccount": "¿Eres nuevo?",
   "auth.login.createOne": "Crear una cuenta",
   "auth.login.failed": "No se pudo iniciar sesión.",
+  "auth.password.show": "Mostrar contraseña",
+  "auth.password.hide": "Ocultar contraseña",
   "auth.signup.title": "Únete a UMTUBA",
   "auth.signup.subtitle": "Crea tu cuenta para ver, crear y ganar.",
   "auth.signup.fullName": "Nombre completo",

@@ -8,8 +8,10 @@ import {
   TextInput,
 } from "react-native";
 
+import { PasswordField } from "@/components/auth/PasswordField";
 import { AuthScreen } from "@/components/AuthScreen";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { loginIdentifierAutofillProps } from "@/src/lib/auth/authInput";
 import { useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { colors } from "@/src/theme/colors";
@@ -79,26 +81,20 @@ export default function LoginScreen() {
     >
       <TextInput
         style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-        textContentType="emailAddress"
+        {...loginIdentifierAutofillProps()}
         placeholder={t("auth.login.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
         accessibilityLabel={t("auth.login.email")}
       />
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        autoComplete="password"
-        textContentType="password"
-        placeholder={t("auth.login.password")}
-        placeholderTextColor={colors.textSubtle}
+      <PasswordField
+        purpose="current"
         value={password}
         onChangeText={setPassword}
+        placeholder={t("auth.login.password")}
         accessibilityLabel={t("auth.login.password")}
+        testID="login-password"
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">

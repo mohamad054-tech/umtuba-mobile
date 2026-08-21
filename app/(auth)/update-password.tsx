@@ -5,9 +5,9 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
 } from "react-native";
 
+import { PasswordField } from "@/components/auth/PasswordField";
 import { AuthScreen } from "@/components/AuthScreen";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
@@ -148,29 +148,23 @@ export default function UpdatePasswordScreen() {
         </>
       ) : (
         <>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            autoComplete="new-password"
-            textContentType="newPassword"
-            placeholder={t("auth.update.newPassword")}
-            placeholderTextColor={colors.textSubtle}
+          <PasswordField
+            purpose="new"
             value={password}
             onChangeText={setPassword}
-            editable={!busy && !success}
+            placeholder={t("auth.update.newPassword")}
             accessibilityLabel={t("auth.update.newPassword")}
+            editable={!busy && !success}
+            testID="update-password"
           />
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            autoComplete="new-password"
-            textContentType="newPassword"
-            placeholder={t("auth.update.confirmPassword")}
-            placeholderTextColor={colors.textSubtle}
+          <PasswordField
+            purpose="new"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            editable={!busy && !success}
+            placeholder={t("auth.update.confirmPassword")}
             accessibilityLabel={t("auth.update.confirmPassword")}
+            editable={!busy && !success}
+            testID="update-password-confirm"
           />
           {error ? (
             <Text style={styles.error} accessibilityRole="alert">
@@ -208,17 +202,6 @@ export default function UpdatePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    color: colors.text,
-    fontSize: 16,
-    minHeight: 48,
-  },
   button: {
     marginTop: 8,
     backgroundColor: colors.text,

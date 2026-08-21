@@ -136,6 +136,8 @@ export const ptMessages: MobileMessages = {
   "auth.login.noAccount": "Novo por aqui?",
   "auth.login.createOne": "Criar uma conta",
   "auth.login.failed": "Não foi possível entrar.",
+  "auth.password.show": "Mostrar senha",
+  "auth.password.hide": "Ocultar senha",
   "auth.signup.title": "Entre no UMTUBA",
   "auth.signup.subtitle": "Crie sua conta para assistir, criar e ganhar.",
   "auth.signup.fullName": "Nome completo",

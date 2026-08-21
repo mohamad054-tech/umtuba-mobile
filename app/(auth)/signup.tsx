@@ -8,9 +8,15 @@ import {
   TextInput,
 } from "react-native";
 
+import { PasswordField } from "@/components/auth/PasswordField";
 import { AuthScreen } from "@/components/AuthScreen";
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import {
+  signupEmailAutofillProps,
+  signupNameAutofillProps,
+  signupUsernameAutofillProps,
+} from "@/src/lib/auth/authInput";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import { signupValidationErrorKey } from "@/src/lib/auth/signupForm";
@@ -98,43 +104,34 @@ export default function SignupScreen() {
         placeholderTextColor={colors.textSubtle}
         value={fullName}
         onChangeText={setFullName}
-        autoComplete="name"
-        textContentType="name"
+        {...signupNameAutofillProps()}
         accessibilityLabel={t("auth.signup.fullName")}
       />
       <TextInput
         style={styles.input}
-        autoCapitalize="none"
         placeholder={t("auth.signup.username")}
         placeholderTextColor={colors.textSubtle}
         value={username}
         onChangeText={setUsername}
-        autoComplete="username"
-        textContentType="username"
+        {...signupUsernameAutofillProps()}
         accessibilityLabel={t("auth.signup.username")}
       />
       <TextInput
         style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
         placeholder={t("auth.signup.email")}
         placeholderTextColor={colors.textSubtle}
         value={email}
         onChangeText={setEmail}
-        autoComplete="email"
-        textContentType="emailAddress"
+        {...signupEmailAutofillProps()}
         accessibilityLabel={t("auth.signup.email")}
       />
-      <TextInput
-        style={styles.input}
-        secureTextEntry
-        placeholder={t("auth.signup.password")}
-        placeholderTextColor={colors.textSubtle}
+      <PasswordField
+        purpose="new"
         value={password}
         onChangeText={setPassword}
-        autoComplete="new-password"
-        textContentType="newPassword"
+        placeholder={t("auth.signup.password")}
         accessibilityLabel={t("auth.signup.password")}
+        testID="signup-password"
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">

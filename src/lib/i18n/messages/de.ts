@@ -135,6 +135,8 @@ export const deMessages: MobileMessages = {
   "auth.login.noAccount": "Neu hier?",
   "auth.login.createOne": "Konto erstellen",
   "auth.login.failed": "Anmeldung nicht möglich.",
+  "auth.password.show": "Passwort anzeigen",
+  "auth.password.hide": "Passwort ausblenden",
   "auth.signup.title": "UMTUBA beitreten",
   "auth.signup.subtitle":
     "Erstellen Sie Ihr Konto, um anzusehen, zu erstellen und zu verdienen.",
