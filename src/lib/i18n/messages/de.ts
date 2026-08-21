@@ -148,6 +148,16 @@ export const deMessages: MobileMessages = {
   "auth.signup.haveAccount": "Haben Sie schon ein Konto?",
   "auth.signup.signIn": "Anmelden",
   "auth.signup.failed": "Konto konnte nicht erstellt werden.",
+  "auth.signup.usernameHint":
+    "Verwenden Sie 3–24 Zeichen: Kleinbuchstaben, Zahlen, Punkte oder Unterstriche.",
+  "auth.signup.usernameRequired": "Benutzername ist erforderlich.",
+  "auth.signup.usernameTaken": "Dieser Benutzername ist bereits vergeben.",
+  "auth.signup.fullNameRequired": "Vollständiger Name ist erforderlich.",
+  "auth.signup.emailInvalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+  "auth.signup.passwordRequired": "Passwort ist erforderlich.",
+  "auth.signup.passwordMin": "Das Passwort muss mindestens 6 Zeichen haben.",
+  "auth.signup.checkEmail":
+    "Konto erstellt. Bitte bestätigen Sie Ihre E-Mail-Adresse, bevor Sie sich anmelden.",
   "auth.forgot.title": "Passwort zurücksetzen",
   "auth.forgot.subtitle":
     "Wir senden Ihnen einen Link, um ein neues Passwort festzulegen.",

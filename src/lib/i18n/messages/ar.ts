@@ -138,6 +138,16 @@ export const arMessages: MobileMessages = {
   "auth.signup.haveAccount": "لديك حساب بالفعل؟",
   "auth.signup.signIn": "تسجيل الدخول",
   "auth.signup.failed": "تعذّر إنشاء حسابك.",
+  "auth.signup.usernameHint":
+    "استخدم 3–24 حرفًا: أحرفًا صغيرة وأرقامًا ونقاطًا أو شرطات سفلية.",
+  "auth.signup.usernameRequired": "اسم المستخدم مطلوب.",
+  "auth.signup.usernameTaken": "اسم المستخدم هذا مستخدم بالفعل.",
+  "auth.signup.fullNameRequired": "الاسم الكامل مطلوب.",
+  "auth.signup.emailInvalid": "يرجى إدخال بريد إلكتروني صالح.",
+  "auth.signup.passwordRequired": "كلمة المرور مطلوبة.",
+  "auth.signup.passwordMin": "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.",
+  "auth.signup.checkEmail":
+    "تم إنشاء الحساب. يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.",
   "auth.forgot.title": "إعادة تعيين كلمة المرور",
   "auth.forgot.subtitle": "سنرسل رابطًا لاختيار كلمة مرور جديدة.",
   "auth.forgot.submit": "إرسال رابط إعادة التعيين",

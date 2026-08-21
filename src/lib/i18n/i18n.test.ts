@@ -234,6 +234,19 @@ describe("catalog completeness", () => {
     );
   });
 
+  it("localizes signup username validation without English leak", () => {
+    expect(enMessages["auth.signup.usernameHint"]).toMatch(/3–24/);
+    expect(MESSAGE_CATALOGS.ar["auth.signup.usernameHint"]).not.toBe(
+      enMessages["auth.signup.usernameHint"]
+    );
+    expect(MESSAGE_CATALOGS.ar["auth.signup.usernameHint"]).not.toMatch(
+      /lowercase letters/
+    );
+    expect(MESSAGE_CATALOGS.fr["auth.signup.usernameRequired"]).not.toBe(
+      enMessages["auth.signup.usernameRequired"]
+    );
+  });
+
   it("localizes Watch double-back exit hint", () => {
     expect(enMessages["watch.pressBackAgainToExit"]).toBe(
       "Press Back again to exit Watch"

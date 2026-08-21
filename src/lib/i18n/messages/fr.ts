@@ -145,6 +145,17 @@ export const frMessages: MobileMessages = {
   "auth.signup.haveAccount": "Vous avez déjà un compte ?",
   "auth.signup.signIn": "Se connecter",
   "auth.signup.failed": "Impossible de créer le compte.",
+  "auth.signup.usernameHint":
+    "Utilisez 3 à 24 caractères : lettres minuscules, chiffres, points ou traits de soulignement.",
+  "auth.signup.usernameRequired": "Le nom d’utilisateur est obligatoire.",
+  "auth.signup.usernameTaken": "Ce nom d’utilisateur est déjà pris.",
+  "auth.signup.fullNameRequired": "Le nom complet est obligatoire.",
+  "auth.signup.emailInvalid": "Veuillez saisir une adresse e-mail valide.",
+  "auth.signup.passwordRequired": "Le mot de passe est obligatoire.",
+  "auth.signup.passwordMin":
+    "Le mot de passe doit contenir au moins 6 caractères.",
+  "auth.signup.checkEmail":
+    "Compte créé. Vérifiez votre e-mail pour confirmer votre adresse avant de vous connecter.",
   "auth.forgot.title": "Réinitialiser le mot de passe",
   "auth.forgot.subtitle":
     "Nous vous enverrons un lien pour choisir un nouveau mot de passe.",

@@ -145,6 +145,16 @@ export const esMessages: MobileMessages = {
   "auth.signup.haveAccount": "¿Ya tienes una cuenta?",
   "auth.signup.signIn": "Iniciar sesión",
   "auth.signup.failed": "No se pudo crear tu cuenta.",
+  "auth.signup.usernameHint":
+    "Usa de 3 a 24 caracteres: letras minúsculas, números, puntos o guiones bajos.",
+  "auth.signup.usernameRequired": "El nombre de usuario es obligatorio.",
+  "auth.signup.usernameTaken": "Ese nombre de usuario ya está en uso.",
+  "auth.signup.fullNameRequired": "El nombre completo es obligatorio.",
+  "auth.signup.emailInvalid": "Introduce una dirección de correo válida.",
+  "auth.signup.passwordRequired": "La contraseña es obligatoria.",
+  "auth.signup.passwordMin": "La contraseña debe tener al menos 6 caracteres.",
+  "auth.signup.checkEmail":
+    "Cuenta creada. Revisa tu correo para confirmar la dirección antes de iniciar sesión.",
   "auth.forgot.title": "Restablecer contraseña",
   "auth.forgot.subtitle":
     "Te enviaremos un enlace para elegir una contraseña nueva.",

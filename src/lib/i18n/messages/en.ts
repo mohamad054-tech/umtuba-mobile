@@ -142,6 +142,16 @@ export const enMessages: MobileMessages = {
   "auth.signup.haveAccount": "Already have an account?",
   "auth.signup.signIn": "Sign in",
   "auth.signup.failed": "Unable to create your account.",
+  "auth.signup.usernameHint":
+    "Use 3–24 characters: lowercase letters, numbers, dots, or underscores.",
+  "auth.signup.usernameRequired": "Username is required.",
+  "auth.signup.usernameTaken": "That username is already taken.",
+  "auth.signup.fullNameRequired": "Full name is required.",
+  "auth.signup.emailInvalid": "Please enter a valid email address.",
+  "auth.signup.passwordRequired": "Password is required.",
+  "auth.signup.passwordMin": "Password must be at least 6 characters.",
+  "auth.signup.checkEmail":
+    "Account created. Please check your email to confirm your address before signing in.",
   "auth.forgot.title": "Reset password",
   "auth.forgot.subtitle": "We’ll email you a link to choose a new password.",
   "auth.forgot.submit": "Send reset link",

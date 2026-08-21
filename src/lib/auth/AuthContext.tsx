@@ -17,10 +17,10 @@ import {
   isValidEmail,
   isValidUsername,
   normalizeUsername,
-  USERNAME_HINT,
   validatePassword,
 } from "@/src/contracts/validation";
 import { getProfileForUser } from "@/src/lib/auth/profile";
+import { useTranslation } from "@/src/lib/i18n";
 import {
   AUTH_EMAIL_CONFIRM_PATH,
   createAuthRedirectUrl,
@@ -68,6 +68,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 async function claimReferralAfterSignup(): Promise<void> {
   const supabase = getSupabase();
   const { code, visitorId } = await getReferralAttribution();
+  if (!code) {
+    return;
+  }
   const anonymousVisitorId = visitorId ?? (await getOrCreateVisitorId());
 
   try {
@@ -88,6 +91,7 @@ async function claimReferralAfterSignup(): Promise<void> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -252,20 +256,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const username = normalizeUsername(input.username);
 
       if (!isValidEmail(email)) {
-        throw new Error("Please enter a valid email address.");
+        throw new Error(t("auth.signup.emailInvalid"));
       }
       const passwordError = validatePassword(input.password);
       if (passwordError) {
-        throw new Error(passwordError);
+        throw new Error(
+          input.password
+            ? t("auth.signup.passwordMin")
+            : t("auth.signup.passwordRequired")
+        );
       }
       if (!fullName) {
-        throw new Error("Please enter your full name.");
+        throw new Error(t("auth.signup.fullNameRequired"));
       }
       if (!username) {
-        throw new Error("Please choose a username.");
+        throw new Error(t("auth.signup.usernameRequired"));
       }
       if (!isValidUsername(username)) {
-        throw new Error(USERNAME_HINT);
+        throw new Error(t("auth.signup.usernameHint"));
       }
 
       const supabase = getSupabase();
@@ -281,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (existingUsername) {
-        throw new Error("That username is already taken.");
+        throw new Error(t("auth.signup.usernameTaken"));
       }
 
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -301,22 +309,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (signUpError) {
         const message = getErrorMessage(
           signUpError,
-          "Unable to create your account."
+          t("auth.signup.failed")
         );
         setError(message);
         throw new Error(message);
       }
 
       if (data.user && !data.session) {
-        throw new Error(
-          "Account created. Please check your email to confirm your address before signing in."
-        );
+        throw new Error(t("auth.signup.checkEmail"));
       }
 
       await applySession(data.session);
       await claimReferralAfterSignup();
     },
-    [applySession]
+    [applySession, t]
   );
 
   const signOut = useCallback(async () => {

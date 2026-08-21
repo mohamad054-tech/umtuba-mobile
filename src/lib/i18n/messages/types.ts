@@ -141,6 +141,14 @@ export type MobileMessages = {
   "auth.signup.haveAccount": string;
   "auth.signup.signIn": string;
   "auth.signup.failed": string;
+  "auth.signup.usernameHint": string;
+  "auth.signup.usernameRequired": string;
+  "auth.signup.usernameTaken": string;
+  "auth.signup.fullNameRequired": string;
+  "auth.signup.emailInvalid": string;
+  "auth.signup.passwordRequired": string;
+  "auth.signup.passwordMin": string;
+  "auth.signup.checkEmail": string;
   "auth.forgot.title": string;
   "auth.forgot.subtitle": string;
   "auth.forgot.submit": string;

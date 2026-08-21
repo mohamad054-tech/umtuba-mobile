@@ -9,14 +9,12 @@ import {
 } from "react-native";
 
 import { AuthScreen } from "@/components/AuthScreen";
-import { useTranslation } from "@/src/lib/i18n";
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
-import {
-  getReferralAttribution,
-  saveReferralAttribution,
-} from "@/src/lib/auth/referralAttribution";
+import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
+import { signupValidationErrorKey } from "@/src/lib/auth/signupForm";
+import { useTranslation } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/colors";
 
 export default function SignupScreen() {
@@ -28,7 +26,6 @@ export default function SignupScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,13 +34,8 @@ export default function SignupScreen() {
       typeof params.ref === "string" ? params.ref : null
     );
     if (fromParam) {
-      setReferralCode(fromParam);
       void saveReferralAttribution(fromParam);
-      return;
     }
-    void getReferralAttribution().then(({ code }) => {
-      if (code) setReferralCode(code);
-    });
   }, [params.ref]);
 
   if (!loading && session && passwordRecoveryPending) {
@@ -58,21 +50,25 @@ export default function SignupScreen() {
     setBusy(true);
     setError(null);
     try {
-      if (referralCode) {
-        await saveReferralAttribution(referralCode);
+      const validationKey = signupValidationErrorKey({
+        fullName,
+        username,
+        email,
+        password,
+      });
+      if (validationKey) {
+        setError(t(validationKey));
+        return;
       }
       await signUp({
         email,
         password,
         fullName,
         username,
-        referralCode: referralCode || null,
       });
       router.replace(POST_AUTH_HREF);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("auth.signup.failed")
-      );
+      setError(err instanceof Error ? err.message : t("auth.signup.failed"));
     } finally {
       setBusy(false);
     }
@@ -139,15 +135,6 @@ export default function SignupScreen() {
         autoComplete="new-password"
         textContentType="newPassword"
         accessibilityLabel={t("auth.signup.password")}
-      />
-      <TextInput
-        style={styles.input}
-        autoCapitalize="characters"
-        placeholder={t("auth.signup.referral")}
-        placeholderTextColor={colors.textSubtle}
-        value={referralCode}
-        onChangeText={setReferralCode}
-        accessibilityLabel={t("auth.signup.referralA11y")}
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">

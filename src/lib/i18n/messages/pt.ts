@@ -148,6 +148,16 @@ export const ptMessages: MobileMessages = {
   "auth.signup.haveAccount": "Já tem uma conta?",
   "auth.signup.signIn": "Entrar",
   "auth.signup.failed": "Não foi possível criar sua conta.",
+  "auth.signup.usernameHint":
+    "Use 3–24 caracteres: letras minúsculas, números, pontos ou sublinhados.",
+  "auth.signup.usernameRequired": "O nome de usuário é obrigatório.",
+  "auth.signup.usernameTaken": "Esse nome de usuário já está em uso.",
+  "auth.signup.fullNameRequired": "O nome completo é obrigatório.",
+  "auth.signup.emailInvalid": "Digite um endereço de e-mail válido.",
+  "auth.signup.passwordRequired": "A senha é obrigatória.",
+  "auth.signup.passwordMin": "A senha deve ter pelo menos 6 caracteres.",
+  "auth.signup.checkEmail":
+    "Conta criada. Confirme seu e-mail antes de entrar.",
   "auth.forgot.title": "Redefinir senha",
   "auth.forgot.subtitle":
     "Vamos enviar um link para você escolher uma senha nova.",
