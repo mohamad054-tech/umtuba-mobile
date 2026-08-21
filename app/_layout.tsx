@@ -13,6 +13,7 @@ import { I18nProvider, useI18n, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import { GLOBAL_STACK_HEADER_OPTIONS } from "@/src/lib/nav/globalBack";
+import { WatchEntryTracker } from "@/src/lib/nav/WatchEntryTracker";
 import {
   establishEmailConfirmSession,
   isEmailConfirmCallbackUrl,
@@ -239,6 +240,7 @@ export default function RootLayout() {
             <StatusBar style="light" />
             <SplashGate>
               <DeepLinkHandler />
+              <WatchEntryTracker />
               <PushNotificationsBridge />
               <LocalizedStack />
             </SplashGate>

@@ -241,6 +241,7 @@ export const ptMessages: MobileMessages = {
   "watch.autoNext": "Próximo auto",
   "watch.muteVideo": "Silenciar vídeo",
   "watch.unmuteVideo": "Ativar o som do vídeo",
+  "watch.pressBackAgainToExit": "Toque em Voltar novamente para sair de Assistir",
 
   "discover.loading": "Carregando Descobrir…",
   "discover.unavailable": "Descobrir indisponível",

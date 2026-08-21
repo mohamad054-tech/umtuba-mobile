@@ -238,6 +238,7 @@ export const frMessages: MobileMessages = {
   "watch.autoNext": "Suivant auto",
   "watch.muteVideo": "Couper le son de la vidéo",
   "watch.unmuteVideo": "Activer le son de la vidéo",
+  "watch.pressBackAgainToExit": "Appuyez encore sur Retour pour quitter Regarder",
 
   "discover.loading": "Chargement de Découvrir…",
   "discover.unavailable": "Découvrir indisponible",

@@ -1,4 +1,9 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -85,6 +90,16 @@ import {
   watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
+import {
+  previousRouteNameFromState,
+} from "@/src/lib/nav/globalBack";
+import {
+  peekWatchEntryHref,
+  resolveWatchExitNavigation,
+  resolveWatchRootBack,
+  shouldConsumeHardwareBack,
+  shouldInterceptWatchRootBack,
+} from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { colors } from "@/src/theme/colors";
 
@@ -104,6 +119,7 @@ function toLifecycleState(state: AppStateStatus): AppLifecycleState {
 export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
   const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
@@ -139,6 +155,7 @@ export default function WatchScreen() {
   );
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [preparingShare, setPreparingShare] = useState(false);
+  const [exitHintVisible, setExitHintVisible] = useState(false);
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -147,6 +164,10 @@ export default function WatchScreen() {
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
   const programmaticAdvanceUntilRef = useRef(0);
+  const armedUntilMsRef = useRef<number | null>(null);
+  const screenFocusedRef = useRef(true);
+  const commentPostIdRef = useRef<number | null>(null);
+  const exitHintVisibleRef = useRef(false);
 
   const claimActiveIndex = useCallback((nextIndex: number) => {
     const safeIndex = sanitizeWatchListIndex(nextIndex);
@@ -175,6 +196,7 @@ export default function WatchScreen() {
   useFocusEffect(
     useCallback(() => {
       setScreenFocused(true);
+      screenFocusedRef.current = true;
       void Promise.all([loadBlockedUsers(), loadHiddenPostIds()]).then(
         ([users, posts]) => {
           setBlockedUserIds(new Set(users.map((row) => row.userId)));
@@ -182,10 +204,18 @@ export default function WatchScreen() {
         }
       );
       return () => {
+        screenFocusedRef.current = false;
         setScreenFocused(false);
+        armedUntilMsRef.current = null;
+        exitHintVisibleRef.current = false;
+        setExitHintVisible(false);
       };
     }, [])
   );
+
+  useEffect(() => {
+    commentPostIdRef.current = commentPostId;
+  }, [commentPostId]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -224,28 +254,115 @@ export default function WatchScreen() {
     videosLengthRef.current = visibleVideos.length;
   }, [visibleVideos.length]);
 
+  const clearExitArm = useCallback(() => {
+    armedUntilMsRef.current = null;
+    if (exitHintVisibleRef.current) {
+      exitHintVisibleRef.current = false;
+      setExitHintVisible(false);
+    }
+  }, []);
+
+  const armWatchExit = useCallback((armedUntilMs: number) => {
+    armedUntilMsRef.current = armedUntilMs;
+    exitHintVisibleRef.current = true;
+    setExitHintVisible(true);
+  }, []);
+
+  const exitWatchToEntry = useCallback(() => {
+    const state = navigation.getState() as
+      | { index?: number; routes?: Array<{ name?: string }> }
+      | undefined;
+    const decision = resolveWatchExitNavigation({
+      entryHref: peekWatchEntryHref(),
+      canGoBack: navigation.canGoBack(),
+      previousRouteName: previousRouteNameFromState(state),
+    });
+    clearExitArm();
+    if (decision.action === "history-back") {
+      router.back();
+      return decision;
+    }
+    if (decision.action === "replace") {
+      router.replace(decision.href as never);
+      return decision;
+    }
+    return decision;
+  }, [clearExitArm, navigation, router]);
+
+  const decideWatchRootBack = useCallback(() => {
+    return resolveWatchRootBack({
+      nowMs: Date.now(),
+      armedUntilMs: armedUntilMsRef.current,
+      nestedOverlayOpen: commentPostIdRef.current != null,
+      atWatchRoot: screenFocusedRef.current,
+    });
+  }, []);
+
   useEffect(() => {
-    if (Platform.OS !== "android") return;
+    if (!shouldInterceptWatchRootBack(Platform.OS)) return;
 
     const onBack = () => {
-      if (!screenFocused) return false;
-      if (activeIndexRef.current > 0) {
-        const prev = activeIndexRef.current - 1;
-        const offset = resolveWatchScrollOffset(prev, itemHeightRef.current);
-        if (offset != null) {
-          programmaticAdvanceUntilRef.current =
-            Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
-          listRef.current?.scrollToOffset({ offset, animated: true });
-          claimActiveIndexRef.current(prev);
-        }
+      const decision = decideWatchRootBack();
+      if (decision.action === "close-nested") {
+        setCommentPostId(null);
         return true;
+      }
+      if (decision.action === "arm-exit") {
+        armWatchExit(decision.armedUntilMs);
+        return true;
+      }
+      if (decision.action === "exit") {
+        const exitNav = exitWatchToEntry();
+        return shouldConsumeHardwareBack(decision, exitNav);
       }
       return false;
     };
 
     const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
     return () => sub.remove();
-  }, [screenFocused]);
+  }, [armWatchExit, decideWatchRootBack, exitWatchToEntry]);
+
+  useEffect(() => {
+    if (!shouldInterceptWatchRootBack(Platform.OS)) return;
+
+    const unsubscribe = navigation.addListener("beforeRemove", (event) => {
+      const actionType = (
+        event as { data?: { action?: { type?: string } } }
+      ).data?.action?.type;
+      if (
+        actionType &&
+        actionType !== "GO_BACK" &&
+        actionType !== "POP" &&
+        actionType !== "POP_TO_TOP"
+      ) {
+        return;
+      }
+      const decision = decideWatchRootBack();
+      if (decision.action === "close-nested") {
+        event.preventDefault();
+        setCommentPostId(null);
+        return;
+      }
+      if (decision.action === "arm-exit") {
+        event.preventDefault();
+        armWatchExit(decision.armedUntilMs);
+      }
+    });
+    return unsubscribe;
+  }, [armWatchExit, decideWatchRootBack, navigation]);
+
+  useEffect(() => {
+    if (!exitHintVisible) return;
+    const armedUntilMs = armedUntilMsRef.current;
+    if (armedUntilMs == null) return;
+    const waitMs = Math.max(0, armedUntilMs - Date.now());
+    const timer = setTimeout(() => {
+      if (armedUntilMsRef.current === armedUntilMs) {
+        clearExitArm();
+      }
+    }, waitMs);
+    return () => clearTimeout(timer);
+  }, [clearExitArm, exitHintVisible]);
 
   const loadInitial = useCallback(
     async (opts?: { soft?: boolean }) => {
@@ -801,6 +918,16 @@ export default function WatchScreen() {
     return null;
   }, [endReached, loadingMore, t, videos.length]);
 
+  const exitHint = exitHintVisible ? (
+    <View
+      style={[styles.exitHint, { bottom: insets.bottom + 72 }]}
+      pointerEvents="none"
+      accessibilityLiveRegion="polite"
+    >
+      <Text style={styles.exitHintText}>{t("watch.pressBackAgainToExit")}</Text>
+    </View>
+  ) : null;
+
   if (loading) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -811,6 +938,7 @@ export default function WatchScreen() {
           accessibilityLabel={t("watch.loading")}
         />
         <Text style={styles.hint}>{t("watch.loading")}</Text>
+        {exitHint}
       </View>
     );
   }
@@ -830,6 +958,7 @@ export default function WatchScreen() {
         >
           <Text style={styles.retryText}>{t("actions.retry")}</Text>
         </Pressable>
+        {exitHint}
       </View>
     );
   }
@@ -848,6 +977,7 @@ export default function WatchScreen() {
         >
           <Text style={styles.retryText}>{t("actions.refresh")}</Text>
         </Pressable>
+        {exitHint}
       </View>
     );
   }
@@ -929,6 +1059,7 @@ export default function WatchScreen() {
           <Text style={styles.preparingText}>{t("watch.preparingVideo")}</Text>
         </View>
       ) : null}
+      {exitHint}
       <CommentsSheet
         visible={commentPostId != null}
         postId={commentPostId}
@@ -1040,5 +1171,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     flex: 1,
+  },
+  exitHint: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 5,
+    borderRadius: 12,
+    backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  exitHintText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

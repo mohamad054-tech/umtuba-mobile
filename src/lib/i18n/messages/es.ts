@@ -239,6 +239,7 @@ export const esMessages: MobileMessages = {
   "watch.autoNext": "Siguiente auto",
   "watch.muteVideo": "Silenciar video",
   "watch.unmuteVideo": "Activar sonido del video",
+  "watch.pressBackAgainToExit": "Pulsa Atrás de nuevo para salir de Ver",
 
   "discover.loading": "Cargando Descubrir…",
   "discover.unavailable": "Descubrir no disponible",

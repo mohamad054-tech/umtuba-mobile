@@ -233,4 +233,17 @@ describe("catalog completeness", () => {
       "مشاركة الفيديو كفيديو"
     );
   });
+
+  it("localizes Watch double-back exit hint", () => {
+    expect(enMessages["watch.pressBackAgainToExit"]).toBe(
+      "Press Back again to exit Watch"
+    );
+    expect(MESSAGE_CATALOGS.ar["watch.pressBackAgainToExit"]).toBe(
+      "اضغط رجوع مرة أخرى للخروج من شاهد"
+    );
+    expect(MESSAGE_CATALOGS.fr["watch.pressBackAgainToExit"]).toMatch(/Regarder/);
+    expect(MESSAGE_CATALOGS.es["watch.pressBackAgainToExit"]).toMatch(/Ver/);
+    expect(MESSAGE_CATALOGS.de["watch.pressBackAgainToExit"]).toMatch(/Ansehen/);
+    expect(MESSAGE_CATALOGS.pt["watch.pressBackAgainToExit"]).toMatch(/Assistir/);
+  });
 });

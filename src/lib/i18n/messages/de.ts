@@ -243,6 +243,7 @@ export const deMessages: MobileMessages = {
   "watch.autoNext": "Auto-weiter",
   "watch.muteVideo": "Video stummschalten",
   "watch.unmuteVideo": "Ton des Videos einschalten",
+  "watch.pressBackAgainToExit": "Erneut auf Zurück tippen, um Ansehen zu verlassen",
 
   "discover.loading": "Entdecken wird geladen…",
   "discover.unavailable": "Entdecken nicht verfügbar",
