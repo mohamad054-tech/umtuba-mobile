@@ -48,6 +48,8 @@ describe("internal route labels", () => {
     });
     expect(globalHeaderBackSlot(false)).toBe("left");
     expect(globalHeaderBackSlot(true)).toBe("right");
+    // IdentityHeader uses the same slot so EN keeps the arrow leading-left
+    // and AR places it trailing-right without I18nManager double-flip.
     expect(isRedirectOnlyRoute("(tabs)")).toBe(false);
     expect(isRedirectOnlyRoute("index")).toBe(true);
     expect(isValidHistoryPrevious("(tabs)", "/settings")).toBe(true);

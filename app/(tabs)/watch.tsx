@@ -96,6 +96,7 @@ import {
 import {
   peekWatchEntryHref,
   resolveWatchExitNavigation,
+  resolveWatchHeaderArrowNavigation,
   resolveWatchRootBack,
   shouldConsumeHardwareBack,
   shouldInterceptWatchRootBack,
@@ -287,6 +288,27 @@ export default function WatchScreen() {
       return decision;
     }
     return decision;
+  }, [clearExitArm, navigation, router]);
+
+  const onWatchHeaderArrow = useCallback(() => {
+    if (commentPostIdRef.current != null) {
+      setCommentPostId(null);
+      return;
+    }
+    const state = navigation.getState() as
+      | { index?: number; routes?: Array<{ name?: string }> }
+      | undefined;
+    const decision = resolveWatchHeaderArrowNavigation({
+      entryHref: peekWatchEntryHref(),
+      canGoBack: navigation.canGoBack(),
+      previousRouteName: previousRouteNameFromState(state),
+    });
+    clearExitArm();
+    if (decision.action === "history-back") {
+      router.back();
+      return;
+    }
+    router.replace(decision.href as never);
   }, [clearExitArm, navigation, router]);
 
   const decideWatchRootBack = useCallback(() => {
@@ -967,7 +989,7 @@ export default function WatchScreen() {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
-        <IdentityHeader title={t("watch.title")} />
+        <IdentityHeader title={t("watch.title")} onBack={onWatchHeaderArrow} />
         <Text style={styles.hint}>{t("watch.empty")}</Text>
         <Pressable
           style={styles.retry}
@@ -985,12 +1007,6 @@ export default function WatchScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <View
-        style={[styles.header, { paddingTop: insets.top }]}
-        pointerEvents="box-none"
-      >
-        <IdentityHeader title={t("watch.title")} />
-      </View>
       {error ? (
         <View style={[styles.banner, { top: insets.top + 48 }]}>
           <Text style={styles.bannerText}>{error}</Text>
@@ -1050,6 +1066,13 @@ export default function WatchScreen() {
           }, 100);
         }}
       />
+      <View
+        style={[styles.header, { paddingTop: insets.top }]}
+        pointerEvents="box-none"
+        collapsable={false}
+      >
+        <IdentityHeader title={t("watch.title")} onBack={onWatchHeaderArrow} />
+      </View>
       {preparingShare ? (
         <View style={styles.preparing} pointerEvents="none">
           <ActivityIndicator
@@ -1090,7 +1113,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 2,
+    zIndex: 20,
+    elevation: 20,
   },
   banner: {
     position: "absolute",

@@ -21,6 +21,7 @@ import { colors } from "@/src/theme/colors";
 
 type GlobalBackButtonProps = {
   tintColor?: ColorValue;
+  onPress?: () => void;
 };
 
 function hasOtherUserParam(value: string | string[] | undefined): boolean {
@@ -56,8 +57,10 @@ export function useGlobalBack() {
 
 export function GlobalBackButton({
   tintColor = colors.text,
+  onPress: onPressOverride,
 }: GlobalBackButtonProps) {
-  const onPress = useGlobalBack();
+  const defaultOnPress = useGlobalBack();
+  const onPress = onPressOverride ?? defaultOnPress;
   const { t, locale } = useTranslation();
 
   return (

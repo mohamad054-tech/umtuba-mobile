@@ -11,7 +11,9 @@ import {
   noteWatchNavPath,
   peekWatchEntryHref,
   resetWatchEntryContextForTests,
+  WATCH_HEADER_ARROW_IN_APP_FALLBACK,
   resolveWatchExitNavigation,
+  resolveWatchHeaderArrowNavigation,
   resolveWatchRootBack,
   shouldConsumeHardwareBack,
   shouldInterceptWatchRootBack,
@@ -235,6 +237,53 @@ describe("resolveWatchExitNavigation", () => {
   });
 });
 
+describe("resolveWatchHeaderArrowNavigation", () => {
+  it("exits on one tap using the same destinations as hardware exit", () => {
+    expect(
+      resolveWatchHeaderArrowNavigation({
+        entryHref: "/(tabs)/discover",
+        canGoBack: true,
+        previousRouteName: "profile/index",
+      })
+    ).toEqual({ action: "history-back" });
+    expect(
+      resolveWatchHeaderArrowNavigation({
+        entryHref: "/(tabs)/create",
+        canGoBack: true,
+        previousRouteName: "index",
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/create" });
+  });
+
+  it("never system-exits — session root replaces in-app to Discover", () => {
+    expect(WATCH_HEADER_ARROW_IN_APP_FALLBACK).toBe("/(tabs)/discover");
+    expect(
+      resolveWatchHeaderArrowNavigation({
+        entryHref: null,
+        canGoBack: true,
+        previousRouteName: "index",
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/discover" });
+  });
+
+  it("does not arm double-back", () => {
+    const firstHardware = resolveWatchRootBack({
+      nowMs: 10_000,
+      armedUntilMs: null,
+      nestedOverlayOpen: false,
+      atWatchRoot: true,
+    });
+    expect(firstHardware.action).toBe("arm-exit");
+    expect(
+      resolveWatchHeaderArrowNavigation({
+        entryHref: "/(tabs)/discover",
+        canGoBack: false,
+        previousRouteName: null,
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/discover" });
+  });
+});
+
 describe("platform intercept", () => {
   it("intercepts Android hardware Back and leaves iOS alone", () => {
     expect(shouldInterceptWatchRootBack("android")).toBe(true);
@@ -255,7 +304,7 @@ describe("platform intercept", () => {
 });
 
 describe("global Back elsewhere stays unchanged", () => {
-  it("still no-ops the Watch tab header and keeps other-tab policy", () => {
+  it("keeps Watch Global Back as noop; header arrow is a separate control", () => {
     expect(
       resolveGlobalBack({
         canGoBack: true,

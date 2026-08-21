@@ -209,6 +209,29 @@ export function resolveWatchExitNavigation(input: {
   return { action: "system-exit" };
 }
 
+/**
+ * Visible Watch header arrow: one tap exits Watch.
+ * Does not arm double-back. Does not finish the Android activity.
+ * Session-root fallback stays in-app (Discover) so the control is never dead.
+ */
+export const WATCH_HEADER_ARROW_IN_APP_FALLBACK = "/(tabs)/discover" as const;
+
+export type WatchHeaderArrowDecision =
+  | { action: "history-back" }
+  | { action: "replace"; href: string };
+
+export function resolveWatchHeaderArrowNavigation(input: {
+  entryHref: string | null;
+  canGoBack: boolean;
+  previousRouteName: string | null;
+}): WatchHeaderArrowDecision {
+  const exit = resolveWatchExitNavigation(input);
+  if (exit.action === "system-exit") {
+    return { action: "replace", href: WATCH_HEADER_ARROW_IN_APP_FALLBACK };
+  }
+  return exit;
+}
+
 /** Android hardware/system Back only. iOS must not fake a hardware Back. */
 export function shouldInterceptWatchRootBack(
   platform: "ios" | "android" | string
