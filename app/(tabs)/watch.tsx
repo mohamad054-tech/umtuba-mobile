@@ -102,6 +102,7 @@ import {
   shouldInterceptWatchRootBack,
 } from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
+import { watchHeaderOverlayLayerStyle } from "@/src/lib/watch/watchHeaderOverlay";
 import { colors } from "@/src/theme/colors";
 
 const { height: RAW_WINDOW_HEIGHT } = Dimensions.get("window");
@@ -1067,7 +1068,11 @@ export default function WatchScreen() {
         }}
       />
       <View
-        style={[styles.header, { paddingTop: insets.top }]}
+        style={[
+          styles.header,
+          watchHeaderOverlayLayerStyle(Platform.OS),
+          { paddingTop: insets.top },
+        ]}
         pointerEvents="box-none"
         collapsable={false}
       >
@@ -1113,8 +1118,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
-    elevation: 20,
   },
   banner: {
     position: "absolute",
