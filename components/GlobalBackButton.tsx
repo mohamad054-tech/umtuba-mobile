@@ -5,8 +5,15 @@ import {
   useRouter,
   useSegments,
 } from "expo-router";
-import { useCallback, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, type ColorValue } from "react-native";
+import { useCallback, useEffect, type ReactNode } from "react";
+import {
+  BackHandler,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  type ColorValue,
+} from "react-native";
 
 import { useTranslation } from "@/src/lib/i18n";
 import { isRtlLocale } from "@/src/lib/i18n/locales";
@@ -14,8 +21,10 @@ import { backGlyph } from "@/src/lib/i18n/rtl";
 import {
   applyGlobalBackDecision,
   globalHeaderBackSlot,
+  isOriginAwareProfileStack,
   previousRouteNameFromState,
   resolveGlobalBack,
+  type GlobalBackDecision,
 } from "@/src/lib/nav/globalBack";
 import { isFollowListPath } from "@/src/lib/profile/followListNav";
 import {
@@ -29,8 +38,7 @@ type GlobalBackButtonProps = {
   onPress?: () => void;
 };
 
-export function useGlobalBack() {
-  const router = useRouter();
+export function useResolvedGlobalBack() {
   const navigation = useNavigation();
   const pathname = usePathname();
   const segments = useSegments();
@@ -46,11 +54,11 @@ export function useGlobalBack() {
   const profileOrigin = parseProfileNavOrigin(params.from);
   const onFollowList = isFollowListPath(pathname, segments);
 
-  return useCallback(() => {
+  return useCallback((): GlobalBackDecision => {
     const state = navigation.getState() as
       | { index?: number; routes?: Array<{ name?: string }> }
       | undefined;
-    const decision = resolveGlobalBack({
+    return resolveGlobalBack({
       canGoBack: navigation.canGoBack(),
       currentPath: pathname,
       segments,
@@ -63,10 +71,6 @@ export function useGlobalBack() {
       followListOwnerId: onFollowList ? params.id : null,
       followListOwnerUsername: onFollowList ? params.u : null,
     });
-    applyGlobalBackDecision(decision, {
-      back: () => router.back(),
-      replace: (href) => router.replace(href as never),
-    });
   }, [
     navigation,
     onFollowList,
@@ -78,9 +82,74 @@ export function useGlobalBack() {
     pathname,
     profileHasOtherUser,
     profileOrigin,
-    router,
     segments,
   ]);
+}
+
+export function useGlobalBack() {
+  const router = useRouter();
+  const resolve = useResolvedGlobalBack();
+
+  return useCallback(() => {
+    applyGlobalBackDecision(resolve(), {
+      back: () => router.back(),
+      replace: (href) => router.replace(href as never),
+    });
+  }, [resolve, router]);
+}
+
+/**
+ * Header Back, Android hardware Back, and iOS swipe-pop share one policy
+ * on stacked Profile / follow-list routes. Own Profile tab is untouched.
+ */
+export function useStackedOriginBackEffects() {
+  const resolve = useResolvedGlobalBack();
+  const router = useRouter();
+  const navigation = useNavigation();
+  const pathname = usePathname();
+  const segments = useSegments();
+  const stacked = isOriginAwareProfileStack(pathname, segments);
+
+  useEffect(() => {
+    if (!stacked || Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      const decision = resolve();
+      if (decision.action === "noop") return false;
+      applyGlobalBackDecision(decision, {
+        back: () => router.back(),
+        replace: (href) => router.replace(href as never),
+      });
+      return true;
+    });
+    return () => sub.remove();
+  }, [resolve, router, stacked]);
+
+  useEffect(() => {
+    if (!stacked) return;
+    const unsubscribe = navigation.addListener("beforeRemove", (event) => {
+      const actionType = (
+        event as { data?: { action?: { type?: string } } }
+      ).data?.action?.type;
+      if (
+        actionType &&
+        actionType !== "GO_BACK" &&
+        actionType !== "POP" &&
+        actionType !== "POP_TO_TOP"
+      ) {
+        return;
+      }
+      const decision = resolve();
+      if (decision.action === "history-back") return;
+      event.preventDefault();
+      if (decision.action === "replace") {
+        applyGlobalBackDecision(decision, {
+          back: () => router.back(),
+          replace: (href) => router.replace(href as never),
+        });
+      }
+    });
+    return unsubscribe;
+  }, [navigation, resolve, router, stacked]);
 }
 
 export function GlobalBackButton({

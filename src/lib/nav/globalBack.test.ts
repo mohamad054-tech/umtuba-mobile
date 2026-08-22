@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { resetProfileBackContextForTests } from "./profileBackContext";
 
 import {
   GLOBAL_HEADER_LAYOUT_DIRECTION,
@@ -15,6 +17,10 @@ import {
   resolveGlobalBack,
   sanitizeBackLabel,
 } from "./globalBack";
+
+beforeEach(() => {
+  resetProfileBackContextForTests();
+});
 
 describe("normalizeNavPath", () => {
   it("strips groups, query, and trailing slashes", () => {
@@ -242,7 +248,26 @@ describe("resolveGlobalBack", () => {
     ).toEqual({ action: "replace", href: "/(tabs)/profile" });
   });
 
-  it("sends stack other-user Profile back through history or Watch", () => {
+  it("origin-backs stacked other-user Profile instead of popping onto (tabs)", () => {
+    expect(
+      resolveGlobalBack({
+        canGoBack: true,
+        currentPath: "/profile",
+        segments: ["profile"],
+        previousRouteName: "(tabs)",
+        profileHasOtherUser: true,
+        profileOrigin: "watch",
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
+    expect(
+      resolveGlobalBack({
+        canGoBack: false,
+        currentPath: "/profile",
+        segments: ["profile"],
+        profileHasOtherUser: true,
+        profileOrigin: "home",
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/discover" });
     expect(
       resolveGlobalBack({
         canGoBack: true,
@@ -251,15 +276,7 @@ describe("resolveGlobalBack", () => {
         previousRouteName: "(tabs)",
         profileHasOtherUser: true,
       })
-    ).toEqual({ action: "history-back" });
-    expect(
-      resolveGlobalBack({
-        canGoBack: false,
-        currentPath: "/profile",
-        segments: ["profile"],
-        profileHasOtherUser: true,
-      })
-    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
+    ).toEqual({ action: "noop" });
   });
 
   it("never applies a history-back that would exit the app", () => {

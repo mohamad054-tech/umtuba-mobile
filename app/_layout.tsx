@@ -168,6 +168,7 @@ function LocalizedStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "" }} />
       <Stack.Screen name="profile/index" options={{ title: t("nav.profile") }} />
       <Stack.Screen name="profile/user" options={{ title: t("nav.profile") }} />
+      <Stack.Screen name="profile/member" options={{ title: t("nav.profile") }} />
       <Stack.Screen
         name="profile/followers"
         options={{ title: t("profile.followers") }}

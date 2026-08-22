@@ -2,7 +2,9 @@ import {
   useFocusEffect,
   useLocalSearchParams,
   useNavigation,
+  usePathname,
   useRouter,
+  useSegments,
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +41,8 @@ import {
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { rememberProfileBackContext } from "@/src/lib/nav/profileBackContext";
+import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
 import {
   applySuccessfulDeleteToList,
@@ -98,6 +102,7 @@ import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
 import {
+  isWatchRootSurface,
   peekWatchEntryHref,
   resolveWatchExitNavigation,
   resolveWatchHeaderArrowNavigation,
@@ -127,6 +132,8 @@ export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
+  const pathname = usePathname();
+  const segments = useSegments();
   const { user } = useAuth();
   const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
@@ -346,6 +353,7 @@ export default function WatchScreen() {
     if (!shouldInterceptWatchRootBack(Platform.OS)) return;
 
     const onBack = () => {
+      if (!isWatchRootSurface(pathname, segments)) return false;
       const decision = decideWatchRootBack();
       if (decision.action === "close-nested") {
         setCommentPostId(null);
@@ -364,12 +372,13 @@ export default function WatchScreen() {
 
     const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
     return () => sub.remove();
-  }, [armWatchExit, decideWatchRootBack, exitWatchToEntry]);
+  }, [armWatchExit, decideWatchRootBack, exitWatchToEntry, pathname, segments]);
 
   useEffect(() => {
     if (!shouldInterceptWatchRootBack(Platform.OS)) return;
 
     const unsubscribe = navigation.addListener("beforeRemove", (event) => {
+      if (!isWatchRootSurface(pathname, segments)) return;
       const actionType = (
         event as { data?: { action?: { type?: string } } }
       ).data?.action?.type;
@@ -393,7 +402,7 @@ export default function WatchScreen() {
       }
     });
     return unsubscribe;
-  }, [armWatchExit, decideWatchRootBack, navigation]);
+  }, [armWatchExit, decideWatchRootBack, navigation, pathname, segments]);
 
   useEffect(() => {
     if (!exitHintVisible) return;
@@ -922,6 +931,14 @@ export default function WatchScreen() {
         onOpenProfile={() => {
           const href = buildWatchCreatorProfileHref(item.author);
           if (href) {
+            rememberProfileBackContext({
+              origin: "watch",
+              via: null,
+              listId: null,
+              listUsername: null,
+              ownerId: parseProfileUserId(item.author.id),
+              ownerUsername: item.author.username ?? null,
+            });
             router.push(href as never);
           }
         }}

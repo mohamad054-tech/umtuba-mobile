@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resolveGlobalBack } from "./globalBack";
+import { resetProfileBackContextForTests } from "./profileBackContext";
 import {
   VIDEO_HISTORY_STACK_GROWTH,
   WATCH_DOUBLE_BACK_TIMEOUT_MS,
@@ -22,6 +23,7 @@ import {
 
 afterEach(() => {
   resetWatchEntryContextForTests();
+  resetProfileBackContextForTests();
 });
 
 describe("watch root exit contract", () => {
@@ -327,7 +329,8 @@ describe("global Back elsewhere stays unchanged", () => {
         segments: ["profile"],
         previousRouteName: "(tabs)",
         profileHasOtherUser: true,
+        profileOrigin: "watch",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
   });
 });

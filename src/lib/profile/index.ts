@@ -19,6 +19,7 @@ export {
 } from "@/src/lib/profile/profileNav";
 export {
   FOLLOW_LIST_PATHS,
+  STACKED_MEMBER_PROFILE_PATH,
   buildFollowListHref,
   buildFollowListMemberProfileHref,
   followListOwnerFallbackHref,

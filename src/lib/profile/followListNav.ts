@@ -13,6 +13,9 @@ export const FOLLOW_LIST_PATHS = {
   following: "/profile/following",
 } as const;
 
+/** Distinct from `/profile/user` so Expo can stack member on top of the owner. */
+export const STACKED_MEMBER_PROFILE_PATH = "/profile/member" as const;
+
 export function parseFollowListKind(
   raw: string | string[] | null | undefined
 ): FollowListKind | null {
@@ -85,14 +88,14 @@ export function buildFollowListMemberProfileHref(input: {
     origin,
   });
   if (!href) return null;
-  const [path, query] = href.split("?");
+  const [, query] = href.split("?");
   const params = new URLSearchParams(query);
   params.set("via", input.listKind);
   const listId = parseProfileUserId(input.listOwnerId);
   if (listId) params.set("listId", listId);
   const listUsername = normalizeUsername(input.listOwnerUsername ?? "");
   if (listUsername) params.set("listU", listUsername);
-  return `${path}?${params.toString()}`;
+  return `${STACKED_MEMBER_PROFILE_PATH}?${params.toString()}`;
 }
 
 export function followListOwnerFallbackHref(input: {
@@ -139,5 +142,8 @@ export function followListViaFallbackHref(input: {
 }
 
 export function isStackedProfileHref(href: string): boolean {
-  return href.startsWith(`${STACKED_PROFILE_PATH}?`);
+  return (
+    href.startsWith(`${STACKED_PROFILE_PATH}?`) ||
+    href.startsWith(`${STACKED_MEMBER_PROFILE_PATH}?`)
+  );
 }

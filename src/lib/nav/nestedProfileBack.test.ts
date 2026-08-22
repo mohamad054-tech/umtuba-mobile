@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { resetProfileBackContextForTests } from "./profileBackContext";
 
 import { resolveGlobalBack } from "./globalBack";
 import {
@@ -24,8 +26,12 @@ const EMAN = {
 };
 const VIEWER = "22222222-2222-4222-8222-222222222222";
 
+beforeEach(() => {
+  resetProfileBackContextForTests();
+});
+
 describe("1 Watch -> @eman Profile -> Back -> Watch", () => {
-  it("opens the stack route and history-backs to Watch", () => {
+  it("opens the stack route and origin-backs to Watch when previous is (tabs)", () => {
     const href = buildWatchCreatorProfileHref({
       id: EMAN.userId,
       username: `@${EMAN.username}`,
@@ -43,7 +49,7 @@ describe("1 Watch -> @eman Profile -> Back -> Watch", () => {
         profileHasOtherUser: true,
         profileOrigin: "watch",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
   });
 });
 
@@ -95,7 +101,7 @@ describe("3 Home -> Profile -> Back -> Home", () => {
         profileHasOtherUser: true,
         profileOrigin: "home",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/discover" });
     expect(profileOriginFallbackHref("home")).toBe("/(tabs)/discover");
   });
 });
@@ -111,7 +117,7 @@ describe("4 Search/Discover -> Profile -> Back correct origin", () => {
         profileHasOtherUser: true,
         profileOrigin: "search",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/discover" });
     expect(
       resolveGlobalBack({
         canGoBack: false,
@@ -154,12 +160,12 @@ describe("5 Watch -> Profile -> Follow -> Back -> Watch", () => {
         profileHasOtherUser: true,
         profileOrigin: "watch",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
   });
 });
 
 describe("6 Repeated Watch -> Profile -> Back x5", () => {
-  it("pops back to Watch each time and does not grow video history", () => {
+  it("returns to Watch each time and does not grow video history", () => {
     const stack = ["watch"];
     for (let i = 0; i < 5; i += 1) {
       stack.push("profile/user");
@@ -171,7 +177,7 @@ describe("6 Repeated Watch -> Profile -> Back x5", () => {
         profileHasOtherUser: true,
         profileOrigin: "watch",
       });
-      expect(decision).toEqual({ action: "history-back" });
+      expect(decision).toEqual({ action: "replace", href: "/(tabs)/watch" });
       stack.pop();
     }
     expect(stack).toEqual(["watch"]);

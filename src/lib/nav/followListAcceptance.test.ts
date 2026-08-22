@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { planWatchSignedUrlWork } from "@/src/lib/feed/signedUrlScheduler";
 import {
   FOLLOW_LIST_PATHS,
+  STACKED_MEMBER_PROFILE_PATH,
   buildFollowListHref,
   buildFollowListMemberProfileHref,
 } from "@/src/lib/profile/followListNav";
@@ -27,10 +28,15 @@ import {
   parentFallbackHref,
   resolveGlobalBack,
 } from "./globalBack";
+import { resetProfileBackContextForTests } from "./profileBackContext";
 
 const OWN = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const MEMBER = "33333333-3333-4333-8333-333333333333";
+
+beforeEach(() => {
+  resetProfileBackContextForTests();
+});
 
 function followQueryClient(kind: "followers" | "following", target: string) {
   const eqCalls: Array<[string, string]> = [];
@@ -182,7 +188,7 @@ describe("LIST_USER_TO_PROFILE", () => {
       listOwnerUsername: "eman",
       origin: "watch",
     });
-    expect(href).toContain(`${STACKED_PROFILE_PATH}?`);
+    expect(href).toContain(`${STACKED_MEMBER_PROFILE_PATH}?`);
     expect(href).not.toMatch(/^\/profile\?/);
     expect(href).not.toContain("/(tabs)/profile");
     const params = new URLSearchParams(href!.split("?")[1]);
@@ -252,8 +258,8 @@ describe("BACK_TO_ORIGIN_PROFILE", () => {
     expect(
       resolveGlobalBack({
         canGoBack: false,
-        currentPath: "/profile/user",
-        segments: ["profile", "user"],
+        currentPath: "/profile/member",
+        segments: ["profile", "member"],
         profileHasOtherUser: true,
         profileOrigin: memberParams.get("from"),
         profileVia: memberParams.get("via"),
@@ -286,7 +292,7 @@ describe("WATCH_PROFILE_BACK_REGRESSION", () => {
         profileHasOtherUser: true,
         profileOrigin: "watch",
       })
-    ).toEqual({ action: "history-back" });
+    ).toEqual({ action: "replace", href: "/(tabs)/watch" });
     expect(
       classifySurface({
         path: "/profile/followers",

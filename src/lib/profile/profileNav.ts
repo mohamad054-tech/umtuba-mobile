@@ -68,7 +68,12 @@ export function isStackedProfilePath(
     .filter((part) => !part.startsWith("("))
     .join("/")
     .split("?")[0];
-  return leaf === "profile/user" || leaf.endsWith("profile/user");
+  return (
+    leaf === "profile/user" ||
+    leaf === "profile/member" ||
+    leaf.endsWith("profile/user") ||
+    leaf.endsWith("profile/member")
+  );
 }
 
 export function buildStackedProfileHref(input: {

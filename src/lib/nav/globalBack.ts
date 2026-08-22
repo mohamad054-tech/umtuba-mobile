@@ -4,6 +4,11 @@
  */
 
 import {
+  clearProfileBackContext,
+  isPrimaryTabHref,
+  peekProfileBackContext,
+} from "@/src/lib/nav/profileBackContext";
+import {
   followListOwnerFallbackHref,
   followListViaFallbackHref,
   isFollowListPath,
@@ -34,6 +39,7 @@ export const SECONDARY_PATHS = [
   "/change-password",
   "/profile",
   "/profile/user",
+  "/profile/member",
   "/profile/followers",
   "/profile/following",
   "/messages/[id]",
@@ -223,11 +229,13 @@ export function parentFallbackHref(path: string, segments?: readonly string[]): 
   if (
     n === "/profile" ||
     n === "/profile/user" ||
+    n === "/profile/member" ||
     leaf === "profile" ||
     leaf === "profile/index" ||
-    leaf === "profile/user"
+    leaf === "profile/user" ||
+    leaf === "profile/member"
   ) {
-    return "/(tabs)/watch";
+    return null;
   }
   if (
     n === "/signup" ||
@@ -242,10 +250,76 @@ export function parentFallbackHref(path: string, segments?: readonly string[]): 
   return "/(tabs)/watch";
 }
 
+function firstParam(
+  value: string | string[] | null | undefined
+): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export function isTabContainerPrevious(
+  previousRouteName: string | null | undefined
+): boolean {
+  if (previousRouteName == null || previousRouteName === "") return true;
+  const previous = previousRouteName.trim();
+  if (previous === "(tabs)") return true;
+  if (previous.includes("(tabs)")) return true;
+  const n = normalizeNavPath(previous);
+  const leaf = n.replace(/^\//, "");
+  return TAB_LEAVES.has(leaf);
+}
+
+export function isOriginAwareProfileStack(
+  path: string,
+  segments?: readonly string[]
+): boolean {
+  if (isStackedProfilePath(path, segments)) return true;
+  if (isFollowListPath(path, segments)) return true;
+  const n = normalizeNavPath(path);
+  if (n !== "/profile") return false;
+  return classifySurface({ path, segments }) === "secondary";
+}
+
+export function shouldTrustHistoryBack(input: GlobalBackInput): boolean {
+  if (
+    !input.canGoBack ||
+    !isValidHistoryPrevious(input.previousRouteName, input.currentPath)
+  ) {
+    return false;
+  }
+  if (
+    isOriginAwareProfileStack(input.currentPath, input.segments) &&
+    isTabContainerPrevious(input.previousRouteName)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function withRememberedProfileBack(input: GlobalBackInput): GlobalBackInput {
+  const remembered = peekProfileBackContext();
+  return {
+    ...input,
+    profileOrigin:
+      parseProfileNavOrigin(input.profileOrigin) ?? remembered.origin,
+    profileVia: firstParam(input.profileVia) ?? remembered.via,
+    profileListId: firstParam(input.profileListId) ?? remembered.listId,
+    profileListUsername:
+      firstParam(input.profileListUsername) ?? remembered.listUsername,
+    followListOwnerId:
+      firstParam(input.followListOwnerId) ?? remembered.ownerId,
+    followListOwnerUsername:
+      firstParam(input.followListOwnerUsername) ?? remembered.ownerUsername,
+  };
+}
+
 export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
+  const resolved = withRememberedProfileBack(input);
   const surface = classifySurface({
-    path: input.currentPath,
-    segments: input.segments,
+    path: resolved.currentPath,
+    segments: resolved.segments,
   });
 
   if (surface === "redirect") {
@@ -253,9 +327,9 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
   }
 
   if (surface === "root") {
-    if (input.profileHasOtherUser) {
+    if (resolved.profileHasOtherUser) {
       const originHref = profileOriginFallbackHref(
-        parseProfileNavOrigin(input.profileOrigin)
+        parseProfileNavOrigin(resolved.profileOrigin)
       );
       if (originHref && originHref !== "/(tabs)/profile") {
         return { action: "replace", href: originHref };
@@ -269,32 +343,29 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
     return { action: "noop" };
   }
 
-  const current = normalizeNavPath(input.currentPath);
+  const current = normalizeNavPath(resolved.currentPath);
 
-  if (
-    input.canGoBack &&
-    isValidHistoryPrevious(input.previousRouteName, input.currentPath)
-  ) {
+  if (shouldTrustHistoryBack(resolved)) {
     return { action: "history-back" };
   }
 
-  if (isStackedProfilePath(input.currentPath, input.segments)) {
+  if (isStackedProfilePath(resolved.currentPath, resolved.segments)) {
     const viaHref = followListViaFallbackHref({
-      via: input.profileVia,
-      listOwnerId: input.profileListId,
-      listOwnerUsername: input.profileListUsername,
-      origin: input.profileOrigin,
+      via: resolved.profileVia,
+      listOwnerId: resolved.profileListId,
+      listOwnerUsername: resolved.profileListUsername,
+      origin: resolved.profileOrigin,
     });
     if (viaHref && normalizeNavPath(viaHref) !== current) {
       return { action: "replace", href: viaHref };
     }
   }
 
-  if (isFollowListPath(input.currentPath, input.segments)) {
+  if (isFollowListPath(resolved.currentPath, resolved.segments)) {
     const ownerHref = followListOwnerFallbackHref({
-      ownerId: input.followListOwnerId,
-      ownerUsername: input.followListOwnerUsername,
-      origin: input.profileOrigin,
+      ownerId: resolved.followListOwnerId,
+      ownerUsername: resolved.followListOwnerUsername,
+      origin: resolved.profileOrigin,
     });
     if (ownerHref && normalizeNavPath(ownerHref) !== current) {
       return { action: "replace", href: ownerHref };
@@ -302,13 +373,13 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
   }
 
   const originHref = profileOriginFallbackHref(
-    parseProfileNavOrigin(input.profileOrigin)
+    parseProfileNavOrigin(resolved.profileOrigin)
   );
   if (originHref && normalizeNavPath(originHref) !== current) {
     return { action: "replace", href: originHref };
   }
 
-  const href = parentFallbackHref(input.currentPath, input.segments);
+  const href = parentFallbackHref(resolved.currentPath, resolved.segments);
   if (href && normalizeNavPath(href) !== current) {
     return { action: "replace", href };
   }
@@ -325,6 +396,9 @@ export function applyGlobalBackDecision(
     return "history-back";
   }
   if (decision.action === "replace") {
+    if (isPrimaryTabHref(decision.href)) {
+      clearProfileBackContext();
+    }
     nav.replace(decision.href);
     return "replace";
   }

@@ -1,3 +1,4 @@
+import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -47,6 +48,7 @@ import {
   resolveActiveMobileProfileTab,
   type MobileProfileTabId,
 } from "@/src/lib/profile/profileTabs";
+import { rememberProfileBackContext } from "@/src/lib/nav/profileBackContext";
 import { buildFollowListHref } from "@/src/lib/profile/followListNav";
 import { parseProfileNavOrigin } from "@/src/lib/profile/profileNav";
 import {
@@ -66,6 +68,7 @@ import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
+  useStackedOriginBackEffects();
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const { t, locale } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
@@ -286,13 +289,25 @@ export default function ProfileScreen() {
         otherUserId: otherProfile?.id ?? null,
       });
       if (!targetUserId) return;
+      const origin =
+        parseProfileNavOrigin(params.from) ?? (isOwn ? "profile" : null);
       const href = buildFollowListHref({
         kind,
         targetUserId,
         username: view.username,
-        origin: parseProfileNavOrigin(params.from) ?? (isOwn ? "profile" : null),
+        origin,
       });
-      if (href) router.push(href as never);
+      if (href) {
+        rememberProfileBackContext({
+          origin,
+          via: null,
+          listId: null,
+          listUsername: null,
+          ownerId: targetUserId,
+          ownerUsername: view.username ?? null,
+        });
+        router.push(href as never);
+      }
     },
     [
       isOwn,

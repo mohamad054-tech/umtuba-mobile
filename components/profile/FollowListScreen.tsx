@@ -1,3 +1,4 @@
+import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -13,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTranslation } from "@/src/lib/i18n";
 import { localeRootStyle, localeTextAlign } from "@/src/lib/i18n/rtl";
+import { rememberProfileBackContext } from "@/src/lib/nav/profileBackContext";
 import { buildFollowListMemberProfileHref } from "@/src/lib/profile/followListNav";
 import { parseProfileNavOrigin } from "@/src/lib/profile/profileNav";
 import {
@@ -30,6 +32,7 @@ type FollowListScreenProps = {
 };
 
 export default function FollowListScreen({ kind }: FollowListScreenProps) {
+  useStackedOriginBackEffects();
   const { t, locale } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -98,7 +101,17 @@ export default function FollowListScreen({ kind }: FollowListScreenProps) {
         listOwnerUsername: typeof params.u === "string" ? params.u : null,
         origin,
       });
-      if (href) router.push(href as never);
+      if (href) {
+        rememberProfileBackContext({
+          origin,
+          via: kind,
+          listId: targetUserId,
+          listUsername: typeof params.u === "string" ? params.u : null,
+          ownerId: targetUserId,
+          ownerUsername: typeof params.u === "string" ? params.u : null,
+        });
+        router.push(href as never);
+      }
     },
     [kind, origin, params.u, router, targetUserId]
   );
