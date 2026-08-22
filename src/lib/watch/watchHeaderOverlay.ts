@@ -7,13 +7,24 @@
  * Build 20: header before the list, zIndex 2 — video layer stayed primary.
  * Build 21: header after the list, zIndex 20 — iPhone 13 Watch stalled.
  *
+ * 48c510f moved Android elevation into a fresh object every render. On Fold6
+ * that re-applies native elevation during Watch updates and can tear the
+ * active TextureView surface so ExoPlayer never reaches readyToPlay.
+ *
  * Document order (later sibling) is enough for hits. Never set zIndex on iOS.
+ * Android keeps a module-stable elevation 20 style (same values as 15d9aec).
  */
 
 export type WatchHeaderOverlayLayerStyle = {
   zIndex?: number;
   elevation?: number;
 };
+
+const IOS_HEADER_OVERLAY: WatchHeaderOverlayLayerStyle = Object.freeze({});
+const ANDROID_HEADER_OVERLAY: WatchHeaderOverlayLayerStyle = Object.freeze({
+  zIndex: 20,
+  elevation: 20,
+});
 
 export function shouldPromoteWatchHeaderStackingContext(
   platform: "ios" | "android" | string
@@ -25,7 +36,7 @@ export function watchHeaderOverlayLayerStyle(
   platform: "ios" | "android" | string
 ): WatchHeaderOverlayLayerStyle {
   if (!shouldPromoteWatchHeaderStackingContext(platform)) {
-    return {};
+    return IOS_HEADER_OVERLAY;
   }
-  return { zIndex: 20, elevation: 20 };
+  return ANDROID_HEADER_OVERLAY;
 }

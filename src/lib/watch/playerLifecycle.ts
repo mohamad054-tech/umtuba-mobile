@@ -6,8 +6,8 @@
  * players. Native release is owned by useVideoPlayer / useReleasingSharedObject.
  * JS must detach (mark dead, drop refs) and never call play/pause/mute after.
  *
- * iOS: do not play/pause/seek until AVPlayerItem is ready. Pause-during-replace
- * after a ±1 remount is the Build 15 intermittent "resource unavailable" class.
+ * Do not play/pause/seek until the item is ready. Pause-during-replace
+ * after a remount is the Build 15 intermittent "resource unavailable" class.
  */
 
 import { shouldLoadPlayer } from "./playbackPolicy";
@@ -37,8 +37,10 @@ export function resolveWatchNativePlatform(
 }
 
 /**
- * iOS must not issue play/pause/seek until the item is ready.
- * Mute/volume/loop chrome is always safe. Android may transport immediately.
+ * Do not issue play/pause/seek until the item is ready.
+ * Mute/volume/loop chrome is always safe.
+ * iOS: pause-during-replace after a ±1 remount was Build 15 "resource unavailable".
+ * Android: play/pause on a preparing ExoPlayer can leave TextureView in "loading".
  */
 export function shouldApplyWatchTransport(input: {
   playerAlive: boolean;
@@ -48,7 +50,8 @@ export function shouldApplyWatchTransport(input: {
 }): boolean {
   if (!input.playerAlive) return false;
   if (input.kind === "chrome") return true;
-  if (input.platform === "ios" && !input.itemReady) return false;
+  if (!input.itemReady) return false;
+  void input.platform;
   return true;
 }
 
@@ -92,26 +95,28 @@ export function shouldRecreateWatchPlayer(
 
 export function watchWindowMountedIndexes(
   activeIndex: number,
-  itemCount: number
+  itemCount: number,
+  platform?: string | null
 ): number[] {
   const mounted: number[] = [];
   for (let index = 0; index < itemCount; index += 1) {
-    if (shouldLoadPlayer(index, activeIndex)) {
+    if (shouldLoadPlayer(index, activeIndex, platform)) {
       mounted.push(index);
     }
   }
   return mounted;
 }
 
-/** Indexes that leave the ±1 window and later remount (A→B→C→B remounts 0). */
+/** Indexes that leave the load window and later remount (A→B→C→B remounts 0). */
 export function watchWindowRemounts(
   sequence: number[],
-  itemCount: number
+  itemCount: number,
+  platform?: string | null
 ): number[] {
   const remounted: number[] = [];
   let previous = new Set<number>();
   for (const active of sequence) {
-    const next = new Set(watchWindowMountedIndexes(active, itemCount));
+    const next = new Set(watchWindowMountedIndexes(active, itemCount, platform));
     if (previous.size > 0) {
       for (const index of next) {
         if (!previous.has(index)) {

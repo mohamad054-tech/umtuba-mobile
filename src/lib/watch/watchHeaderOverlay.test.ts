@@ -20,4 +20,13 @@ describe("Watch header overlay vs iOS AVPlayerLayer", () => {
       elevation: 20,
     });
   });
+
+  it("returns module-stable layer refs so Android elevation is not reapplied every render", () => {
+    expect(watchHeaderOverlayLayerStyle("android")).toBe(
+      watchHeaderOverlayLayerStyle("android")
+    );
+    expect(watchHeaderOverlayLayerStyle("ios")).toBe(
+      watchHeaderOverlayLayerStyle("ios")
+    );
+  });
 });

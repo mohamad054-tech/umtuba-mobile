@@ -34,12 +34,29 @@ export function shouldPlayVideo(input: {
   );
 }
 
-/** Preload current + adjacent only (memory-friendly Android feed). */
-export function shouldLoadPlayer(index: number, activeIndex: number): boolean {
+/**
+ * How many neighbors may mount a native player.
+ * iOS: ±1 preload. Android: active only — extra TextureView/ExoPlayer
+ * instances compete for decoders and keep the spinner on Fold6.
+ */
+export function resolveWatchPlayerLoadWindow(
+  platform?: string | null
+): number {
+  return platform === "android" ? 0 : 1;
+}
+
+/** Preload current + platform window. Omit platform to keep the shared ±1 contract. */
+export function shouldLoadPlayer(
+  index: number,
+  activeIndex: number,
+  platform?: string | null
+): boolean {
   if (!Number.isFinite(index) || !Number.isFinite(activeIndex)) {
     return false;
   }
-  return Math.abs(index - activeIndex) <= 1;
+  return (
+    Math.abs(index - activeIndex) <= resolveWatchPlayerLoadWindow(platform)
+  );
 }
 
 /** Append page results without duplicating post ids. */

@@ -90,7 +90,7 @@ const SCRUB_CATCHUP_EPSILON = 0.02;
 export type WatchVideoCardProps = {
   video: WatchVideo;
   isActive: boolean;
-  /** Mount native player only for current + adjacent cards. */
+  /** Mount native player only for the platform load window (iOS ±1, Android active). */
   shouldLoadPlayer: boolean;
   /** Bumps on every active-index change so late play cannot revive the previous card. */
   ownershipGeneration: number;

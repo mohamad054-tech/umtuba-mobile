@@ -344,6 +344,7 @@ describe("A→B→C→B→A player window", () => {
     expect(remounts.filter((index) => index === 0).length).toBeGreaterThan(1);
     for (const active of sequence) {
       expect(watchWindowMountedIndexes(active, 5).length).toBeLessThanOrEqual(3);
+      expect(watchWindowMountedIndexes(active, 5, "android")).toEqual([active]);
     }
   });
 
@@ -366,8 +367,8 @@ describe("A→B→C→B→A player window", () => {
   });
 });
 
-describe("iOS transport waits until item ready", () => {
-  it("blocks play/pause/seek on iOS before ready and allows chrome", () => {
+describe("transport waits until item ready", () => {
+  it("blocks play/pause/seek before ready on both platforms and allows chrome", () => {
     expect(
       shouldApplyWatchTransport({
         playerAlive: true,
@@ -399,13 +400,29 @@ describe("iOS transport waits until item ready", () => {
         kind: "pause",
         platform: "android",
       })
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: false,
+        kind: "play",
+        platform: "android",
+      })
+    ).toBe(false);
     expect(
       shouldApplyWatchTransport({
         playerAlive: true,
         itemReady: true,
         kind: "play",
         platform: "ios",
+      })
+    ).toBe(true);
+    expect(
+      shouldApplyWatchTransport({
+        playerAlive: true,
+        itemReady: true,
+        kind: "play",
+        platform: "android",
       })
     ).toBe(true);
   });

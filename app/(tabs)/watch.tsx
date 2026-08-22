@@ -840,7 +840,7 @@ export default function WatchScreen() {
       <WatchVideoCard
         video={item}
         isActive={index === activeIndex}
-        shouldLoadPlayer={shouldLoadPlayer(index, activeIndex)}
+        shouldLoadPlayer={shouldLoadPlayer(index, activeIndex, Platform.OS)}
         ownershipGeneration={playbackGeneration}
         muted={muted}
         volume={volume}
@@ -1043,7 +1043,7 @@ export default function WatchScreen() {
         windowSize={5}
         maxToRenderPerBatch={3}
         initialNumToRender={2}
-        removeClippedSubviews={Platform.OS === "android"}
+        removeClippedSubviews={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

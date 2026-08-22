@@ -32,6 +32,7 @@ import {
   serializeWatchAutoNextPreference,
   serializeWatchMutedPreference,
   serializeWatchVolumePreference,
+  resolveWatchPlayerLoadWindow,
   shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
@@ -109,6 +110,16 @@ describe("shouldLoadPlayer", () => {
     expect(shouldLoadPlayer(3, 2)).toBe(true);
     expect(shouldLoadPlayer(0, 2)).toBe(false);
     expect(shouldLoadPlayer(4, 2)).toBe(false);
+  });
+
+  it("loads only the active card on Android", () => {
+    expect(resolveWatchPlayerLoadWindow("android")).toBe(0);
+    expect(resolveWatchPlayerLoadWindow("ios")).toBe(1);
+    expect(shouldLoadPlayer(2, 2, "android")).toBe(true);
+    expect(shouldLoadPlayer(1, 2, "android")).toBe(false);
+    expect(shouldLoadPlayer(3, 2, "android")).toBe(false);
+    expect(shouldLoadPlayer(2, 2, "ios")).toBe(true);
+    expect(shouldLoadPlayer(1, 2, "ios")).toBe(true);
   });
 });
 
