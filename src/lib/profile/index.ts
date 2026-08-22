@@ -11,6 +11,13 @@ export {
 } from "@/src/lib/profile/resolveTarget";
 export { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
 export {
+  STACKED_PROFILE_PATH,
+  buildStackedProfileHref,
+  parseProfileNavOrigin,
+  profileOriginFallbackHref,
+  type ProfileNavOrigin,
+} from "@/src/lib/profile/profileNav";
+export {
   listProfileVideos,
   mapProfileVideoRow,
   type ProfileVideoItem,

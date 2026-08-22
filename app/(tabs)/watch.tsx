@@ -30,7 +30,10 @@ import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { REPORT_REASON_KEYS, useTranslation } from "@/src/lib/i18n";
-import { prepareWatchPlaybackUrls } from "@/src/lib/feed/watchPlaybackPrep";
+import {
+  prepareWatchPlaybackUrls,
+  shouldApplyResolvedWatchSrc,
+} from "@/src/lib/feed/watchPlaybackPrep";
 import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
@@ -103,6 +106,7 @@ import {
   shouldInterceptWatchRootBack,
 } from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
+import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
 import { watchHeaderOverlayLayerStyle } from "@/src/lib/watch/watchHeaderOverlay";
 import { colors } from "@/src/theme/colors";
 
@@ -210,6 +214,11 @@ export default function WatchScreen() {
       return () => {
         screenFocusedRef.current = false;
         setScreenFocused(false);
+        const nextGeneration = bumpWatchLeaveGeneration(
+          playbackGenerationRef.current
+        );
+        playbackGenerationRef.current = nextGeneration;
+        setPlaybackGeneration(nextGeneration);
         armedUntilMsRef.current = null;
         exitHintVisibleRef.current = false;
         setExitHintVisible(false);
@@ -503,6 +512,9 @@ export default function WatchScreen() {
       isCurrent: () => urlGenerationRef.current === generation,
       onResolved: (id, src) => {
         if (urlGenerationRef.current !== generation) return;
+        const current = visibleVideosRef.current.find((video) => video.id === id)
+          ?.src;
+        if (!shouldApplyResolvedWatchSrc(current, src)) return;
         patchVideo(id, { src });
       },
     });

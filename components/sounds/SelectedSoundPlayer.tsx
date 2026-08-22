@@ -60,6 +60,12 @@ export function SelectedSoundPlayer({
   }, [loop, muted, player, shouldPlay, volume]);
 
   useEffect(() => {
+    return () => {
+      applyInactiveAudioTeardown(player, { resetPosition: false });
+    };
+  }, [player]);
+
+  useEffect(() => {
     if (!isPlayerAlive(player)) return;
     if (!Number.isFinite(startOffsetMs) || startOffsetMs <= 0) return;
     try {

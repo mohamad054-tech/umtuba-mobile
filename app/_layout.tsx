@@ -167,6 +167,7 @@ function LocalizedStack() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "" }} />
       <Stack.Screen name="profile/index" options={{ title: t("nav.profile") }} />
+      <Stack.Screen name="profile/user" options={{ title: t("nav.profile") }} />
       <Stack.Screen
         name="notifications"
         options={{ title: t("settings.notifications") }}

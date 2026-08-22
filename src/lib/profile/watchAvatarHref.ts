@@ -1,22 +1,17 @@
-import { normalizeUsername } from "@/src/contracts/validation";
-import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
+import { buildStackedProfileHref } from "@/src/lib/profile/profileNav";
 
 /**
- * Watch creator/avatar → stack Profile.
- * Prefer posts.user_id (profiles.id). Keep ?u= for deep-link compatibility.
+ * Watch creator/avatar → ROOT STACK Profile (`/profile/user`), never the
+ * Profile tab. `/profile?u=` is captured by `/(tabs)/profile` and Back
+ * cannot return to Watch.
  */
 export function buildWatchCreatorProfileHref(author: {
   id?: string | null;
   username?: string | null;
 }): string | null {
-  const userId = parseProfileUserId(author.id);
-  const username = normalizeUsername(author.username ?? "");
-  if (!userId && !username) {
-    return null;
-  }
-
-  const params = new URLSearchParams();
-  if (username) params.set("u", username);
-  if (userId) params.set("id", userId);
-  return `/profile?${params.toString()}`;
+  return buildStackedProfileHref({
+    username: author.username,
+    userId: author.id,
+    origin: "watch",
+  });
 }

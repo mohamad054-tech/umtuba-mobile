@@ -30,6 +30,17 @@ export type WatchPlaybackPrepResult = {
 
 const defaultDeduper = createInflightDeduper<string | null>();
 
+/** Skip patching a card when the signed URL did not actually change. */
+export function shouldApplyResolvedWatchSrc(
+  currentSrc: string | null | undefined,
+  nextSrc: string | null | undefined
+): boolean {
+  const current = (currentSrc ?? "").trim();
+  const next = (nextSrc ?? "").trim();
+  if (!next) return false;
+  return current !== next;
+}
+
 export function resolvePlaybackSource(row: {
   video_path?: string | null;
   video_url?: string | null;

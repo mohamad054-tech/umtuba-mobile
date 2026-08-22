@@ -17,6 +17,10 @@ import {
   previousRouteNameFromState,
   resolveGlobalBack,
 } from "@/src/lib/nav/globalBack";
+import {
+  hasOtherUserProfileQuery,
+  parseProfileNavOrigin,
+} from "@/src/lib/profile/profileNav";
 import { colors } from "@/src/theme/colors";
 
 type GlobalBackButtonProps = {
@@ -24,18 +28,18 @@ type GlobalBackButtonProps = {
   onPress?: () => void;
 };
 
-function hasOtherUserParam(value: string | string[] | undefined): boolean {
-  const raw = Array.isArray(value) ? value[0] : value;
-  return typeof raw === "string" && raw.trim().length > 0;
-}
-
 export function useGlobalBack() {
   const router = useRouter();
   const navigation = useNavigation();
   const pathname = usePathname();
   const segments = useSegments();
-  const params = useLocalSearchParams<{ u?: string | string[] }>();
-  const profileHasOtherUser = hasOtherUserParam(params.u);
+  const params = useLocalSearchParams<{
+    u?: string | string[];
+    id?: string | string[];
+    from?: string | string[];
+  }>();
+  const profileHasOtherUser = hasOtherUserProfileQuery(params);
+  const profileOrigin = parseProfileNavOrigin(params.from);
 
   return useCallback(() => {
     const state = navigation.getState() as
@@ -47,12 +51,20 @@ export function useGlobalBack() {
       segments,
       previousRouteName: previousRouteNameFromState(state),
       profileHasOtherUser,
+      profileOrigin,
     });
     applyGlobalBackDecision(decision, {
       back: () => router.back(),
       replace: (href) => router.replace(href as never),
     });
-  }, [navigation, pathname, profileHasOtherUser, router, segments]);
+  }, [
+    navigation,
+    pathname,
+    profileHasOtherUser,
+    profileOrigin,
+    router,
+    segments,
+  ]);
 }
 
 export function GlobalBackButton({

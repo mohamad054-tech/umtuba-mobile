@@ -2,15 +2,25 @@
  * Shared Watch player lifecycle.
  *
  * PRODUCT: ONLY_ACTIVE_WATCH_POST_CAN_PRODUCE_AUDIO
- * IMPLEMENTATION: pause + mute + loop=false on still-mounted non-active
- * players. Native release is owned by useVideoPlayer / useReleasingSharedObject.
- * JS must detach (mark dead, drop refs) and never call play/pause/mute after.
+ * ACTIVE_PLAYING_VIDEO_COUNT <= 1
  *
- * Do not play/pause/seek until the item is ready. Pause-during-replace
- * after a remount is the Build 15 intermittent "resource unavailable" class.
+ * iOS may keep a ±1 preload window mounted. Android mounts the active
+ * item only (dd86a3e). Mounted != audible. Neighbors stay silent.
+ *
+ * Release sequence: silence while the SharedObject is still alive, then
+ * detach JS bindings. Native release is owned by useVideoPlayer /
+ * useReleasingSharedObject. After detach, never call play/pause/mute.
+ *
+ * Play/seek wait until the item is ready. Silence of a non-owner must
+ * not wait — that was Build 24 leftover audio + post-asset stall.
  */
 
 import { shouldLoadPlayer } from "./playbackPolicy";
+import {
+  applyInactiveAudioTeardown,
+  runAlivePlayerOp,
+  type PlayerLike,
+} from "./playerSession";
 
 export type WatchNativePlatform = "ios" | "android";
 export type WatchTransportKind = "play" | "pause" | "seek" | "chrome";
@@ -25,9 +35,139 @@ export function detachWatchPlayerBinding(input: {
   input.dropBoundRef();
 }
 
-/** Unmount/swap must not invoke player methods. Native release owns teardown. */
+/** After detach/markDead, do not invoke player methods. */
 export function shouldCallPlayerMethodsOnUnmount(): false {
   return false;
+}
+
+/** Mute+pause the still-alive player before useReleasingSharedObject drops it. */
+export function shouldSilencePlayerBeforeDetach(): true {
+  return true;
+}
+
+export type WatchNativePlayerStatus =
+  | "idle"
+  | "loading"
+  | "readyToPlay"
+  | "error"
+  | string
+  | null
+  | undefined;
+
+export type WatchJsPlayerStatus = "idle" | "loading" | "ready" | "error";
+
+/**
+ * Native readyToPlay can beat the React bind. Record it and apply on bind
+ * so the active item does not sit 12–20s waiting for a second statusChange.
+ */
+export function resolveNativePlayerStatusCatchup(input: {
+  bound: boolean;
+  nativeStatus: WatchNativePlayerStatus;
+  jsStatus: WatchJsPlayerStatus;
+}): WatchJsPlayerStatus | null {
+  if (!input.bound) return null;
+  if (input.nativeStatus === "readyToPlay" && input.jsStatus !== "ready") {
+    return "ready";
+  }
+  if (input.nativeStatus === "error" && input.jsStatus !== "error") {
+    return "error";
+  }
+  if (input.nativeStatus === "loading" && input.jsStatus === "idle") {
+    return "loading";
+  }
+  return null;
+}
+
+export function shouldStartPlaybackAfterAsset(input: {
+  nativeReady: boolean;
+  jsReady: boolean;
+  isActive: boolean;
+  shouldPlay: boolean;
+  playerAlive: boolean;
+  ownerGeneration: number;
+  commandGeneration: number;
+}): boolean {
+  if (!input.playerAlive) return false;
+  if (!input.isActive || !input.shouldPlay) return false;
+  if (!(input.nativeReady || input.jsReady)) return false;
+  if (!Number.isFinite(input.ownerGeneration)) return false;
+  if (!Number.isFinite(input.commandGeneration)) return false;
+  return input.ownerGeneration === input.commandGeneration;
+}
+
+export type InactiveTeardownMode = "mute-and-pause" | "mute-only";
+
+/**
+ * iOS leftover AVPlayer audio is the Build 24 overlap class — always pause.
+ * Android preparing ExoPlayer must not be paused before ready (dd86a3e).
+ */
+export function resolveInactiveTeardownMode(input: {
+  platform: WatchNativePlatform;
+  itemReady: boolean;
+}): InactiveTeardownMode {
+  if (input.platform === "ios") return "mute-and-pause";
+  return input.itemReady ? "mute-and-pause" : "mute-only";
+}
+
+export function applyWatchInactiveTeardown(
+  player: PlayerLike,
+  input: { platform: WatchNativePlatform; itemReady: boolean }
+): boolean {
+  if (resolveInactiveTeardownMode(input) === "mute-only") {
+    return runAlivePlayerOp(player, (alive) => {
+      alive.muted = true;
+      alive.volume = 0;
+      alive.loop = false;
+    });
+  }
+  return applyInactiveAudioTeardown(player, { resetPosition: false });
+}
+
+/** Silence first, then drop JS bindings. Safe if the object is already dead. */
+export function releaseWatchPlayerBinding(input: {
+  player: PlayerLike | null | undefined;
+  markDead: () => void;
+  clearPlayGeneration: () => void;
+  dropBoundRef: () => void;
+}): void {
+  if (input.player) {
+    applyInactiveAudioTeardown(input.player, { resetPosition: false });
+  }
+  detachWatchPlayerBinding({
+    markDead: input.markDead,
+    clearPlayGeneration: input.clearPlayGeneration,
+    dropBoundRef: input.dropBoundRef,
+  });
+}
+
+export function bumpWatchLeaveGeneration(prev: number): number {
+  return nextPlayerInstanceGeneration(prev);
+}
+
+export function shouldHonorPlayerEventAfterLeave(input: {
+  screenFocused: boolean;
+  eventGeneration: number | null;
+  ownerGeneration: number;
+}): boolean {
+  if (!input.screenFocused) return false;
+  if (input.eventGeneration == null) return false;
+  if (!Number.isFinite(input.ownerGeneration)) return false;
+  if (!Number.isFinite(input.eventGeneration)) return false;
+  return input.eventGeneration === input.ownerGeneration;
+}
+
+/** Neighbor cards may preload video, never a second selected-sound player. */
+export function shouldMountSelectedSoundPlayer(input: {
+  isActive: boolean;
+  shouldLoadPlayer: boolean;
+  uri: string | null | undefined;
+}): boolean {
+  return (
+    input.isActive === true &&
+    input.shouldLoadPlayer === true &&
+    typeof input.uri === "string" &&
+    input.uri.trim().length > 0
+  );
 }
 
 export function resolveWatchNativePlatform(

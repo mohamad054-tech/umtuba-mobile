@@ -77,6 +77,12 @@ describe("classifySurface", () => {
     );
     expect(
       classifySurface({
+        path: "/profile/user",
+        segments: ["profile", "user"],
+      })
+    ).toBe("secondary");
+    expect(
+      classifySurface({
         path: "/messages/abc-1",
         segments: ["messages", "abc-1"],
       })

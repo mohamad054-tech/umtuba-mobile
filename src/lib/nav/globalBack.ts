@@ -3,6 +3,12 @@
  * Arrow stays visible on root/tab surfaces but never exits the app.
  */
 
+import {
+  parseProfileNavOrigin,
+  profileOriginFallbackHref,
+  type ProfileNavOrigin,
+} from "@/src/lib/profile/profileNav";
+
 export const PRIMARY_TAB_PATHS = [
   "/(tabs)/watch",
   "/(tabs)/discover",
@@ -21,6 +27,7 @@ export const SECONDARY_PATHS = [
   "/blocked-users",
   "/change-password",
   "/profile",
+  "/profile/user",
   "/messages/[id]",
   "/sound/[id]",
   "/(auth)/signup",
@@ -65,6 +72,7 @@ export type GlobalBackInput = {
   segments?: readonly string[];
   previousRouteName?: string | null;
   profileHasOtherUser?: boolean;
+  profileOrigin?: ProfileNavOrigin | string | null;
 };
 
 const TAB_LEAVES = new Set([
@@ -191,7 +199,13 @@ export function parentFallbackHref(path: string, segments?: readonly string[]): 
     return n === "/language" ? "/settings" : "/(tabs)/profile";
   }
   if (n === "/world") return "/(tabs)/discover";
-  if (n === "/profile" || leaf === "profile" || leaf === "profile/index") {
+  if (
+    n === "/profile" ||
+    n === "/profile/user" ||
+    leaf === "profile" ||
+    leaf === "profile/index" ||
+    leaf === "profile/user"
+  ) {
     return "/(tabs)/watch";
   }
   if (
@@ -219,6 +233,12 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
 
   if (surface === "root") {
     if (input.profileHasOtherUser) {
+      const originHref = profileOriginFallbackHref(
+        parseProfileNavOrigin(input.profileOrigin)
+      );
+      if (originHref && originHref !== "/(tabs)/profile") {
+        return { action: "replace", href: originHref };
+      }
       return { action: "replace", href: "/(tabs)/profile" };
     }
     return { action: "noop" };
@@ -235,8 +255,15 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
     return { action: "history-back" };
   }
 
-  const href = parentFallbackHref(input.currentPath, input.segments);
+  const originHref = profileOriginFallbackHref(
+    parseProfileNavOrigin(input.profileOrigin)
+  );
   const current = normalizeNavPath(input.currentPath);
+  if (originHref && normalizeNavPath(originHref) !== current) {
+    return { action: "replace", href: originHref };
+  }
+
+  const href = parentFallbackHref(input.currentPath, input.segments);
   if (href && normalizeNavPath(href) !== current) {
     return { action: "replace", href };
   }

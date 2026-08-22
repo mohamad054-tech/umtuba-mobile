@@ -44,7 +44,7 @@ describe("Watch creator avatar → other-user Profile", () => {
     });
 
     const href = buildWatchCreatorProfileHref(video.author);
-    expect(href).toBe(`/profile?u=ada&id=${CREATOR_ID}`);
+    expect(href).toBe(`/profile/user?u=ada&id=${CREATOR_ID}&from=watch`);
 
     const params = hrefParams(href!);
     const target = resolveProfileTarget({
@@ -76,7 +76,7 @@ describe("Watch creator avatar → other-user Profile", () => {
 
     expect(video.author.username).toBe("@user");
     const href = buildWatchCreatorProfileHref(video.author);
-    expect(href).toBe(`/profile?u=user&id=${CREATOR_ID}`);
+    expect(href).toBe(`/profile/user?u=user&id=${CREATOR_ID}&from=watch`);
 
     const params = hrefParams(href!);
     const target = resolveProfileTarget({
@@ -100,7 +100,7 @@ describe("Watch creator avatar → other-user Profile", () => {
       id: VIEWER_ID,
       username: "@sam",
     });
-    expect(href).toBe(`/profile?u=sam&id=${VIEWER_ID}`);
+    expect(href).toBe(`/profile/user?u=sam&id=${VIEWER_ID}&from=watch`);
 
     expect(
       resolveProfileTarget({

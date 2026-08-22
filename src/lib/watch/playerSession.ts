@@ -17,6 +17,8 @@ export type PlayerLike = {
   duration?: number;
   replay?: () => void;
   replaceAsync?: (src: string) => Promise<unknown>;
+  /** expo-video VideoPlayer.status; optional on the test double. */
+  status?: string;
   /** Present on our test double; native SharedObject throws instead. */
   isReleased?: boolean;
 };

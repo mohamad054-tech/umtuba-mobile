@@ -9,13 +9,17 @@ import {
   shouldHonorLatePlayerEvent,
 } from "./activePlayerOwnership";
 import {
+  applyWatchInactiveTeardown,
   detachWatchPlayerBinding,
   isRetryHitTargetClear,
   nextPlayerInstanceGeneration,
+  releaseWatchPlayerBinding,
+  resolveInactiveTeardownMode,
   resolveRetryTargetPostId,
   shouldApplyWatchTransport,
   shouldCallPlayerMethodsOnUnmount,
   shouldRecreateWatchPlayer,
+  shouldSilencePlayerBeforeDetach,
   watchWindowMountedIndexes,
   watchWindowRemounts,
 } from "./playerLifecycle";
@@ -301,8 +305,8 @@ describe("TEST_I integer-cast regression", () => {
   });
 });
 
-describe("unmount detach does not touch the player", () => {
-  it("marks dead and drops refs without play/pause/mute", () => {
+describe("unmount silences then detaches", () => {
+  it("mutes and pauses the alive player, then drops refs without later methods", () => {
     const session = createPlayerSession();
     applyPlaybackIntent(session.player, {
       shouldPlay: true,
@@ -310,11 +314,31 @@ describe("unmount detach does not touch the player", () => {
       volume: 1,
       loop: false,
     });
-    const callsBefore = session.calls.slice();
     let dead = false;
     let generation: number | null = 4;
     let bound: unknown = session.player;
+    expect(shouldSilencePlayerBeforeDetach()).toBe(true);
     expect(shouldCallPlayerMethodsOnUnmount()).toBe(false);
+    releaseWatchPlayerBinding({
+      player: session.player,
+      markDead: () => {
+        dead = true;
+      },
+      clearPlayGeneration: () => {
+        generation = null;
+      },
+      dropBoundRef: () => {
+        bound = null;
+      },
+    });
+    expect(session.player.muted).toBe(true);
+    expect(session.player.volume).toBe(0);
+    expect(session.calls).toContain("pause");
+    expect(dead).toBe(true);
+    expect(generation).toBeNull();
+    expect(bound).toBeNull();
+    expect(session.released).toBe(false);
+    const callsAfter = session.calls.slice();
     detachWatchPlayerBinding({
       markDead: () => {
         dead = true;
@@ -326,11 +350,42 @@ describe("unmount detach does not touch the player", () => {
         bound = null;
       },
     });
-    expect(dead).toBe(true);
-    expect(generation).toBeNull();
-    expect(bound).toBeNull();
-    expect(session.calls).toEqual(callsBefore);
-    expect(session.released).toBe(false);
+    expect(session.calls).toEqual(callsAfter);
+  });
+
+  it("uses mute-and-pause on iOS even before ready", () => {
+    expect(
+      resolveInactiveTeardownMode({ platform: "ios", itemReady: false })
+    ).toBe("mute-and-pause");
+    const session = createPlayerSession();
+    applyPlaybackIntent(session.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: true,
+    });
+    applyWatchInactiveTeardown(session.player, {
+      platform: "ios",
+      itemReady: false,
+    });
+    expect(session.player.muted).toBe(true);
+    expect(session.player.volume).toBe(0);
+    expect(session.player.loop).toBe(false);
+    expect(session.calls).toContain("pause");
+  });
+
+  it("does not pause an unready Android player (dd86a3e)", () => {
+    expect(
+      resolveInactiveTeardownMode({ platform: "android", itemReady: false })
+    ).toBe("mute-only");
+    const session = createPlayerSession();
+    applyWatchInactiveTeardown(session.player, {
+      platform: "android",
+      itemReady: false,
+    });
+    expect(session.player.muted).toBe(true);
+    expect(session.player.volume).toBe(0);
+    expect(session.calls).not.toContain("pause");
   });
 });
 

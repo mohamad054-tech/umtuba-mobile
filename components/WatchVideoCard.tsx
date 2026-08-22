@@ -62,11 +62,15 @@ import {
   shouldTeardownUnexpectedPlay,
 } from "@/src/lib/watch/activePlayerOwnership";
 import {
-  detachWatchPlayerBinding,
+  applyWatchInactiveTeardown,
   nextPlayerInstanceGeneration,
+  releaseWatchPlayerBinding,
+  resolveNativePlayerStatusCatchup,
   resolveRetryTargetPostId,
   resolveWatchNativePlatform,
   shouldApplyWatchTransport,
+  shouldMountSelectedSoundPlayer,
+  shouldStartPlaybackAfterAsset,
 } from "@/src/lib/watch/playerLifecycle";
 import {
   applyInactiveAudioTeardown,
@@ -332,6 +336,7 @@ function WatchPlayerPane({
   const ownershipGenerationRef = useRef(ownershipGeneration);
   const playGenerationRef = useRef<number | null>(null);
   const playerAliveRef = useRef(true);
+  const nativeStatusRef = useRef<string | null>(null);
   isActiveRef.current = isActive;
   shouldPlayRef.current = shouldPlay;
   ownershipGenerationRef.current = ownershipGeneration;
@@ -359,6 +364,7 @@ function WatchPlayerPane({
     isPlayerAlive(player);
 
   useEventListener(player, "statusChange", ({ status: next, error }) => {
+    nativeStatusRef.current = next;
     if (!canTouchBoundPlayer()) return;
     if (next === "loading") {
       setStatus("loading");
@@ -455,11 +461,12 @@ function WatchPlayerPane({
     }
   });
 
-  // Bind this SharedObject only. Unmount/swap: detach JS binding and never
-  // call play/pause/mute — useReleasingSharedObject owns native release.
+  // Bind this SharedObject. Silence the previous instance before release so
+  // leftover AVPlayer audio cannot mix into the next item (Build 24).
   useLayoutEffect(() => {
     if (boundPlayerRef.current && boundPlayerRef.current !== player) {
-      detachWatchPlayerBinding({
+      releaseWatchPlayerBinding({
+        player: boundPlayerRef.current,
         markDead: () => {
           playerAliveRef.current = false;
         },
@@ -473,8 +480,33 @@ function WatchPlayerPane({
     }
     boundPlayerRef.current = player;
     playerAliveRef.current = true;
+    nativeStatusRef.current = null;
+    statusRef.current = "loading";
+    setStatus("loading");
+    setErrorMessage(null);
+    let nativeStatus: string | null = nativeStatusRef.current;
+    try {
+      if (typeof player.status === "string") {
+        nativeStatus = player.status;
+        nativeStatusRef.current = nativeStatus;
+      }
+    } catch {
+      nativeStatus = nativeStatusRef.current;
+    }
+    const caught = resolveNativePlayerStatusCatchup({
+      bound: true,
+      nativeStatus,
+      jsStatus: statusRef.current,
+    });
+    if (caught && caught !== statusRef.current) {
+      setStatus(caught);
+      if (caught !== "error") {
+        setErrorMessage(null);
+      }
+    }
     return () => {
-      detachWatchPlayerBinding({
+      releaseWatchPlayerBinding({
+        player,
         markDead: () => {
           playerAliveRef.current = false;
         },
@@ -493,17 +525,32 @@ function WatchPlayerPane({
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;
     const itemReady = status === "ready";
-    const allowed = canProduceWatchAudio({
+    const nativeReady = nativeStatusRef.current === "readyToPlay";
+    const allowed = shouldStartPlaybackAfterAsset({
+      nativeReady,
+      jsReady: itemReady,
       isActive,
       shouldPlay,
+      playerAlive: true,
       ownerGeneration: ownershipGeneration,
       commandGeneration: ownershipGeneration,
     });
+    if (!isActive || !shouldPlay) {
+      applyWatchInactiveTeardown(player, {
+        platform: nativePlatform,
+        itemReady,
+      });
+      playGenerationRef.current = null;
+      if (!isActive) {
+        onTimeline({ currentTime: 0, duration: 0, ratio: 0 });
+      }
+      return;
+    }
     if (
       !shouldApplyWatchTransport({
         playerAlive: true,
-        itemReady,
-        kind: allowed ? "play" : "pause",
+        itemReady: itemReady || nativeReady,
+        kind: "play",
         platform: nativePlatform,
       })
     ) {
@@ -516,6 +563,12 @@ function WatchPlayerPane({
     }
     if (
       allowed &&
+      canProduceWatchAudio({
+        isActive,
+        shouldPlay,
+        ownerGeneration: ownershipGeneration,
+        commandGeneration: ownershipGeneration,
+      }) &&
       shouldApplyWatchPlayerOp({
         playerAlive: true,
         ownerGeneration: ownershipGeneration,
@@ -539,19 +592,10 @@ function WatchPlayerPane({
       return;
     }
     playGenerationRef.current = null;
-    applyPlaybackIntent(
-      player,
-      resolveWatchPlaybackIntent({
-        isActive,
-        shouldPlay: false,
-        muted,
-        volume,
-        loop,
-      })
-    );
-    if (!isActive) {
-      onTimeline({ currentTime: 0, duration: 0, ratio: 0 });
-    }
+    applyWatchInactiveTeardown(player, {
+      platform: nativePlatform,
+      itemReady,
+    });
   }, [
     player,
     shouldPlay,
@@ -971,7 +1015,12 @@ function WatchVideoCardComponent({
         </View>
       )}
 
-      {loadPlayer && selectedSoundUri ? (
+      {selectedSoundUri &&
+      shouldMountSelectedSoundPlayer({
+        isActive,
+        shouldLoadPlayer: loadPlayer,
+        uri: selectedSoundUri,
+      }) ? (
         <SelectedSoundPlayer
           uri={selectedSoundUri}
           shouldPlay={selectedSoundAudio.shouldPlay}
