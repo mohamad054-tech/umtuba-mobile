@@ -19,6 +19,8 @@ export type WatchVideo = {
   id: string;
   /** Numeric post id when source is supabase; null for demo. */
   postId: number | null;
+  /** Storage object path used to sign playback. Not a signed URL. */
+  videoPath?: string | null;
   src: string;
   poster?: string;
   title: string;

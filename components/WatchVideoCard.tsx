@@ -36,9 +36,11 @@ import {
   watchEditAudioScale,
   watchEditFromPipeline,
 } from "@/src/lib/video/watchEditPlayback";
+import { shouldMountWatchPlayer } from "@/src/lib/feed/videoStoragePath";
 import {
   canSeekWithDuration,
   formatPlaybackClock,
+  isLikelyExpiredPlaybackUrl,
   resolveEffectiveAudio,
   resolveProgressRatio,
   resolveScrubRatioFromPageX,
@@ -688,9 +690,15 @@ function WatchVideoCardComponent({
   const [paneError, setPaneError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const retryInFlightRef = useRef(false);
+  const expiredRefreshAttemptedRef = useRef(false);
+  const mountPlayer = shouldMountWatchPlayer({
+    shouldLoadPlayer: loadPlayer,
+    src: epochSrc,
+  });
 
   useEffect(() => {
     setEpochSrc(video.src);
+    expiredRefreshAttemptedRef.current = false;
   }, [video.src]);
 
   const feedShouldPlay = shouldPlayVideo({
@@ -805,6 +813,14 @@ function WatchVideoCardComponent({
       setRetrying(false);
     }
   }, [isActive, onRefreshSrc, video.postId]);
+
+  useEffect(() => {
+    if (!isActive || paneStatus !== "error") return;
+    if (expiredRefreshAttemptedRef.current) return;
+    if (!isLikelyExpiredPlaybackUrl(paneError)) return;
+    expiredRefreshAttemptedRef.current = true;
+    void onRetryPlayback();
+  }, [isActive, onRetryPlayback, paneError, paneStatus]);
 
   const onTogglePlayPause = useCallback(() => {
     if (paneStatus === "error") return;
@@ -925,7 +941,7 @@ function WatchVideoCardComponent({
         );
       }}
     >
-      {loadPlayer ? (
+      {mountPlayer ? (
         <WatchPlayerPane
           key={`watch-player-${video.id}-${playerEpoch}`}
           src={epochSrc}
@@ -942,7 +958,16 @@ function WatchVideoCardComponent({
         />
       ) : (
         <View style={styles.placeholder} accessibilityElementsHidden>
-          <View />
+          {loadPlayer ? (
+            <View style={styles.centerOverlay} pointerEvents="none">
+              <ActivityIndicator
+                color={colors.accentCyan}
+                accessibilityLabel={t("watch.loadingVideo")}
+              />
+            </View>
+          ) : (
+            <View />
+          )}
         </View>
       )}
 

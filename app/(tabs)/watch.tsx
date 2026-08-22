@@ -30,6 +30,7 @@ import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { REPORT_REASON_KEYS, useTranslation } from "@/src/lib/i18n";
+import { prepareWatchPlaybackUrls } from "@/src/lib/feed/watchPlaybackPrep";
 import {
   fetchWatchFeedPage,
   refreshPlaybackUrl,
@@ -161,6 +162,7 @@ export default function WatchScreen() {
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
+  const urlGenerationRef = useRef(0);
   const activeIndexRef = useRef(0);
   const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
@@ -251,6 +253,16 @@ export default function WatchScreen() {
       }),
     [blockedUserIds, hiddenPostIds, videos]
   );
+
+  const playbackIdentity = useMemo(
+    () =>
+      visibleVideos
+        .map((video) => `${watchItemKey(video)}:${video.videoPath ?? ""}`)
+        .join("|"),
+    [visibleVideos]
+  );
+  const visibleVideosRef = useRef(visibleVideos);
+  visibleVideosRef.current = visibleVideos;
 
   useEffect(() => {
     videosLengthRef.current = visibleVideos.length;
@@ -403,6 +415,7 @@ export default function WatchScreen() {
           focusPostId,
           limit: 12,
         });
+        urlGenerationRef.current += 1;
         setVideos(page.videos);
         setCursor(page.nextCursor);
         setEndReached(!page.nextCursor);
@@ -480,6 +493,20 @@ export default function WatchScreen() {
       )
     );
   }, []);
+
+  useEffect(() => {
+    const snapshot = visibleVideosRef.current;
+    if (snapshot.length === 0) return;
+    const generation = urlGenerationRef.current + 1;
+    urlGenerationRef.current = generation;
+    void prepareWatchPlaybackUrls(getSupabase(), snapshot, activeIndex, {
+      isCurrent: () => urlGenerationRef.current === generation,
+      onResolved: (id, src) => {
+        if (urlGenerationRef.current !== generation) return;
+        patchVideo(id, { src });
+      },
+    });
+  }, [activeIndex, patchVideo, playbackIdentity]);
 
   const onToggleLike = useCallback(
     async (video: WatchVideo) => {

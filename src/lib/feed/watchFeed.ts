@@ -10,6 +10,11 @@ import {
   type WatchFeedPage,
   type WatchVideo,
 } from "@/src/contracts/watch";
+import { watchSignedUrlCache } from "@/src/lib/feed/signedUrlCache";
+import {
+  isLegacyHttpPlaybackUrl,
+  normalizeVideoStoragePath,
+} from "@/src/lib/feed/videoStoragePath";
 import {
   loadViewerInteractionState,
   viewerLikedFromState,
@@ -63,6 +68,7 @@ export type MappedPlaybackRow = {
   playbackUrl: string;
   likedByMe: boolean;
   savedByMe: boolean;
+  videoPath?: string | null;
 };
 
 /** Pure mapper — unit-tested without Supabase. */
@@ -72,10 +78,14 @@ export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
     ? row.author_username
     : `@${row.author_username || "user"}`;
   const caption = (row.content || "").trim();
+  const normalizedPath = normalizeVideoStoragePath(
+    input.videoPath ?? row.video_path
+  );
 
   return {
     id: `post-${row.id}`,
     postId: row.id,
+    videoPath: normalizedPath.ok ? normalizedPath.path : null,
     src: playbackUrl,
     poster: row.image_url ?? undefined,
     title: caption.slice(0, 80) || "UMTUBA",
@@ -115,36 +125,71 @@ export async function createVideoSignedUrl(
   supabase: SupabaseClient,
   path: string
 ): Promise<string | null> {
-  const trimmed = path.trim();
-  if (!trimmed) return null;
+  const normalized = normalizeVideoStoragePath(path);
+  if (!normalized.ok) return null;
 
-  const { data, error } = await supabase.storage
-    .from(POST_VIDEOS_BUCKET)
-    .createSignedUrl(trimmed, VIDEO_SIGNED_URL_TTL_SECONDS);
+  const cached = watchSignedUrlCache.peek(normalized.path);
+  if (cached) return cached;
+
+  const signOnce = async () =>
+    supabase.storage
+      .from(POST_VIDEOS_BUCKET)
+      .createSignedUrl(normalized.path, VIDEO_SIGNED_URL_TTL_SECONDS);
+
+  let { data, error } = await signOnce();
+  if (
+    (!data?.signedUrl || error) &&
+    isTransientStorageSignFailure(error)
+  ) {
+    ({ data, error } = await signOnce());
+  }
 
   if (error || !data?.signedUrl) {
-    console.error("Unable to sign video URL:", trimmed, error);
+    console.error("Unable to sign video URL:", normalized.path, error);
     return null;
   }
 
+  watchSignedUrlCache.set(normalized.path, data.signedUrl);
   return data.signedUrl;
 }
 
-async function resolvePlaybackUrl(
-  supabase: SupabaseClient,
-  row: VideoPostRow
-): Promise<string | null> {
-  const path = row.video_path?.trim();
-  if (path) {
-    return createVideoSignedUrl(supabase, path);
-  }
+function isTransientStorageSignFailure(error: unknown): boolean {
+  if (!error) return false;
+  const raw =
+    typeof error === "string"
+      ? error
+      : typeof error === "object" && "message" in error
+        ? String((error as { message: unknown }).message)
+        : "";
+  const status =
+    error && typeof error === "object" && "status" in error
+      ? Number((error as { status: unknown }).status)
+      : null;
+  return (
+    status === 403 ||
+    status === 401 ||
+    /\b(403|401|forbidden|expired|signature|unauthorized)\b/i.test(raw)
+  );
+}
 
-  const legacy = row.video_url?.trim();
-  if (legacy?.startsWith("http://") || legacy?.startsWith("https://")) {
-    return legacy;
+function initialPlaybackSrc(row: VideoPostRow): {
+  path: string | null;
+  src: string;
+  include: boolean;
+} {
+  const normalized = normalizeVideoStoragePath(row.video_path);
+  if (normalized.ok) {
+    return {
+      path: normalized.path,
+      src: watchSignedUrlCache.peek(normalized.path) ?? "",
+      include: true,
+    };
   }
-
-  return null;
+  const legacy = row.video_url?.trim() ?? "";
+  if (isLegacyHttpPlaybackUrl(legacy)) {
+    return { path: null, src: legacy, include: true };
+  }
+  return { path: null, src: "", include: false };
 }
 
 export type FetchWatchFeedInput = {
@@ -240,13 +285,14 @@ export async function fetchWatchFeedPage(
   const videos: WatchVideo[] = [];
 
   for (const row of pageRows) {
-    const playbackUrl = await resolvePlaybackUrl(supabase, row);
-    if (!playbackUrl) continue;
+    const initial = initialPlaybackSrc(row);
+    if (!initial.include) continue;
     const state = viewerState.get(row.id);
     videos.push(
       mapRowToWatchVideo({
         row,
-        playbackUrl,
+        playbackUrl: initial.src,
+        videoPath: initial.path,
         likedByMe: viewerLikedFromState(state?.likedByMe),
         savedByMe: state?.savedByMe === true,
       })
@@ -283,6 +329,10 @@ export async function refreshPlaybackUrl(
   const path =
     typeof data.video_path === "string" ? data.video_path.trim() : "";
   if (path) {
+    const normalized = normalizeVideoStoragePath(path);
+    if (normalized.ok) {
+      watchSignedUrlCache.invalidate(normalized.path);
+    }
     const signed = await createVideoSignedUrl(supabase, path);
     if (!signed) {
       return { ok: false, message: "Playback link expired. Try again." };
