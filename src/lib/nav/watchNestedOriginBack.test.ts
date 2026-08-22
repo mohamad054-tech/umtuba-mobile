@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe("WATCH_PROFILE_BACK_STATIC — Fold6 previous=(tabs) class", () => {
-  it("does not history-back Watch → Profile onto the tab container", () => {
+  it("does not history-back Watch → Profile onto the tab container when no Watch instance is underneath", () => {
     const href = buildWatchCreatorProfileHref({
       id: EMAN,
       username: "@eman",

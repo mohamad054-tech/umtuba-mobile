@@ -2,6 +2,9 @@
  * Remembers Watch/Home/list origin across Expo Router param loss.
  * URL `from` / `via` still win when present. Own Profile tab never
  * inherits a stale Watch origin.
+ *
+ * Also tracks whether a Watch screen instance is still mounted so
+ * Back can pop to it instead of replacing /(tabs)/watch.
  */
 
 import type { FollowListKind } from "@/src/lib/social/followLists";
@@ -26,9 +29,29 @@ const EMPTY: ProfileBackContext = {
 };
 
 let context: ProfileBackContext = { ...EMPTY };
+let watchInstanceGeneration = 0;
+let liveWatchInstanceGeneration: number | null = null;
 
 export function resetProfileBackContextForTests(): void {
   context = { ...EMPTY };
+  watchInstanceGeneration = 0;
+  liveWatchInstanceGeneration = null;
+}
+
+export function registerMountedWatchInstance(): number {
+  watchInstanceGeneration += 1;
+  liveWatchInstanceGeneration = watchInstanceGeneration;
+  return liveWatchInstanceGeneration;
+}
+
+export function unregisterMountedWatchInstance(generation: number): void {
+  if (liveWatchInstanceGeneration === generation) {
+    liveWatchInstanceGeneration = null;
+  }
+}
+
+export function isMountedWatchInstanceLive(): boolean {
+  return liveWatchInstanceGeneration != null;
 }
 
 export function peekProfileBackContext(): ProfileBackContext {

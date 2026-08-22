@@ -23,9 +23,11 @@ import {
   globalHeaderBackSlot,
   isOriginAwareProfileStack,
   previousRouteNameFromState,
+  previousTabNameFromState,
   resolveGlobalBack,
   type GlobalBackDecision,
 } from "@/src/lib/nav/globalBack";
+import { isMountedWatchInstanceLive } from "@/src/lib/nav/profileBackContext";
 import { isFollowListPath } from "@/src/lib/profile/followListNav";
 import {
   hasOtherUserProfileQuery,
@@ -56,13 +58,24 @@ export function useResolvedGlobalBack() {
 
   return useCallback((): GlobalBackDecision => {
     const state = navigation.getState() as
-      | { index?: number; routes?: Array<{ name?: string }> }
+      | {
+          index?: number;
+          routes?: Array<{
+            name?: string;
+            state?: {
+              index?: number;
+              routes?: Array<{ name?: string }>;
+            };
+          }>;
+        }
       | undefined;
     return resolveGlobalBack({
       canGoBack: navigation.canGoBack(),
       currentPath: pathname,
       segments,
       previousRouteName: previousRouteNameFromState(state),
+      previousTabName: previousTabNameFromState(state),
+      watchOriginUnderneath: isMountedWatchInstanceLive(),
       profileHasOtherUser,
       profileOrigin,
       profileVia: params.via,

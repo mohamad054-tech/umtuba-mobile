@@ -41,7 +41,11 @@ import {
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import { rememberProfileBackContext } from "@/src/lib/nav/profileBackContext";
+import {
+  registerMountedWatchInstance,
+  rememberProfileBackContext,
+  unregisterMountedWatchInstance,
+} from "@/src/lib/nav/profileBackContext";
 import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
 import {
@@ -203,6 +207,11 @@ export default function WatchScreen() {
 
   const claimActiveIndexRef = useRef(claimActiveIndex);
   claimActiveIndexRef.current = claimActiveIndex;
+
+  useEffect(() => {
+    const generation = registerMountedWatchInstance();
+    return () => unregisterMountedWatchInstance(generation);
+  }, []);
 
   useEffect(() => {
     itemHeightRef.current = itemHeight;

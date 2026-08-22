@@ -5,6 +5,7 @@
 
 import {
   clearProfileBackContext,
+  isMountedWatchInstanceLive,
   isPrimaryTabHref,
   peekProfileBackContext,
 } from "@/src/lib/nav/profileBackContext";
@@ -85,6 +86,8 @@ export type GlobalBackInput = {
   currentPath: string;
   segments?: readonly string[];
   previousRouteName?: string | null;
+  previousTabName?: string | null;
+  watchOriginUnderneath?: boolean;
   profileHasOtherUser?: boolean;
   profileOrigin?: ProfileNavOrigin | string | null;
   profileVia?: string | string[] | null;
@@ -92,6 +95,14 @@ export type GlobalBackInput = {
   profileListUsername?: string | string[] | null;
   followListOwnerId?: string | string[] | null;
   followListOwnerUsername?: string | string[] | null;
+};
+
+type NavRouteState = {
+  index?: number;
+  routes?: Array<{
+    name?: string;
+    state?: NavRouteState;
+  }>;
 };
 
 const TAB_LEAVES = new Set([
@@ -130,12 +141,42 @@ export function sanitizeBackLabel(label: string | null | undefined): string {
   return "";
 }
 
-export function previousRouteNameFromState(state: {
-  index?: number;
-  routes?: Array<{ name?: string }>;
-} | null | undefined): string | null {
+export function previousRouteNameFromState(
+  state: NavRouteState | null | undefined
+): string | null {
   if (!state?.routes || state.index == null || state.index < 1) return null;
   return state.routes[state.index - 1]?.name ?? null;
+}
+
+function tabLeafFromName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const leaf = normalizeNavPath(name.trim()).replace(/^\//, "");
+  return TAB_LEAVES.has(leaf) ? leaf : null;
+}
+
+function selectedPrimaryTabLeaf(
+  route: { name?: string; state?: NavRouteState } | null | undefined
+): string | null {
+  if (!route) return null;
+  const nested = route.state;
+  if (nested?.routes && nested.index != null) {
+    const selected = nested.routes[nested.index];
+    if (selected) {
+      const deeper = selectedPrimaryTabLeaf(selected);
+      if (deeper) return deeper;
+      const nestedLeaf = tabLeafFromName(selected.name);
+      if (nestedLeaf) return nestedLeaf;
+    }
+  }
+  return tabLeafFromName(route.name);
+}
+
+/** Tab leaf that history-back onto `(tabs)` would reveal. */
+export function previousTabNameFromState(
+  state: NavRouteState | null | undefined
+): string | null {
+  if (!state?.routes || state.index == null || state.index < 1) return null;
+  return selectedPrimaryTabLeaf(state.routes[state.index - 1]);
 }
 
 function leafFromSegments(segments: readonly string[]): string {
@@ -282,6 +323,45 @@ export function isOriginAwareProfileStack(
   return classifySurface({ path, segments }) === "secondary";
 }
 
+/**
+ * True when popping the stacked Profile would reveal the same
+ * mounted Watch instance. False when Expo selected another tab
+ * underneath, Watch unmounted, or history is gone (replace fallback).
+ */
+export function hasValidWatchOriginUnderneath(input: GlobalBackInput): boolean {
+  if (!input.canGoBack) return false;
+  if (input.watchOriginUnderneath === false) return false;
+
+  const tab = firstParam(input.previousTabName);
+  if (tab) {
+    const leaf = normalizeNavPath(tab).replace(/^\//, "");
+    if (leaf === "watch") return true;
+    if (TAB_LEAVES.has(leaf)) return false;
+  }
+
+  const previous = (input.previousRouteName ?? "").trim();
+  if (tabLeafFromName(previous) === "watch") return true;
+
+  if (input.watchOriginUnderneath === true) return true;
+  if (!isTabContainerPrevious(input.previousRouteName)) return false;
+  return isMountedWatchInstanceLive();
+}
+
+export function shouldPopToMountedWatch(input: GlobalBackInput): boolean {
+  const resolved = withRememberedProfileBack(input);
+  if (isFollowListPath(resolved.currentPath, resolved.segments)) {
+    return false;
+  }
+  if (!isOriginAwareProfileStack(resolved.currentPath, resolved.segments)) {
+    return false;
+  }
+  if (firstParam(resolved.profileVia)) return false;
+  if (parseProfileNavOrigin(resolved.profileOrigin) !== "watch") {
+    return false;
+  }
+  return hasValidWatchOriginUnderneath(resolved);
+}
+
 export function shouldTrustHistoryBack(input: GlobalBackInput): boolean {
   if (
     !input.canGoBack ||
@@ -293,7 +373,7 @@ export function shouldTrustHistoryBack(input: GlobalBackInput): boolean {
     isOriginAwareProfileStack(input.currentPath, input.segments) &&
     isTabContainerPrevious(input.previousRouteName)
   ) {
-    return false;
+    return shouldPopToMountedWatch(input);
   }
   return true;
 }

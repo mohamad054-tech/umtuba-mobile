@@ -14,6 +14,7 @@ import {
   normalizeNavPath,
   parentFallbackHref,
   previousRouteNameFromState,
+  previousTabNameFromState,
   resolveGlobalBack,
   sanitizeBackLabel,
 } from "./globalBack";
@@ -307,7 +308,7 @@ describe("parentFallbackHref", () => {
 });
 
 describe("previousRouteNameFromState", () => {
-  it("reads the prior stack entry", () => {
+  it("reads the prior stack entry and the tab leaf underneath", () => {
     expect(
       previousRouteNameFromState({
         index: 1,
@@ -320,5 +321,35 @@ describe("previousRouteNameFromState", () => {
         routes: [{ name: "(tabs)" }],
       })
     ).toBeNull();
+    expect(
+      previousTabNameFromState({
+        index: 1,
+        routes: [
+          {
+            name: "(tabs)",
+            state: {
+              index: 0,
+              routes: [{ name: "watch" }, { name: "profile" }],
+            },
+          },
+          { name: "profile/user" },
+        ],
+      })
+    ).toBe("watch");
+    expect(
+      previousTabNameFromState({
+        index: 1,
+        routes: [
+          {
+            name: "(tabs)",
+            state: {
+              index: 1,
+              routes: [{ name: "watch" }, { name: "profile" }],
+            },
+          },
+          { name: "profile/user" },
+        ],
+      })
+    ).toBe("profile");
   });
 });
