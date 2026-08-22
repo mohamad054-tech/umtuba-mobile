@@ -23,6 +23,7 @@ export {
   buildFollowListHref,
   buildFollowListMemberProfileHref,
   followListOwnerFallbackHref,
+  isStackedMemberProfilePath,
   parseFollowListKind,
 } from "@/src/lib/profile/followListNav";
 export {

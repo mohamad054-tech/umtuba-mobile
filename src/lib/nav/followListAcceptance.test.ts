@@ -191,6 +191,7 @@ describe("LIST_USER_TO_PROFILE", () => {
     expect(href).toContain(`${STACKED_MEMBER_PROFILE_PATH}?`);
     expect(href).not.toMatch(/^\/profile\?/);
     expect(href).not.toContain("/(tabs)/profile");
+    expect(href).not.toContain("/profile/user?");
     const params = new URLSearchParams(href!.split("?")[1]);
     expect(params.get("id")).toBe(MEMBER);
     expect(params.get("via")).toBe("followers");

@@ -1,5 +1,5 @@
 import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useFocusEffect, useLocalSearchParams, usePathname, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -49,7 +49,11 @@ import {
   type MobileProfileTabId,
 } from "@/src/lib/profile/profileTabs";
 import { rememberProfileBackContext } from "@/src/lib/nav/profileBackContext";
-import { buildFollowListHref } from "@/src/lib/profile/followListNav";
+import {
+  buildFollowListHref,
+  isStackedMemberProfilePath,
+  parseFollowListKind,
+} from "@/src/lib/profile/followListNav";
 import { parseProfileNavOrigin } from "@/src/lib/profile/profileNav";
 import {
   planOtherProfileLookup,
@@ -75,11 +79,15 @@ export default function ProfileScreen() {
   const columnWidth = resolveProfileContentWidth(windowWidth);
   const mediaBox = resolveProfileMediaBox(windowWidth, columnWidth);
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams<{
     u?: string;
     id?: string;
     tab?: string;
     from?: string;
+    via?: string;
+    listId?: string;
+    listU?: string;
   }>();
   const [refreshing, setRefreshing] = useState(false);
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
@@ -280,6 +288,46 @@ export default function ProfileScreen() {
       setFollowBusy(false);
     }
   }, [following, otherProfile?.id, router, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const origin =
+        parseProfileNavOrigin(params.from) ?? (isOwn ? "profile" : null);
+      if (isStackedMemberProfilePath(pathname)) {
+        const listId = typeof params.listId === "string" ? params.listId : null;
+        rememberProfileBackContext({
+          origin,
+          via: parseFollowListKind(params.via),
+          listId,
+          listUsername: typeof params.listU === "string" ? params.listU : null,
+          ownerId: listId,
+          ownerUsername: typeof params.listU === "string" ? params.listU : null,
+        });
+        return;
+      }
+      rememberProfileBackContext({
+        origin,
+        via: null,
+        listId: null,
+        listUsername: null,
+        ownerId:
+          otherProfile?.id ??
+          (isOwn ? (user?.id ?? profile?.id ?? null) : null),
+        ownerUsername: view.username ?? null,
+      });
+    }, [
+      isOwn,
+      otherProfile?.id,
+      params.from,
+      params.listId,
+      params.listU,
+      params.via,
+      pathname,
+      profile?.id,
+      user?.id,
+      view.username,
+    ])
+  );
 
   const openFollowList = useCallback(
     (kind: FollowListKind) => {

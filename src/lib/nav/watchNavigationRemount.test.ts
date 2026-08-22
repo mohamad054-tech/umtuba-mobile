@@ -200,6 +200,29 @@ describe("CASE B — Followers full chain ends at the same mounted Watch", () =>
     expect(nav.back).toHaveBeenCalledTimes(1);
     expect(nav.replace).not.toHaveBeenCalled();
   });
+
+  it("does not inherit leftover member via onto originating Profile Back", () => {
+    registerMountedWatchInstance();
+    rememberProfileBackContext({
+      origin: "watch",
+      via: "followers",
+      listId: EMAN,
+      listUsername: "eman",
+      ownerId: EMAN,
+      ownerUsername: "eman",
+    });
+    const poisoned = resolveGlobalBack(
+      watchOriginProfileBack({
+        previousTabName: "watch",
+        watchOriginUnderneath: true,
+      })
+    );
+    expect(poisoned).toEqual({ action: "history-back" });
+    expect(poisoned).not.toEqual({
+      action: "replace",
+      href: `${FOLLOW_LIST_PATHS.followers}?id=${EMAN}&u=eman&from=watch`,
+    });
+  });
 });
 
 describe("CASE C — Following full chain ends at the same mounted Watch", () => {

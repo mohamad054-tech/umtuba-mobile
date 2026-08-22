@@ -13,6 +13,7 @@ import {
   followListOwnerFallbackHref,
   followListViaFallbackHref,
   isFollowListPath,
+  isStackedMemberProfilePath,
 } from "@/src/lib/profile/followListNav";
 import {
   isStackedProfilePath,
@@ -355,7 +356,12 @@ export function shouldPopToMountedWatch(input: GlobalBackInput): boolean {
   if (!isOriginAwareProfileStack(resolved.currentPath, resolved.segments)) {
     return false;
   }
-  if (firstParam(resolved.profileVia)) return false;
+  if (
+    isStackedMemberProfilePath(resolved.currentPath, resolved.segments) &&
+    firstParam(resolved.profileVia)
+  ) {
+    return false;
+  }
   if (parseProfileNavOrigin(resolved.profileOrigin) !== "watch") {
     return false;
   }
@@ -363,31 +369,39 @@ export function shouldPopToMountedWatch(input: GlobalBackInput): boolean {
 }
 
 export function shouldTrustHistoryBack(input: GlobalBackInput): boolean {
-  if (
-    !input.canGoBack ||
-    !isValidHistoryPrevious(input.previousRouteName, input.currentPath)
-  ) {
+  if (!input.canGoBack) return false;
+  if (shouldPopToMountedWatch(input)) return true;
+  if (!isValidHistoryPrevious(input.previousRouteName, input.currentPath)) {
     return false;
   }
   if (
     isOriginAwareProfileStack(input.currentPath, input.segments) &&
     isTabContainerPrevious(input.previousRouteName)
   ) {
-    return shouldPopToMountedWatch(input);
+    return false;
   }
   return true;
 }
 
 function withRememberedProfileBack(input: GlobalBackInput): GlobalBackInput {
   const remembered = peekProfileBackContext();
+  const onMember = isStackedMemberProfilePath(
+    input.currentPath,
+    input.segments
+  );
   return {
     ...input,
     profileOrigin:
       parseProfileNavOrigin(input.profileOrigin) ?? remembered.origin,
-    profileVia: firstParam(input.profileVia) ?? remembered.via,
-    profileListId: firstParam(input.profileListId) ?? remembered.listId,
-    profileListUsername:
-      firstParam(input.profileListUsername) ?? remembered.listUsername,
+    profileVia: onMember
+      ? (firstParam(input.profileVia) ?? remembered.via)
+      : firstParam(input.profileVia),
+    profileListId: onMember
+      ? (firstParam(input.profileListId) ?? remembered.listId)
+      : firstParam(input.profileListId),
+    profileListUsername: onMember
+      ? (firstParam(input.profileListUsername) ?? remembered.listUsername)
+      : firstParam(input.profileListUsername),
     followListOwnerId:
       firstParam(input.followListOwnerId) ?? remembered.ownerId,
     followListOwnerUsername:

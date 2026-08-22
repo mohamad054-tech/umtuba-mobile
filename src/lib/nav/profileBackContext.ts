@@ -3,6 +3,10 @@
  * URL `from` / `via` still win when present. Own Profile tab never
  * inherits a stale Watch origin.
  *
+ * `via` is member-Profile-only. Originating `/profile/user` and
+ * follow-list screens must not inherit a leftover list via, or Back
+ * oscillates list ↔ profile and never reaches Watch.
+ *
  * Also tracks whether a Watch screen instance is still mounted so
  * Back can pop to it instead of replacing /(tabs)/watch.
  */

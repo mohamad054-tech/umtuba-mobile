@@ -43,6 +43,15 @@ export function isFollowListPath(
   );
 }
 
+/** Member-only. `/profile/user` must not inherit this identity. */
+export function isStackedMemberProfilePath(
+  path: string,
+  segments?: readonly string[]
+): boolean {
+  const leaf = leafFromPath(path, segments);
+  return leaf === "profile/member" || leaf.endsWith("/profile/member");
+}
+
 export function followListKindFromPath(
   path: string,
   segments?: readonly string[]

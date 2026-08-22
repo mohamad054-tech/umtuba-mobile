@@ -1,5 +1,5 @@
 import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -89,6 +89,19 @@ export default function FollowListScreen({ kind }: FollowListScreenProps) {
   useEffect(() => {
     void loadPage(0, false);
   }, [loadPage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      rememberProfileBackContext({
+        origin,
+        via: null,
+        listId: null,
+        listUsername: null,
+        ownerId: targetUserId,
+        ownerUsername: typeof params.u === "string" ? params.u : null,
+      });
+    }, [origin, params.u, targetUserId])
+  );
 
   const onOpenMember = useCallback(
     (member: FollowListMember) => {
