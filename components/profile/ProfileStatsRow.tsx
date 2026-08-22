@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ProfileTranslate } from "@/components/profile/profileUi";
 import type { AppLocale } from "@/src/lib/i18n/locales";
@@ -11,6 +11,8 @@ type ProfileStatsRowProps = {
   followersCount: number | null;
   followingCount: number | null;
   postsCount: number;
+  onOpenFollowers?: () => void;
+  onOpenFollowing?: () => void;
 };
 
 export default function ProfileStatsRow({
@@ -19,6 +21,8 @@ export default function ProfileStatsRow({
   followersCount,
   followingCount,
   postsCount,
+  onOpenFollowers,
+  onOpenFollowing,
 }: ProfileStatsRowProps) {
   if (followersCount == null && followingCount == null && postsCount === 0) {
     return null;
@@ -28,14 +32,26 @@ export default function ProfileStatsRow({
     <View
       style={[styles.statsRow, { direction: localeWritingDirection(locale) }]}
     >
-      <View style={styles.stat}>
+      <Pressable
+        style={styles.stat}
+        onPress={onOpenFollowers}
+        disabled={!onOpenFollowers}
+        accessibilityRole="button"
+        accessibilityLabel={t("profile.openFollowers")}
+      >
         <Text style={styles.statValue}>{followersCount ?? 0}</Text>
         <Text style={styles.statLabel}>{t("profile.followers")}</Text>
-      </View>
-      <View style={styles.stat}>
+      </Pressable>
+      <Pressable
+        style={styles.stat}
+        onPress={onOpenFollowing}
+        disabled={!onOpenFollowing}
+        accessibilityRole="button"
+        accessibilityLabel={t("profile.openFollowing")}
+      >
         <Text style={styles.statValue}>{followingCount ?? 0}</Text>
         <Text style={styles.statLabel}>{t("profile.following")}</Text>
-      </View>
+      </Pressable>
       <View style={styles.stat}>
         <Text style={styles.statValue}>{postsCount}</Text>
         <Text style={styles.statLabel}>{t("profile.posts")}</Text>

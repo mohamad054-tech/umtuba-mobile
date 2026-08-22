@@ -169,6 +169,14 @@ function LocalizedStack() {
       <Stack.Screen name="profile/index" options={{ title: t("nav.profile") }} />
       <Stack.Screen name="profile/user" options={{ title: t("nav.profile") }} />
       <Stack.Screen
+        name="profile/followers"
+        options={{ title: t("profile.followers") }}
+      />
+      <Stack.Screen
+        name="profile/following"
+        options={{ title: t("profile.following") }}
+      />
+      <Stack.Screen
         name="notifications"
         options={{ title: t("settings.notifications") }}
       />

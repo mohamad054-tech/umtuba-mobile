@@ -4,6 +4,12 @@
  */
 
 import {
+  followListOwnerFallbackHref,
+  followListViaFallbackHref,
+  isFollowListPath,
+} from "@/src/lib/profile/followListNav";
+import {
+  isStackedProfilePath,
   parseProfileNavOrigin,
   profileOriginFallbackHref,
   type ProfileNavOrigin,
@@ -28,6 +34,8 @@ export const SECONDARY_PATHS = [
   "/change-password",
   "/profile",
   "/profile/user",
+  "/profile/followers",
+  "/profile/following",
   "/messages/[id]",
   "/sound/[id]",
   "/(auth)/signup",
@@ -73,6 +81,11 @@ export type GlobalBackInput = {
   previousRouteName?: string | null;
   profileHasOtherUser?: boolean;
   profileOrigin?: ProfileNavOrigin | string | null;
+  profileVia?: string | string[] | null;
+  profileListId?: string | string[] | null;
+  profileListUsername?: string | string[] | null;
+  followListOwnerId?: string | string[] | null;
+  followListOwnerUsername?: string | string[] | null;
 };
 
 const TAB_LEAVES = new Set([
@@ -200,6 +213,14 @@ export function parentFallbackHref(path: string, segments?: readonly string[]): 
   }
   if (n === "/world") return "/(tabs)/discover";
   if (
+    n === "/profile/followers" ||
+    n === "/profile/following" ||
+    leaf === "profile/followers" ||
+    leaf === "profile/following"
+  ) {
+    return null;
+  }
+  if (
     n === "/profile" ||
     n === "/profile/user" ||
     leaf === "profile" ||
@@ -248,6 +269,8 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
     return { action: "noop" };
   }
 
+  const current = normalizeNavPath(input.currentPath);
+
   if (
     input.canGoBack &&
     isValidHistoryPrevious(input.previousRouteName, input.currentPath)
@@ -255,10 +278,32 @@ export function resolveGlobalBack(input: GlobalBackInput): GlobalBackDecision {
     return { action: "history-back" };
   }
 
+  if (isStackedProfilePath(input.currentPath, input.segments)) {
+    const viaHref = followListViaFallbackHref({
+      via: input.profileVia,
+      listOwnerId: input.profileListId,
+      listOwnerUsername: input.profileListUsername,
+      origin: input.profileOrigin,
+    });
+    if (viaHref && normalizeNavPath(viaHref) !== current) {
+      return { action: "replace", href: viaHref };
+    }
+  }
+
+  if (isFollowListPath(input.currentPath, input.segments)) {
+    const ownerHref = followListOwnerFallbackHref({
+      ownerId: input.followListOwnerId,
+      ownerUsername: input.followListOwnerUsername,
+      origin: input.profileOrigin,
+    });
+    if (ownerHref && normalizeNavPath(ownerHref) !== current) {
+      return { action: "replace", href: ownerHref };
+    }
+  }
+
   const originHref = profileOriginFallbackHref(
     parseProfileNavOrigin(input.profileOrigin)
   );
-  const current = normalizeNavPath(input.currentPath);
   if (originHref && normalizeNavPath(originHref) !== current) {
     return { action: "replace", href: originHref };
   }

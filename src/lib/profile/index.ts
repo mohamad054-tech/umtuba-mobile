@@ -18,6 +18,13 @@ export {
   type ProfileNavOrigin,
 } from "@/src/lib/profile/profileNav";
 export {
+  FOLLOW_LIST_PATHS,
+  buildFollowListHref,
+  buildFollowListMemberProfileHref,
+  followListOwnerFallbackHref,
+  parseFollowListKind,
+} from "@/src/lib/profile/followListNav";
+export {
   listProfileVideos,
   mapProfileVideoRow,
   type ProfileVideoItem,

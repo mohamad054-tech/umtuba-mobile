@@ -47,10 +47,16 @@ import {
   resolveActiveMobileProfileTab,
   type MobileProfileTabId,
 } from "@/src/lib/profile/profileTabs";
+import { buildFollowListHref } from "@/src/lib/profile/followListNav";
+import { parseProfileNavOrigin } from "@/src/lib/profile/profileNav";
 import {
   planOtherProfileLookup,
   resolveProfileTarget,
 } from "@/src/lib/profile/resolveTarget";
+import {
+  resolveFollowListOpenTarget,
+  type FollowListKind,
+} from "@/src/lib/social/followLists";
 import {
   getProfileFollowSnapshot,
   toggleProfileFollow,
@@ -66,7 +72,12 @@ export default function ProfileScreen() {
   const columnWidth = resolveProfileContentWidth(windowWidth);
   const mediaBox = resolveProfileMediaBox(windowWidth, columnWidth);
   const router = useRouter();
-  const params = useLocalSearchParams<{ u?: string; id?: string; tab?: string }>();
+  const params = useLocalSearchParams<{
+    u?: string;
+    id?: string;
+    tab?: string;
+    from?: string;
+  }>();
   const [refreshing, setRefreshing] = useState(false);
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
   const [otherStatus, setOtherStatus] = useState<
@@ -267,6 +278,33 @@ export default function ProfileScreen() {
     }
   }, [following, otherProfile?.id, router, user]);
 
+  const openFollowList = useCallback(
+    (kind: FollowListKind) => {
+      const targetUserId = resolveFollowListOpenTarget({
+        isOwn,
+        ownUserId: user?.id ?? profile?.id ?? null,
+        otherUserId: otherProfile?.id ?? null,
+      });
+      if (!targetUserId) return;
+      const href = buildFollowListHref({
+        kind,
+        targetUserId,
+        username: view.username,
+        origin: parseProfileNavOrigin(params.from) ?? (isOwn ? "profile" : null),
+      });
+      if (href) router.push(href as never);
+    },
+    [
+      isOwn,
+      otherProfile?.id,
+      params.from,
+      profile?.id,
+      router,
+      user?.id,
+      view.username,
+    ]
+  );
+
   const onShare = useCallback(async () => {
     const url = buildProfileShareUrl(view.username);
     if (!url) return;
@@ -447,6 +485,8 @@ export default function ProfileScreen() {
               followersCount={followersCount}
               followingCount={followingCount}
               postsCount={timeline.length}
+              onOpenFollowers={() => openFollowList("followers")}
+              onOpenFollowing={() => openFollowList("following")}
             />
 
             <ProfileTabStrip

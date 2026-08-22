@@ -17,6 +17,7 @@ import {
   previousRouteNameFromState,
   resolveGlobalBack,
 } from "@/src/lib/nav/globalBack";
+import { isFollowListPath } from "@/src/lib/profile/followListNav";
 import {
   hasOtherUserProfileQuery,
   parseProfileNavOrigin,
@@ -37,9 +38,13 @@ export function useGlobalBack() {
     u?: string | string[];
     id?: string | string[];
     from?: string | string[];
+    via?: string | string[];
+    listId?: string | string[];
+    listU?: string | string[];
   }>();
   const profileHasOtherUser = hasOtherUserProfileQuery(params);
   const profileOrigin = parseProfileNavOrigin(params.from);
+  const onFollowList = isFollowListPath(pathname, segments);
 
   return useCallback(() => {
     const state = navigation.getState() as
@@ -52,6 +57,11 @@ export function useGlobalBack() {
       previousRouteName: previousRouteNameFromState(state),
       profileHasOtherUser,
       profileOrigin,
+      profileVia: params.via,
+      profileListId: params.listId,
+      profileListUsername: params.listU,
+      followListOwnerId: onFollowList ? params.id : null,
+      followListOwnerUsername: onFollowList ? params.u : null,
     });
     applyGlobalBackDecision(decision, {
       back: () => router.back(),
@@ -59,6 +69,12 @@ export function useGlobalBack() {
     });
   }, [
     navigation,
+    onFollowList,
+    params.id,
+    params.listId,
+    params.listU,
+    params.u,
+    params.via,
     pathname,
     profileHasOtherUser,
     profileOrigin,
