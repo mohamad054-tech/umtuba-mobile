@@ -40,6 +40,9 @@ yarn-error.*
 /ios
 /android
 
+# local portable toolchain (JDK / build cache)
+.tools/
+
 # secrets
 .env
 .env.*

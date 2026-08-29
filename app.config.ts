@@ -4,7 +4,7 @@ const config: ExpoConfig = {
   name: "UMTUBA",
   slug: "umtuba-mobile",
   owner: "umtuba",
-  version: "1.0.0",
+  version: "1.0.22",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "umtuba",
@@ -63,7 +63,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.umtuba.app",
-    versionCode: 21,
+    versionCode: 22,
     adaptiveIcon: {
       backgroundColor: "#050510",
       foregroundImage: "./assets/images/android-icon-foreground.png",

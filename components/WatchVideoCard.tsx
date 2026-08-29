@@ -90,6 +90,7 @@ import {
   WATCH_VOLUME_RIGHT_CLEARANCE,
   watchRailBottomOffset,
 } from "@/src/lib/watch/railLayout";
+import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -702,7 +703,7 @@ function WatchPlayerPane({
         <VideoView
           style={styles.video}
           player={player}
-          contentFit="cover"
+          contentFit={WATCH_VIDEO_CONTENT_FIT}
           nativeControls={false}
           allowsPictureInPicture={false}
           surfaceType="textureView"
