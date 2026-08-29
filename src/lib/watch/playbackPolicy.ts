@@ -81,6 +81,73 @@ export function shouldPrepareWatchPlayer(
   return Math.trunc(index) === Math.trunc(activeIndex) + 1;
 }
 
+/**
+ * Attach the next Android TextureView only after ExoPlayer is READY and
+ * the current clip is near end. Off-screen, next-only — not a visible
+ * second player and not a ±1 window.
+ */
+export const ANDROID_NEXT_SURFACE_WARM_REMAINING_MS = 1800;
+export const ANDROID_HANDOFF_WAIT_MS = 700;
+
+export function shouldWarmAndroidNextSurface(input: {
+  platform?: string | null;
+  remainingMs: number | null | undefined;
+  ended?: boolean;
+}): boolean {
+  if (input.platform !== "android") return false;
+  if (input.ended === true) return true;
+  if (input.remainingMs == null || !Number.isFinite(input.remainingMs)) {
+    return false;
+  }
+  return input.remainingMs <= ANDROID_NEXT_SURFACE_WARM_REMAINING_MS;
+}
+
+/** Surface mount. iOS stays on the load window. */
+export function shouldAttachWatchSurface(input: {
+  loadPlayer: boolean;
+  preparePlayer: boolean;
+  itemReady: boolean;
+  warmNextSurface: boolean;
+  platform?: string | null;
+}): boolean {
+  if (input.loadPlayer) return true;
+  if (input.platform !== "android") return false;
+  return (
+    input.preparePlayer === true &&
+    input.itemReady === true &&
+    input.warmNextSurface === true
+  );
+}
+
+export type WatchHandoffReadiness =
+  | "blocked"
+  | "ready-buffered"
+  | "ready-to-render";
+
+export function resolveWatchHandoffReadiness(input: {
+  nextReady: boolean;
+  nextFirstFrame: boolean;
+}): WatchHandoffReadiness {
+  if (input.nextFirstFrame) return "ready-to-render";
+  if (input.nextReady) return "ready-buffered";
+  return "blocked";
+}
+
+/**
+ * Prefer first-frame (decoder + TextureView). After max wait, advance
+ * anyway so the last frame cannot stall forever.
+ */
+export function shouldHandoffWatchAdvance(input: {
+  nextFirstFrame: boolean;
+  waitedMs: number;
+  maxWaitMs?: number;
+}): boolean {
+  if (input.nextFirstFrame) return true;
+  if (!Number.isFinite(input.waitedMs) || input.waitedMs < 0) return false;
+  const max = input.maxWaitMs ?? ANDROID_HANDOFF_WAIT_MS;
+  return input.waitedMs >= max;
+}
+
 /** Append page results without duplicating post ids. */
 export function mergeWatchVideos(
   existing: WatchVideo[],

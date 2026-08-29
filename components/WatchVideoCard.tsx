@@ -48,12 +48,14 @@ import {
   sanitizePlaybackError,
   scrubFillWidthPercent,
   scrubThumbLeftPercent,
+  shouldAttachWatchSurface,
   WATCH_SCRUB_LAYOUT_DIRECTION,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldPlayWithUserPause,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
+import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
 import {
   canProduceWatchAudio,
   resolveWatchPlaybackIntent,
@@ -100,6 +102,10 @@ export type WatchVideoCardProps = {
   shouldLoadPlayer: boolean;
   /** Android next-only media prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
   shouldPreparePlayer?: boolean;
+  /** Android: attach next TextureView off-screen once READY and current is near end. */
+  warmNextSurface?: boolean;
+  onHandoffState?: (state: { ready: boolean; firstFrame: boolean }) => void;
+  onRemainingMs?: (remainingMs: number | null) => void;
   /** Bumps on every active-index change so late play cannot revive the previous card. */
   ownershipGeneration: number;
   muted: boolean;
@@ -143,8 +149,9 @@ type PlayerPaneProps = {
   src: string;
   isActive: boolean;
   shouldPlay: boolean;
-  /** False = keep ExoPlayer prepared without a TextureView (Android next item). */
-  attachSurface: boolean;
+  loadPlayer: boolean;
+  preparePlayer: boolean;
+  warmNextSurface: boolean;
   ownershipGeneration: number;
   muted: boolean;
   volume: number;
@@ -152,6 +159,7 @@ type PlayerPaneProps = {
   seekRequest: { token: number; ratio: number } | null;
   onTimeline: (state: TimelineState) => void;
   onEnded?: () => void;
+  onFirstFrame?: () => void;
   onPlayerStatus?: (
     status: "idle" | "loading" | "ready" | "error",
     message?: string | null
@@ -318,7 +326,9 @@ function WatchPlayerPane({
   src,
   isActive,
   shouldPlay,
-  attachSurface,
+  loadPlayer,
+  preparePlayer,
+  warmNextSurface,
   ownershipGeneration,
   muted,
   volume,
@@ -326,6 +336,7 @@ function WatchPlayerPane({
   seekRequest,
   onTimeline,
   onEnded,
+  onFirstFrame,
   onPlayerStatus,
 }: PlayerPaneProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
@@ -596,6 +607,9 @@ function WatchPlayerPane({
           loop,
         })
       );
+      if (isActive && !muted && volume > 0) {
+        markWatchTransition(nativePlatform, "audio_start");
+      }
       return;
     }
     playGenerationRef.current = null;
@@ -649,6 +663,30 @@ function WatchPlayerPane({
   }, [seekRequest, player, onTimeline]);
 
   const { t } = useTranslation();
+  const attachSurface = shouldAttachWatchSurface({
+    loadPlayer,
+    preparePlayer,
+    itemReady: status === "ready" || nativeStatusRef.current === "readyToPlay",
+    warmNextSurface,
+    platform: nativePlatform,
+  });
+
+  useEffect(() => {
+    if (attachSurface) {
+      markWatchTransition(nativePlatform, "surface_attached");
+    }
+  }, [attachSurface, nativePlatform]);
+
+  useEffect(() => {
+    if (status === "ready") {
+      markWatchTransition(nativePlatform, "next_ready");
+    }
+  }, [nativePlatform, status]);
+
+  const onRenderedFirstFrame = useCallback(() => {
+    markWatchTransition(nativePlatform, "first_frame");
+    onFirstFrame?.();
+  }, [nativePlatform, onFirstFrame]);
 
   return (
     <View
@@ -665,6 +703,7 @@ function WatchPlayerPane({
           surfaceType="textureView"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
+          onFirstFrameRender={onRenderedFirstFrame}
         />
       ) : null}
 
@@ -685,6 +724,9 @@ function WatchVideoCardComponent({
   isActive,
   shouldLoadPlayer: loadPlayer,
   shouldPreparePlayer: preparePlayer = loadPlayer,
+  warmNextSurface = false,
+  onHandoffState,
+  onRemainingMs,
   ownershipGeneration,
   muted,
   volume,
@@ -834,6 +876,23 @@ function WatchVideoCardComponent({
     }, PLAY_PAUSE_FEEDBACK_MS);
   }, []);
 
+  const firstFrameRef = useRef(false);
+  const onHandoffStateRef = useRef(onHandoffState);
+  onHandoffStateRef.current = onHandoffState;
+  const onRemainingMsRef = useRef(onRemainingMs);
+  onRemainingMsRef.current = onRemainingMs;
+
+  useEffect(() => {
+    firstFrameRef.current = false;
+  }, [playerEpoch, video.id]);
+
+  useEffect(() => {
+    onHandoffStateRef.current?.({
+      ready: paneStatus === "ready",
+      firstFrame: firstFrameRef.current,
+    });
+  }, [paneStatus]);
+
   const onPlayerStatus = useCallback(
     (
       next: "idle" | "loading" | "ready" | "error",
@@ -887,6 +946,11 @@ function WatchVideoCardComponent({
   }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
 
   const onTimeline = useCallback((state: TimelineState) => {
+    if (isActive && state.duration > 0) {
+      onRemainingMsRef.current?.(
+        Math.max(0, (state.duration - state.currentTime) * 1000)
+      );
+    }
     const durationMs =
       video.durationMs ??
       (state.duration > 0 ? Math.round(state.duration * 1000) : null);
@@ -938,7 +1002,7 @@ function WatchVideoCardComponent({
       scrubTargetRatioRef.current = null;
     }
     setTimeline(state);
-  }, [edit, loop, onEnded, video.durationMs]);
+  }, [edit, isActive, loop, onEnded, video.durationMs]);
 
   const onSeekRatio = useCallback(
     (ratio: number) => {
@@ -1001,7 +1065,9 @@ function WatchVideoCardComponent({
           src={epochSrc}
           isActive={isActive}
           shouldPlay={shouldPlay}
-          attachSurface={loadPlayer}
+          loadPlayer={loadPlayer}
+          preparePlayer={preparePlayer}
+          warmNextSurface={warmNextSurface}
           ownershipGeneration={ownershipGeneration}
           muted={audio.muted}
           volume={audio.volume}
@@ -1009,6 +1075,13 @@ function WatchVideoCardComponent({
           seekRequest={isActive ? seekRequest : null}
           onTimeline={onTimeline}
           onEnded={onEnded}
+          onFirstFrame={() => {
+            firstFrameRef.current = true;
+            onHandoffState?.({
+              ready: paneStatus === "ready",
+              firstFrame: true,
+            });
+          }}
           onPlayerStatus={onPlayerStatus}
         />
       ) : (

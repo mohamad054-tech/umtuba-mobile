@@ -95,14 +95,18 @@ import {
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
+  resolveWatchHandoffReadiness,
   shouldAcceptViewableIndexUpdate,
+  shouldHandoffWatchAdvance,
   shouldLoadPlayer,
   shouldPrepareWatchPlayer,
+  shouldWarmAndroidNextSurface,
   toWatchListPixels,
   watchInteractionSignature,
   watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
+import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -188,6 +192,15 @@ export default function WatchScreen() {
   const screenFocusedRef = useRef(true);
   const commentPostIdRef = useRef<number | null>(null);
   const exitHintVisibleRef = useRef(false);
+  const remainingMsRef = useRef<number | null>(null);
+  const currentEndedRef = useRef(false);
+  const nextHandoffRef = useRef({
+    index: -1,
+    ready: false,
+    firstFrame: false,
+  });
+  const handoffGenRef = useRef(0);
+  const [warmNextSurface, setWarmNextSurface] = useState(false);
 
   const claimActiveIndex = useCallback((nextIndex: number) => {
     const safeIndex = sanitizeWatchListIndex(nextIndex);
@@ -208,6 +221,14 @@ export default function WatchScreen() {
 
   const claimActiveIndexRef = useRef(claimActiveIndex);
   claimActiveIndexRef.current = claimActiveIndex;
+
+  useEffect(() => {
+    remainingMsRef.current = null;
+    currentEndedRef.current = false;
+    handoffGenRef.current += 1;
+    setWarmNextSurface(false);
+    nextHandoffRef.current = { index: -1, ready: false, firstFrame: false };
+  }, [activeIndex]);
 
   useEffect(() => {
     const generation = registerMountedWatchInstance();
@@ -818,7 +839,11 @@ export default function WatchScreen() {
     setListScrollEnabled(!active);
   }, []);
 
-  const scrollToWatchIndex = useCallback((nextIndex: number, attempt = 0) => {
+  const scrollToWatchIndex = useCallback((
+    nextIndex: number,
+    attempt = 0,
+    options?: { animated?: boolean }
+  ) => {
     const height = itemHeightRef.current;
     const offset = resolveWatchScrollOffset(nextIndex, height);
     if (offset == null) {
@@ -832,11 +857,16 @@ export default function WatchScreen() {
     programmaticAdvanceUntilRef.current =
       Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
     claimActiveIndex(nextIndex);
+    markWatchTransition(Platform.OS, "next_source_activation", {
+      index: nextIndex,
+      readiness: resolveWatchHandoffReadiness(nextHandoffRef.current),
+    });
 
+    const animated = options?.animated ?? attempt === 0;
     const run = () => {
       listRef.current?.scrollToOffset({
         offset,
-        animated: attempt === 0,
+        animated,
       });
     };
 
@@ -845,7 +875,10 @@ export default function WatchScreen() {
     } catch (err) {
       console.warn("Watch auto-next scroll failed:", err);
       if (attempt < 3) {
-        setTimeout(() => scrollToWatchIndex(nextIndex, attempt + 1), 80 * (attempt + 1));
+        setTimeout(
+          () => scrollToWatchIndex(nextIndex, attempt + 1, options),
+          80 * (attempt + 1)
+        );
       }
       return;
     }
@@ -856,7 +889,7 @@ export default function WatchScreen() {
           listRef.current?.scrollToOffset({ offset, animated: false });
         } catch (err) {
           console.warn("Watch auto-next scroll retry failed:", err);
-          scrollToWatchIndex(nextIndex, attempt + 1);
+          scrollToWatchIndex(nextIndex, attempt + 1, options);
         }
       }, 120);
     }
@@ -871,7 +904,34 @@ export default function WatchScreen() {
     if (nextIndex == null) {
       return;
     }
-    scrollToWatchIndex(nextIndex);
+    markWatchTransition(Platform.OS, "current_end", { index: nextIndex });
+    if (Platform.OS !== "android") {
+      scrollToWatchIndex(nextIndex);
+      return;
+    }
+    currentEndedRef.current = true;
+    setWarmNextSurface(true);
+    const started = Date.now();
+    const gen = handoffGenRef.current + 1;
+    handoffGenRef.current = gen;
+    const tryHandoff = () => {
+      if (handoffGenRef.current !== gen) return;
+      const waitedMs = Date.now() - started;
+      const nextState = nextHandoffRef.current;
+      const firstFrame =
+        nextState.index === nextIndex && nextState.firstFrame;
+      if (
+        shouldHandoffWatchAdvance({
+          nextFirstFrame: firstFrame,
+          waitedMs,
+        })
+      ) {
+        scrollToWatchIndex(nextIndex, 0, { animated: !firstFrame });
+        return;
+      }
+      setTimeout(tryHandoff, 32);
+    };
+    tryHandoff();
   }, [autoNext, scrollToWatchIndex]);
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
@@ -904,6 +964,33 @@ export default function WatchScreen() {
           activeIndex,
           Platform.OS
         )}
+        warmNextSurface={
+          Platform.OS === "android" &&
+          index === activeIndex + 1 &&
+          warmNextSurface
+        }
+        onHandoffState={
+          Platform.OS === "android" && index === activeIndex + 1
+            ? (state) => {
+                nextHandoffRef.current = { index, ...state };
+              }
+            : undefined
+        }
+        onRemainingMs={
+          Platform.OS === "android" && index === activeIndex
+            ? (remainingMs) => {
+                remainingMsRef.current = remainingMs;
+                const nextWarm = shouldWarmAndroidNextSurface({
+                  platform: "android",
+                  remainingMs,
+                  ended: currentEndedRef.current,
+                });
+                setWarmNextSurface((prev) =>
+                  prev === nextWarm ? prev : nextWarm
+                );
+              }
+            : undefined
+        }
         ownershipGeneration={playbackGeneration}
         muted={muted}
         volume={volume}
@@ -968,6 +1055,7 @@ export default function WatchScreen() {
       playbackGeneration,
       appState,
       autoNext,
+      warmNextSurface,
       insets.bottom,
       insets.top,
       itemHeight,

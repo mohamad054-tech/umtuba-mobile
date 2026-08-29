@@ -369,3 +369,11 @@ describe("11 ANDROID_NEXT_MEDIA_PREPARE_WITHOUT_SURFACE", () => {
     ).toBe(1);
   });
 });
+
+describe("12 ANDROID_HANDOFF_WAITS_FOR_FIRST_FRAME", () => {
+  it("keeps the surface window active-only until READY+near-end warm", () => {
+    expect(watchWindowMountedIndexes(4, 9, "android")).toEqual([4]);
+    expect(shouldLoadPlayer(5, 4, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(5, 4, "android")).toBe(true);
+  });
+});

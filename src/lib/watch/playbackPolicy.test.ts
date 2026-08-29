@@ -34,9 +34,13 @@ import {
   serializeWatchVolumePreference,
   resolveWatchPlayerLoadWindow,
   shouldAcceptViewableIndexUpdate,
+  shouldAttachWatchSurface,
+  shouldHandoffWatchAdvance,
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
   shouldPrepareWatchPlayer,
+  shouldWarmAndroidNextSurface,
+  resolveWatchHandoffReadiness,
   shouldPlayVideo,
   shouldPlayWithUserPause,
   watchInteractionSignature,
@@ -138,6 +142,87 @@ describe("shouldPrepareWatchPlayer", () => {
     expect(shouldPrepareWatchPlayer(2, 2, "ios")).toBe(true);
     expect(shouldPrepareWatchPlayer(3, 2, "ios")).toBe(true);
     expect(shouldPrepareWatchPlayer(4, 2, "ios")).toBe(false);
+  });
+});
+
+describe("Android next-surface warm and gated handoff", () => {
+  it("does not attach a second Android surface until READY and near end", () => {
+    expect(
+      shouldWarmAndroidNextSurface({
+        platform: "android",
+        remainingMs: 4000,
+      })
+    ).toBe(false);
+    expect(
+      shouldWarmAndroidNextSurface({
+        platform: "android",
+        remainingMs: 1200,
+      })
+    ).toBe(true);
+    expect(
+      shouldWarmAndroidNextSurface({
+        platform: "android",
+        remainingMs: 4000,
+        ended: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldWarmAndroidNextSurface({
+        platform: "ios",
+        remainingMs: 200,
+      })
+    ).toBe(false);
+    expect(
+      shouldAttachWatchSurface({
+        loadPlayer: false,
+        preparePlayer: true,
+        itemReady: true,
+        warmNextSurface: true,
+        platform: "android",
+      })
+    ).toBe(true);
+    expect(
+      shouldAttachWatchSurface({
+        loadPlayer: false,
+        preparePlayer: true,
+        itemReady: true,
+        warmNextSurface: true,
+        platform: "ios",
+      })
+    ).toBe(false);
+    expect(
+      shouldAttachWatchSurface({
+        loadPlayer: false,
+        preparePlayer: true,
+        itemReady: false,
+        warmNextSurface: true,
+        platform: "android",
+      })
+    ).toBe(false);
+  });
+
+  it("handoffs when the next first frame exists, otherwise after max wait", () => {
+    expect(
+      shouldHandoffWatchAdvance({ nextFirstFrame: true, waitedMs: 0 })
+    ).toBe(true);
+    expect(
+      shouldHandoffWatchAdvance({ nextFirstFrame: false, waitedMs: 100 })
+    ).toBe(false);
+    expect(
+      shouldHandoffWatchAdvance({ nextFirstFrame: false, waitedMs: 700 })
+    ).toBe(true);
+    expect(
+      resolveWatchHandoffReadiness({
+        nextReady: true,
+        nextFirstFrame: false,
+      })
+    ).toBe("ready-buffered");
+    expect(
+      resolveWatchHandoffReadiness({
+        nextReady: true,
+        nextFirstFrame: true,
+      })
+    ).toBe("ready-to-render");
   });
 });
 
