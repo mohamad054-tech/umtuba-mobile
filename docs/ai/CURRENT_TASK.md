@@ -13,6 +13,7 @@ Bounded Android Watch 3-video window: previous retained, current playing, next p
 - Isolated worktree: `C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-WATCH-NEXT-VIDEO-TRANSITION-DELAY-V1`
 - Branch: `desktop/android-watch-next-video-transition-delay-v1`
 - Base: `a79f5d11b0432e825b9262c4d6dd41f28bd952dd`
+- Fix commit: `1a4b0f8b41ff388b99ffb136bbc39156d841e52f`
 
 ## Allowed scope
 
