@@ -129,11 +129,13 @@ describe("shouldLoadPlayer", () => {
 });
 
 describe("shouldPrepareWatchPlayer", () => {
-  it("prepares only the next Android index without expanding the surface window", () => {
+  it("keeps an Android previous+current+next window without expanding TextureView", () => {
     expect(shouldPrepareWatchPlayer(2, 2, "android")).toBe(true);
     expect(shouldPrepareWatchPlayer(3, 2, "android")).toBe(true);
-    expect(shouldPrepareWatchPlayer(1, 2, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(1, 2, "android")).toBe(true);
     expect(shouldPrepareWatchPlayer(4, 2, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(0, 2, "android")).toBe(false);
+    expect(shouldLoadPlayer(1, 2, "android")).toBe(false);
     expect(shouldLoadPlayer(3, 2, "android")).toBe(false);
   });
 

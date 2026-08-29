@@ -56,6 +56,7 @@ import {
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
 import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
+import { resolveAndroidWatchBufferOptions } from "@/src/lib/watch/androidWatchMediaCache";
 import {
   canProduceWatchAudio,
   resolveWatchPlaybackIntent,
@@ -100,7 +101,7 @@ export type WatchVideoCardProps = {
   isActive: boolean;
   /** Mount native player only for the platform load window (iOS ±1, Android active). */
   shouldLoadPlayer: boolean;
-  /** Android next-only media prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
+  /** Android previous+current+next prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
   shouldPreparePlayer?: boolean;
   /** Android: attach next TextureView off-screen once READY and current is near end. */
   warmNextSurface?: boolean;
@@ -373,6 +374,10 @@ function WatchPlayerPane({
     p.showNowPlayingNotification = false;
     p.keepScreenOnWhilePlaying = true;
     p.timeUpdateEventInterval = TIME_UPDATE_INTERVAL_SEC;
+    const buffers = resolveAndroidWatchBufferOptions(nativePlatform);
+    if (buffers) {
+      p.bufferOptions = buffers;
+    }
   });
   const boundPlayerRef = useRef<typeof player | null>(null);
 

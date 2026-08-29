@@ -1,4 +1,4 @@
-# CURRENT TASK — DESKTOP_ANDROID_WATCH_TRANSITION_MICRO_GAP_V2
+# CURRENT TASK — DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
 
 ## Status
 
@@ -6,7 +6,7 @@
 
 ## Task
 
-Residual fraction-of-a-second Watch gap on Fold6 after V1 headless next-prepare (`a79f5d1`). Measure remaining path. Handoff only when next is ready to render. Next-item-only. No Watch redesign, no feed change, no Web/iOS, no Play upload.
+Bounded Android Watch 3-video window: previous retained, current playing, next prepared. N+2 starts when the window slides. No Watch redesign, no feed change, no Web/iOS, no Play upload.
 
 ## Authoritative source
 
@@ -16,22 +16,20 @@ Residual fraction-of-a-second Watch gap on Fold6 after V1 headless next-prepare 
 
 ## Allowed scope
 
-- Android Watch auto-next handoff / next-only surface warm / transition marks
+- Android Watch prepare window / retain previous / bounded Media3 cache / V2-compatible first-frame handoff
 - Isolated worktree above
-- Local commit of a proven Android-only fix
+- Local commit
 - `docs/ai/CURSOR_REPORT.md` and this file
 
 ## Forbidden scope
 
 - Web / iOS behavior
-- Parent web `office/profile-hero-completeness-v1` @ `380a366`
-- Dirty parent `umtuba-mobile`
-- Feed rewrite, Watch redesign, playlist/single-player rewrite
-- Second **visible** TextureView / preload beyond immediate next
-- Play upload, production deploy, Desktop writes, `_port_extract`
+- Parent web `380a366` and dirty mobile parent
+- Single-player / playlist Watch rewrite
+- Whole-feed preload, Play upload, Desktop writes, `_port_extract`
 
 ## Isolation notes
 
-- Fold6 `RFCX718LVHK` authorized this session, but installed app is versionCode **20** (2026-08-23), not V1/V2.
-- V2 not installed. Device QA of this fix is NOT_RUN.
-- Android load window stays 0. iOS ±1 unchanged.
+- V2 first-frame gated auto-next kept (compatible).
+- Android TextureView load window stays 0.
+- Fold6 authorized but installed versionCode 20 (not this SHA).

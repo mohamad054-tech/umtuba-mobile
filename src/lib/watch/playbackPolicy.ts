@@ -60,25 +60,29 @@ export function shouldLoadPlayer(
 }
 
 /**
- * Prepare the next playable asset while the current clip still plays.
- * Android: next index only — no extra TextureView (load window stays 0).
- * iOS: same as the ±1 load window. Never a whole-feed prepare.
+ * Keep a bounded 3-item playback window: previous + current + next.
+ * Android TextureView stays active-only (load window 0). Neighbors keep a
+ * silent prepared player so back does not remount and N+2 starts when the
+ * window slides. Never the whole feed.
  */
+export function resolveWatchPlayerPrepareWindow(
+  _platform?: string | null
+): number {
+  return 1;
+}
+
 export function shouldPrepareWatchPlayer(
   index: number,
   activeIndex: number,
   platform?: string | null
 ): boolean {
-  if (shouldLoadPlayer(index, activeIndex, platform)) {
-    return true;
-  }
-  if (platform !== "android") {
-    return false;
-  }
   if (!Number.isFinite(index) || !Number.isFinite(activeIndex)) {
     return false;
   }
-  return Math.trunc(index) === Math.trunc(activeIndex) + 1;
+  void platform;
+  return (
+    Math.abs(index - activeIndex) <= resolveWatchPlayerPrepareWindow(platform)
+  );
 }
 
 /**

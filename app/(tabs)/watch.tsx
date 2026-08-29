@@ -107,6 +107,7 @@ import {
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
 import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
+import { ensureAndroidWatchVideoCache } from "@/src/lib/watch/androidWatchMediaCache";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -233,6 +234,10 @@ export default function WatchScreen() {
   useEffect(() => {
     const generation = registerMountedWatchInstance();
     return () => unregisterMountedWatchInstance(generation);
+  }, []);
+
+  useEffect(() => {
+    void ensureAndroidWatchVideoCache(Platform.OS);
   }, []);
 
   useEffect(() => {

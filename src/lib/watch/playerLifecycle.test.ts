@@ -20,6 +20,7 @@ import {
   shouldCallPlayerMethodsOnUnmount,
   shouldRecreateWatchPlayer,
   shouldSilencePlayerBeforeDetach,
+  watchWindowEvictedIndexes,
   watchWindowMountedIndexes,
   watchWindowPreparedIndexes,
   watchWindowRemounts,
@@ -402,9 +403,13 @@ describe("A→B→C→B→A player window", () => {
       expect(watchWindowMountedIndexes(active, 5).length).toBeLessThanOrEqual(3);
       expect(watchWindowMountedIndexes(active, 5, "android")).toEqual([active]);
       expect(watchWindowPreparedIndexes(active, 5, "android")).toEqual(
-        active < 4 ? [active, active + 1] : [active]
+        [active - 1, active, active + 1].filter(
+          (index) => index >= 0 && index < 5
+        )
       );
     }
+    expect(watchWindowEvictedIndexes(2, 3, 6, "android")).toEqual([1]);
+    expect(watchWindowPreparedIndexes(3, 6, "android")).toEqual([2, 3, 4]);
   });
 
   it("does not reset source identity on ownership-only changes", () => {

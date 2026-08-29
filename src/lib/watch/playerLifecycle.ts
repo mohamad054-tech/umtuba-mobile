@@ -5,7 +5,8 @@
  * ACTIVE_PLAYING_VIDEO_COUNT <= 1
  *
  * iOS may keep a ±1 preload window mounted. Android mounts the active
- * TextureView only (dd86a3e) and may prepare the next item headless.
+ * TextureView only (dd86a3e) and keeps a silent ±1 prepare window
+ * (previous + current + next). Neighbors stay silent.
  * Mounted != audible. Neighbors stay silent.
  *
  * Release sequence: silence while the SharedObject is still alive, then
@@ -248,7 +249,7 @@ export function watchWindowMountedIndexes(
   return mounted;
 }
 
-/** Android next-only media prepare. Surface mount stays `watchWindowMountedIndexes`. */
+/** Silent previous+current+next prepare. Surface mount stays `watchWindowMountedIndexes`. */
 export function watchWindowPreparedIndexes(
   activeIndex: number,
   itemCount: number,
@@ -261,6 +262,22 @@ export function watchWindowPreparedIndexes(
     }
   }
   return prepared;
+}
+
+/** Indexes that leave the 3-item prepare window when the active index slides. */
+export function watchWindowEvictedIndexes(
+  previousActive: number,
+  nextActive: number,
+  itemCount: number,
+  platform?: string | null
+): number[] {
+  const before = new Set(
+    watchWindowPreparedIndexes(previousActive, itemCount, platform)
+  );
+  const after = new Set(
+    watchWindowPreparedIndexes(nextActive, itemCount, platform)
+  );
+  return [...before].filter((index) => !after.has(index)).sort((a, b) => a - b);
 }
 
 /** Indexes that leave the load window and later remount (A→B→C→B remounts 0). */

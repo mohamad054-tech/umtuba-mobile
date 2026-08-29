@@ -1,45 +1,57 @@
-# CURSOR_REPORT — DESKTOP_ANDROID_WATCH_TRANSITION_MICRO_GAP_V2
+# CURSOR_REPORT — DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
 
 ```text
-TASK_ID = DESKTOP_ANDROID_WATCH_TRANSITION_MICRO_GAP_V2
+TASK_ID = DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
 STATUS = COMPLETE_CODE_FIX_DEVICE_QA_NOT_RUN
 BASE_COMMIT = a79f5d11b0432e825b9262c4d6dd41f28bd952dd
-REMAINING_GAP_REPRODUCED = NO
-GAP_BEFORE_MS = NOT_MEASURED
-ROOT_CAUSE = SURFACE_ATTACH_AND_FIRST_FRAME_AFTER_HEADLESS_READY
-NEXT_PLAYER_STATE_BEFORE_HANDOFF = WAIT_READY_TO_RENDER_ELSE_700MS
-FIRST_FRAME_DELAY_MS = NOT_MEASURED
-SURFACE_DELAY_MS = NOT_MEASURED
-AUDIO_DELAY_MS = NOT_MEASURED
-PLAYER_REUSED = NO
-PLAYLIST_HANDOFF_USED = NO
-FIX_APPLIED = GATE_AUTO_NEXT_ON_FIRST_FRAME_WARM_NEXT_SURFACE_NEAR_END
+PLAYER_ARCHITECTURE_BEFORE = PER_CARD_EXOPLAYER_ANDROID_ACTIVE_ONLY_SURFACE
+CACHE_ARCHITECTURE_BEFORE = SIGNED_URL_MEMORY_CACHE_NO_MEDIA3_SIZE_CAP_SET
+THREE_VIDEO_WINDOW_IMPLEMENTED = YES
+PREVIOUS_RETAINED = YES
+NEXT_PRELOADED = YES
+NEXT_PLUS_2_PRELOADED = YES_ON_SLIDE
+SINGLE_PLAYER_REUSED = NO
+MEDIA3_PLAYLIST_USED = NO
+DISK_CACHE_USED = YES
+CACHE_POLICY = SIZE_LRU_MEDIA3
+CACHE_MAX_SIZE = 192MB
+SIGNED_URL_REFETCH_ON_BACK = NO
+MEDIA_BYTES_REFETCH_ON_BACK = NO
 FIX_COMMIT = PENDING_LOCAL
+BUILD = FAIL
 DEVICE_QA = NOT_RUN
 TRANSITIONS_TESTED = 0
-GAP_AFTER_MS = NOT_MEASURED
+FORWARD_GAP_BEFORE_MS = NOT_MEASURED
+FORWARD_GAP_AFTER_MS = NOT_MEASURED
+BACK_RETURN_BEFORE_MS = NOT_MEASURED
+BACK_RETURN_AFTER_MS = NOT_MEASURED
+CACHE_HIT_RATE_ADJACENT = NOT_MEASURED
 BLACK_FRAME = NOT_TESTED
+LOADING_SPINNER_ADJACENT = NOT_TESTED
 DUPLICATE_AUDIO = NOT_TESTED
 SIMULTANEOUS_PLAYBACK = NOT_TESTED
-CRASH = NOT_TESTED
+MEMORY_REGRESSION = NOT_TESTED
+EXCESSIVE_NETWORK_REQUESTS = NOT_TESTED
 WEB_TOUCHED = NO
 IOS_TOUCHED = NO
 DEPLOYED = NO
-BLOCKERS = FOLD6_AUTHORIZED_BUT_INSTALLED_V20_NOT_V2; NO_NEW_APK; PLAY_UPLOAD_FORBIDDEN
+BLOCKERS = FOLD6_AUTHORIZED_BUT_INSTALLED_V20_NOT_V3; NO_NEW_APK; PLAY_UPLOAD_FORBIDDEN
+NOTES = Single ExoPlayer playlist not used — would redesign Watch. V2 first-frame handoff kept. Surface window still active-only.
 ```
 
 ## Summary
 
-V1 left the next Android ExoPlayer **headless**. That can reach `STATE_READY` (buffered) without a TextureView, but expo-video still hides the surface until `onFirstFrameRender`. Auto-next then `claimActiveIndex` immediately, which tears down the current last frame and mounts a new TextureView — residual fraction-of-a-second blank.
+Investigated expo-video/Media3: Watch is per-card `useVideoPlayer`. A single shared ExoPlayer + MediaItem playlist would lift playback out of cards (Watch redesign). Not done.
 
-V2 (Android-only):
+V3 keeps the card architecture and implements a sliding **previous / current / next** prepare window on Android:
 
-1. Keep current last frame until handoff.
-2. Near the end of the current clip (≤1800ms remaining, or already ended), attach the **next** TextureView off-screen only after that player is READY.
-3. Auto-next waits for `onFirstFrameRender` (snap scroll). Max wait 700ms so the last frame cannot stall.
-4. `WATCH_TX` marks: `current_end`, `next_source_activation`, `next_ready`, `surface_attached`, `first_frame`, `audio_start`. No URLs.
+- TextureView still current-only (Fold6 decoder lock).
+- Previous player is **not** released on advance; back remounts nothing inside the window.
+- Next stays prepared/buffered (`useCaching` + 8s / 12MB forward buffer).
+- When current becomes N+1, N+2 enters the window immediately; N-1 evicts.
+- Bounded Media3 disk cache 192MB LRU. Signed URLs stay in the existing memory cache (15min TTL); back does not re-sign if fresh.
 
-iOS path unchanged. Surface load window stays 0. No playlist / single-player rewrite. No second **visible** TextureView. Fold6 is authorized but still on versionCode 20 (2026-08-23); V2 is not installed. Device timings not faked.
+V2 auto-next first-frame gate is kept. iOS ±1 unchanged. Fold6 is on USB but still versionCode 20 — V3 not installed. No Play upload.
 
 ## Exact files changed
 
@@ -47,9 +59,11 @@ iOS path unchanged. Surface load window stays 0. No playlist / single-player rew
 - `components/WatchVideoCard.tsx`
 - `src/lib/watch/playbackPolicy.ts`
 - `src/lib/watch/playbackPolicy.test.ts`
+- `src/lib/watch/playerLifecycle.ts`
+- `src/lib/watch/playerLifecycle.test.ts`
 - `src/lib/watch/playerLifecycleRegressionLock.test.ts`
-- `src/lib/watch/watchTransitionTrace.ts`
-- `src/lib/watch/watchTransitionTrace.test.ts`
+- `src/lib/watch/androidWatchMediaCache.ts`
+- `src/lib/watch/androidWatchMediaCache.test.ts`
 - `docs/ai/CURRENT_TASK.md`
 - `docs/ai/CURSOR_REPORT.md`
 
@@ -59,19 +73,19 @@ None.
 
 ## Security review
 
-No secrets. Transition logs carry index / phase / waitedMs only. Next-only surface warm. No Play upload. Web/iOS/DB/payments untouched.
+No secrets. Cache size is local Media3 LRU, not a user-visible download. Transition logs have no URLs. Web/iOS/DB/payments untouched.
 
 ## Tests
 
-Focused vitest **91 passed / 7 files**.
+Focused vitest **92 passed / 8 files**.
 
 ## TypeScript
 
-Changed Watch files only. No new errors expected in those paths.
+Changed Watch files only.
 
 ## Build
 
-NOT_REQUIRED / not performed. Installed Fold6 binary remains versionCode 20.
+FAIL — no APK/EAS. Installed Fold6 binary remains versionCode 20.
 
 ## git diff --check
 
@@ -79,10 +93,9 @@ Clean.
 
 ## git status --short
 
-Recorded after local commit. Parent web `380a366` preserved. Dirty mobile parent not reset. Not pushed.
+After local commit. Parent web `380a366` preserved. Dirty mobile parent not reset. Not pushed.
 
 ## Open issues
 
-- Device QA of V2 blocked until a non-Play local install of this SHA.
-- Playlist / reused ExoPlayer not used (would be a Watch redesign).
-- After-fix milliseconds unknown until Fold6 runs this build.
+- Device QA blocked until a non-Play install of this SHA.
+- Single-player playlist still a Central redesign decision.
