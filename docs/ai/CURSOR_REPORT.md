@@ -3,7 +3,7 @@
 ```text
 TASK_ID = DESKTOP_ANDROID_WATCH_NEXT_VIDEO_TRANSITION_DELAY_V1
 STATUS = COMPLETE_CODE_FIX_DEVICE_QA_NOT_RUN
-SOURCE_SHA = 17cbfefbc8c77d5286efdf2c9b941101db84b6c3
+SOURCE_SHA = a79f5d11b0432e825b9262c4d6dd41f28bd952dd
 DEVICE = Galaxy Z Fold6
 ISSUE_REPRODUCED = NO
 TRANSITION_GAP_BEFORE_MS = NOT_MEASURED / OWNER_~1000
@@ -14,7 +14,7 @@ NEXT_MEDIA_PRELOADED = YES_AFTER_FIX_NEXT_ONLY_HEADLESS
 PLAYER_REMOUNT_ON_TRANSITION = NO_AFTER_FIX_NEXT_PLAYER_PRESERVED
 FIX_REQUIRED = YES
 FIX_SCOPE = ANDROID_NEXT_ONLY_HEADLESS_PREPARE
-FIX_COMMIT = PENDING_LOCAL
+FIX_COMMIT = a79f5d11b0432e825b9262c4d6dd41f28bd952dd
 BUILD = NOT_REQUIRED
 DEVICE_QA = NOT_RUN
 TRANSITIONS_TESTED = 0
@@ -87,7 +87,7 @@ Clean.
 
 ## git status --short
 
-Recorded at handoff after local commit. Parent `umtuba-web` remains `office/profile-hero-completeness-v1` @ `380a366`. Parent `umtuba-mobile` dirty tree not reset.
+Clean after docs SHA fill-in commit. Parent `umtuba-web` remains `office/profile-hero-completeness-v1` @ `380a366`. Parent `umtuba-mobile` dirty tree not reset. Not pushed.
 
 ## Open issues
 

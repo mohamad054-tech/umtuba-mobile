@@ -14,6 +14,7 @@ Galaxy Z Fold6: perceptible ~1s gap when one Watch video ends and the next begin
 - Isolated worktree: `C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-WATCH-NEXT-VIDEO-TRANSITION-DELAY-V1`
 - Branch: `desktop/android-watch-next-video-transition-delay-v1`
 - Base: `17cbfefbc8c77d5286efdf2c9b941101db84b6c3`
+- Fix commit: `a79f5d11b0432e825b9262c4d6dd41f28bd952dd`
 
 ## Allowed scope
 
