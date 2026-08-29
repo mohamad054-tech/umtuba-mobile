@@ -21,6 +21,7 @@ import {
   shouldRecreateWatchPlayer,
   shouldSilencePlayerBeforeDetach,
   watchWindowMountedIndexes,
+  watchWindowPreparedIndexes,
   watchWindowRemounts,
 } from "./playerLifecycle";
 import {
@@ -400,6 +401,9 @@ describe("A→B→C→B→A player window", () => {
     for (const active of sequence) {
       expect(watchWindowMountedIndexes(active, 5).length).toBeLessThanOrEqual(3);
       expect(watchWindowMountedIndexes(active, 5, "android")).toEqual([active]);
+      expect(watchWindowPreparedIndexes(active, 5, "android")).toEqual(
+        active < 4 ? [active, active + 1] : [active]
+      );
     }
   });
 

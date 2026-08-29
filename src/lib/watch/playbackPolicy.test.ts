@@ -36,6 +36,7 @@ import {
   shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
+  shouldPrepareWatchPlayer,
   shouldPlayVideo,
   shouldPlayWithUserPause,
   watchInteractionSignature,
@@ -120,6 +121,23 @@ describe("shouldLoadPlayer", () => {
     expect(shouldLoadPlayer(3, 2, "android")).toBe(false);
     expect(shouldLoadPlayer(2, 2, "ios")).toBe(true);
     expect(shouldLoadPlayer(1, 2, "ios")).toBe(true);
+  });
+});
+
+describe("shouldPrepareWatchPlayer", () => {
+  it("prepares only the next Android index without expanding the surface window", () => {
+    expect(shouldPrepareWatchPlayer(2, 2, "android")).toBe(true);
+    expect(shouldPrepareWatchPlayer(3, 2, "android")).toBe(true);
+    expect(shouldPrepareWatchPlayer(1, 2, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(4, 2, "android")).toBe(false);
+    expect(shouldLoadPlayer(3, 2, "android")).toBe(false);
+  });
+
+  it("matches the iOS ±1 load window and does not add Android-only prepare", () => {
+    expect(shouldPrepareWatchPlayer(1, 2, "ios")).toBe(true);
+    expect(shouldPrepareWatchPlayer(2, 2, "ios")).toBe(true);
+    expect(shouldPrepareWatchPlayer(3, 2, "ios")).toBe(true);
+    expect(shouldPrepareWatchPlayer(4, 2, "ios")).toBe(false);
   });
 });
 

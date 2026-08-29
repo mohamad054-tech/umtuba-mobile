@@ -98,6 +98,8 @@ export type WatchVideoCardProps = {
   isActive: boolean;
   /** Mount native player only for the platform load window (iOS ±1, Android active). */
   shouldLoadPlayer: boolean;
+  /** Android next-only media prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
+  shouldPreparePlayer?: boolean;
   /** Bumps on every active-index change so late play cannot revive the previous card. */
   ownershipGeneration: number;
   muted: boolean;
@@ -141,6 +143,8 @@ type PlayerPaneProps = {
   src: string;
   isActive: boolean;
   shouldPlay: boolean;
+  /** False = keep ExoPlayer prepared without a TextureView (Android next item). */
+  attachSurface: boolean;
   ownershipGeneration: number;
   muted: boolean;
   volume: number;
@@ -314,6 +318,7 @@ function WatchPlayerPane({
   src,
   isActive,
   shouldPlay,
+  attachSurface,
   ownershipGeneration,
   muted,
   volume,
@@ -345,7 +350,9 @@ function WatchPlayerPane({
     onPlayerStatus?.(status, errorMessage);
   }, [errorMessage, onPlayerStatus, status]);
 
-  const player = useVideoPlayer(src, (p) => {
+  const playerSource =
+    nativePlatform === "android" ? { uri: src, useCaching: true } : src;
+  const player = useVideoPlayer(playerSource, (p) => {
     // New SharedObject starts silent. Ownership effect unmutes only the active post.
     p.loop = false;
     p.muted = true;
@@ -648,18 +655,20 @@ function WatchPlayerPane({
       style={styles.playerWrap}
       importantForAccessibility="no-hide-descendants"
     >
-      <VideoView
-        style={styles.video}
-        player={player}
-        contentFit="cover"
-        nativeControls={false}
-        allowsPictureInPicture={false}
-        surfaceType="textureView"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
+      {attachSurface ? (
+        <VideoView
+          style={styles.video}
+          player={player}
+          contentFit="cover"
+          nativeControls={false}
+          allowsPictureInPicture={false}
+          surfaceType="textureView"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      ) : null}
 
-      {status === "loading" && (
+      {attachSurface && status === "loading" && (
         <View style={styles.centerOverlay} pointerEvents="none">
           <ActivityIndicator
             color={colors.accentCyan}
@@ -675,6 +684,7 @@ function WatchVideoCardComponent({
   video,
   isActive,
   shouldLoadPlayer: loadPlayer,
+  shouldPreparePlayer: preparePlayer = loadPlayer,
   ownershipGeneration,
   muted,
   volume,
@@ -736,7 +746,7 @@ function WatchVideoCardComponent({
   const retryInFlightRef = useRef(false);
   const expiredRefreshAttemptedRef = useRef(false);
   const mountPlayer = shouldMountWatchPlayer({
-    shouldLoadPlayer: loadPlayer,
+    shouldLoadPlayer: loadPlayer || preparePlayer,
     src: epochSrc,
   });
 
@@ -991,6 +1001,7 @@ function WatchVideoCardComponent({
           src={epochSrc}
           isActive={isActive}
           shouldPlay={shouldPlay}
+          attachSurface={loadPlayer}
           ownershipGeneration={ownershipGeneration}
           muted={audio.muted}
           volume={audio.volume}

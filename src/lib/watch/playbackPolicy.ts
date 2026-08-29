@@ -59,6 +59,28 @@ export function shouldLoadPlayer(
   );
 }
 
+/**
+ * Prepare the next playable asset while the current clip still plays.
+ * Android: next index only — no extra TextureView (load window stays 0).
+ * iOS: same as the ±1 load window. Never a whole-feed prepare.
+ */
+export function shouldPrepareWatchPlayer(
+  index: number,
+  activeIndex: number,
+  platform?: string | null
+): boolean {
+  if (shouldLoadPlayer(index, activeIndex, platform)) {
+    return true;
+  }
+  if (platform !== "android") {
+    return false;
+  }
+  if (!Number.isFinite(index) || !Number.isFinite(activeIndex)) {
+    return false;
+  }
+  return Math.trunc(index) === Math.trunc(activeIndex) + 1;
+}
+
 /** Append page results without duplicating post ids. */
 export function mergeWatchVideos(
   existing: WatchVideo[],

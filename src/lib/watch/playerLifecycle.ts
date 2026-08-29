@@ -5,7 +5,8 @@
  * ACTIVE_PLAYING_VIDEO_COUNT <= 1
  *
  * iOS may keep a ±1 preload window mounted. Android mounts the active
- * item only (dd86a3e). Mounted != audible. Neighbors stay silent.
+ * TextureView only (dd86a3e) and may prepare the next item headless.
+ * Mounted != audible. Neighbors stay silent.
  *
  * Release sequence: silence while the SharedObject is still alive, then
  * detach JS bindings. Native release is owned by useVideoPlayer /
@@ -15,7 +16,7 @@
  * not wait — that was Build 24 leftover audio + post-asset stall.
  */
 
-import { shouldLoadPlayer } from "./playbackPolicy";
+import { shouldLoadPlayer, shouldPrepareWatchPlayer } from "./playbackPolicy";
 import {
   applyInactiveAudioTeardown,
   runAlivePlayerOp,
@@ -245,6 +246,21 @@ export function watchWindowMountedIndexes(
     }
   }
   return mounted;
+}
+
+/** Android next-only media prepare. Surface mount stays `watchWindowMountedIndexes`. */
+export function watchWindowPreparedIndexes(
+  activeIndex: number,
+  itemCount: number,
+  platform?: string | null
+): number[] {
+  const prepared: number[] = [];
+  for (let index = 0; index < itemCount; index += 1) {
+    if (shouldPrepareWatchPlayer(index, activeIndex, platform)) {
+      prepared.push(index);
+    }
+  }
+  return prepared;
 }
 
 /** Indexes that leave the load window and later remount (A→B→C→B remounts 0). */

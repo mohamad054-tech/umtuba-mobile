@@ -97,6 +97,7 @@ import {
   saveWatchVolumePreference,
   shouldAcceptViewableIndexUpdate,
   shouldLoadPlayer,
+  shouldPrepareWatchPlayer,
   toWatchListPixels,
   watchInteractionSignature,
   watchItemKey,
@@ -898,6 +899,11 @@ export default function WatchScreen() {
         video={item}
         isActive={index === activeIndex}
         shouldLoadPlayer={shouldLoadPlayer(index, activeIndex, Platform.OS)}
+        shouldPreparePlayer={shouldPrepareWatchPlayer(
+          index,
+          activeIndex,
+          Platform.OS
+        )}
         ownershipGeneration={playbackGeneration}
         muted={muted}
         volume={volume}

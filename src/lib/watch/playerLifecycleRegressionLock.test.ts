@@ -30,8 +30,13 @@ import {
   shouldMountSelectedSoundPlayer,
   shouldStartPlaybackAfterAsset,
   watchWindowMountedIndexes,
+  watchWindowPreparedIndexes,
 } from "./playerLifecycle";
-import { shouldLoadPlayer, shouldPlayVideo } from "./playbackPolicy";
+import {
+  shouldLoadPlayer,
+  shouldPlayVideo,
+  shouldPrepareWatchPlayer,
+} from "./playbackPolicy";
 import {
   applyPlaybackIntent,
   createPlayerSession,
@@ -344,5 +349,23 @@ describe("10 PREVIOUS_dd86a3_ONE_ACTIVE_PLAYER_BEHAVIOR_PRESERVED", () => {
         commandGeneration: 0,
       })
     ).toBe(false);
+  });
+});
+
+describe("11 ANDROID_NEXT_MEDIA_PREPARE_WITHOUT_SURFACE", () => {
+  it("prepares the next Android item while the TextureView window stays active-only", () => {
+    expect(watchWindowMountedIndexes(4, 9, "android")).toEqual([4]);
+    expect(watchWindowPreparedIndexes(4, 9, "android")).toEqual([4, 5]);
+    expect(shouldLoadPlayer(5, 4, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(5, 4, "android")).toBe(true);
+    expect(shouldPrepareWatchPlayer(3, 4, "android")).toBe(false);
+    expect(shouldPrepareWatchPlayer(6, 4, "android")).toBe(false);
+    expect(watchWindowPreparedIndexes(2, 6, "ios")).toEqual([1, 2, 3]);
+    expect(
+      countAudibleWatchPlayers([
+        { isActive: true, shouldPlay: true, muted: false, volume: 1, playing: true },
+        { isActive: false, shouldPlay: false, muted: true, volume: 0, playing: false },
+      ])
+    ).toBe(1);
   });
 });
