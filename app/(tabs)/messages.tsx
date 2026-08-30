@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  I18nManager,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -13,7 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ConversationListItem } from "@/components/messenger/ConversationListItem";
 import { MessengerStatePanel } from "@/components/messenger/MessengerStatePanel";
+import { StartConversationSheet } from "@/components/messenger/StartConversationSheet";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { commsCopy } from "@/src/lib/comms/copy";
 import {
   getOrCreateDirectConversation,
   listConversationsForUser,
@@ -36,21 +39,27 @@ type InboxPhase =
   | "error";
 
 export default function MessagesInboxScreen() {
-  const { user, session, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading, profile } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const copy = commsCopy(I18nManager.isRTL);
   const params = useLocalSearchParams<{
     conversation?: string;
     message?: string;
     creatorId?: string;
+    username?: string;
+    start?: string;
   }>();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [phase, setPhase] = useState<InboxPhase>("loading");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [startOpen, setStartOpen] = useState(false);
   const inFlight = useRef(false);
   const openedDeepLink = useRef<string | null>(null);
+  const startUsername =
+    typeof params.username === "string" ? params.username : "";
 
   const load = useCallback(
     async (opts?: { soft?: boolean }) => {
@@ -149,11 +158,21 @@ export default function MessagesInboxScreen() {
         router.replace(href as never);
       }
     }
+
+    if (
+      (startUsername || params.start === "1") &&
+      openedDeepLink.current !== `start:${startUsername || "1"}`
+    ) {
+      openedDeepLink.current = `start:${startUsername || "1"}`;
+      setStartOpen(true);
+    }
   }, [
     authLoading,
     params.conversation,
     params.creatorId,
     params.message,
+    params.start,
+    startUsername,
     router,
     user,
   ]);
@@ -206,6 +225,16 @@ export default function MessagesInboxScreen() {
 
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
+      <View style={styles.toolbar}>
+        <Pressable
+          style={styles.startBtn}
+          onPress={() => setStartOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={copy.startConversation}
+        >
+          <Text style={styles.startBtnText}>{copy.startConversation}</Text>
+        </Pressable>
+      </View>
       {error && phase === "ready" ? (
         <Text style={styles.banner} accessibilityRole="alert">
           {error}
@@ -249,7 +278,7 @@ export default function MessagesInboxScreen() {
             <MessengerStatePanel
               variant="empty"
               title="No conversations yet"
-              body="Direct messages will show up here. Groups, attachments, and calls are not available yet."
+              body="Start a conversation by username, email, phone, or personal link. Groups, attachments, and calls are not available yet."
               onRetry={() => void load()}
               busy={refreshing}
             />
@@ -261,6 +290,14 @@ export default function MessagesInboxScreen() {
             onPress={onOpenConversation}
           />
         )}
+      />
+      <StartConversationSheet
+        visible={startOpen}
+        currentUserId={user.id}
+        ownUsername={profile?.username ?? null}
+        initialQuery={startUsername}
+        onClose={() => setStartOpen(false)}
+        onOpenConversation={(href) => router.push(href as never)}
       />
     </View>
   );
@@ -277,6 +314,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   listFill: { flexGrow: 1 },
+  toolbar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  startBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: colors.text,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  startBtnText: { color: colors.bg, fontWeight: "800" },
   title: { color: colors.text, fontSize: 20, fontWeight: "700" },
   banner: {
     color: colors.danger,

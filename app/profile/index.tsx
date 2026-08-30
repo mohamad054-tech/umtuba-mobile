@@ -1,7 +1,8 @@
-import { Link, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  I18nManager,
   Image,
   Pressable,
   ScrollView,
@@ -12,15 +13,54 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { commsCopy } from "@/src/lib/comms/copy";
+import { discoverUserByUsername } from "@/src/lib/comms/discovery";
+import type { DiscoveredIdentity } from "@/src/lib/comms/privacyContract";
+import { getOrCreateDirectConversation } from "@/src/lib/messenger/api";
+import { conversationThreadHref } from "@/src/lib/messenger/mapDestination";
 import { buildProfilePresentation } from "@/src/lib/profile";
+import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
   const { profile, user, loading, error, restore, clearError } = useAuth();
   const router = useRouter();
+  const copy = commsCopy(I18nManager.isRTL);
+  const params = useLocalSearchParams<{ u?: string }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [peer, setPeer] = useState<DiscoveredIdentity | null>(null);
+  const [peerError, setPeerError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+  const lookupUsername =
+    typeof params.u === "string" ? params.u.replace(/^@/, "").toLowerCase() : "";
+  const viewingOther =
+    Boolean(lookupUsername) &&
+    lookupUsername !== (profile?.username ?? "").toLowerCase();
 
   const view = buildProfilePresentation(profile, user);
+
+  useEffect(() => {
+    if (!viewingOther || !user) {
+      setPeer(null);
+      setPeerError(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const result = await discoverUserByUsername(getSupabase(), lookupUsername);
+      if (cancelled) return;
+      if (!result.ok) {
+        setPeer(null);
+        setPeerError(result.message);
+        return;
+      }
+      setPeer(result.identity);
+      setPeerError(result.identity ? null : copy.notFound);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.notFound, lookupUsername, user, viewingOther]);
 
   const onRetry = useCallback(async () => {
     clearError();
@@ -76,6 +116,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
+        {viewingOther ? null : (
         <View
           style={styles.avatar}
           accessibilityLabel={
@@ -96,8 +137,9 @@ export default function ProfileScreen() {
             </Text>
           )}
         </View>
+        )}
 
-        {view.hasReliableIdentity ? (
+        {viewingOther ? null : view.hasReliableIdentity ? (
           <>
             <Text style={styles.name} accessibilityRole="header">
               {view.displayName || view.username || "Account"}
@@ -139,6 +181,47 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
         )}
+
+        {viewingOther ? (
+          <View style={styles.banner}>
+            {peer ? (
+              <>
+                <Text style={styles.emptyTitle}>{peer.displayName}</Text>
+                <Text style={styles.username}>@{peer.username}</Text>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    void (async () => {
+                      setOpening(true);
+                      const result = await getOrCreateDirectConversation(
+                        getSupabase(),
+                        peer.userId
+                      );
+                      setOpening(false);
+                      if (!result.ok) {
+                        setPeerError(result.message);
+                        return;
+                      }
+                      const href = conversationThreadHref(result.conversationId);
+                      if (href) router.push(href as never);
+                    })();
+                  }}
+                  disabled={opening}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.message}
+                >
+                  {opening ? (
+                    <ActivityIndicator color={colors.text} />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>{copy.message}</Text>
+                  )}
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.muted}>{peerError ?? copy.notFound}</Text>
+            )}
+          </View>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBox} accessibilityRole="alert">

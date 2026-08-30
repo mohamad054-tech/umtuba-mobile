@@ -19,6 +19,14 @@ describe("parseDeepLink", () => {
       type: "profile",
       username: "alice",
     });
+    expect(parseDeepLink("https://umtuba.com/@maya").target).toEqual({
+      type: "profile",
+      username: "maya",
+    });
+    expect(parseDeepLink("https://umtuba.com/u/maya").target).toEqual({
+      type: "profile",
+      username: "maya",
+    });
     expect(parseDeepLink("https://www.umtuba.com/live/room1").target).toEqual({
       type: "live",
       roomId: "room1",

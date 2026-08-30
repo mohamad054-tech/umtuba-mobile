@@ -119,6 +119,15 @@ export function parseDeepLink(url: string): ParsedDeepLink {
     };
   }
 
+  if (head.startsWith("@") && head.length > 1) {
+    const username = head.replace(/^@+/, "").toLowerCase() || null;
+    return {
+      target: { type: "profile", username },
+      referralCode: refFromQuery,
+      rawUrl,
+    };
+  }
+
   if (head === "live") {
     return {
       target: { type: "live", roomId: segments[1] ?? null },
