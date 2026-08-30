@@ -245,6 +245,10 @@ export type MobileMessages = {
   "watch.captionsOn": string;
   "watch.captionsOff": string;
   "watch.followFailed": string;
+  "watch.expandCaption": string;
+  "watch.collapseCaption": string;
+  "watch.openHashtag": string;
+  "watch.openMention": string;
   "watch.autoNext": string;
   "watch.muteVideo": string;
   "watch.unmuteVideo": string;

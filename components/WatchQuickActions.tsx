@@ -124,6 +124,7 @@ export function WatchQuickActions({
               <ActionRow
                 label={saved ? t("watch.unsave") : t("watch.save")}
                 onPress={onSave}
+                selected={saved}
               />
             ) : null}
             {actions.includes("not-interested") ? (
@@ -171,6 +172,7 @@ export function WatchQuickActions({
                 }
                 onPress={following ? undefined : onFollow}
                 disabled={following}
+                selected={following}
               />
             ) : null}
           </View>
@@ -184,10 +186,12 @@ function ActionRow({
   label,
   onPress,
   disabled,
+  selected,
 }: {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  selected?: boolean;
 }) {
   return (
     <Pressable
@@ -195,7 +199,10 @@ function ActionRow({
       onPress={onPress}
       disabled={disabled || !onPress}
       accessibilityRole="button"
-      accessibilityState={{ disabled: disabled === true }}
+      accessibilityState={{
+        disabled: disabled === true,
+        selected: selected === true,
+      }}
     >
       <Text style={styles.rowText}>{label}</Text>
     </Pressable>

@@ -1203,6 +1203,25 @@ export default function WatchScreen() {
             ? () => onBlockUser(item)
             : undefined
         }
+        onHashtagPress={() => {
+          Alert.alert(t("discover.hashtags"), t("discover.hashtagsSoon"));
+        }}
+        onMentionPress={(username) => {
+          const href = buildWatchCreatorProfileHref({
+            username,
+            id: null,
+          });
+          if (!href) return;
+          rememberProfileBackContext({
+            origin: "watch",
+            via: null,
+            listId: null,
+            listUsername: null,
+            ownerId: null,
+            ownerUsername: username,
+          });
+          router.push(href as never);
+        }}
         onOpenProfile={() => {
           const href = buildWatchCreatorProfileHref(item.author);
           if (href) {
@@ -1249,6 +1268,7 @@ export default function WatchScreen() {
       playbackRate,
       followByAuthor,
       user?.id,
+      t,
       onVolumeChange,
       refreshSrcFor,
       router,

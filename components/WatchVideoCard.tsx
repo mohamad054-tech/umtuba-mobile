@@ -18,11 +18,16 @@ import {
 
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
 import { SelectedSoundPlayer } from "@/components/sounds/SelectedSoundPlayer";
+import { WatchCaption } from "@/components/WatchCaption";
 import { WatchQuickActions } from "@/components/WatchQuickActions";
 import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import { useTranslation } from "@/src/lib/i18n";
+import {
+  localeTextAlign,
+  localeWritingDirection,
+  useTranslation,
+} from "@/src/lib/i18n";
 import {
   resolveSelectedSoundWatchAudio,
   resolveSocialSoundPlaybackUriById,
@@ -109,6 +114,12 @@ import {
   shouldApplyWatchPlaybackSpeed,
   type WatchPlaybackSpeed,
 } from "@/src/lib/watch/watchQuickActions";
+import {
+  WATCH_FOLLOW_CHIP_MIN_HEIGHT,
+  shouldShowWatchFollowChip,
+  watchFollowChipState,
+} from "@/src/lib/watch/watchCaption";
+import { watchPrefersReducedMotion } from "@/src/lib/watch/watchReduceMotion";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -161,6 +172,8 @@ export type WatchVideoCardProps = {
   following?: boolean;
   onEnsureFollow?: () => void;
   onNotInterested?: () => void;
+  onHashtagPress?: (tag: string) => void;
+  onMentionPress?: (username: string) => void;
   style?: StyleProp<ViewStyle>;
   topInset?: number;
   bottomInset?: number;
@@ -807,13 +820,22 @@ function WatchVideoCardComponent({
   following = false,
   onEnsureFollow,
   onNotInterested,
+  onHashtagPress,
+  onMentionPress,
   style,
   topInset = 0,
   bottomInset = 0,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
+  const captionAlign = localeTextAlign(locale);
+  const captionDirection = localeWritingDirection(locale);
+  const followState = watchFollowChipState(following);
   const router = useRouter();
   const { user } = useAuth();
+  const showFollow = shouldShowWatchFollowChip({
+    viewerId: user?.id,
+    authorId: video.author.id,
+  });
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const [selectedSoundUri, setSelectedSoundUri] = useState<string | null>(null);
   const [userPaused, setUserPaused] = useState(false);
@@ -1018,6 +1040,7 @@ function WatchVideoCardComponent({
   }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
 
   const showLikeAck = useCallback(() => {
+    if (watchPrefersReducedMotion()) return;
     setLikeAck(true);
     if (likeAckTimer.current) {
       clearTimeout(likeAckTimer.current);
@@ -1239,9 +1262,8 @@ function WatchVideoCardComponent({
             onPress={onVideoAreaTap}
             onLongPress={onVideoAreaLongPress}
             delayLongPress={WATCH_LONG_PRESS_MS}
-            accessibilityRole="button"
-            accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
-            accessibilityHint={t("watch.playPauseHint")}
+            accessible={false}
+            importantForAccessibility="no"
           />
         ) : null}
 
@@ -1324,28 +1346,54 @@ function WatchVideoCardComponent({
             accessibilityState={{ disabled: !onOpenProfile }}
             hitSlop={8}
           >
-            <Text style={styles.username} numberOfLines={1}>
+            <Text
+              style={[
+                styles.username,
+                { textAlign: captionAlign, writingDirection: captionDirection },
+              ]}
+              numberOfLines={1}
+            >
               {video.author.username}
             </Text>
           </Pressable>
-          {onEnsureFollow && user?.id && user.id !== video.author.id ? (
+          {showFollow && onEnsureFollow ? (
             <Pressable
-              onPress={following ? undefined : onEnsureFollow}
-              disabled={following}
+              onPress={followState.disabled ? undefined : onEnsureFollow}
+              disabled={followState.disabled}
               accessibilityRole="button"
               accessibilityLabel={
-                following ? t("follow.following") : t("follow.follow")
+                followState.kind === "following"
+                  ? t("follow.following")
+                  : t("follow.follow")
               }
-              style={styles.followChip}
+              accessibilityState={{
+                selected: followState.selected,
+                disabled: followState.disabled,
+              }}
+              style={[
+                styles.followChip,
+                followState.kind === "following" && styles.followChipOn,
+              ]}
             >
-              <Text style={styles.followChipText}>
-                {following ? t("follow.following") : t("follow.follow")}
+              <Text
+                style={[
+                  styles.followChipText,
+                  followState.kind === "following" && styles.followChipTextOn,
+                ]}
+              >
+                {followState.kind === "following"
+                  ? t("follow.following")
+                  : t("follow.follow")}
               </Text>
             </Pressable>
           ) : null}
-          <Text style={styles.caption} numberOfLines={3}>
-            {video.caption || video.title}
-          </Text>
+          <WatchCaption
+            caption={video.caption}
+            title={video.title}
+            resetKey={video.id}
+            onHashtagPress={onHashtagPress}
+            onMentionPress={onMentionPress}
+          />
           {publishedLabel ? (
             <Text
               style={styles.publishedAt}
@@ -1564,7 +1612,12 @@ function WatchVideoCardComponent({
       ) : null}
       {captionsOn && (video.caption || video.title) ? (
         <View style={styles.captionOverlay} pointerEvents="none">
-          <Text style={styles.captionOverlayText}>
+          <Text
+            style={[
+              styles.captionOverlayText,
+              { textAlign: captionAlign, writingDirection: captionDirection },
+            ]}
+          >
             {video.caption || video.title}
           </Text>
         </View>
@@ -1574,11 +1627,11 @@ function WatchVideoCardComponent({
         actions={resolveWatchQuickActions({
           canShare: Boolean(onShare),
           canReport: Boolean(onReport),
-          canFollow: Boolean(onEnsureFollow && user?.id && user.id !== video.author.id),
+          canFollow: showFollow && Boolean(onEnsureFollow),
         })}
         saved={video.savedByMe === true}
         following={following}
-        canFollow={Boolean(onEnsureFollow && user?.id && user.id !== video.author.id)}
+        canFollow={showFollow && Boolean(onEnsureFollow)}
         speed={resolveWatchPlaybackSpeed(playbackRate)}
         captionsOn={captionsOn}
         onClose={() => setQuickActionsOpen(false)}
@@ -1776,16 +1829,25 @@ const styles = StyleSheet.create({
   followChip: {
     alignSelf: "flex-start",
     marginTop: 6,
+    minHeight: WATCH_FOLLOW_CHIP_MIN_HEIGHT,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.accentCyan,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    justifyContent: "center",
+  },
+  followChipOn: {
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   followChipText: {
     color: colors.accentCyan,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
+  },
+  followChipTextOn: {
+    color: colors.textMuted,
   },
   captionOverlay: {
     position: "absolute",
