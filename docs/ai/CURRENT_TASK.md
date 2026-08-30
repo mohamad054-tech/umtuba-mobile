@@ -2,52 +2,38 @@
 
 ## Task title
 
-DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1B_IMPLEMENTATION
+DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1C_P1_INTERACTIONS
 
 ## Status
 
-**IMPLEMENTATION_COMPLETE / DEVICE_QA_NOT_RUN.** P0 Watch interaction foundation implemented on isolated branch `desktop/watch-interaction-foundation-v1-part1b` from FIT SHA `703740b`. Uncommitted. No deploy. No Play/App Store upload. No migrations.
+**IMPLEMENTATION_COMPLETE. Fold6 QA pending after EAS preview.** Isolated P1 Watch interactions on `desktop/watch-interaction-foundation-v1-part1c` from Part 1B `dd320331`. No deploy. No Play/App Store. No migrations.
 
 ```
-TASK_ID = DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1B_IMPLEMENTATION
+TASK_ID = DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1C_P1_INTERACTIONS
 STATUS = IMPLEMENTATION_COMPLETE
-BASE_SHA = 703740b85048d4d14ea6ffb1e322f33b33d24a48
-RESULT_SHA = UNCOMMITTED
-BRANCH = desktop/watch-interaction-foundation-v1-part1b
-WORKTREE = C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-FOLD6-WATCH-VIDEO-FIT-V1
-DOUBLE_TAP_LIKE_IMPLEMENTED = YES
-DOUBLE_TAP_ALREADY_LIKED_NOOP = YES
-DUPLICATE_LIKE_RPC_PROTECTION = YES
-SINGLE_TAP_PLAY_PAUSE_PRESERVED = YES
-REFRESH_SWIPE_CONFLICT_FIXED = YES
-VERTICAL_PAGING_PRESERVED = YES
-PLAYBACK_POLICY_CHANGED = NO
-PRELOAD_ARCHITECTURE_CHANGED = NO
+BASE_SHA = dd32033172684048f2c108a9f4e2eded4fd32292
+BRANCH = desktop/watch-interaction-foundation-v1-part1c
 IMPLEMENTED = YES
 DEPLOYED = NO
 PLAY_UPLOAD = NO
 APP_STORE_UPLOAD = NO
+MERGED_TO_MASTER = NO
 MIGRATIONS_CREATED = NO
-ANDROID_DEVICE_QA = NOT_RUN
-IOS_DEVICE_QA = NOT_RUN
-READY_FOR_PART1C_P1_FEATURES = YES
 ```
 
 ## Allowed scope
 
-- P0 Watch interaction only in this isolated worktree.
-- Double-tap Like, tap classifier, like confirmation, RefreshControl gate.
-- Focused tests + typecheck.
+P1 Watch interactions only: long-press quick actions, optional official Expo 57 haptics, playback speed, scrub eligibility, optimistic like/save, follow-from-Watch using existing follow RPCs, local Not Interested.
 
 ## Forbidden scope
 
+- Do not start Part 1D without a new GO.
+- Do not reopen Watch FIT design.
 - Do not patch dirty `umtuba-mobile` parent `3b33561`.
-- Do not change Central `origin/master` outside this worktree.
 - Do not deploy. Do not upload to Play or App Store.
-- Do not create migrations.
-- Do not touch Learning, Store, payments, database, UM Points, web production.
-- Do not change player ownership, shouldPlayVideo, Android/iOS preload windows, signed-URL strategy, FlatList windowSize.
+- Do not merge to master. Do not create migrations.
+- Do not invent Not Interested backend taxonomy.
 
 ## Residual
 
-Device QA not run. Build/upload forbidden until a new GO. Dirty parent web checkout must stay preserved.
+Fold6 physical QA and EAS preview install still required before READY_FOR_PART1D_P2.

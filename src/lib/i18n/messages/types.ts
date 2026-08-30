@@ -236,6 +236,15 @@ export type MobileMessages = {
   "watch.loadMoreFailed": string;
   "watch.playing": string;
   "watch.playPauseHint": string;
+  "watch.quickActions": string;
+  "watch.quickActionsHint": string;
+  "watch.notInterested": string;
+  "watch.notInterestedDone": string;
+  "watch.playbackSpeed": string;
+  "watch.speedValue": string;
+  "watch.captionsOn": string;
+  "watch.captionsOff": string;
+  "watch.followFailed": string;
   "watch.autoNext": string;
   "watch.muteVideo": string;
   "watch.unmuteVideo": string;

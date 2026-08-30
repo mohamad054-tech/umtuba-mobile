@@ -1,27 +1,31 @@
-# CURSOR_REPORT — DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1B_IMPLEMENTATION
+# CURSOR_REPORT — DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1C_P1_INTERACTIONS
 
 ## Summary
 
-Implemented P0 Watch interaction foundation on isolated branch `desktop/watch-interaction-foundation-v1-part1b` from `703740b`. Double-tap on the safe video area likes via `ensurePostLike` (never unlikes; in-flight lock). Single tap still play/pause through one 240ms classifier. RefreshControl mounts only at index 0 so swipe-down previous is not stolen. Comments/Share/Profile paths unchanged. Playback and preload architecture not redesigned. Uncommitted. No deploy. No Play/App Store upload.
+Implemented P1 Watch interactions on the isolated worktree without changing playback lifecycle, Android TextureView windows, iOS ±1 preload, or Fold6 contain/FIT. Long-press (450ms) on the safe video area opens an original UMTUBA bottom sheet. Speed 0.5/1/1.5/2 applies only to the active player and resets to 1.0x on page change. Scrub affordance requires duration ≥ 8s. Like/Save are optimistic with snapshot rollback and per-item in-flight. Follow is follow-only via snapshot-then-`toggle_profile_follow`. Not Interested is device-local via `hidePostLocally`. `expo-haptics` ~57.0.2 is the official Expo 57 package.
 
 ## Exact files changed
 
 - `app/(tabs)/watch.tsx`
 - `components/WatchVideoCard.tsx`
+- `components/WatchQuickActions.tsx`
+- `src/lib/watch/watchGestures.ts`
+- `src/lib/watch/watchQuickActions.ts`
+- `src/lib/watch/watchQuickActions.test.ts`
+- `src/lib/watch/watchHaptics.ts`
+- `src/lib/watch/playbackPolicy.ts`
+- `src/lib/watch/playerSession.ts`
 - `src/lib/social/interactions.ts`
 - `src/lib/social/interactions.test.ts`
-- `src/lib/watch/watchGestures.ts` (new)
-- `src/lib/watch/watchGestures.test.ts` (new)
-- `src/lib/i18n/messages/types.ts`
-- `src/lib/i18n/messages/en.ts`
-- `src/lib/i18n/messages/ar.ts`
-- `src/lib/i18n/messages/de.ts`
-- `src/lib/i18n/messages/es.ts`
-- `src/lib/i18n/messages/fr.ts`
-- `src/lib/i18n/messages/pt.ts`
+- `src/lib/social/follows.ts`
+- `src/lib/social/follows.test.ts`
+- `src/lib/i18n/messages/types.ts` + six catalogs
+- `package.json` / `package-lock.json` (`expo-haptics` ~57.0.2)
+- `.easignore`
 - `docs/ai/CURRENT_TASK.md`
 - `docs/ai/CURSOR_REPORT.md`
-- `docs/ops/watch-interaction-foundation-v1-part1b/DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1B.md`
+- `docs/ai/PROJECT_STATE.md`
+- `docs/ops/watch-interaction-foundation-v1-part1c/DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1C_P1_INTERACTIONS.md`
 
 ## Migrations created
 
@@ -29,53 +33,27 @@ None.
 
 ## Security review
 
-`ensurePostLike` requires an authenticated user before insert-check/toggle. Already-liked paths do not call `toggle_post_like`. Double tap cannot unlike. No new public writes. No secrets. No schema change.
+No schema change. Follow still uses existing `get_profile_follow_snapshot` + `toggle_profile_follow`. Not Interested does not write a server hide. No secrets. No store upload.
 
 ## Tests
 
-`npx vitest run` on Watch interaction + lifecycle: **PASS** (93 in the focused rerun; 112 including ownership/session earlier).
-
-Full suite: 843 pass / 3 fail, all pre-existing and outside this GO:
-- `appStoreConfig.test.ts` expects version `1.0.0` / versionCode 21 (tree is 1.0.22 / 22)
-- `wallet/format.test.ts` Arabic grouping
+Focused Watch + lifecycle + social + i18n: **146 PASS**. `tsc --noEmit` PASS.
 
 ## TypeScript
 
-`npx tsc --noEmit` **PASS**. One pre-existing handoff-trace argument was mapped to `{ nextReady, nextFirstFrame }` so the file we edited typechecks. Handoff timing / TextureView window unchanged.
+PASS.
 
 ## Build
 
-Not run. Device QA not run. No EAS. No upload.
+EAS preview not started at implementation commit. Local Gradle not used.
 
 ## git diff --check
 
-PASS (clean).
-
-## git status --short
-
-```
- M app/(tabs)/watch.tsx
- M components/WatchVideoCard.tsx
- M docs/ai/CURRENT_TASK.md
- M docs/ai/CURSOR_REPORT.md
- M src/lib/i18n/messages/ar.ts
- M src/lib/i18n/messages/de.ts
- M src/lib/i18n/messages/en.ts
- M src/lib/i18n/messages/es.ts
- M src/lib/i18n/messages/fr.ts
- M src/lib/i18n/messages/pt.ts
- M src/lib/i18n/messages/types.ts
- M src/lib/social/interactions.test.ts
- M src/lib/social/interactions.ts
-?? docs/ai/PROJECT_STATE.md
-?? docs/ops/
-?? src/lib/watch/watchGestures.test.ts
-?? src/lib/watch/watchGestures.ts
-```
+Clean on product files included in this commit.
 
 ## Open issues
 
-- Device QA not run. Do not claim Fold6/iPhone PASS.
-- No commit. No push.
-- Haptics, long-press, optimistic like, Watch Follow remain Part 1C / P1.
-- Do not patch dirty `umtuba-mobile` parent.
+- Fold6 physical QA pending after preview APK.
+- Captions toggle enlarges the post caption overlay only. No subtitle track exists.
+- Not Interested is device-local persistent (`umtuba.ugc.hiddenPosts`), not a backend taxonomy.
+- Dirty `umtuba-mobile` parent still untouched.

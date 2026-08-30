@@ -54,7 +54,14 @@ import {
   viewerMaySeeDeleteControl,
 } from "@/src/lib/social/deleteOwnedPost";
 import {
+  ensureProfileFollow,
+  getProfileFollowSnapshot,
+} from "@/src/lib/social/follows";
+import {
   ensurePostLike,
+  previewEnsureLike,
+  previewToggleLike,
+  previewToggleSave,
   togglePostLike,
   togglePostSave,
 } from "@/src/lib/social/interactions";
@@ -71,6 +78,7 @@ import {
 import {
   blockUserLocally,
   filterWatchItemsForViewer,
+  hidePostLocally,
   loadBlockedUsers,
   loadHiddenPostIds,
   reportWatchPost,
@@ -124,6 +132,13 @@ import {
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
 import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
+import { watchLightHaptic } from "@/src/lib/watch/watchHaptics";
+import {
+  DEFAULT_WATCH_PLAYBACK_SPEED,
+  resetWatchPlaybackSpeedOnPageChange,
+  resolveWatchPlaybackSpeed,
+  type WatchPlaybackSpeed,
+} from "@/src/lib/watch/watchQuickActions";
 import { watchHeaderOverlayLayerStyle } from "@/src/lib/watch/watchHeaderOverlay";
 import { colors } from "@/src/theme/colors";
 
@@ -182,6 +197,12 @@ export default function WatchScreen() {
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [preparingShare, setPreparingShare] = useState(false);
   const [exitHintVisible, setExitHintVisible] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<WatchPlaybackSpeed>(
+    DEFAULT_WATCH_PLAYBACK_SPEED
+  );
+  const [followByAuthor, setFollowByAuthor] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const initialInFlight = useRef(false);
   const moreInFlight = useRef(false);
@@ -321,6 +342,42 @@ export default function WatchScreen() {
   useEffect(() => {
     videosLengthRef.current = visibleVideos.length;
   }, [visibleVideos.length]);
+
+  const activeVideoId = visibleVideos[activeIndex]?.id ?? null;
+  useEffect(() => {
+    setPlaybackRate(resetWatchPlaybackSpeedOnPageChange());
+  }, [activeVideoId]);
+
+  useEffect(() => {
+    const authors = [
+      ...new Set(
+        visibleVideos
+          .map((video) => video.author.id)
+          .filter((id): id is string => Boolean(id) && id !== user?.id)
+      ),
+    ].slice(0, 8);
+    if (authors.length === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      authors.map(async (id) => {
+        const snap = await getProfileFollowSnapshot(getSupabase(), id);
+        return [id, snap.ok && snap.following === true] as const;
+      })
+    ).then((rows) => {
+      if (cancelled) return;
+      setFollowByAuthor((prev) => {
+        const next = { ...prev };
+        for (const [id, following] of rows) {
+          if (prev[id] === true && following === false) continue;
+          next[id] = following;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, playbackIdentity]);
 
   const clearExitArm = useCallback(() => {
     armedUntilMsRef.current = null;
@@ -570,9 +627,22 @@ export default function WatchScreen() {
   const onToggleLike = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
-      const supabase = getSupabase();
-      const result = await togglePostLike(supabase, video.postId);
+      const snapshot = {
+        likedByMe: video.likedByMe,
+        likes: video.stats.likes,
+      };
+      const preview = previewToggleLike(snapshot);
+      patchVideo(video.id, {
+        likedByMe: preview.liked,
+        stats: { ...video.stats, likes: preview.likes },
+      });
+      if (preview.liked) watchLightHaptic();
+      const result = await togglePostLike(getSupabase(), video.postId);
       if (!result.ok) {
+        patchVideo(video.id, {
+          likedByMe: snapshot.likedByMe,
+          stats: { ...video.stats, likes: snapshot.likes },
+        });
         Alert.alert(t("watch.likeFailed"), result.message);
         return;
       }
@@ -587,11 +657,24 @@ export default function WatchScreen() {
   const onEnsureLike = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
-      const result = await ensurePostLike(getSupabase(), video.postId, {
+      const snapshot = {
         likedByMe: video.likedByMe,
         likes: video.stats.likes,
-      });
+      };
+      const preview = previewEnsureLike(snapshot);
+      if (!preview.noop) {
+        patchVideo(video.id, {
+          likedByMe: true,
+          stats: { ...video.stats, likes: preview.likes },
+        });
+        watchLightHaptic();
+      }
+      const result = await ensurePostLike(getSupabase(), video.postId, snapshot);
       if (!result.ok) {
+        patchVideo(video.id, {
+          likedByMe: snapshot.likedByMe,
+          stats: { ...video.stats, likes: snapshot.likes },
+        });
         Alert.alert(t("watch.likeFailed"), result.message);
         return;
       }
@@ -676,9 +759,22 @@ export default function WatchScreen() {
   const onToggleSave = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
-      const supabase = getSupabase();
-      const result = await togglePostSave(supabase, video.postId);
+      const snapshot = {
+        savedByMe: video.savedByMe,
+        saves: video.stats.saves,
+      };
+      const preview = previewToggleSave(snapshot);
+      patchVideo(video.id, {
+        savedByMe: preview.saved,
+        stats: { ...video.stats, saves: preview.saves },
+      });
+      if (preview.saved) watchLightHaptic();
+      const result = await togglePostSave(getSupabase(), video.postId);
       if (!result.ok) {
+        patchVideo(video.id, {
+          savedByMe: snapshot.savedByMe,
+          stats: { ...video.stats, saves: snapshot.saves },
+        });
         Alert.alert(t("watch.saveFailed"), result.message);
         return;
       }
@@ -688,6 +784,36 @@ export default function WatchScreen() {
       });
     },
     [patchVideo, t]
+  );
+
+  const onEnsureFollow = useCallback(
+    async (authorId: string) => {
+      if (!authorId || followByAuthor[authorId] === true) return;
+      setFollowByAuthor((prev) => ({ ...prev, [authorId]: true }));
+      watchLightHaptic();
+      const result = await ensureProfileFollow(getSupabase(), authorId, {
+        following: false,
+      });
+      if (!result.ok) {
+        setFollowByAuthor((prev) => ({ ...prev, [authorId]: false }));
+        Alert.alert(t("watch.followFailed"), result.message);
+      }
+    },
+    [followByAuthor, t]
+  );
+
+  const onNotInterested = useCallback(
+    async (video: WatchVideo) => {
+      if (!video.postId) return;
+      setHiddenPostIds((prev) => {
+        const next = new Set(prev);
+        next.add(video.postId as number);
+        return next;
+      });
+      await hidePostLocally(video.postId);
+      Alert.alert(t("watch.notInterested"), t("watch.notInterestedDone"));
+    },
+    [t]
   );
 
   const onDeleteOwn = useCallback(
@@ -1035,6 +1161,23 @@ export default function WatchScreen() {
         onToggleLike={() => void onToggleLike(item)}
         onEnsureLike={() => void onEnsureLike(item)}
         onToggleSave={() => void onToggleSave(item)}
+        playbackRate={index === activeIndex ? playbackRate : DEFAULT_WATCH_PLAYBACK_SPEED}
+        onPlaybackRateChange={
+          index === activeIndex
+            ? (rate) => {
+                setPlaybackRate(resolveWatchPlaybackSpeed(rate));
+              }
+            : undefined
+        }
+        following={item.author.id ? followByAuthor[item.author.id] === true : false}
+        onEnsureFollow={
+          item.author.id && user?.id && item.author.id !== user.id
+            ? () => void onEnsureFollow(item.author.id as string)
+            : undefined
+        }
+        onNotInterested={
+          item.postId ? () => void onNotInterested(item) : undefined
+        }
         onOpenComments={
           item.postId
             ? () => setCommentPostId(item.postId as number)
@@ -1101,6 +1244,10 @@ export default function WatchScreen() {
       onToggleLike,
       onToggleMute,
       onToggleSave,
+      onEnsureFollow,
+      onNotInterested,
+      playbackRate,
+      followByAuthor,
       user?.id,
       onVolumeChange,
       refreshSrcFor,

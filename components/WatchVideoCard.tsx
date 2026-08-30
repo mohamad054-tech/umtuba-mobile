@@ -18,6 +18,7 @@ import {
 
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
 import { SelectedSoundPlayer } from "@/components/sounds/SelectedSoundPlayer";
+import { WatchQuickActions } from "@/components/WatchQuickActions";
 import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
 import { useAuth } from "@/src/lib/auth/AuthContext";
@@ -52,6 +53,7 @@ import {
   WATCH_SCRUB_LAYOUT_DIRECTION,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
+  shouldExposeWatchScrub,
   shouldPlayWithUserPause,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
@@ -93,10 +95,20 @@ import {
 import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 import {
   WATCH_LIKE_ACK_MS,
+  WATCH_LONG_PRESS_MS,
   createWatchTapClassifier,
+  shouldCancelWatchTapsOnLongPress,
   shouldDispatchWatchVideoTap,
   shouldMountWatchVideoTapLayer,
+  shouldOpenWatchQuickActions,
 } from "@/src/lib/watch/watchGestures";
+import {
+  DEFAULT_WATCH_PLAYBACK_SPEED,
+  resolveWatchPlaybackSpeed,
+  resolveWatchQuickActions,
+  shouldApplyWatchPlaybackSpeed,
+  type WatchPlaybackSpeed,
+} from "@/src/lib/watch/watchQuickActions";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -144,6 +156,11 @@ export type WatchVideoCardProps = {
   onBlockUser?: () => void;
   onOpenProfile?: () => void;
   onRefreshSrc?: () => Promise<string | null>;
+  playbackRate?: WatchPlaybackSpeed;
+  onPlaybackRateChange?: (rate: WatchPlaybackSpeed) => void;
+  following?: boolean;
+  onEnsureFollow?: () => void;
+  onNotInterested?: () => void;
   style?: StyleProp<ViewStyle>;
   topInset?: number;
   bottomInset?: number;
@@ -167,6 +184,7 @@ type PlayerPaneProps = {
   volume: number;
   loop: boolean;
   seekRequest: { token: number; ratio: number } | null;
+  playbackRate: WatchPlaybackSpeed;
   onTimeline: (state: TimelineState) => void;
   onEnded?: () => void;
   onFirstFrame?: () => void;
@@ -344,6 +362,7 @@ function WatchPlayerPane({
   volume,
   loop,
   seekRequest,
+  playbackRate,
   onTimeline,
   onEnded,
   onFirstFrame,
@@ -424,6 +443,11 @@ function WatchPlayerPane({
             loop,
           })
         );
+        runAlivePlayerOp(player, (alive) => {
+          alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActiveRef.current)
+            ? playbackRate
+            : DEFAULT_WATCH_PLAYBACK_SPEED;
+        });
       } else {
         playGenerationRef.current = null;
         applyInactiveAudioTeardown(player, { resetPosition: false });
@@ -621,6 +645,11 @@ function WatchPlayerPane({
           loop,
         })
       );
+      runAlivePlayerOp(player, (alive) => {
+        alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActive)
+          ? playbackRate
+          : DEFAULT_WATCH_PLAYBACK_SPEED;
+      });
       if (isActive && !muted && volume > 0) {
         markWatchTransition(nativePlatform, "audio_start");
       }
@@ -642,7 +671,17 @@ function WatchPlayerPane({
     status,
     nativePlatform,
     onTimeline,
+    playbackRate,
   ]);
+
+  useEffect(() => {
+    if (!canTouchBoundPlayer()) return;
+    runAlivePlayerOp(player, (alive) => {
+      alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActive)
+        ? playbackRate
+        : DEFAULT_WATCH_PLAYBACK_SPEED;
+    });
+  }, [isActive, playbackRate, player]);
 
   useEffect(() => {
     if (!seekRequest) return;
@@ -763,6 +802,11 @@ function WatchVideoCardComponent({
   onBlockUser,
   onOpenProfile,
   onRefreshSrc,
+  playbackRate = DEFAULT_WATCH_PLAYBACK_SPEED,
+  onPlaybackRateChange,
+  following = false,
+  onEnsureFollow,
+  onNotInterested,
   style,
   topInset = 0,
   bottomInset = 0,
@@ -791,6 +835,8 @@ function WatchVideoCardComponent({
   } | null>(null);
   const [feedback, setFeedback] = useState<"play" | "pause" | null>(null);
   const [likeAck, setLikeAck] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const likeAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapClassifierRef = useRef(createWatchTapClassifier());
@@ -867,6 +913,7 @@ function WatchVideoCardComponent({
       setUserPaused(false);
       setFeedback(null);
       setLikeAck(false);
+      setQuickActionsOpen(false);
       setTimeline({ currentTime: 0, duration: 0, ratio: 0 });
       setSeekRequest(null);
       trimEndedRef.current = false;
@@ -982,6 +1029,7 @@ function WatchVideoCardComponent({
   }, []);
 
   const onVideoAreaTap = useCallback(() => {
+    if (quickActionsOpen) return;
     if (!shouldDispatchWatchVideoTap("video")) return;
     if (!shouldMountWatchVideoTapLayer({ paneStatus })) return;
     tapClassifierRef.current.tap({
@@ -991,7 +1039,16 @@ function WatchVideoCardComponent({
         onEnsureLike?.();
       },
     });
-  }, [onEnsureLike, onTogglePlayPause, paneStatus, showLikeAck]);
+  }, [onEnsureLike, onTogglePlayPause, paneStatus, quickActionsOpen, showLikeAck]);
+
+  const onVideoAreaLongPress = useCallback(() => {
+    if (!shouldOpenWatchQuickActions("video")) return;
+    if (!shouldMountWatchVideoTapLayer({ paneStatus })) return;
+    if (shouldCancelWatchTapsOnLongPress()) {
+      tapClassifierRef.current.cancel();
+    }
+    setQuickActionsOpen(true);
+  }, [paneStatus]);
 
   const onTimeline = useCallback((state: TimelineState) => {
     if (isActive && state.duration > 0) {
@@ -1121,6 +1178,7 @@ function WatchVideoCardComponent({
           volume={audio.volume}
           loop={loop}
           seekRequest={isActive ? seekRequest : null}
+          playbackRate={playbackRate}
           onTimeline={onTimeline}
           onEnded={onEnded}
           onFirstFrame={() => {
@@ -1179,6 +1237,8 @@ function WatchVideoCardComponent({
           <Pressable
             style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
             onPress={onVideoAreaTap}
+            onLongPress={onVideoAreaLongPress}
+            delayLongPress={WATCH_LONG_PRESS_MS}
             accessibilityRole="button"
             accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
             accessibilityHint={t("watch.playPauseHint")}
@@ -1268,6 +1328,21 @@ function WatchVideoCardComponent({
               {video.author.username}
             </Text>
           </Pressable>
+          {onEnsureFollow && user?.id && user.id !== video.author.id ? (
+            <Pressable
+              onPress={following ? undefined : onEnsureFollow}
+              disabled={following}
+              accessibilityRole="button"
+              accessibilityLabel={
+                following ? t("follow.following") : t("follow.follow")
+              }
+              style={styles.followChip}
+            >
+              <Text style={styles.followChipText}>
+                {following ? t("follow.following") : t("follow.follow")}
+              </Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.caption} numberOfLines={3}>
             {video.caption || video.title}
           </Text>
@@ -1444,13 +1519,21 @@ function WatchVideoCardComponent({
               {formatPlaybackClock(timeline.duration)}
             </Text>
           </View>
-          <ScrubBar
-            ratio={isActive ? timeline.ratio : 0}
-            accessibilityLabel={t("watch.seek")}
-            onSeekRatio={onSeekRatio}
-            onGestureActiveChange={onScrubActive}
-            tall
-          />
+          {shouldExposeWatchScrub(timeline.duration) ? (
+            <ScrubBar
+              ratio={isActive ? timeline.ratio : 0}
+              accessibilityLabel={t("watch.seek")}
+              onSeekRatio={onSeekRatio}
+              onGestureActiveChange={onScrubActive}
+              tall
+            />
+          ) : (
+            <View
+              style={styles.shortProgress}
+              pointerEvents="none"
+              accessibilityElementsHidden
+            />
+          )}
         </View>
       </View>
       {paneStatus === "error" ? (
@@ -1479,6 +1562,63 @@ function WatchVideoCardComponent({
           </Pressable>
         </View>
       ) : null}
+      {captionsOn && (video.caption || video.title) ? (
+        <View style={styles.captionOverlay} pointerEvents="none">
+          <Text style={styles.captionOverlayText}>
+            {video.caption || video.title}
+          </Text>
+        </View>
+      ) : null}
+      <WatchQuickActions
+        visible={quickActionsOpen && isActive}
+        actions={resolveWatchQuickActions({
+          canShare: Boolean(onShare),
+          canReport: Boolean(onReport),
+          canFollow: Boolean(onEnsureFollow && user?.id && user.id !== video.author.id),
+        })}
+        saved={video.savedByMe === true}
+        following={following}
+        canFollow={Boolean(onEnsureFollow && user?.id && user.id !== video.author.id)}
+        speed={resolveWatchPlaybackSpeed(playbackRate)}
+        captionsOn={captionsOn}
+        onClose={() => setQuickActionsOpen(false)}
+        onSave={() => {
+          setQuickActionsOpen(false);
+          onToggleSave();
+        }}
+        onNotInterested={() => {
+          setQuickActionsOpen(false);
+          onNotInterested?.();
+        }}
+        onSpeed={(next) => {
+          onPlaybackRateChange?.(next);
+        }}
+        onCaptions={() => setCaptionsOn((prev) => !prev)}
+        onReport={
+          onReport
+            ? () => {
+                setQuickActionsOpen(false);
+                onReport();
+              }
+            : undefined
+        }
+        onShare={
+          onShare
+            ? () => {
+                setQuickActionsOpen(false);
+                onShare();
+              }
+            : undefined
+        }
+        onFollow={
+          onEnsureFollow
+            ? () => {
+                setQuickActionsOpen(false);
+                onEnsureFollow();
+              }
+            : undefined
+        }
+      />
     </View>
   );
 }
@@ -1632,6 +1772,42 @@ const styles = StyleSheet.create({
   meta: {
     maxWidth: "72%",
     zIndex: 5,
+  },
+  followChip: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.accentCyan,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  followChipText: {
+    color: colors.accentCyan,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  captionOverlay: {
+    position: "absolute",
+    left: 16,
+    right: 88,
+    bottom: 118,
+    backgroundColor: "rgba(5,5,16,0.72)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  captionOverlayText: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  shortProgress: {
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
   username: {
     color: colors.text,

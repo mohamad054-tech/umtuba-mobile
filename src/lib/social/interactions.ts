@@ -134,6 +134,49 @@ export function isEnsurePostLikeInFlight(postId: number): boolean {
   return ensureLikeInflight.has(postId);
 }
 
+export function previewEnsureLike(input: {
+  likedByMe?: unknown;
+  likes?: number;
+}): { liked: true; likes: number; noop: boolean } {
+  const likes = asNumber(input.likes, 0);
+  if (viewerLikedFromState(input.likedByMe)) {
+    return { liked: true, likes, noop: true };
+  }
+  return { liked: true, likes: likes + 1, noop: false };
+}
+
+export function previewToggleLike(input: {
+  likedByMe?: unknown;
+  likes?: number;
+}): { liked: boolean; likes: number } {
+  const liked = viewerLikedFromState(input.likedByMe);
+  const likes = asNumber(input.likes, 0);
+  return liked
+    ? { liked: false, likes: Math.max(0, likes - 1) }
+    : { liked: true, likes: likes + 1 };
+}
+
+export function previewToggleSave(input: {
+  savedByMe?: unknown;
+  saves?: number;
+}): { saved: boolean; saves: number } {
+  const saved = input.savedByMe === true;
+  const saves = asNumber(input.saves, 0);
+  return saved
+    ? { saved: false, saves: Math.max(0, saves - 1) }
+    : { saved: true, saves: saves + 1 };
+}
+
+const saveInflight = new Map<number, Promise<ActionResult<ToggleSaveResult>>>();
+
+export function resetTogglePostSaveInflightForTests(): void {
+  saveInflight.clear();
+}
+
+export function isTogglePostSaveInFlight(postId: number): boolean {
+  return saveInflight.has(postId);
+}
+
 /**
  * Double-tap Like. Never unlikes. Unlike stays on the explicit heart
  * (`togglePostLike`). Callers must not invoke toggle from the video tap.
@@ -223,7 +266,38 @@ async function performEnsurePostLike(
   };
 }
 
-export async function togglePostLike(
+const likeInflight = new Map<number, Promise<ActionResult<ToggleLikeResult>>>();
+
+export function resetTogglePostLikeInflightForTests(): void {
+  likeInflight.clear();
+}
+
+export function isTogglePostLikeInFlight(postId: number): boolean {
+  return likeInflight.has(postId);
+}
+
+export function togglePostLike(
+  supabase: SupabaseClient,
+  postId: number
+): Promise<ActionResult<ToggleLikeResult>> {
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return Promise.resolve({
+      ok: false,
+      message: "Unable to update like. Please try again.",
+    });
+  }
+  const pending = likeInflight.get(postId);
+  if (pending) return pending;
+  const work = performTogglePostLike(supabase, postId).finally(() => {
+    if (likeInflight.get(postId) === work) {
+      likeInflight.delete(postId);
+    }
+  });
+  likeInflight.set(postId, work);
+  return work;
+}
+
+async function performTogglePostLike(
   supabase: SupabaseClient,
   postId: number
 ): Promise<ActionResult<ToggleLikeResult>> {
@@ -265,13 +339,31 @@ export async function togglePostLike(
  * block; other-user saves do not. Table RLS still allows the viewer's own
  * bookmark row; `sync_post_saves_count` keeps `posts.saves` in sync.
  */
-export async function togglePostSave(
+export function togglePostSave(
   supabase: SupabaseClient,
   postId: number
 ): Promise<ActionResult<ToggleSaveResult>> {
   if (!Number.isInteger(postId) || postId <= 0) {
-    return { ok: false, message: "Unable to update save. Please try again." };
+    return Promise.resolve({
+      ok: false,
+      message: "Unable to update save. Please try again.",
+    });
   }
+  const pending = saveInflight.get(postId);
+  if (pending) return pending;
+  const work = performTogglePostSave(supabase, postId).finally(() => {
+    if (saveInflight.get(postId) === work) {
+      saveInflight.delete(postId);
+    }
+  });
+  saveInflight.set(postId, work);
+  return work;
+}
+
+async function performTogglePostSave(
+  supabase: SupabaseClient,
+  postId: number
+): Promise<ActionResult<ToggleSaveResult>> {
 
   const {
     data: { user },

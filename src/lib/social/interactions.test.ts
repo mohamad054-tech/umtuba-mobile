@@ -5,7 +5,12 @@ import {
   isEnsurePostLikeInFlight,
   loadViewerInteractionState,
   normalizePostId,
+  previewEnsureLike,
+  previewToggleLike,
+  previewToggleSave,
   resetEnsurePostLikeInflightForTests,
+  resetTogglePostLikeInflightForTests,
+  resetTogglePostSaveInflightForTests,
   togglePostLike,
   togglePostSave,
   viewerLikedFromState,
@@ -232,6 +237,18 @@ describe("togglePostSave — other-user Watch bookmark", () => {
       payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
     });
   });
+
+  it("shares one save write while in flight", async () => {
+    resetTogglePostSaveInflightForTests();
+    const supabase = createSaveClient({ userId: VIEWER, savesCount: 3 });
+    const first = togglePostSave(supabase as never, OTHER_POST_ID);
+    const second = togglePostSave(supabase as never, OTHER_POST_ID);
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+    expect(
+      supabase.calls.filter((call) => call.op === "insert")
+    ).toHaveLength(1);
+  });
 });
 
 function createViewerStateClient(options: {
@@ -348,6 +365,27 @@ describe("togglePostLike — still RPC", () => {
       p_post_id: OTHER_POST_ID,
     });
     expect(result).toEqual({ ok: true, liked: true, likes: 8 });
+  });
+
+  it("shares one like write while in flight", async () => {
+    resetTogglePostLikeInflightForTests();
+    vi.useFakeTimers();
+    const rpc = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () => resolve({ data: { liked: true, likes: 8 }, error: null }),
+            40
+          );
+        })
+    );
+    const first = togglePostLike({ rpc } as never, OTHER_POST_ID);
+    const second = togglePostLike({ rpc } as never, OTHER_POST_ID);
+    await vi.advanceTimersByTimeAsync(40);
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });
 
@@ -486,6 +524,34 @@ describe("ensurePostLike — double-tap never unlikes", () => {
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     expect(isEnsurePostLikeInFlight(OTHER_POST_ID)).toBe(false);
     vi.useRealTimers();
+  });
+
+  it("previews optimistic like without unliking on double-tap", () => {
+    expect(previewEnsureLike({ likedByMe: false, likes: 4 })).toEqual({
+      liked: true,
+      likes: 5,
+      noop: false,
+    });
+    expect(previewEnsureLike({ likedByMe: true, likes: 4 })).toEqual({
+      liked: true,
+      likes: 4,
+      noop: true,
+    });
+  });
+
+  it("previews rail unlike and save rollback snapshots", () => {
+    expect(previewToggleLike({ likedByMe: true, likes: 4 })).toEqual({
+      liked: false,
+      likes: 3,
+    });
+    expect(previewToggleSave({ savedByMe: false, saves: 1 })).toEqual({
+      saved: true,
+      saves: 2,
+    });
+    expect(previewToggleSave({ savedByMe: true, saves: 1 })).toEqual({
+      saved: false,
+      saves: 0,
+    });
   });
 
   it("refuses to apply unlike if toggle unexpectedly returns liked:false", async () => {

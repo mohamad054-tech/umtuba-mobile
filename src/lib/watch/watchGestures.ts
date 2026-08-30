@@ -8,6 +8,9 @@ export const WATCH_DOUBLE_TAP_WINDOW_MS = 240;
 
 export const WATCH_LIKE_ACK_MS = 320;
 
+/** Above the double-tap window so long-press cannot be a second tap. */
+export const WATCH_LONG_PRESS_MS = 450;
+
 export type WatchGestureSurface =
   | "video"
   | "rail"
@@ -80,6 +83,17 @@ export function shouldMountWatchVideoTapLayer(input: {
  */
 export function shouldEnableWatchPullToRefresh(activeIndex: number): boolean {
   return Number.isFinite(activeIndex) && activeIndex === 0;
+}
+
+/** Long-press quick actions only from the safe video area. */
+export function shouldOpenWatchQuickActions(
+  surface: WatchGestureSurface
+): boolean {
+  return surface === "video";
+}
+
+export function shouldCancelWatchTapsOnLongPress(): boolean {
+  return true;
 }
 
 export type WatchTapHandlers = {

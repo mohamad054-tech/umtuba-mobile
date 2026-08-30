@@ -445,6 +445,19 @@ export function canSeekWithDuration(duration: number): boolean {
   return Number.isFinite(duration) && duration > 0;
 }
 
+/**
+ * Hide the interactive scrub affordance on very short clips.
+ * Seek math (`canSeekWithDuration` / RTL fill) is unchanged.
+ */
+export const WATCH_SCRUB_MIN_DURATION_SEC = 8;
+
+export function shouldExposeWatchScrub(durationSec: number): boolean {
+  return (
+    canSeekWithDuration(durationSec) &&
+    durationSec >= WATCH_SCRUB_MIN_DURATION_SEC
+  );
+}
+
 /** Clamp playback progress for the timeline (0–1). */
 export function resolveProgressRatio(
   currentTime: number,

@@ -21,6 +21,7 @@ export type PlayerLike = {
   status?: string;
   /** Present on our test double; native SharedObject throws instead. */
   isReleased?: boolean;
+  playbackRate?: number;
 };
 
 export type PlaybackIntent = {
