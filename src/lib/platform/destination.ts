@@ -38,8 +38,19 @@ function mapPlatformPath(pathWithQuery: string): string | null {
   const pathOnly = (pathPart || "/").replace(/\/+$/, "") || "/";
   const params = new URLSearchParams(query);
 
-  if (pathOnly === "/discover" || pathOnly === "/(tabs)/discover") {
+  if (
+    pathOnly === "/" ||
+    pathOnly === "/life" ||
+    pathOnly === "/discover" ||
+    pathOnly === "/(tabs)/discover"
+  ) {
     return "/(tabs)/discover";
+  }
+  if (pathOnly === "/learning" || pathOnly === "/(tabs)/learning") {
+    return "/(tabs)/learning";
+  }
+  if (pathOnly === "/store" || pathOnly === "/(tabs)/store") {
+    return "/(tabs)/store";
   }
   if (pathOnly === "/watch" || pathOnly === "/(tabs)/watch") {
     const post = params.get("post");

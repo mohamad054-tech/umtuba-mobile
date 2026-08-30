@@ -33,8 +33,19 @@ export function mapWorldDestination(
 function mapWorldPath(pathWithQuery: string): string | null {
   const pathOnly = (pathWithQuery.split("?")[0] || "/").replace(/\/+$/, "") || "/";
 
-  if (pathOnly === "/discover" || pathOnly === "/(tabs)/discover") {
+  if (
+    pathOnly === "/" ||
+    pathOnly === "/life" ||
+    pathOnly === "/discover" ||
+    pathOnly === "/(tabs)/discover"
+  ) {
     return "/(tabs)/discover";
+  }
+  if (pathOnly === "/learning" || pathOnly === "/(tabs)/learning") {
+    return "/(tabs)/learning";
+  }
+  if (pathOnly === "/store" || pathOnly === "/(tabs)/store") {
+    return "/(tabs)/store";
   }
   if (pathOnly === "/live" || pathOnly === "/(tabs)/live") {
     return "/(tabs)/live";

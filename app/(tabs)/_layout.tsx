@@ -1,8 +1,10 @@
 import { Redirect, Tabs } from "expo-router";
-import { Platform, Text, type ColorValue } from "react-native";
+import { I18nManager, Text, type ColorValue } from "react-native";
 
+import { UmLifeTabIcon } from "@/components/nav/UmLifeTabIcon";
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { umLifeNavCopy } from "@/src/lib/nav/umLifeHomeEntry";
 import { colors } from "@/src/theme/colors";
 
 function TabLabel({
@@ -19,6 +21,7 @@ function TabLabel({
 
 export default function TabLayout() {
   const { session, loading, passwordRecoveryPending } = useAuth();
+  const copy = umLifeNavCopy(I18nManager.isRTL ? "ar" : "en");
 
   if (!loading && session && passwordRecoveryPending) {
     return <Redirect href="/(auth)/update-password" />;
@@ -45,31 +48,49 @@ export default function TabLayout() {
       <Tabs.Screen
         name="watch"
         options={{
-          title: "Watch",
+          title: copy.watch,
           headerShown: false,
+          tabBarAccessibilityLabel: copy.watch,
           tabBarIcon: ({ color }) => <TabLabel label="▶" color={color} />,
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
-          title: "Discover",
-          tabBarIcon: ({ color }) => <TabLabel label="◎" color={color} />,
+          title: "UM Life",
+          tabBarAccessibilityLabel: copy.umLifeAria,
+          tabBarIcon: ({ color }) => <UmLifeTabIcon color={color} />,
         }}
       />
       <Tabs.Screen
         name="create"
         options={{
-          title: "Create",
+          title: copy.create,
+          tabBarAccessibilityLabel: copy.create,
           tabBarIcon: ({ color }) => <TabLabel label="＋" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="learning"
+        options={{
+          title: copy.learning,
+          tabBarAccessibilityLabel: copy.learning,
+          tabBarIcon: ({ color }) => <TabLabel label="▣" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="store"
+        options={{
+          title: copy.store,
+          tabBarAccessibilityLabel: copy.store,
+          tabBarIcon: ({ color }) => <TabLabel label="⌂" color={color} />,
         }}
       />
       <Tabs.Screen
         name="live"
         options={{
           title: "Live",
-          // Unfinished Live join is an App Review risk on iOS. Android unchanged.
-          href: Platform.OS === "ios" ? null : "/(tabs)/live",
+          href: null,
           tabBarIcon: ({ color }) => <TabLabel label="◉" color={color} />,
         }}
       />
@@ -77,6 +98,7 @@ export default function TabLayout() {
         name="messages"
         options={{
           title: "Messages",
+          href: null,
           tabBarIcon: ({ color }) => <TabLabel label="✉" color={color} />,
         }}
       />
