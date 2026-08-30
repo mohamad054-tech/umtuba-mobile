@@ -54,6 +54,7 @@ import {
   viewerMaySeeDeleteControl,
 } from "@/src/lib/social/deleteOwnedPost";
 import {
+  ensurePostLike,
   togglePostLike,
   togglePostSave,
 } from "@/src/lib/social/interactions";
@@ -122,6 +123,7 @@ import {
 } from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
+import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
 import { watchHeaderOverlayLayerStyle } from "@/src/lib/watch/watchHeaderOverlay";
 import { colors } from "@/src/theme/colors";
 
@@ -582,6 +584,25 @@ export default function WatchScreen() {
     [patchVideo, t]
   );
 
+  const onEnsureLike = useCallback(
+    async (video: WatchVideo) => {
+      if (!video.postId) return;
+      const result = await ensurePostLike(getSupabase(), video.postId, {
+        likedByMe: video.likedByMe,
+        likes: video.stats.likes,
+      });
+      if (!result.ok) {
+        Alert.alert(t("watch.likeFailed"), result.message);
+        return;
+      }
+      patchVideo(video.id, {
+        likedByMe: true,
+        stats: { ...video.stats, likes: result.likes },
+      });
+    },
+    [patchVideo, t]
+  );
+
   const runShare = useCallback(
     async (
       attempt: ShareAttempt,
@@ -864,7 +885,10 @@ export default function WatchScreen() {
     claimActiveIndex(nextIndex);
     markWatchTransition(Platform.OS, "next_source_activation", {
       index: nextIndex,
-      readiness: resolveWatchHandoffReadiness(nextHandoffRef.current),
+      readiness: resolveWatchHandoffReadiness({
+        nextReady: nextHandoffRef.current.ready,
+        nextFirstFrame: nextHandoffRef.current.firstFrame,
+      }),
     });
 
     const animated = options?.animated ?? attempt === 0;
@@ -1009,6 +1033,7 @@ export default function WatchScreen() {
         onScrubGestureChange={onScrubGestureChange}
         onEnded={index === activeIndex ? onActiveEnded : undefined}
         onToggleLike={() => void onToggleLike(item)}
+        onEnsureLike={() => void onEnsureLike(item)}
         onToggleSave={() => void onToggleSave(item)}
         onOpenComments={
           item.postId
@@ -1072,6 +1097,7 @@ export default function WatchScreen() {
       onDeleteOwn,
       onReport,
       onShare,
+      onEnsureLike,
       onToggleLike,
       onToggleMute,
       onToggleSave,
@@ -1209,12 +1235,14 @@ export default function WatchScreen() {
         initialNumToRender={2}
         removeClippedSubviews={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void loadInitial({ soft: true })}
-            tintColor={colors.accentCyan}
-            colors={[colors.accentCyan]}
-          />
+          shouldEnableWatchPullToRefresh(activeIndex) ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void loadInitial({ soft: true })}
+              tintColor={colors.accentCyan}
+              colors={[colors.accentCyan]}
+            />
+          ) : undefined
         }
         ListFooterComponent={listFooter}
         onScrollToIndexFailed={(info) => {

@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ensurePostLike,
+  isEnsurePostLikeInFlight,
   loadViewerInteractionState,
   normalizePostId,
+  resetEnsurePostLikeInflightForTests,
   togglePostLike,
   togglePostSave,
   viewerLikedFromState,
@@ -345,5 +348,157 @@ describe("togglePostLike — still RPC", () => {
       p_post_id: OTHER_POST_ID,
     });
     expect(result).toEqual({ ok: true, liked: true, likes: 8 });
+  });
+});
+
+function createEnsureLikeClient(options: {
+  userId?: string | null;
+  alreadyLikedOnServer?: boolean;
+  rpcLiked?: boolean;
+  rpcLikes?: number;
+  selectError?: { message: string } | null;
+  rpcDelayMs?: number;
+}) {
+  const rpc = vi.fn(
+    () =>
+      new Promise<{ data: { liked: boolean; likes: number } | null; error: null }>(
+        (resolve) => {
+          const finish = () =>
+            resolve({
+              data: {
+                liked: options.rpcLiked ?? true,
+                likes: options.rpcLikes ?? 4,
+              },
+              error: null,
+            });
+          if (options.rpcDelayMs && options.rpcDelayMs > 0) {
+            setTimeout(finish, options.rpcDelayMs);
+          } else {
+            finish();
+          }
+        }
+      )
+  );
+
+  const from = vi.fn((table: string) => {
+    if (table !== "post_likes") {
+      throw new Error(`unexpected table ${table}`);
+    }
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => {
+              if (options.selectError) {
+                return { data: null, error: options.selectError };
+              }
+              return {
+                data: options.alreadyLikedOnServer
+                  ? { post_id: OTHER_POST_ID }
+                  : null,
+                error: null,
+              };
+            }),
+          })),
+        })),
+      })),
+    };
+  });
+
+  return {
+    rpc,
+    from,
+    auth: {
+      getUser: vi.fn(async () => ({
+        data: { user: options.userId ? { id: options.userId } : null },
+        error: null,
+      })),
+    },
+  };
+}
+
+describe("ensurePostLike — double-tap never unlikes", () => {
+  beforeEach(() => {
+    resetEnsurePostLikeInflightForTests();
+    vi.useRealTimers();
+  });
+
+  it("likes an unliked post exactly once", async () => {
+    const supabase = createEnsureLikeClient({
+      userId: VIEWER,
+      rpcLikes: 5,
+    });
+    const result = await ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: false,
+      likes: 4,
+    });
+    expect(result).toEqual({ ok: true, liked: true, likes: 5, noop: false });
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(supabase.rpc).toHaveBeenCalledWith("toggle_post_like", {
+      p_post_id: OTHER_POST_ID,
+    });
+  });
+
+  it("no-ops when already liked and never calls toggle", async () => {
+    const supabase = createEnsureLikeClient({ userId: VIEWER });
+    const result = await ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: true,
+      likes: 9,
+    });
+    expect(result).toEqual({ ok: true, liked: true, likes: 9, noop: true });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("no-ops when the server already has the like row", async () => {
+    const supabase = createEnsureLikeClient({
+      userId: VIEWER,
+      alreadyLikedOnServer: true,
+    });
+    const result = await ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: false,
+      likes: 3,
+    });
+    expect(result).toEqual({ ok: true, liked: true, likes: 3, noop: true });
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("shares one in-flight like RPC across rapid callers", async () => {
+    vi.useFakeTimers();
+    const supabase = createEnsureLikeClient({
+      userId: VIEWER,
+      rpcLikes: 6,
+      rpcDelayMs: 50,
+    });
+    const first = ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: false,
+      likes: 5,
+    });
+    expect(isEnsurePostLikeInFlight(OTHER_POST_ID)).toBe(true);
+    const second = ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: false,
+      likes: 5,
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual({ ok: true, liked: true, likes: 6, noop: false });
+    expect(b).toEqual(a);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
+    expect(isEnsurePostLikeInFlight(OTHER_POST_ID)).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it("refuses to apply unlike if toggle unexpectedly returns liked:false", async () => {
+    const supabase = createEnsureLikeClient({
+      userId: VIEWER,
+      rpcLiked: false,
+      rpcLikes: 2,
+    });
+    const result = await ensurePostLike(supabase as never, OTHER_POST_ID, {
+      likedByMe: false,
+      likes: 3,
+    });
+    expect(result.ok).toBe(false);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
 });

@@ -204,6 +204,7 @@ export type MobileMessages = {
   "watch.soundOn": string;
   "watch.muted": string;
   "watch.like": string;
+  "watch.likeConfirmed": string;
   "watch.unlike": string;
   "watch.save": string;
   "watch.unsave": string;

@@ -91,6 +91,12 @@ import {
   watchRailBottomOffset,
 } from "@/src/lib/watch/railLayout";
 import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
+import {
+  WATCH_LIKE_ACK_MS,
+  createWatchTapClassifier,
+  shouldDispatchWatchVideoTap,
+  shouldMountWatchVideoTapLayer,
+} from "@/src/lib/watch/watchGestures";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -125,6 +131,8 @@ export type WatchVideoCardProps = {
   onScrubGestureChange?: (active: boolean) => void;
   onEnded?: () => void;
   onToggleLike: () => void;
+  /** Double-tap Like only. Must never unlike. */
+  onEnsureLike?: () => void;
   onToggleSave: () => void;
   onOpenComments?: () => void;
   onShare?: () => void;
@@ -746,6 +754,7 @@ function WatchVideoCardComponent({
   onScrubGestureChange,
   onEnded,
   onToggleLike,
+  onEnsureLike,
   onToggleSave,
   onOpenComments,
   onShare,
@@ -781,7 +790,10 @@ function WatchVideoCardComponent({
     ratio: number;
   } | null>(null);
   const [feedback, setFeedback] = useState<"play" | "pause" | null>(null);
+  const [likeAck, setLikeAck] = useState(false);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const likeAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tapClassifierRef = useRef(createWatchTapClassifier());
   const seekTokenRef = useRef(0);
   const scrubTargetRatioRef = useRef<number | null>(null);
   const [playerEpoch, setPlayerEpoch] = useState(0);
@@ -851,8 +863,10 @@ function WatchVideoCardComponent({
 
   useEffect(() => {
     if (!isActive) {
+      tapClassifierRef.current.cancel();
       setUserPaused(false);
       setFeedback(null);
+      setLikeAck(false);
       setTimeline({ currentTime: 0, duration: 0, ratio: 0 });
       setSeekRequest(null);
       trimEndedRef.current = false;
@@ -864,9 +878,14 @@ function WatchVideoCardComponent({
   }, [video.id]);
 
   useEffect(() => {
+    const classifier = tapClassifierRef.current;
     return () => {
+      classifier.cancel();
       if (feedbackTimer.current) {
         clearTimeout(feedbackTimer.current);
+      }
+      if (likeAckTimer.current) {
+        clearTimeout(likeAckTimer.current);
       }
     };
   }, []);
@@ -950,6 +969,29 @@ function WatchVideoCardComponent({
       return next;
     });
   }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
+
+  const showLikeAck = useCallback(() => {
+    setLikeAck(true);
+    if (likeAckTimer.current) {
+      clearTimeout(likeAckTimer.current);
+    }
+    likeAckTimer.current = setTimeout(() => {
+      setLikeAck(false);
+      likeAckTimer.current = null;
+    }, WATCH_LIKE_ACK_MS);
+  }, []);
+
+  const onVideoAreaTap = useCallback(() => {
+    if (!shouldDispatchWatchVideoTap("video")) return;
+    if (!shouldMountWatchVideoTapLayer({ paneStatus })) return;
+    tapClassifierRef.current.tap({
+      onSingle: onTogglePlayPause,
+      onDouble: () => {
+        showLikeAck();
+        onEnsureLike?.();
+      },
+    });
+  }, [onEnsureLike, onTogglePlayPause, paneStatus, showLikeAck]);
 
   const onTimeline = useCallback((state: TimelineState) => {
     if (isActive && state.duration > 0) {
@@ -1133,15 +1175,28 @@ function WatchVideoCardComponent({
         style={styles.overlay}
         pointerEvents={paneStatus === "error" ? "none" : "box-none"}
       >
-        {paneStatus === "error" ? null : (
+        {shouldMountWatchVideoTapLayer({ paneStatus }) ? (
           <Pressable
             style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
-            onPress={onTogglePlayPause}
+            onPress={onVideoAreaTap}
             accessibilityRole="button"
             accessibilityLabel={userPaused ? t("watch.play") : t("watch.pause")}
             accessibilityHint={t("watch.playPauseHint")}
           />
-        )}
+        ) : null}
+
+        {likeAck ? (
+          <View
+            style={styles.likeAck}
+            pointerEvents="none"
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={t("watch.likeConfirmed")}
+            testID="watch-like-ack"
+          >
+            <View style={styles.likeAckRing} />
+            <View style={styles.likeAckCore} />
+          </View>
+        ) : null}
 
         {feedback ? (
           <View
@@ -1493,6 +1548,32 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(5,5,16,0.45)",
     paddingHorizontal: 24,
     gap: 12,
+  },
+  likeAck: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "38%",
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 6,
+  },
+  likeAckRing: {
+    position: "absolute",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: colors.accentCyan,
+    opacity: 0.85,
+  },
+  likeAckCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: colors.accentCyan,
+    transform: [{ rotate: "45deg" }],
   },
   feedbackBadge: {
     position: "absolute",

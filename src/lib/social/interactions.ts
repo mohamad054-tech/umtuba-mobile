@@ -115,6 +115,114 @@ export async function loadViewerInteractionState(
   return state;
 }
 
+export type EnsureLikeResult = {
+  liked: true;
+  likes: number;
+  noop: boolean;
+};
+
+const ensureLikeInflight = new Map<
+  number,
+  Promise<ActionResult<EnsureLikeResult>>
+>();
+
+export function resetEnsurePostLikeInflightForTests(): void {
+  ensureLikeInflight.clear();
+}
+
+export function isEnsurePostLikeInFlight(postId: number): boolean {
+  return ensureLikeInflight.has(postId);
+}
+
+/**
+ * Double-tap Like. Never unlikes. Unlike stays on the explicit heart
+ * (`togglePostLike`). Callers must not invoke toggle from the video tap.
+ */
+export function ensurePostLike(
+  supabase: SupabaseClient,
+  postId: number,
+  input: { likedByMe?: unknown; likes?: number } = {}
+): Promise<ActionResult<EnsureLikeResult>> {
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return Promise.resolve({
+      ok: false,
+      message: "Unable to update like. Please try again.",
+    });
+  }
+
+  const likes = asNumber(input.likes, 0);
+  if (viewerLikedFromState(input.likedByMe)) {
+    return Promise.resolve({
+      ok: true,
+      liked: true,
+      likes,
+      noop: true,
+    });
+  }
+
+  const pending = ensureLikeInflight.get(postId);
+  if (pending) return pending;
+
+  const work = performEnsurePostLike(supabase, postId, likes).finally(() => {
+    if (ensureLikeInflight.get(postId) === work) {
+      ensureLikeInflight.delete(postId);
+    }
+  });
+  ensureLikeInflight.set(postId, work);
+  return work;
+}
+
+async function performEnsurePostLike(
+  supabase: SupabaseClient,
+  postId: number,
+  likes: number
+): Promise<ActionResult<EnsureLikeResult>> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user?.id) {
+    return {
+      ok: false,
+      message: "Please sign in to like posts.",
+      requiresAuth: true,
+    };
+  }
+
+  const existing = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("user_id", user.id)
+    .eq("post_id", postId)
+    .maybeSingle();
+
+  if (existing.error) {
+    return { ok: false, message: "Unable to update like. Please try again." };
+  }
+
+  if (existing.data) {
+    return {
+      ok: true,
+      liked: true,
+      likes: likes > 0 ? likes : 1,
+      noop: true,
+    };
+  }
+
+  const toggled = await togglePostLike(supabase, postId);
+  if (!toggled.ok) return toggled;
+  if (toggled.liked !== true) {
+    return { ok: false, message: "Unable to update like. Please try again." };
+  }
+  return {
+    ok: true,
+    liked: true,
+    likes: toggled.likes,
+    noop: false,
+  };
+}
+
 export async function togglePostLike(
   supabase: SupabaseClient,
   postId: number
