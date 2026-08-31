@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { WatchVideo } from "@/src/contracts/watch";
+import { isLocalWatchPlaybackUri } from "@/src/lib/feed/videoStoragePath";
 import {
   createSignedUrlCache,
   watchSignedUrlCache,
@@ -38,6 +39,7 @@ export function shouldApplyResolvedWatchSrc(
   const current = (currentSrc ?? "").trim();
   const next = (nextSrc ?? "").trim();
   if (!next) return false;
+  if (isLocalWatchPlaybackUri(current)) return false;
   return current !== next;
 }
 

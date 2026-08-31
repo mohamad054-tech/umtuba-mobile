@@ -125,8 +125,18 @@ import {
   watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
-import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
-import { ensureAndroidWatchVideoCache } from "@/src/lib/watch/androidWatchMediaCache";
+import {
+  markWatchCache,
+  markWatchCellBind,
+  markWatchTransition,
+} from "@/src/lib/watch/watchTransitionTrace";
+import {
+  ANDROID_WATCH_CACHE_TARGET,
+  ensureAndroidWatchVideoCache,
+  peekAndroidWatchCacheHits,
+  syncAndroidWatchRollingCache,
+} from "@/src/lib/watch/androidWatchMediaCache";
+import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -224,6 +234,8 @@ export default function WatchScreen() {
   const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
+  const lastLaidOutHeightRef = useRef(WINDOW_HEIGHT);
+  const cacheSyncGenerationRef = useRef(0);
   const programmaticAdvanceUntilRef = useRef(0);
   const armedUntilMsRef = useRef<number | null>(null);
   const screenFocusedRef = useRef(true);
@@ -255,6 +267,19 @@ export default function WatchScreen() {
     }
     activeIndexRef.current = nextIndex;
     setActiveIndex(nextIndex);
+    const nextVideo = visibleVideosRef.current[nextIndex];
+    if (nextVideo && Platform.OS === "android") {
+      const mediaId = watchMediaIdentity(nextVideo);
+      markWatchCellBind("android", {
+        visibleIndex: nextIndex,
+        visibleMediaId: mediaId,
+        activeIndex: nextIndex,
+        activeMediaId: mediaId,
+        playerMediaId: mediaId,
+        surfaceAttached: true,
+        aligned: true,
+      });
+    }
   }, []);
 
   const claimActiveIndexRef = useRef(claimActiveIndex);
@@ -276,6 +301,16 @@ export default function WatchScreen() {
   useEffect(() => {
     void ensureAndroidWatchVideoCache(Platform.OS);
   }, []);
+
+  useEffect(() => {
+    if (itemHeight === lastLaidOutHeightRef.current) return;
+    const previous = lastLaidOutHeightRef.current;
+    lastLaidOutHeightRef.current = itemHeight;
+    if (previous === itemHeight) return;
+    const offset = resolveWatchScrollOffset(activeIndexRef.current, itemHeight);
+    if (offset == null) return;
+    listRef.current?.scrollToOffset({ offset, animated: false });
+  }, [itemHeight]);
 
   useEffect(() => {
     itemHeightRef.current = itemHeight;
@@ -654,6 +689,56 @@ export default function WatchScreen() {
           ?.src;
         if (!shouldApplyResolvedWatchSrc(current, src)) return;
         patchVideo(id, { src });
+      },
+    });
+  }, [activeIndex, patchVideo, playbackIdentity]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const snapshot = visibleVideosRef.current;
+    if (snapshot.length === 0) return;
+    let cancelled = false;
+    void peekAndroidWatchCacheHits({ videos: snapshot }).then((hits) => {
+      if (cancelled) return;
+      for (const hit of hits) {
+        const current = visibleVideosRef.current.find(
+          (video) => video.id === hit.videoId
+        )?.src;
+        if (current === hit.uri) continue;
+        patchVideo(hit.videoId, { src: hit.uri });
+      }
+      if (hits.length > 0) {
+        markWatchCache("android", {
+          target: ANDROID_WATCH_CACHE_TARGET,
+          cachedIds: hits.map((hit) => hit.mediaId),
+          hits: hits.map((hit) => hit.mediaId),
+          misses: [],
+          evicted: [],
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [patchVideo, playbackIdentity]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const snapshot = visibleVideosRef.current;
+    if (snapshot.length === 0) return;
+    const generation = cacheSyncGenerationRef.current + 1;
+    cacheSyncGenerationRef.current = generation;
+    void syncAndroidWatchRollingCache({
+      platform: "android",
+      videos: snapshot,
+      activeIndex,
+      onResolved: (videoId, localUri) => {
+        if (cacheSyncGenerationRef.current !== generation) return;
+        const current = visibleVideosRef.current.find(
+          (video) => video.id === videoId
+        )?.src;
+        if (current === localUri) return;
+        patchVideo(videoId, { src: localUri });
       },
     });
   }, [activeIndex, patchVideo, playbackIdentity]);
@@ -1140,6 +1225,7 @@ export default function WatchScreen() {
     ({ item, index }: { item: WatchVideo; index: number }) => (
       <WatchVideoCard
         video={item}
+        listIndex={index}
         isActive={index === activeIndex}
         shouldLoadPlayer={shouldLoadPlayer(index, activeIndex, Platform.OS)}
         shouldPreparePlayer={shouldPrepareWatchPlayer(
@@ -1147,6 +1233,7 @@ export default function WatchScreen() {
           activeIndex,
           Platform.OS
         )}
+        isNextItem={index === activeIndex + 1}
         warmNextSurface={
           Platform.OS === "android" &&
           index === activeIndex + 1 &&

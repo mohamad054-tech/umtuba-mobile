@@ -65,6 +65,9 @@ describe("shouldMountWatchPlayer", () => {
     }));
     expect(srcs.filter((item) => shouldMountWatchPlayer(item))).toHaveLength(2);
     expect(isPlayableWatchSrc("https://x/y")).toBe(true);
+    expect(isPlayableWatchSrc("file:///cache/umtuba-watch-media/post-1.mp4")).toBe(
+      true
+    );
     expect(isPlayableWatchSrc("")).toBe(false);
   });
 });

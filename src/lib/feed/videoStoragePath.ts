@@ -36,9 +36,15 @@ export function isLegacyHttpPlaybackUrl(
   return trimmed.startsWith("http://") || trimmed.startsWith("https://");
 }
 
+export function isLocalWatchPlaybackUri(
+  raw: string | null | undefined
+): raw is string {
+  const trimmed = (raw ?? "").trim();
+  return trimmed.startsWith("file://") || trimmed.startsWith("content://");
+}
+
 export function isPlayableWatchSrc(src: string | null | undefined): boolean {
-  const trimmed = (src ?? "").trim();
-  return trimmed.startsWith("http://") || trimmed.startsWith("https://");
+  return isLegacyHttpPlaybackUrl(src) || isLocalWatchPlaybackUri(src);
 }
 
 /** Native player mounts only when a playable URL exists. URL prep is not a player. */

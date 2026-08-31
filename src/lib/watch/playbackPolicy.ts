@@ -106,16 +106,30 @@ export function shouldWarmAndroidNextSurface(input: {
   return input.remainingMs <= ANDROID_NEXT_SURFACE_WARM_REMAINING_MS;
 }
 
-/** Surface mount. iOS stays on the load window. */
+/**
+ * Surface mount.
+ * iOS stays on the load window.
+ * Android attaches the active TextureView immediately, and the next
+ * prepared neighbor as soon as it is READY. Waiting for near-end warm
+ * left swipe 1→2 with item-2 audio and a black surface on Fold6.
+ */
 export function shouldAttachWatchSurface(input: {
   loadPlayer: boolean;
   preparePlayer: boolean;
   itemReady: boolean;
   warmNextSurface: boolean;
+  isNextItem?: boolean;
   platform?: string | null;
 }): boolean {
   if (input.loadPlayer) return true;
   if (input.platform !== "android") return false;
+  if (
+    input.preparePlayer === true &&
+    input.itemReady === true &&
+    input.isNextItem === true
+  ) {
+    return true;
+  }
   return (
     input.preparePlayer === true &&
     input.itemReady === true &&

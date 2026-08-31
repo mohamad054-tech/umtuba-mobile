@@ -100,6 +100,12 @@ describe("1 NO_FEED_WIDE_SIGNED_URL_SERIAL_BLOCKING", () => {
       false
     );
     expect(shouldApplyResolvedWatchSrc("", "https://cdn.example/a")).toBe(true);
+    expect(
+      shouldApplyResolvedWatchSrc(
+        "file:///cache/umtuba-watch-media/post-1.mp4",
+        "https://cdn.example/a"
+      )
+    ).toBe(false);
   });
 });
 
@@ -371,7 +377,7 @@ describe("11 ANDROID_NEXT_MEDIA_PREPARE_WITHOUT_SURFACE", () => {
 });
 
 describe("12 ANDROID_HANDOFF_WAITS_FOR_FIRST_FRAME", () => {
-  it("keeps the surface window active-only until READY+near-end warm", () => {
+  it("keeps Android load-window active-only while next may prepare a surface", () => {
     expect(watchWindowMountedIndexes(4, 9, "android")).toEqual([4]);
     expect(shouldLoadPlayer(5, 4, "android")).toBe(false);
     expect(shouldPrepareWatchPlayer(5, 4, "android")).toBe(true);

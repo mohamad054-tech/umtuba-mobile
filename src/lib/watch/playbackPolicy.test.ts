@@ -148,7 +148,7 @@ describe("shouldPrepareWatchPlayer", () => {
 });
 
 describe("Android next-surface warm and gated handoff", () => {
-  it("does not attach a second Android surface until READY and near end", () => {
+  it("attaches the next Android surface once READY, not only near end", () => {
     expect(
       shouldWarmAndroidNextSurface({
         platform: "android",
@@ -174,6 +174,16 @@ describe("Android next-surface warm and gated handoff", () => {
         remainingMs: 200,
       })
     ).toBe(false);
+    expect(
+      shouldAttachWatchSurface({
+        loadPlayer: false,
+        preparePlayer: true,
+        itemReady: true,
+        warmNextSurface: false,
+        isNextItem: true,
+        platform: "android",
+      })
+    ).toBe(true);
     expect(
       shouldAttachWatchSurface({
         loadPlayer: false,

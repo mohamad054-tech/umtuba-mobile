@@ -41,7 +41,10 @@ import {
   watchEditAudioScale,
   watchEditFromPipeline,
 } from "@/src/lib/video/watchEditPlayback";
-import { shouldMountWatchPlayer } from "@/src/lib/feed/videoStoragePath";
+import {
+  isLocalWatchPlaybackUri,
+  shouldMountWatchPlayer,
+} from "@/src/lib/feed/videoStoragePath";
 import {
   canSeekWithDuration,
   formatPlaybackClock,
@@ -59,9 +62,14 @@ import {
   shouldPlayVideo,
   shouldExposeWatchScrub,
   shouldPlayWithUserPause,
+  watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
-import { markWatchTransition } from "@/src/lib/watch/watchTransitionTrace";
+import { isWatchCellBindingAligned, watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
+import {
+  markWatchCellBind,
+  markWatchTransition,
+} from "@/src/lib/watch/watchTransitionTrace";
 import { resolveAndroidWatchBufferOptions } from "@/src/lib/watch/androidWatchMediaCache";
 import {
   canProduceWatchAudio,
@@ -130,11 +138,14 @@ const SCRUB_CATCHUP_EPSILON = 0.02;
 
 export type WatchVideoCardProps = {
   video: WatchVideo;
+  listIndex?: number;
   isActive: boolean;
   /** Mount native player only for the platform load window (iOS ±1, Android active). */
   shouldLoadPlayer: boolean;
   /** Android previous+current+next prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
   shouldPreparePlayer?: boolean;
+  /** Android: this cell is activeIndex + 1. Attach TextureView once READY. */
+  isNextItem?: boolean;
   /** Android: attach next TextureView off-screen once READY and current is near end. */
   warmNextSurface?: boolean;
   onHandoffState?: (state: { ready: boolean; firstFrame: boolean }) => void;
@@ -196,7 +207,10 @@ type PlayerPaneProps = {
   shouldPlay: boolean;
   loadPlayer: boolean;
   preparePlayer: boolean;
+  isNextItem: boolean;
   warmNextSurface: boolean;
+  mediaId: string;
+  listIndex: number;
   ownershipGeneration: number;
   muted: boolean;
   volume: number;
@@ -374,7 +388,10 @@ function WatchPlayerPane({
   shouldPlay,
   loadPlayer,
   preparePlayer,
+  isNextItem,
   warmNextSurface,
+  mediaId,
+  listIndex,
   ownershipGeneration,
   muted,
   volume,
@@ -409,7 +426,9 @@ function WatchPlayerPane({
   }, [errorMessage, onPlayerStatus, status]);
 
   const playerSource =
-    nativePlatform === "android" ? { uri: src, useCaching: true } : src;
+    nativePlatform === "android"
+      ? { uri: src, useCaching: !isLocalWatchPlaybackUri(src) }
+      : src;
   const player = useVideoPlayer(playerSource, (p) => {
     // New SharedObject starts silent. Ownership effect unmutes only the active post.
     p.loop = false;
@@ -739,6 +758,7 @@ function WatchPlayerPane({
     preparePlayer,
     itemReady: status === "ready" || nativeStatusRef.current === "readyToPlay",
     warmNextSurface,
+    isNextItem,
     platform: nativePlatform,
   });
 
@@ -746,7 +766,32 @@ function WatchPlayerPane({
     if (attachSurface) {
       markWatchTransition(nativePlatform, "surface_attached");
     }
-  }, [attachSurface, nativePlatform]);
+    if (nativePlatform !== "android") return;
+    const aligned = isWatchCellBindingAligned({
+      visibleIndex: listIndex,
+      visibleMediaId: mediaId,
+      activeIndex: isActive ? listIndex : isNextItem ? listIndex - 1 : listIndex,
+      activeMediaId: mediaId,
+      playerMediaId: mediaId,
+      surfaceMediaId: attachSurface ? mediaId : null,
+    });
+    markWatchCellBind("android", {
+      visibleIndex: listIndex,
+      visibleMediaId: mediaId,
+      activeIndex: isActive ? listIndex : isNextItem ? listIndex - 1 : listIndex,
+      activeMediaId: mediaId,
+      playerMediaId: mediaId,
+      surfaceAttached: attachSurface,
+      aligned: isActive ? aligned && attachSurface : aligned,
+    });
+  }, [
+    attachSurface,
+    isActive,
+    isNextItem,
+    listIndex,
+    mediaId,
+    nativePlatform,
+  ]);
 
   useEffect(() => {
     if (status === "ready") {
@@ -792,9 +837,11 @@ function WatchPlayerPane({
 
 function WatchVideoCardComponent({
   video,
+  listIndex,
   isActive,
   shouldLoadPlayer: loadPlayer,
   shouldPreparePlayer: preparePlayer = loadPlayer,
+  isNextItem = false,
   warmNextSurface = false,
   onHandoffState,
   onRemainingMs,
@@ -1209,12 +1256,15 @@ function WatchVideoCardComponent({
     >
       {mountPlayer ? (
         <WatchPlayerPane
-          key={`watch-player-${video.id}-${playerEpoch}`}
+          key={`watch-player-${watchItemKey(video)}-${playerEpoch}`}
           src={epochSrc}
+          mediaId={watchMediaIdentity(video)}
+          listIndex={listIndex ?? -1}
           isActive={isActive}
           shouldPlay={shouldPlay}
           loadPlayer={loadPlayer}
           preparePlayer={preparePlayer}
+          isNextItem={isNextItem}
           warmNextSurface={warmNextSurface}
           ownershipGeneration={ownershipGeneration}
           muted={audio.muted}
