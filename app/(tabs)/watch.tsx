@@ -76,6 +76,7 @@ import {
   isWatchInPlaceOverlayOpen,
   isWatchShareSheetOpen,
   resolveWatchInPlaceOverlayClose,
+  shouldMountWatchShareOverlay,
   type WatchShareSheetSnapshot,
 } from "@/src/lib/social/watchShareSheet";
 import {
@@ -1491,24 +1492,26 @@ export default function WatchScreen() {
         </View>
       ) : null}
       {exitHint}
-      <WatchShareSheet
-        visible={isWatchShareSheetOpen(shareSheet)}
-        choices={listWatchShareChoices()}
-        onClose={() => setShareSheet(null)}
-        onChoose={(mode) => {
-          const snapshot = shareSheet;
-          setShareSheet(null);
-          if (!snapshot) return;
-          const entry = openWatchShareEntry({ postId: snapshot.postId });
-          if (!entry) return;
-          void runShare(
-            entry.attempt,
-            mode,
-            snapshot.title,
-            snapshot.text
-          );
-        }}
-      />
+      {shouldMountWatchShareOverlay(shareSheet) ? (
+        <WatchShareSheet
+          visible
+          choices={listWatchShareChoices()}
+          onClose={() => setShareSheet(null)}
+          onChoose={(mode) => {
+            const snapshot = shareSheet;
+            setShareSheet(null);
+            if (!snapshot) return;
+            const entry = openWatchShareEntry({ postId: snapshot.postId });
+            if (!entry) return;
+            void runShare(
+              entry.attempt,
+              mode,
+              snapshot.title,
+              snapshot.text
+            );
+          }}
+        />
+      ) : null}
       <CommentsSheet
         visible={commentPostId != null}
         postId={commentPostId}

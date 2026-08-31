@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTranslation } from "@/src/lib/i18n";
@@ -13,6 +13,10 @@ type WatchShareSheetProps = {
   onClose: () => void;
 };
 
+/**
+ * Host-window overlay only. Do not wrap this in RN Modal — a Dialog
+ * next to Android TextureView blacks the next item while audio plays.
+ */
 export function WatchShareSheet({
   visible,
   choices,
@@ -21,58 +25,69 @@ export function WatchShareSheet({
 }: WatchShareSheetProps) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  if (!visible) return null;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+    <View
+      style={styles.host}
+      pointerEvents="box-none"
+      testID="watch-share-sheet"
     >
-      <View style={styles.backdrop} testID="watch-share-sheet">
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={t("actions.cancel")}
+        testID="watch-share-backdrop"
+      />
+      <View
+        style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}
+      >
+        <Text style={styles.title}>{t("watch.share")}</Text>
+        {choices.map((choice) => (
+          <Pressable
+            key={choice.mode}
+            style={styles.row}
+            onPress={() => onChoose(choice.mode)}
+            accessibilityRole="button"
+            accessibilityLabel={t(choice.key)}
+            testID={`watch-share-choice-${choice.mode}`}
+          >
+            <Text style={styles.rowText}>{t(choice.key)}</Text>
+          </Pressable>
+        ))}
         <Pressable
-          style={StyleSheet.absoluteFill}
+          style={styles.cancel}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel={t("actions.cancel")}
-          testID="watch-share-backdrop"
-        />
-        <View
-          style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}
+          testID="watch-share-cancel"
         >
-          <Text style={styles.title}>{t("watch.share")}</Text>
-          {choices.map((choice) => (
-            <Pressable
-              key={choice.mode}
-              style={styles.row}
-              onPress={() => onChoose(choice.mode)}
-              accessibilityRole="button"
-              accessibilityLabel={t(choice.key)}
-              testID={`watch-share-choice-${choice.mode}`}
-            >
-              <Text style={styles.rowText}>{t(choice.key)}</Text>
-            </Pressable>
-          ))}
-          <Pressable
-            style={styles.cancel}
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel={t("actions.cancel")}
-            testID="watch-share-cancel"
-          >
-            <Text style={styles.cancelText}>{t("actions.cancel")}</Text>
-          </Pressable>
-        </View>
+          <Text style={styles.cancelText}>{t("actions.cancel")}</Text>
+        </Pressable>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
+  host: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     justifyContent: "flex-end",
+    zIndex: 30,
+    elevation: 30,
+  },
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
   sheet: {
     backgroundColor: colors.surface,

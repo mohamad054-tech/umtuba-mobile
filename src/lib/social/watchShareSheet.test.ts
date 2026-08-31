@@ -28,8 +28,10 @@ import {
   isWatchShareSheetOpen,
   resolveWatchInPlaceOverlayClose,
   shouldDismissWatchShareOnHardwareBack,
+  shouldMountWatchShareOverlay,
   watchShareDismissPreservesActiveItem,
   watchShareOverlayPausesPlayback,
+  watchShareOverlayUsesHostWindow,
   watchShareSheetRemountsWatch,
   type WatchShareSheetSnapshot,
 } from "./watchShareSheet";
@@ -96,5 +98,14 @@ describe("Watch in-place share sheet", () => {
         screenFocused: true,
       })
     ).toBe(true);
+  });
+
+  it("mounts only while open and stays in the Watch host window", () => {
+    expect(shouldMountWatchShareOverlay(null)).toBe(false);
+    expect(shouldMountWatchShareOverlay(SNAPSHOT)).toBe(true);
+    expect(watchShareOverlayUsesHostWindow()).toBe(true);
+    expect(watchShareSheetRemountsWatch()).toBe(false);
+    expect(watchShareDismissPreservesActiveItem()).toBe(true);
+    expect(SNAPSHOT.activeItemId).toBe("post-88");
   });
 });

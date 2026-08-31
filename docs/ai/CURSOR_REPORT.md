@@ -1,15 +1,14 @@
-# CURSOR_REPORT — PART1F SHARE IN-PLACE
+# CURSOR_REPORT — ANDROID PLAYBACK REGRESSION AFTER PART1F
 
 ## Summary
 
-Replaced the Watch share `Alert.alert` chooser with an in-Watch Modal sheet. Cancel / backdrop / Android Back dismiss the sheet on the same live Watch instance. Link and file share actions are unchanged. No fake data. No production touch.
+Part1F’s standing RN `Modal` next to Watch TextureView is the Fold6 black-frame / audio-ahead / snap-back regression. Share is now a host-window overlay mounted only while open. Preload window and Part1F share actions preserved.
 
 ## Tests
 
-77 focused PASS. `tsc --noEmit` PASS.
+81 focused PASS. `tsc --noEmit` PASS.
 
 ## Open issues
 
+- Part1F device gate still not PASS until Fold6 re-QA.
 - Part1E sound-return still DEVICE_QA_BLOCKED_DATA.
-- 1D caption/mention/hashtag/Follow-other residuals remain.
-- Native OS share sheet after choosing link/file is unchanged.

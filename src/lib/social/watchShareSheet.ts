@@ -49,3 +49,18 @@ export function watchShareDismissPreservesActiveItem(): true {
 export function watchShareOverlayPausesPlayback(): false {
   return false;
 }
+
+/** Mount only while open. A standing RN Modal Dialog steals Android TextureView. */
+export function shouldMountWatchShareOverlay(
+  snapshot: WatchShareSheetSnapshot | null | undefined
+): boolean {
+  return isWatchShareSheetOpen(snapshot);
+}
+
+/**
+ * Stay in the Watch host window. A second Android Dialog next to
+ * TextureView can play item-2 audio on a black surface and jump the list.
+ */
+export function watchShareOverlayUsesHostWindow(): true {
+  return true;
+}
