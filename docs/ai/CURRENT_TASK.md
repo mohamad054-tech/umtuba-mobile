@@ -2,29 +2,30 @@
 
 ## Task title
 
-DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1E_CHILD_RETURN_AND_RAIL
+DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1F_SHARE_INPLACE
 
 ## Status
 
-**IMPLEMENTATION_DONE / DEVICE_QA_BLOCKED_DATA.** Part 1E is installed on Fold6 from EAS `f59ba290`. Sound-return QA cannot run: current Watch feed has no original-sound chip. Do not mark PASS or FAIL. No fake data. No deploy. No Play/App Store.
+**IN PROGRESS.** Replace Watch `Alert.alert` share chooser with an in-Watch dismissible sheet. Do not redo 1B/1C/1D/1E/2x. No fake data. No deploy. No Play/App Store.
 
 ```
-TASK_ID = DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1E_CHILD_RETURN_AND_RAIL
-PART1E_DEVICE_QA = DEVICE_QA_BLOCKED_DATA
-REAL_SOUND_ITEM_AVAILABLE = NO
-EAS_BUILD_ID = f59ba290-9819-477f-a834-2ca1ed12219b
+TASK_ID = DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1F_SHARE_INPLACE
+BASE_SHA = ed39854a989e8c25c59510b8f671a7bd9f03ea36
+PART1E_STATUS = IMPLEMENTATION_COMMITTED / DEVICE_QA_BLOCKED_DATA
 WATCH_FOUNDATION_COMPLETE = NO
-NEXT_PART = PART1F_WATCH_SHARE_INPLACE
 DEPLOYED = NO
 PLAY_UPLOAD = NO
 ```
 
 ## Allowed scope
 
-Closed for product unless a new GO arrives. Next candidate is in-Watch share chooser (no remount, no fake data).
+- In-Watch share sheet (same live Watch instance)
+- Android Back / backdrop / Cancel dismiss without remount
+- Existing link/file share actions unchanged
+- Focused tests + typecheck + EAS preview if checks pass
 
 ## Forbidden scope
 
-- Do not redo 1B, 1C, 1D, or 2x.
-- Do not invent feed captions, mentions, hashtags, Follow-other, or sound_id rows.
-- Do not deploy. Do not upload to stores. Do not mutate production.
+- Redo 1B/1C/1D/2x or Part1E sound-origin
+- Hashtag/mention/Follow-other residuals
+- Fake feed rows, production query/mutation, deploy, Play

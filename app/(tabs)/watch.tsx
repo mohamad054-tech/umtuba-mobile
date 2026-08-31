@@ -27,6 +27,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CommentsSheet } from "@/components/CommentsSheet";
+import { WatchShareSheet } from "@/components/WatchShareSheet";
 import { IdentityHeader } from "@/components/IdentityHeader";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
@@ -68,8 +69,15 @@ import {
 } from "@/src/lib/social/interactions";
 import {
   isWatchShareEntryEnabled,
+  listWatchShareChoices,
   openWatchShareEntry,
 } from "@/src/lib/social/shareEntry";
+import {
+  isWatchInPlaceOverlayOpen,
+  isWatchShareSheetOpen,
+  resolveWatchInPlaceOverlayClose,
+  type WatchShareSheetSnapshot,
+} from "@/src/lib/social/watchShareSheet";
 import {
   shareWatchPostFile,
   shareWatchPostLink,
@@ -196,6 +204,9 @@ export default function WatchScreen() {
     () => new Set()
   );
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [shareSheet, setShareSheet] = useState<WatchShareSheetSnapshot | null>(
+    null
+  );
   const [preparingShare, setPreparingShare] = useState(false);
   const [exitHintVisible, setExitHintVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<WatchPlaybackSpeed>(
@@ -216,6 +227,7 @@ export default function WatchScreen() {
   const armedUntilMsRef = useRef<number | null>(null);
   const screenFocusedRef = useRef(true);
   const commentPostIdRef = useRef<number | null>(null);
+  const shareSheetOpenRef = useRef(false);
   const exitHintVisibleRef = useRef(false);
   const remainingMsRef = useRef<number | null>(null);
   const currentEndedRef = useRef(false);
@@ -296,6 +308,10 @@ export default function WatchScreen() {
   useEffect(() => {
     commentPostIdRef.current = commentPostId;
   }, [commentPostId]);
+
+  useEffect(() => {
+    shareSheetOpenRef.current = isWatchShareSheetOpen(shareSheet);
+  }, [shareSheet]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -415,11 +431,24 @@ export default function WatchScreen() {
     return decision;
   }, [clearExitArm, navigation, router]);
 
-  const onWatchHeaderArrow = useCallback(() => {
-    if (commentPostIdRef.current != null) {
+  const closeWatchInPlaceOverlay = useCallback(() => {
+    const target = resolveWatchInPlaceOverlayClose({
+      commentsOpen: commentPostIdRef.current != null,
+      shareSheetOpen: shareSheetOpenRef.current,
+    });
+    if (target === "comments") {
       setCommentPostId(null);
-      return;
+      return true;
     }
+    if (target === "share") {
+      setShareSheet(null);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const onWatchHeaderArrow = useCallback(() => {
+    if (closeWatchInPlaceOverlay()) return;
     const state = navigation.getState() as
       | { index?: number; routes?: Array<{ name?: string }> }
       | undefined;
@@ -434,13 +463,16 @@ export default function WatchScreen() {
       return;
     }
     router.replace(decision.href as never);
-  }, [clearExitArm, navigation, router]);
+  }, [clearExitArm, closeWatchInPlaceOverlay, navigation, router]);
 
   const decideWatchRootBack = useCallback(() => {
     return resolveWatchRootBack({
       nowMs: Date.now(),
       armedUntilMs: armedUntilMsRef.current,
-      nestedOverlayOpen: commentPostIdRef.current != null,
+      nestedOverlayOpen: isWatchInPlaceOverlayOpen({
+        commentsOpen: commentPostIdRef.current != null,
+        shareSheetOpen: shareSheetOpenRef.current,
+      }),
       atWatchRoot: screenFocusedRef.current,
     });
   }, []);
@@ -452,7 +484,7 @@ export default function WatchScreen() {
       if (!isWatchRootSurface(pathname, segments)) return false;
       const decision = decideWatchRootBack();
       if (decision.action === "close-nested") {
-        setCommentPostId(null);
+        closeWatchInPlaceOverlay();
         return true;
       }
       if (decision.action === "arm-exit") {
@@ -468,7 +500,7 @@ export default function WatchScreen() {
 
     const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
     return () => sub.remove();
-  }, [armWatchExit, decideWatchRootBack, exitWatchToEntry, pathname, segments]);
+  }, [armWatchExit, closeWatchInPlaceOverlay, decideWatchRootBack, exitWatchToEntry, pathname, segments]);
 
   useEffect(() => {
     if (!shouldInterceptWatchRootBack(Platform.OS)) return;
@@ -489,7 +521,7 @@ export default function WatchScreen() {
       const decision = decideWatchRootBack();
       if (decision.action === "close-nested") {
         event.preventDefault();
-        setCommentPostId(null);
+        closeWatchInPlaceOverlay();
         return;
       }
       if (decision.action === "arm-exit") {
@@ -498,7 +530,7 @@ export default function WatchScreen() {
       }
     });
     return unsubscribe;
-  }, [armWatchExit, decideWatchRootBack, navigation, pathname, segments]);
+  }, [armWatchExit, closeWatchInPlaceOverlay, decideWatchRootBack, navigation, pathname, segments]);
 
   useEffect(() => {
     if (!exitHintVisible) return;
@@ -740,22 +772,16 @@ export default function WatchScreen() {
     [patchVideo, t, videos]
   );
 
-  const onShare = useCallback(
-    (video: WatchVideo) => {
-      const entry = openWatchShareEntry({ postId: video.postId });
-      if (!entry) return;
-      const title = video.title;
-      const text = video.caption || video.title;
-      Alert.alert(t("watch.share"), undefined, [
-        ...entry.choices.map((choice) => ({
-          text: t(choice.key),
-          onPress: () => void runShare(entry.attempt, choice.mode, title, text),
-        })),
-        { text: t("actions.cancel"), style: "cancel" },
-      ]);
-    },
-    [runShare, t]
-  );
+  const onShare = useCallback((video: WatchVideo) => {
+    const entry = openWatchShareEntry({ postId: video.postId });
+    if (!entry) return;
+    setShareSheet({
+      postId: entry.attempt.postId,
+      title: video.title,
+      text: video.caption || video.title,
+      activeItemId: video.id,
+    });
+  }, []);
 
   const onToggleSave = useCallback(
     async (video: WatchVideo) => {
@@ -1465,6 +1491,24 @@ export default function WatchScreen() {
         </View>
       ) : null}
       {exitHint}
+      <WatchShareSheet
+        visible={isWatchShareSheetOpen(shareSheet)}
+        choices={listWatchShareChoices()}
+        onClose={() => setShareSheet(null)}
+        onChoose={(mode) => {
+          const snapshot = shareSheet;
+          setShareSheet(null);
+          if (!snapshot) return;
+          const entry = openWatchShareEntry({ postId: snapshot.postId });
+          if (!entry) return;
+          void runShare(
+            entry.attempt,
+            mode,
+            snapshot.title,
+            snapshot.text
+          );
+        }}
+      />
       <CommentsSheet
         visible={commentPostId != null}
         postId={commentPostId}
