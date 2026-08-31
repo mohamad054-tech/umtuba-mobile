@@ -9,6 +9,7 @@ import {
   isPrimaryTabHref,
   peekProfileBackContext,
 } from "@/src/lib/nav/profileBackContext";
+import { isWatchSoundPath } from "@/src/lib/nav/watchSoundOrigin";
 import {
   followListOwnerFallbackHref,
   followListViaFallbackHref,
@@ -348,10 +349,20 @@ export function hasValidWatchOriginUnderneath(input: GlobalBackInput): boolean {
   return isMountedWatchInstanceLive();
 }
 
+function isWatchOriginSoundSurface(input: GlobalBackInput): boolean {
+  if (!isWatchSoundPath(input.currentPath, input.segments)) {
+    return false;
+  }
+  return parseProfileNavOrigin(input.profileOrigin) === "watch";
+}
+
 export function shouldPopToMountedWatch(input: GlobalBackInput): boolean {
   const resolved = withRememberedProfileBack(input);
   if (isFollowListPath(resolved.currentPath, resolved.segments)) {
     return false;
+  }
+  if (isWatchOriginSoundSurface(resolved)) {
+    return hasValidWatchOriginUnderneath(resolved);
   }
   if (!isOriginAwareProfileStack(resolved.currentPath, resolved.segments)) {
     return false;
@@ -374,9 +385,11 @@ export function shouldTrustHistoryBack(input: GlobalBackInput): boolean {
   if (!isValidHistoryPrevious(input.previousRouteName, input.currentPath)) {
     return false;
   }
+  const resolved = withRememberedProfileBack(input);
   if (
-    isOriginAwareProfileStack(input.currentPath, input.segments) &&
-    isTabContainerPrevious(input.previousRouteName)
+    (isOriginAwareProfileStack(resolved.currentPath, resolved.segments) ||
+      isWatchOriginSoundSurface(resolved)) &&
+    isTabContainerPrevious(resolved.previousRouteName)
   ) {
     return false;
   }

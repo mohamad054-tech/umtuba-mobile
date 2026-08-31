@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
 import {
@@ -13,6 +14,7 @@ import { getSupabase } from "@/src/lib/supabase/client";
 import { colors } from "@/src/theme/colors";
 
 export default function SoundPage() {
+  useStackedOriginBackEffects();
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();

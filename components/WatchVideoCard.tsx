@@ -1,5 +1,4 @@
 import { useEventListener } from "expo";
-import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -90,12 +89,15 @@ import {
   runAlivePlayerOp,
 } from "@/src/lib/watch/playerSession";
 import {
+  WATCH_HEADER_RAIL_RESERVED,
   WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
   WATCH_RAIL_ACTION_MIN_HEIGHT,
+  WATCH_RAIL_COMPACT_GAP,
   WATCH_RAIL_GAP,
   WATCH_TIMELINE_TRAILING_GUTTER,
   WATCH_VOLUME_RIGHT_CLEARANCE,
   watchRailBottomOffset,
+  watchRailShouldCompact,
 } from "@/src/lib/watch/railLayout";
 import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 import {
@@ -174,7 +176,10 @@ export type WatchVideoCardProps = {
   onNotInterested?: () => void;
   onHashtagPress?: (tag: string) => void;
   onMentionPress?: (username: string) => void;
+  onOpenSound?: (soundId: string) => void;
   style?: StyleProp<ViewStyle>;
+  /** Feed cell height. Compact rail only when the full stack does not fit. */
+  cellHeight?: number;
   topInset?: number;
   bottomInset?: number;
 };
@@ -822,7 +827,9 @@ function WatchVideoCardComponent({
   onNotInterested,
   onHashtagPress,
   onMentionPress,
+  onOpenSound,
   style,
+  cellHeight,
   topInset = 0,
   bottomInset = 0,
 }: WatchVideoCardProps) {
@@ -830,8 +837,21 @@ function WatchVideoCardComponent({
   const captionAlign = localeTextAlign(locale);
   const captionDirection = localeWritingDirection(locale);
   const followState = watchFollowChipState(following);
-  const router = useRouter();
   const { user } = useAuth();
+  const railActionCount =
+    4 +
+    (onDeleteOwn ? 1 : 0) +
+    (onReport ? 1 : 0) +
+    (onBlockUser ? 1 : 0);
+  const compactRail =
+    cellHeight != null &&
+    watchRailShouldCompact({
+      cellHeight,
+      actionCount: railActionCount,
+      bottomInset,
+      topReserved: Math.max(WATCH_HEADER_RAIL_RESERVED, topInset),
+    });
+  const railGap = compactRail ? WATCH_RAIL_COMPACT_GAP : WATCH_RAIL_GAP;
   const showFollow = shouldShowWatchFollowChip({
     viewerId: user?.id,
     authorId: video.author.id,
@@ -1406,14 +1426,11 @@ function WatchVideoCardComponent({
           ) : null}
           {edit.soundId ? (
             <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/sound/[id]",
-                  params: { id: edit.soundId as string },
-                })
-              }
+              onPress={() => onOpenSound?.(edit.soundId as string)}
+              disabled={!onOpenSound}
               accessibilityRole="button"
               accessibilityLabel={t("sound.original")}
+              accessibilityState={{ disabled: !onOpenSound }}
               hitSlop={8}
               style={styles.soundChip}
             >
@@ -1426,7 +1443,10 @@ function WatchVideoCardComponent({
 
         <View
           key={`rail-${video.postId ?? video.id}-${video.likedByMe === true ? 1 : 0}`}
-          style={[styles.rail, { bottom: watchRailBottomOffset(bottomInset) }]}
+          style={[
+            styles.rail,
+            { bottom: watchRailBottomOffset(bottomInset), gap: railGap },
+          ]}
           pointerEvents="box-none"
           collapsable={false}
         >
@@ -1447,9 +1467,11 @@ function WatchVideoCardComponent({
             >
               {video.likedByMe === true ? "♥" : "♡"}
             </Text>
-            <Text style={styles.actionCount} numberOfLines={1}>
-              {video.stats.likes}
-            </Text>
+            {compactRail ? null : (
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {video.stats.likes}
+              </Text>
+            )}
           </Pressable>
           <Pressable
             style={styles.action}
@@ -1461,9 +1483,11 @@ function WatchVideoCardComponent({
             <Text style={[styles.actionIcon, video.savedByMe && styles.on]}>
               ★
             </Text>
-            <Text style={styles.actionCount} numberOfLines={1}>
-              {video.stats.saves}
-            </Text>
+            {compactRail ? null : (
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {video.stats.saves}
+              </Text>
+            )}
           </Pressable>
           <Pressable
             style={styles.action}
@@ -1481,9 +1505,11 @@ function WatchVideoCardComponent({
             >
               ◌
             </Text>
-            <Text style={styles.actionCount} numberOfLines={1}>
-              {video.stats.comments}
-            </Text>
+            {compactRail ? null : (
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {video.stats.comments}
+              </Text>
+            )}
           </Pressable>
           <Pressable
             style={styles.action}
@@ -1499,9 +1525,11 @@ function WatchVideoCardComponent({
             >
               ↗
             </Text>
-            <Text style={styles.actionCount} numberOfLines={1}>
-              {video.stats.shares}
-            </Text>
+            {compactRail ? null : (
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {video.stats.shares}
+              </Text>
+            )}
           </Pressable>
           {onDeleteOwn ? (
             <Pressable
@@ -1511,9 +1539,11 @@ function WatchVideoCardComponent({
               accessibilityLabel={t("watch.deleteOwn")}
             >
               <Text style={[styles.actionIcon, styles.deleteIcon]}>⌫</Text>
-              <Text style={styles.actionCount} numberOfLines={1}>
-                {t("actions.delete")}
-              </Text>
+              {compactRail ? null : (
+                <Text style={styles.actionCount} numberOfLines={1}>
+                  {t("actions.delete")}
+                </Text>
+              )}
             </Pressable>
           ) : null}
           {onReport ? (
@@ -1524,9 +1554,11 @@ function WatchVideoCardComponent({
               accessibilityLabel={t("watch.reportVideo")}
             >
               <Text style={styles.actionIcon}>⚑</Text>
-              <Text style={styles.actionCount} numberOfLines={1}>
-                {t("actions.report")}
-              </Text>
+              {compactRail ? null : (
+                <Text style={styles.actionCount} numberOfLines={1}>
+                  {t("actions.report")}
+                </Text>
+              )}
             </Pressable>
           ) : null}
           {onBlockUser ? (
@@ -1537,9 +1569,11 @@ function WatchVideoCardComponent({
               accessibilityLabel={t("watch.blockAccount")}
             >
               <Text style={styles.actionIcon}>⊘</Text>
-              <Text style={styles.actionCount} numberOfLines={1}>
-                {t("actions.block")}
-              </Text>
+              {compactRail ? null : (
+                <Text style={styles.actionCount} numberOfLines={1}>
+                  {t("actions.block")}
+                </Text>
+              )}
             </Pressable>
           ) : null}
         </View>

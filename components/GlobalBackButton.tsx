@@ -28,6 +28,7 @@ import {
   type GlobalBackDecision,
 } from "@/src/lib/nav/globalBack";
 import { isMountedWatchInstanceLive } from "@/src/lib/nav/profileBackContext";
+import { isWatchSoundPath } from "@/src/lib/nav/watchSoundOrigin";
 import { isFollowListPath } from "@/src/lib/profile/followListNav";
 import {
   hasOtherUserProfileQuery,
@@ -113,7 +114,8 @@ export function useGlobalBack() {
 
 /**
  * Header Back, Android hardware Back, and iOS swipe-pop share one policy
- * on stacked Profile / follow-list routes. Own Profile tab is untouched.
+ * on stacked Profile / follow-list / Watch-origin sound routes.
+ * Own Profile tab is untouched.
  */
 export function useStackedOriginBackEffects() {
   const resolve = useResolvedGlobalBack();
@@ -121,7 +123,9 @@ export function useStackedOriginBackEffects() {
   const navigation = useNavigation();
   const pathname = usePathname();
   const segments = useSegments();
-  const stacked = isOriginAwareProfileStack(pathname, segments);
+  const stacked =
+    isOriginAwareProfileStack(pathname, segments) ||
+    isWatchSoundPath(pathname, segments);
 
   useEffect(() => {
     if (!stacked || Platform.OS !== "android") return;

@@ -46,6 +46,7 @@ import {
   rememberProfileBackContext,
   unregisterMountedWatchInstance,
 } from "@/src/lib/nav/profileBackContext";
+import { buildWatchSoundHref } from "@/src/lib/nav/watchSoundOrigin";
 import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
 import {
@@ -1236,8 +1237,25 @@ export default function WatchScreen() {
             router.push(href as never);
           }
         }}
+        onOpenSound={(soundId) => {
+          const href = buildWatchSoundHref(soundId);
+          if (!href) return;
+          rememberProfileBackContext({
+            origin: "watch",
+            via: null,
+            listId: null,
+            listUsername: null,
+            ownerId: parseProfileUserId(item.author.id),
+            ownerUsername: item.author.username ?? null,
+          });
+          router.push({
+            pathname: "/sound/[id]",
+            params: { id: soundId.trim(), from: "watch" },
+          } as never);
+        }}
         onRefreshSrc={() => refreshSrcFor(item)}
         style={{ height: itemHeight }}
+        cellHeight={itemHeight}
         topInset={insets.top + 44}
         bottomInset={insets.bottom}
       />

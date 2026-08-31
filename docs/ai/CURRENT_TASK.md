@@ -2,37 +2,29 @@
 
 ## Task title
 
-DESKTOP_UMTUBA_END_OF_DAY_SAVE_PUSH_CHECKPOINT_2026_08_30
+DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1E_CHILD_RETURN_AND_RAIL
 
 ## Status
 
-**CHECKPOINT. Machine may shut down.** Watch Part 1D remains implementation-complete; Fold6 QA is still open because EAS preview was blocked. Do not mark Foundation V1 complete. No deploy. No Play/App Store. No migrations.
+**IMPLEMENTATION_DONE / DEVICE_QA_BLOCKED_DATA.** Part 1E is installed on Fold6 from EAS `f59ba290`. Sound-return QA cannot run: current Watch feed has no original-sound chip. Do not mark PASS or FAIL. No fake data. No deploy. No Play/App Store.
 
 ```
-TASK_ID = DESKTOP_UMTUBA_END_OF_DAY_SAVE_PUSH_CHECKPOINT_2026_08_30
-STATUS = CHECKPOINT_WRITTEN
-WATCH_PART1D_BRANCH = desktop/watch-interaction-foundation-v1-part1d
-WATCH_PART1D_PRODUCT_SHA = b5cba17b7b70e9afb43ee9265defb6f626d15741
+TASK_ID = DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1E_CHILD_RETURN_AND_RAIL
+PART1E_DEVICE_QA = DEVICE_QA_BLOCKED_DATA
+REAL_SOUND_ITEM_AVAILABLE = NO
+EAS_BUILD_ID = f59ba290-9819-477f-a834-2ca1ed12219b
 WATCH_FOUNDATION_COMPLETE = NO
-DEVICE_GATE = OPEN
-DEVICE_GATE_REASON = EAS preview blocked by Expo GraphQL/network after archive upload
+NEXT_PART = PART1F_WATCH_SHARE_INPLACE
 DEPLOYED = NO
 PLAY_UPLOAD = NO
-APP_STORE_UPLOAD = NO
-MIGRATIONS_CREATED = NO
 ```
 
-## Resume product task
+## Allowed scope
 
-`DESKTOP_UMTUBA_WATCH_INTERACTION_FOUNDATION_V1_PART1D_P2_POLISH` on `b5cba17`.
-
-**NEXT_RESUME_STEP** = Retry preview build/install for `b5cba17` when EAS/network is healthy, then run Fold6 physical Part 1D gate. Do not redo Parts 1B or 1C.
+Closed for product unless a new GO arrives. Next candidate is in-Watch share chooser (no remount, no fake data).
 
 ## Forbidden scope
 
-- Do not start new product work from this checkpoint.
-- Do not reopen Watch FIT design.
-- Do not invent hashtag backend/routes.
-- Do not patch dirty `umtuba-mobile` parent.
-- Do not deploy. Do not upload to Play or App Store.
-- Do not merge to master. Do not create migrations.
+- Do not redo 1B, 1C, 1D, or 2x.
+- Do not invent feed captions, mentions, hashtags, Follow-other, or sound_id rows.
+- Do not deploy. Do not upload to stores. Do not mutate production.
