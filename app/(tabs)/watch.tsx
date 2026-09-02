@@ -22,6 +22,7 @@ import {
   Text,
   View,
   type AppStateStatus,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ViewToken,
@@ -111,7 +112,6 @@ import {
   mergeWatchVideos,
   quantizeWatchVolume,
   resolveNextWatchIndex,
-  resolveWatchIndexFromScrollOffset,
   resolveWatchScrollOffset,
   sanitizeWatchListIndex,
   saveWatchAutoNextPreference,
@@ -140,6 +140,12 @@ import {
   syncAndroidWatchRollingCache,
 } from "@/src/lib/watch/androidWatchMediaCache";
 import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
+import {
+  preserveWatchPostAcrossLayoutSession,
+  reconcileWatchActiveIndex,
+  resolveFrozenWatchViewport,
+  resolveWatchNativePage,
+} from "@/src/lib/watch/watchViewport";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -237,7 +243,10 @@ export default function WatchScreen() {
   const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
-  const lastLaidOutHeightRef = useRef(WINDOW_HEIGHT);
+  const viewportFrozenRef = useRef<{
+    height: number | null;
+    width: number | null;
+  }>({ height: null, width: null });
   const scrollOffsetRef = useRef(0);
   const cacheSyncGenerationRef = useRef(0);
   const programmaticAdvanceUntilRef = useRef(0);
@@ -307,27 +316,42 @@ export default function WatchScreen() {
   }, []);
 
   useEffect(() => {
-    if (itemHeight === lastLaidOutHeightRef.current) return;
-    const previous = lastLaidOutHeightRef.current;
-    lastLaidOutHeightRef.current = itemHeight;
-    if (previous === itemHeight) return;
-    const inferred = resolveWatchIndexFromScrollOffset(
-      scrollOffsetRef.current,
-      previous,
-      videosLengthRef.current
-    );
-    const target = inferred ?? activeIndexRef.current;
-    const offset = resolveWatchScrollOffset(target, itemHeight);
-    if (offset == null) return;
-    if (inferred != null) {
-      claimActiveIndexRef.current(inferred);
-    }
-    listRef.current?.scrollToOffset({ offset, animated: false });
-  }, [itemHeight]);
-
-  useEffect(() => {
     itemHeightRef.current = itemHeight;
   }, [itemHeight]);
+
+  const onWatchListLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    const resolved = resolveFrozenWatchViewport({
+      frozenHeight: viewportFrozenRef.current.height,
+      frozenWidth: viewportFrozenRef.current.width,
+      measuredHeight: height,
+      measuredWidth: width,
+    });
+    if (resolved.height == null) return;
+    const wasUnfrozen = viewportFrozenRef.current.height == null;
+    const sessionChange = resolved.isNewSession && !wasUnfrozen;
+    viewportFrozenRef.current = {
+      height: resolved.height,
+      width: resolved.width,
+    };
+    if (itemHeightRef.current !== resolved.height) {
+      itemHeightRef.current = resolved.height;
+      setItemHeight(resolved.height);
+    }
+    if (!sessionChange || !resolved.heightChanged) return;
+    const current = visibleVideosRef.current[activeIndexRef.current];
+    const keep = preserveWatchPostAcrossLayoutSession({
+      activePostId: current?.postId ?? current?.id ?? null,
+      videos: visibleVideosRef.current,
+      fallbackIndex: activeIndexRef.current,
+    });
+    const offset = resolveWatchScrollOffset(keep, resolved.height);
+    if (offset == null) return;
+    if (keep !== activeIndexRef.current) {
+      claimActiveIndexRef.current(keep);
+    }
+    listRef.current?.scrollToOffset({ offset, animated: false });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -660,11 +684,16 @@ export default function WatchScreen() {
     ) {
       return;
     }
-    const index = resolveWatchIndexFromScrollOffset(
+    const nativePage = resolveWatchNativePage(
       offset,
       itemHeightRef.current,
       videosLengthRef.current
     );
+    const index = reconcileWatchActiveIndex({
+      nativePage,
+      activeIndex: activeIndexRef.current,
+      itemCount: videosLengthRef.current,
+    });
     if (index == null) return;
     claimActiveIndexRef.current(index);
   }, []);
@@ -1403,7 +1432,7 @@ export default function WatchScreen() {
           } as never);
         }}
         onRefreshSrc={() => refreshSrcFor(item)}
-        style={{ height: itemHeight }}
+        style={{ height: itemHeight, flexGrow: 0, flexShrink: 0 }}
         cellHeight={itemHeight}
         topInset={insets.top + 44}
         bottomInset={insets.bottom}
@@ -1553,12 +1582,7 @@ export default function WatchScreen() {
         disableIntervalMomentum
         decelerationRate="fast"
         getItemLayout={getItemLayout}
-        onLayout={(event) => {
-          const nextHeight = toWatchListPixels(event.nativeEvent.layout.height);
-          if (nextHeight != null) {
-            setItemHeight(nextHeight);
-          }
-        }}
+        onLayout={onWatchListLayout}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}

@@ -17,10 +17,15 @@
  * not wait — that was Build 24 leftover audio + post-asset stall.
  */
 
-import { shouldLoadPlayer, shouldPrepareWatchPlayer } from "./playbackPolicy";
+import {
+  clampWatchVolume,
+  shouldLoadPlayer,
+  shouldPrepareWatchPlayer,
+} from "./playbackPolicy";
 import {
   applyInactiveAudioTeardown,
   runAlivePlayerOp,
+  type PlaybackIntent,
   type PlayerLike,
 } from "./playerSession";
 
@@ -80,7 +85,7 @@ export function resolveNativePlayerStatusCatchup(input: {
   return null;
 }
 
-export function shouldStartPlaybackAfterAsset(input: {
+export type WatchPlaybackStartGate = {
   nativeReady: boolean;
   jsReady: boolean;
   isActive: boolean;
@@ -91,7 +96,15 @@ export function shouldStartPlaybackAfterAsset(input: {
   surfaceAttached?: boolean;
   playerMediaId?: string | null;
   visibleMediaId?: string | null;
-}): boolean {
+  playerEpoch?: number | null;
+  visibleEpoch?: number | null;
+  playerPostId?: number | null;
+  visiblePostId?: number | null;
+};
+
+export function shouldStartPlaybackAfterAsset(
+  input: WatchPlaybackStartGate
+): boolean {
   if (!input.playerAlive) return false;
   if (!input.isActive || !input.shouldPlay) return false;
   if (input.surfaceAttached === false) return false;
@@ -102,10 +115,110 @@ export function shouldStartPlaybackAfterAsset(input: {
   ) {
     return false;
   }
+  if (
+    input.playerEpoch != null &&
+    input.visibleEpoch != null &&
+    input.playerEpoch !== input.visibleEpoch
+  ) {
+    return false;
+  }
+  if (
+    input.playerPostId != null &&
+    input.visiblePostId != null &&
+    input.playerPostId !== input.visiblePostId
+  ) {
+    return false;
+  }
   if (!(input.nativeReady || input.jsReady)) return false;
   if (!Number.isFinite(input.ownerGeneration)) return false;
   if (!Number.isFinite(input.commandGeneration)) return false;
   return input.ownerGeneration === input.commandGeneration;
+}
+
+/** Late statusChange from a previous post/player/epoch must not start play. */
+export function shouldHonorWatchStatusEvent(input: {
+  playerAlive: boolean;
+  bound: boolean;
+  eventMediaId?: string | null;
+  boundMediaId?: string | null;
+  eventPostId?: number | null;
+  boundPostId?: number | null;
+  eventEpoch?: number | null;
+  boundEpoch?: number | null;
+}): boolean {
+  if (!input.playerAlive || !input.bound) return false;
+  if (
+    input.eventMediaId != null &&
+    input.boundMediaId != null &&
+    input.eventMediaId !== input.boundMediaId
+  ) {
+    return false;
+  }
+  if (
+    input.eventPostId != null &&
+    input.boundPostId != null &&
+    input.eventPostId !== input.boundPostId
+  ) {
+    return false;
+  }
+  if (
+    input.eventEpoch != null &&
+    input.boundEpoch != null &&
+    input.eventEpoch !== input.boundEpoch
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The only playback-start resolver. readyToPlay, layout, and first-frame
+ * paths must all go through this. Android may start muted until the first
+ * frame exists; unmute is a separate confirmation.
+ */
+export function resolveGatedWatchPlaybackIntent(
+  input: WatchPlaybackStartGate & {
+    platform: WatchNativePlatform;
+    firstFrameConfirmed: boolean;
+    muted: boolean;
+    volume: number;
+    loop: boolean;
+  }
+): PlaybackIntent | null {
+  if (!shouldStartPlaybackAfterAsset(input)) return null;
+  const holdMuteForFrame =
+    input.platform === "android" && !input.firstFrameConfirmed;
+  const muted = input.muted || holdMuteForFrame;
+  return {
+    shouldPlay: true,
+    muted,
+    volume: muted ? 0 : clampWatchVolume(input.volume),
+    loop: input.loop,
+    resetPosition: false,
+  };
+}
+
+export function shouldUnmuteWatchAfterFirstFrame(input: {
+  firstFrameConfirmed: boolean;
+  isActive: boolean;
+  shouldPlay: boolean;
+  userMuted: boolean;
+  surfaceAttached: boolean;
+  playerMediaId?: string | null;
+  visibleMediaId?: string | null;
+}): boolean {
+  if (!input.firstFrameConfirmed) return false;
+  if (!input.isActive || !input.shouldPlay) return false;
+  if (!input.surfaceAttached) return false;
+  if (input.userMuted) return false;
+  if (
+    input.playerMediaId != null &&
+    input.visibleMediaId != null &&
+    input.playerMediaId !== input.visibleMediaId
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export type InactiveTeardownMode = "mute-and-pause" | "mute-only";

@@ -75,8 +75,6 @@ import {
 } from "@/src/lib/watch/watchTransitionTrace";
 import { resolveAndroidWatchBufferOptions } from "@/src/lib/watch/androidWatchMediaCache";
 import {
-  canProduceWatchAudio,
-  resolveWatchPlaybackIntent,
   shouldApplyWatchPlayerOp,
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
@@ -86,11 +84,13 @@ import {
   nextPlayerInstanceGeneration,
   releaseWatchPlayerBinding,
   resolveNativePlayerStatusCatchup,
+  resolveGatedWatchPlaybackIntent,
   resolveRetryTargetPostId,
   resolveWatchNativePlatform,
   shouldApplyWatchTransport,
+  shouldHonorWatchStatusEvent,
   shouldMountSelectedSoundPlayer,
-  shouldStartPlaybackAfterAsset,
+  shouldUnmuteWatchAfterFirstFrame,
 } from "@/src/lib/watch/playerLifecycle";
 import {
   applyInactiveAudioTeardown,
@@ -213,6 +213,8 @@ type PlayerPaneProps = {
   isNextItem: boolean;
   warmNextSurface: boolean;
   mediaId: string;
+  postId: number | null;
+  playerEpoch: number;
   listIndex: number;
   ownershipGeneration: number;
   muted: boolean;
@@ -394,6 +396,8 @@ function WatchPlayerPane({
   isNextItem,
   warmNextSurface,
   mediaId,
+  postId,
+  playerEpoch,
   listIndex,
   ownershipGeneration,
   muted,
@@ -420,9 +424,23 @@ function WatchPlayerPane({
   const playGenerationRef = useRef<number | null>(null);
   const playerAliveRef = useRef(true);
   const nativeStatusRef = useRef<string | null>(null);
+  const attachSurfaceRef = useRef(false);
+  const mediaIdRef = useRef(mediaId);
+  const postIdRef = useRef(postId);
+  const playerEpochRef = useRef(playerEpoch);
+  const mutedRef = useRef(muted);
+  const volumeRef = useRef(volume);
+  const loopRef = useRef(loop);
+  const firstFrameRef = useRef(false);
   isActiveRef.current = isActive;
   shouldPlayRef.current = shouldPlay;
   ownershipGenerationRef.current = ownershipGeneration;
+  mediaIdRef.current = mediaId;
+  postIdRef.current = postId;
+  playerEpochRef.current = playerEpoch;
+  mutedRef.current = muted;
+  volumeRef.current = volume;
+  loopRef.current = loop;
 
   useEffect(() => {
     onPlayerStatus?.(status, errorMessage);
@@ -467,30 +485,56 @@ function WatchPlayerPane({
     }
     if (next === "readyToPlay") {
       setStatus("ready");
+      statusRef.current = "ready";
       setErrorMessage(null);
-      const allowed = canProduceWatchAudio({
+      if (
+        !shouldHonorWatchStatusEvent({
+          playerAlive: true,
+          bound: true,
+          eventMediaId: mediaIdRef.current,
+          boundMediaId: mediaId,
+          eventPostId: postIdRef.current,
+          boundPostId: postId,
+          eventEpoch: playerEpochRef.current,
+          boundEpoch: playerEpoch,
+        })
+      ) {
+        playGenerationRef.current = null;
+        applyInactiveAudioTeardown(player, { resetPosition: false });
+        return;
+      }
+      const intent = resolveGatedWatchPlaybackIntent({
+        nativeReady: true,
+        jsReady: true,
         isActive: isActiveRef.current,
         shouldPlay: shouldPlayRef.current,
+        playerAlive: true,
         ownerGeneration: ownershipGenerationRef.current,
         commandGeneration: ownershipGenerationRef.current,
+        surfaceAttached: attachSurfaceRef.current,
+        playerMediaId: mediaIdRef.current,
+        visibleMediaId: mediaId,
+        playerEpoch: playerEpochRef.current,
+        visibleEpoch: playerEpoch,
+        playerPostId: postIdRef.current,
+        visiblePostId: postId,
+        platform: nativePlatform,
+        firstFrameConfirmed: firstFrameRef.current,
+        muted,
+        volume,
+        loop,
       });
-      if (allowed) {
+      if (intent) {
         playGenerationRef.current = ownershipGenerationRef.current;
-        applyPlaybackIntent(
-          player,
-          resolveWatchPlaybackIntent({
-            isActive: true,
-            shouldPlay: true,
-            muted,
-            volume,
-            loop,
-          })
-        );
+        applyPlaybackIntent(player, intent);
         runAlivePlayerOp(player, (alive) => {
           alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActiveRef.current)
             ? playbackRate
             : DEFAULT_WATCH_PLAYBACK_SPEED;
         });
+        if (!intent.muted && intent.volume > 0) {
+          markWatchTransition(nativePlatform, "audio_start");
+        }
       } else {
         playGenerationRef.current = null;
         applyInactiveAudioTeardown(player, { resetPosition: false });
@@ -629,23 +673,12 @@ function WatchPlayerPane({
     isNextItem,
     platform: nativePlatform,
   });
+  attachSurfaceRef.current = attachSurface;
 
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;
     const itemReady = status === "ready";
     const nativeReady = nativeStatusRef.current === "readyToPlay";
-    const allowed = shouldStartPlaybackAfterAsset({
-      nativeReady,
-      jsReady: itemReady,
-      isActive,
-      shouldPlay,
-      playerAlive: true,
-      ownerGeneration: ownershipGeneration,
-      commandGeneration: ownershipGeneration,
-      surfaceAttached: attachSurface,
-      playerMediaId: mediaId,
-      visibleMediaId: mediaId,
-    });
     if (!isActive || !shouldPlay) {
       applyWatchInactiveTeardown(player, {
         platform: nativePlatform,
@@ -672,14 +705,29 @@ function WatchPlayerPane({
       });
       return;
     }
+    const intent = resolveGatedWatchPlaybackIntent({
+      nativeReady,
+      jsReady: itemReady,
+      isActive,
+      shouldPlay,
+      playerAlive: true,
+      ownerGeneration: ownershipGeneration,
+      commandGeneration: ownershipGeneration,
+      surfaceAttached: attachSurface,
+      playerMediaId: mediaId,
+      visibleMediaId: mediaId,
+      playerEpoch,
+      visibleEpoch: playerEpoch,
+      playerPostId: postId,
+      visiblePostId: postId,
+      platform: nativePlatform,
+      firstFrameConfirmed: firstFrameRef.current,
+      muted,
+      volume,
+      loop,
+    });
     if (
-      allowed &&
-      canProduceWatchAudio({
-        isActive,
-        shouldPlay,
-        ownerGeneration: ownershipGeneration,
-        commandGeneration: ownershipGeneration,
-      }) &&
+      intent &&
       shouldApplyWatchPlayerOp({
         playerAlive: true,
         ownerGeneration: ownershipGeneration,
@@ -690,22 +738,13 @@ function WatchPlayerPane({
       })
     ) {
       playGenerationRef.current = ownershipGeneration;
-      applyPlaybackIntent(
-        player,
-        resolveWatchPlaybackIntent({
-          isActive: true,
-          shouldPlay: true,
-          muted,
-          volume,
-          loop,
-        })
-      );
+      applyPlaybackIntent(player, intent);
       runAlivePlayerOp(player, (alive) => {
         alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActive)
           ? playbackRate
           : DEFAULT_WATCH_PLAYBACK_SPEED;
       });
-      if (isActive && !muted && volume > 0) {
+      if (isActive && !intent.muted && intent.volume > 0) {
         markWatchTransition(nativePlatform, "audio_start");
       }
       return;
@@ -729,6 +768,8 @@ function WatchPlayerPane({
     playbackRate,
     attachSurface,
     mediaId,
+    playerEpoch,
+    postId,
   ]);
 
   useEffect(() => {
@@ -811,10 +852,33 @@ function WatchPlayerPane({
     }
   }, [nativePlatform, status]);
 
+  useEffect(() => {
+    firstFrameRef.current = false;
+  }, [player, mediaId, playerEpoch]);
+
   const onRenderedFirstFrame = useCallback(() => {
+    firstFrameRef.current = true;
     markWatchTransition(nativePlatform, "first_frame");
+    if (
+      canTouchBoundPlayer() &&
+      shouldUnmuteWatchAfterFirstFrame({
+        firstFrameConfirmed: true,
+        isActive: isActiveRef.current,
+        shouldPlay: shouldPlayRef.current,
+        userMuted: mutedRef.current,
+        surfaceAttached: attachSurfaceRef.current,
+        playerMediaId: mediaIdRef.current,
+        visibleMediaId: mediaId,
+      })
+    ) {
+      runAlivePlayerOp(player, (alive) => {
+        alive.muted = false;
+        alive.volume = volumeRef.current;
+      });
+      markWatchTransition(nativePlatform, "audio_start");
+    }
     onFirstFrame?.();
-  }, [nativePlatform, onFirstFrame]);
+  }, [mediaId, nativePlatform, onFirstFrame, player]);
 
   return (
     <View
@@ -1287,6 +1351,8 @@ function WatchVideoCardComponent({
           key={`watch-player-${mediaId}-${boundEpoch}`}
           src={boundSrc}
           mediaId={mediaId}
+          postId={video.postId ?? null}
+          playerEpoch={boundEpoch}
           listIndex={listIndex ?? -1}
           isActive={isActive}
           shouldPlay={shouldPlay}
@@ -1792,9 +1858,10 @@ export const WatchVideoCard = memo(WatchVideoCardComponent);
 
 const styles = StyleSheet.create({
   cell: {
-    flex: 1,
     backgroundColor: colors.bg,
     overflow: "hidden",
+    flexGrow: 0,
+    flexShrink: 0,
   },
   playerWrap: {
     ...StyleSheet.absoluteFill,
