@@ -2,81 +2,79 @@
 
 ## Task title
 
-DESKTOP_UMTUBA_WATCH_ANDROID_5_VIDEO_ROLLING_CACHE_AND_BINDING_FIX_V1
+DESKTOP_FOLD6_WATCH_VIDEO_CELL_BINDING_FAILURE_V2
 
 ## Status
 
-**SOURCE FIX COMMITTED. EAS PREVIEW IN FLIGHT ON EXPO. FOLD6 INSTALL + OWNER QA NOT DONE.**
+**SOURCE FIX COMMITTED AND PUSHED. EAS 5bec2a1f INSTALLED ON FOLD6. OWNER QA REQUIRED. DO NOT CLAIM PASS.**
 
-Owner Fold6 QA on `3c2b747e` / `e03fab9` = **FAIL**. Do not claim black-video or binding fixed until new device evidence.
+Owner Fold6 QA on `0b7e63c` / `91e8f585` = **FAIL** (video 2 black; swipe 2→3 returned to video 1; video 1 repeated three times). Previous TextureView/Modal and bind+5-cache candidates both failed. Do not claim BLACK_VIDEO_FIXED or BINDING_FIXED.
 
 ```
-TASK_ID = DESKTOP_UMTUBA_WATCH_ANDROID_5_VIDEO_ROLLING_CACHE_AND_BINDING_FIX_V1
+TASK_ID = DESKTOP_FOLD6_WATCH_VIDEO_CELL_BINDING_FAILURE_V2
+PREVIOUS_0B7E63C_GATE = FAIL
 PREVIOUS_3C2B747E_GATE = FAIL
 PART1F_DEVICE_GATE = FAIL
-SOURCE_SHA = 0b7e63c7bfe4689b249ad374e9189d35d8cec412
-BASE_SHA = e03fab9e0c301446368c0a4d7ad0ddc4b5acba1b
+SOURCE_SHA = 83df875e925312ea2bb7b17b4e47a48b54f42ec5
+BASE_SHA = 0b7e63c7bfe4689b249ad374e9189d35d8cec412
 BRANCH = desktop/watch-interaction-foundation-v1-part1f
 WORKTREE = C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-FOLD6-WATCH-VIDEO-FIT-V1
-EAS_BUILD_ID = 91e8f585-a853-48b8-9633-3bcba46b5d08
-EAS_URL = https://expo.dev/accounts/umtuba/projects/umtuba-mobile/builds/91e8f585-a853-48b8-9633-3bcba46b5d08
-EAS_STATUS = STARTED_ON_EXPO (upload done 2026-08-31 ~22:24 +3). Local CLI wait may die if Desktop shuts down. Cloud build continues.
-ADB_INSTALL = NOT_DONE
-OWNER_FOLD6_QA = NOT_DONE
+EAS_BUILD_ID = 5bec2a1f-93d8-4a93-a70e-ae096aa85414
+EAS_URL = https://expo.dev/accounts/umtuba/projects/umtuba-mobile/builds/5bec2a1f-93d8-4a93-a70e-ae096aa85414
+APK_URL = https://expo.dev/artifacts/eas/gjP_kv6Dzn7ihhftGV-_1yIQEnVWfQcJpueEYaloqpI.apk
+EAS_STATUS = FINISHED (gitCommitHash 83df875e)
+ADB_INSTALL = SUCCESS 2026-09-02 16:50 +3 (adb install -r; firstInstallTime unchanged 2026-08-18)
+APP_DATA_PRESERVED = YES
+APP_LAUNCHED = YES
+OWNER_FOLD6_QA = REQUIRED
 WATCH_FOUNDATION_COMPLETE = NO
 DEPLOYED = NO
 PLAY_UPLOAD = NO
+PRODUCTION_TOUCHED = NO
 ```
 
-## Resume tomorrow (exact next steps)
+## Root cause (code + owner FAIL on 0b7e63c)
 
-1. Confirm Fold6 only: `adb devices` → serial **RFCX718LVHK**, model **SM-F956B**. Do not install to any other device.
-2. Check EAS `91e8f585-a853-48b8-9633-3bcba46b5d08`. If FINISHED, download APK (do not ask owner to copy it):
-   ```
-   NODE_OPTIONS=--dns-result-order=ipv4first --no-network-family-autoselection
-   npx eas-cli build:download --build-id 91e8f585-a853-48b8-9633-3bcba46b5d08 --non-interactive --json
-   ```
-   Run from this worktree. Verify filename/metadata contains `91e8f585`.
-3. If that build failed or never existed, start **ONE** new preview from `0b7e63c` with the same NODE_OPTIONS. Do not stack extra builds.
-4. `adb -s RFCX718LVHK install -r <apk>`. Preserve app data. Do **not** uninstall UMTUBA.
-5. Launch: `adb -s RFCX718LVHK shell monkey -p com.umtuba.app -c android.intent.category.LAUNCHER 1`
-6. Stop. Owner Fold6 QA only. Do **not** claim PASS from unit tests. Do **not** run 1B/1C/1D/2x/sound QA.
+Not Modal. Not “attach next TextureView when READY.” That 0b7e63c change made Fold6 worse.
 
-## Root cause (code + owner FAIL on 3c2b747e)
+1. Off-screen next TextureView mounted while still on video 1, changing Fold6 cell/list height.
+2. `itemHeight` effect then `scrollToOffset(activeIndex * height)`. Viewability still reported index 0, so the list snapped back to video 1. That is the “video 1 repeats three times” / “2→3 returns to video 1” path.
+3. `onViewableItemsChanged` took the first 80%-visible item (one page late / stuck on 0), not the settled scroll page.
+4. Playback started as soon as ExoPlayer was ready, before the active TextureView attached → audio on a black/stale surface.
+5. Recycled cells updated `epochSrc` in `useEffect` (one frame stale). Initial feed was not deduped by post/media id (duplicate FlatList keys).
 
-Not the Part1F Modal. That fix is already on `e03fab9` / `3c2b747e` and still failed.
+## Source fix on 83df875e
 
-Android attached the next TextureView only when `warmNextSurface` (clip near end). Swipe 1→2 started the prepared item-2 ExoPlayer (audio) before VideoView mounted (black). Next swipe then showed item 2 picture. One-cell-late surface/index binding.
-
-Existing cache was Media3 192MB LRU + 3-item prepare window + signed-URL window 10. Not a 5-item identity-keyed on-device window.
-
-## Source fix on 0b7e63c
-
-- Attach next Android TextureView as soon as the next player is READY (`isNextItem`), not only near-end warm.
-- Player/cell keys use `watchItemKey` / post id, not list index as media identity.
-- Extend `androidWatchMediaCache` to `ANDROID_WATCH_CACHE_TARGET = 5` rolling file cache (stable media id, no redownload of valid hits, evict oldest, local `file://` URI).
-- Signed URL prep must not replace a local cache hit.
-- `file://` is a playable Watch src.
-- Fold6 list-height change re-snaps to the current index (no reset to item 1).
-- Android preview logs: `WATCH_BIND` / `WATCH_CACHE` (ids only, no URLs).
-- Part1F in-place share unchanged.
+- Android attaches TextureView only for the active load-window cell. Prepared neighbors stay silent without a surface.
+- Play only after the active surface is attached and player media id matches the visible post.
+- Active index comes from settled scroll offset. Height relayout infers the current page from the live offset, never blindly index 0.
+- Cell source is replaced synchronously when post/media id or src changes; player remounts on that identity.
+- `mergeWatchVideos` / initial load strip duplicate post IDs without reordering.
+- Existing `androidWatchMediaCache` rolling target of 5 is unchanged (no second cache).
+- Part1F in-place share and closed Watch gestures are unchanged.
 
 ## Tests already run
 
-84 focused PASS. `tsc --noEmit` PASS.
+Focused Watch binding + policy + lifecycle + cache tests PASS (79). `tsc --noEmit` PASS.
 
-## Owner QA when new APK is on Fold6
+Coverage added:
+1. 1→2 binding (picture+audio+cell+player+media id aligned)
+2. 2→3 binding (not video 1)
+3. duplicate post IDs stripped without reordering
+4. recycled cell source replacement (stale player/src cannot survive key/post change)
 
-1. Cold/open Watch. First video should become usable without a long network wait if it was cached.
-2. Swipe 1→2: item 2 picture + item 2 audio immediately. No black TextureView.
-3. Swipe 2→3: item 3 picture + item 3 audio. Not item 2 again. No snap back to 1.
-4. Share Cancel / Back still dismiss in place.
-5. Optional: airplane mode after 5 cached items — those 5 stay playable.
+## Owner QA on Fold6 (this APK)
+
+1. Cold/open Watch. Video 1 should display and play.
+2. Swipe 1→2: item 2 picture + item 2 audio. No black TextureView. No video 1 picture/audio.
+3. Swipe 2→3: item 3 picture + item 3 audio. Must not return to video 1. Video 1 must not repeat.
+4. Share → Cancel/Back still dismisses in place on the same video.
+5. Do not run 1B/1C/1D/2x/sound QA.
 
 ## Do not
 
+- Claim PASS / BLACK_VIDEO_FIXED / BINDING_FIXED without owner Fold6 evidence
 - Production / Play / deploy / production DB
-- Fake feed data
-- Blind delays / reset-to-item-1 workaround
+- Fake feed data / blind delays / reset-to-item-1 workaround
 - Second independent cache system
-- Another EAS if `91e8f585` finishes successfully
+- Another EAS if `5bec2a1f` is already installed

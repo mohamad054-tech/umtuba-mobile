@@ -1,19 +1,20 @@
-# CURSOR_REPORT — 5-video cache + cell binding (paused overnight)
+# CURSOR_REPORT — Fold6 Watch cell binding V2
 
 ## Summary
 
-`3c2b747e` owner Fold6 QA FAIL was not the Part1F Modal. Next TextureView attached only near clip-end, so swipe 1→2 played item-2 audio on a black surface. Source fix `0b7e63c` attaches the ready next surface, binds by media/post id, and extends the existing Android Watch cache to a 5-item rolling on-device window.
+`0b7e63c` / EAS `91e8f585` owner Fold6 QA FAIL was not Modal and was not fixed by attaching the next TextureView early. That next-surface attach relayouted Fold6, and the list-height effect snapped back to video 1. Playback also started before the active surface attached.
 
-EAS preview `91e8f585-a853-48b8-9633-3bcba46b5d08` was uploaded and started on Expo before Desktop shutdown. Install + owner QA remain.
+Source fix `83df875e` binds the active page from scroll offset, attaches only the active TextureView, replaces cell source before play, and strips duplicate post IDs without reordering. Rolling cache target remains 5.
+
+EAS preview `5bec2a1f-93d8-4a93-a70e-ae096aa85414` FINISHED on `83df875e`, APK downloaded, `adb install -r` on RFCX718LVHK, app data preserved, app launched. Owner Fold6 QA is still required. Do not claim PASS.
 
 ## Tests
 
-84 focused PASS. `tsc --noEmit` PASS.
+Focused Watch binding + policy + lifecycle + cache tests PASS (79). `tsc --noEmit` PASS.
 
 ## Open issues
 
-- Fold6 install of `91e8f585` not done.
-- Owner Fold6 QA not done. Do not claim PASS.
+- Owner Fold6 QA not done. Do not claim BLACK_VIDEO_FIXED or BINDING_FIXED.
 - Part1E sound-return still DEVICE_QA_BLOCKED_DATA.
 - Foundation V1 not complete.
 
