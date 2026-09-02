@@ -11,6 +11,9 @@ import { watchMediaIdentity } from "./watchCellBinding";
 export const WATCH_OFFLINE_MANIFEST_TARGET = 5;
 export const WATCH_OFFLINE_MANIFEST_VERSION = 1;
 export const WATCH_OFFLINE_MANIFEST_PREFIX = "umtuba-watch-offline-manifest-";
+export const WATCH_OFFLINE_DURABLE_ROOT = "umtuba-watch-retained/";
+export const WATCH_OFFLINE_MANIFEST_FILE = "manifest.json";
+export const WATCH_OFFLINE_VIDEOS_DIR = "videos/";
 export const WATCH_FEED_BOOTSTRAP_TIMEOUT_MS = 8000;
 
 export type WatchOfflineManifestEntry = {
@@ -65,22 +68,120 @@ export function sanitizeWatchOfflineAccountId(
   return safe.slice(0, 80);
 }
 
-export function watchOfflineManifestFileName(
+export function joinWatchFsUri(dir: string, ...segments: string[]): string {
+  let out = dir.endsWith("/") ? dir : `${dir}/`;
+  for (let i = 0; i < segments.length; i += 1) {
+    const raw = segments[i].replace(/^\/+/, "");
+    if (!raw) continue;
+    const isLast = i === segments.length - 1;
+    out += !isLast && !raw.endsWith("/") ? `${raw}/` : raw;
+  }
+  return out;
+}
+
+function fnv1a32(input: string, seed = 0x811c9dc5): number {
+  let hash = seed >>> 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+/** Path-safe account folder id. Hashed so email/uid never appear in the path. */
+export function hashWatchOfflineAccountId(accountId: string): string {
+  const a = fnv1a32(accountId);
+  const b = fnv1a32(accountId, 0x811c9dc5 ^ 0x00abcdef);
+  return `${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
+}
+
+export function watchOfflineAccountDirName(
   accountId: string | null | undefined
 ): string | null {
   const safe = sanitizeWatchOfflineAccountId(accountId);
   if (!safe) return null;
-  return `${WATCH_OFFLINE_MANIFEST_PREFIX}${safe}.json`;
+  return `acct-${hashWatchOfflineAccountId(safe)}`;
+}
+
+export function watchOfflineManifestFileName(
+  accountId: string | null | undefined
+): string | null {
+  if (!sanitizeWatchOfflineAccountId(accountId)) return null;
+  return WATCH_OFFLINE_MANIFEST_FILE;
+}
+
+export function watchOfflineDurableAccountDirUri(
+  documentDirectory: string | null | undefined,
+  accountId: string | null | undefined
+): string | null {
+  if (!documentDirectory) return null;
+  const folder = watchOfflineAccountDirName(accountId);
+  if (!folder) return null;
+  return joinWatchFsUri(documentDirectory, WATCH_OFFLINE_DURABLE_ROOT, folder);
+}
+
+export function watchOfflineDurableVideosDirUri(
+  documentDirectory: string | null | undefined,
+  accountId: string | null | undefined
+): string | null {
+  const accountDir = watchOfflineDurableAccountDirUri(
+    documentDirectory,
+    accountId
+  );
+  if (!accountDir) return null;
+  return joinWatchFsUri(accountDir, WATCH_OFFLINE_VIDEOS_DIR);
+}
+
+export function watchOfflineDurableVideoUri(
+  documentDirectory: string | null | undefined,
+  accountId: string | null | undefined,
+  mediaId: string
+): string | null {
+  const videosDir = watchOfflineDurableVideosDirUri(documentDirectory, accountId);
+  if (!videosDir) return null;
+  return joinWatchFsUri(videosDir, durableWatchVideoFileName(mediaId));
+}
+
+function durableWatchVideoFileName(mediaId: string): string {
+  const safe = mediaId.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${safe}.mp4`;
 }
 
 export function watchOfflineManifestUri(
-  dir: string | null | undefined,
+  documentDirectory: string | null | undefined,
   accountId: string | null | undefined
 ): string | null {
-  if (!dir) return null;
-  const name = watchOfflineManifestFileName(accountId);
-  if (!name) return null;
-  return `${dir}${name}`;
+  const accountDir = watchOfflineDurableAccountDirUri(
+    documentDirectory,
+    accountId
+  );
+  if (!accountDir) return null;
+  return joinWatchFsUri(accountDir, WATCH_OFFLINE_MANIFEST_FILE);
+}
+
+export function watchOfflineManifestBackupUri(
+  documentDirectory: string | null | undefined,
+  accountId: string | null | undefined
+): string | null {
+  const dest = watchOfflineManifestUri(documentDirectory, accountId);
+  return dest ? `${dest}.bak` : null;
+}
+
+export function watchOfflineManifestTempUri(
+  documentDirectory: string | null | undefined,
+  accountId: string | null | undefined
+): string | null {
+  const dest = watchOfflineManifestUri(documentDirectory, accountId);
+  return dest ? `${dest}.tmp` : null;
+}
+
+export function isWatchOfflineDurableUri(
+  uri: string | null | undefined,
+  documentDirectory: string | null | undefined
+): boolean {
+  if (!uri || !documentDirectory) return false;
+  const root = joinWatchFsUri(documentDirectory, WATCH_OFFLINE_DURABLE_ROOT);
+  return uri.startsWith(root);
 }
 
 export function canRetainWatchVideo(
@@ -114,23 +215,22 @@ export function isValidWatchOfflineManifestEntry(
   return true;
 }
 
-export function parseWatchOfflineManifest(
+export function tryParseWatchOfflineManifest(
   raw: string | null | undefined,
   expectedAccountId?: string | null
-): WatchOfflineManifest {
-  const fallback = emptyWatchOfflineManifest(expectedAccountId ?? "");
-  if (!raw) return fallback;
+): WatchOfflineManifest | null {
+  if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as WatchOfflineManifest;
-    if (!parsed || !Array.isArray(parsed.entries)) return fallback;
+    if (!parsed || !Array.isArray(parsed.entries)) return null;
     const accountId = (parsed.accountId ?? "").trim();
-    if (!accountId) return fallback;
+    if (!accountId) return null;
     if (
       expectedAccountId &&
       sanitizeWatchOfflineAccountId(accountId) !==
         sanitizeWatchOfflineAccountId(expectedAccountId)
     ) {
-      return emptyWatchOfflineManifest(expectedAccountId);
+      return null;
     }
     return {
       version: WATCH_OFFLINE_MANIFEST_VERSION,
@@ -139,8 +239,18 @@ export function parseWatchOfflineManifest(
       entries: parsed.entries.filter(isValidWatchOfflineManifestEntry),
     };
   } catch {
-    return fallback;
+    return null;
   }
+}
+
+export function parseWatchOfflineManifest(
+  raw: string | null | undefined,
+  expectedAccountId?: string | null
+): WatchOfflineManifest {
+  return (
+    tryParseWatchOfflineManifest(raw, expectedAccountId) ??
+    emptyWatchOfflineManifest(expectedAccountId ?? "")
+  );
 }
 
 export function snapshotWatchVideoForOffline(input: {
@@ -309,6 +419,64 @@ async function resolveOptionalPort(
   }
 }
 
+async function existsWithSize(
+  port: WatchMediaCachePort,
+  uri: string
+): Promise<boolean> {
+  try {
+    if (!(await port.exists(uri))) return false;
+    return (await port.size(uri)) > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function deleteQuietly(
+  port: WatchMediaCachePort,
+  uri: string | null | undefined
+): Promise<void> {
+  if (!uri) return;
+  try {
+    await port.delete(uri);
+  } catch {
+    // Best-effort cleanup.
+  }
+}
+
+export async function copyWatchVideoToDurableStore(input: {
+  accountId: string;
+  sourceUri: string;
+  mediaId: string;
+  port: WatchMediaCachePort;
+}): Promise<string | null> {
+  const documentDirectory = input.port.documentDirectory();
+  const dest = watchOfflineDurableVideoUri(
+    documentDirectory,
+    input.accountId,
+    input.mediaId
+  );
+  const videosDir = watchOfflineDurableVideosDirUri(
+    documentDirectory,
+    input.accountId
+  );
+  if (!dest || !videosDir) return null;
+  await input.port.ensureDir(videosDir);
+  if (await existsWithSize(input.port, dest)) return dest;
+  if (!(await existsWithSize(input.port, input.sourceUri))) return null;
+  if (input.sourceUri === dest) return dest;
+  const temp = `${dest}.tmp`;
+  await deleteQuietly(input.port, temp);
+  await input.port.copy(input.sourceUri, temp);
+  if (!(await existsWithSize(input.port, temp))) {
+    await deleteQuietly(input.port, temp);
+    return null;
+  }
+  await deleteQuietly(input.port, dest);
+  await input.port.move(temp, dest);
+  if (!(await existsWithSize(input.port, dest))) return null;
+  return dest;
+}
+
 export async function persistWatchOfflineManifest(input: {
   accountId: string;
   manifest: WatchOfflineManifest;
@@ -318,9 +486,16 @@ export async function persistWatchOfflineManifest(input: {
   if (!accountId) return false;
   const port = await resolveOptionalPort(input.port);
   if (!port) return false;
-  const dest = watchOfflineManifestUri(port.cacheDirectory(), accountId);
-  if (!dest) return false;
-  const temp = `${dest}.tmp`;
+  const documentDirectory = port.documentDirectory();
+  const dest = watchOfflineManifestUri(documentDirectory, accountId);
+  const temp = watchOfflineManifestTempUri(documentDirectory, accountId);
+  const backup = watchOfflineManifestBackupUri(documentDirectory, accountId);
+  const accountDir = watchOfflineDurableAccountDirUri(
+    documentDirectory,
+    accountId
+  );
+  if (!dest || !temp || !backup || !accountDir) return false;
+  await port.ensureDir(accountDir);
   const payload = JSON.stringify({
     ...input.manifest,
     version: WATCH_OFFLINE_MANIFEST_VERSION,
@@ -328,15 +503,119 @@ export async function persistWatchOfflineManifest(input: {
     target: WATCH_OFFLINE_MANIFEST_TARGET,
   });
   await port.writeText(temp, payload);
-  try {
-    if (await port.exists(dest)) {
-      await port.delete(dest);
-    }
-  } catch {
-    // Replace still proceeds via move.
+  if (!(await existsWithSize(port, temp))) return false;
+  if (await port.exists(dest)) {
+    await deleteQuietly(port, backup);
+    await port.move(dest, backup);
   }
   await port.move(temp, dest);
+  const verified = tryParseWatchOfflineManifest(
+    await port.readText(dest),
+    accountId
+  );
+  if (!verified) {
+    if (await existsWithSize(port, backup)) {
+      await deleteQuietly(port, dest);
+      await port.move(backup, dest);
+    }
+    return false;
+  }
+  await deleteQuietly(port, backup);
+  await deleteQuietly(port, temp);
   return true;
+}
+
+async function readRecoverableManifest(
+  port: WatchMediaCachePort,
+  accountId: string
+): Promise<WatchOfflineManifest | null> {
+  const documentDirectory = port.documentDirectory();
+  const dest = watchOfflineManifestUri(documentDirectory, accountId);
+  const backup = watchOfflineManifestBackupUri(documentDirectory, accountId);
+  const temp = watchOfflineManifestTempUri(documentDirectory, accountId);
+  if (!dest || !backup || !temp) return null;
+
+  const primary = tryParseWatchOfflineManifest(
+    await port.readText(dest),
+    accountId
+  );
+  if (primary) return primary;
+
+  const fromBackup = tryParseWatchOfflineManifest(
+    await port.readText(backup),
+    accountId
+  );
+  if (fromBackup) {
+    await persistWatchOfflineManifest({
+      accountId,
+      manifest: fromBackup,
+      port,
+    });
+    return fromBackup;
+  }
+
+  const fromTemp = tryParseWatchOfflineManifest(
+    await port.readText(temp),
+    accountId
+  );
+  if (fromTemp) {
+    await persistWatchOfflineManifest({
+      accountId,
+      manifest: fromTemp,
+      port,
+    });
+    return fromTemp;
+  }
+  return null;
+}
+
+async function reconcileDurableManifestEntries(input: {
+  accountId: string;
+  port: WatchMediaCachePort;
+  manifest: WatchOfflineManifest;
+}): Promise<{ manifest: WatchOfflineManifest; changed: boolean }> {
+  const kept: WatchOfflineManifestEntry[] = [];
+  let changed = false;
+  for (const entry of input.manifest.entries) {
+    if (!isValidWatchOfflineManifestEntry(entry)) {
+      changed = true;
+      continue;
+    }
+    const durable = watchOfflineDurableVideoUri(
+      input.port.documentDirectory(),
+      input.accountId,
+      entry.mediaId
+    );
+    if (durable && (await existsWithSize(input.port, durable))) {
+      if (entry.localUri !== durable) {
+        kept.push({ ...entry, localUri: durable });
+        changed = true;
+      } else {
+        kept.push(entry);
+      }
+      continue;
+    }
+    const copied = await copyWatchVideoToDurableStore({
+      accountId: input.accountId,
+      sourceUri: entry.localUri,
+      mediaId: entry.mediaId,
+      port: input.port,
+    });
+    if (copied) {
+      kept.push({ ...entry, localUri: copied });
+      changed = true;
+      continue;
+    }
+    changed = true;
+  }
+  return {
+    manifest: {
+      ...input.manifest,
+      accountId: input.accountId,
+      entries: kept,
+    },
+    changed,
+  };
 }
 
 export async function loadWatchOfflineManifest(input: {
@@ -349,40 +628,22 @@ export async function loadWatchOfflineManifest(input: {
   if (!accountId) return empty;
   const port = await resolveOptionalPort(input.port);
   if (!port) return empty;
-  const dest = watchOfflineManifestUri(port.cacheDirectory(), accountId);
-  if (!dest) return empty;
-  const raw = await port.readText(dest);
-  const parsed = parseWatchOfflineManifest(raw, accountId);
+  const parsed = (await readRecoverableManifest(port, accountId)) ?? empty;
   if (input.verifyFiles === false) return parsed;
 
-  const kept: WatchOfflineManifestEntry[] = [];
-  let removed = false;
-  for (const entry of parsed.entries) {
-    if (!isValidWatchOfflineManifestEntry(entry)) {
-      removed = true;
-      continue;
-    }
-    const exists = await port.exists(entry.localUri);
-    const size = exists ? await port.size(entry.localUri) : 0;
-    if (!exists || size <= 0) {
-      removed = true;
-      continue;
-    }
-    kept.push(entry);
-  }
-  const next: WatchOfflineManifest = {
-    ...parsed,
+  const reconciled = await reconcileDurableManifestEntries({
     accountId,
-    entries: kept,
-  };
-  if (removed) {
+    port,
+    manifest: parsed,
+  });
+  if (reconciled.changed) {
     await persistWatchOfflineManifest({
       accountId,
-      manifest: next,
+      manifest: reconciled.manifest,
       port,
     });
   }
-  return next;
+  return reconciled.manifest;
 }
 
 export async function rememberWatchedOfflineVideo(input: {
@@ -407,6 +668,13 @@ export async function rememberWatchedOfflineVideo(input: {
     port,
     verifyFiles: false,
   });
+  const durableUri = await copyWatchVideoToDurableStore({
+    accountId,
+    sourceUri: input.localUri,
+    mediaId: watchMediaIdentity(input.video),
+    port,
+  });
+  if (!durableUri) return { manifest: current, evicted: [] };
   const existing =
     current.entries.find(
       (row) =>
@@ -420,7 +688,7 @@ export async function rememberWatchedOfflineVideo(input: {
       : now;
   const snapshot = snapshotWatchVideoForOffline({
     video: input.video,
-    localUri: input.localUri,
+    localUri: durableUri,
     remoteUri: input.remoteUri,
     cachedAt: now,
     lastWatchedAt,
@@ -433,11 +701,12 @@ export async function rememberWatchedOfflineVideo(input: {
   );
   await persistWatchOfflineManifest({ accountId, manifest, port });
   for (const gone of evicted) {
-    try {
-      await port.delete(gone.localUri);
-    } catch {
-      // Best-effort file cleanup after rolling eviction.
-    }
+    const durableGone = watchOfflineDurableVideoUri(
+      port.documentDirectory(),
+      accountId,
+      gone.mediaId
+    );
+    await deleteQuietly(port, durableGone ?? gone.localUri);
   }
   return { manifest, evicted };
 }
@@ -456,23 +725,38 @@ export async function clearWatchOfflineManifestForAccount(input: {
     verifyFiles: false,
   });
   for (const entry of current.entries) {
-    try {
-      await port.delete(entry.localUri);
-    } catch {
-      // Best-effort privacy cleanup.
-    }
+    await deleteQuietly(port, entry.localUri);
+    await deleteQuietly(
+      port,
+      watchOfflineDurableVideoUri(
+        port.documentDirectory(),
+        accountId,
+        entry.mediaId
+      )
+    );
   }
-  const dest = watchOfflineManifestUri(port.cacheDirectory(), accountId);
-  if (!dest) return;
-  try {
-    await port.delete(dest);
-  } catch {
-    // Already gone.
-  }
-  try {
-    await port.delete(`${dest}.tmp`);
-  } catch {
-    // Ignore leftover temp.
+  const documentDirectory = port.documentDirectory();
+  await deleteQuietly(
+    port,
+    watchOfflineManifestUri(documentDirectory, accountId)
+  );
+  await deleteQuietly(
+    port,
+    watchOfflineManifestBackupUri(documentDirectory, accountId)
+  );
+  await deleteQuietly(
+    port,
+    watchOfflineManifestTempUri(documentDirectory, accountId)
+  );
+  const accountDir = watchOfflineDurableAccountDirUri(
+    documentDirectory,
+    accountId
+  );
+  if (accountDir) {
+    await deleteQuietly(
+      port,
+      accountDir.endsWith("/") ? accountDir : `${accountDir}/`
+    );
   }
 }
 

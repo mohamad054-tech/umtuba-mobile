@@ -71,6 +71,7 @@ export type WatchCacheManifest = {
 
 export type WatchMediaCachePort = {
   cacheDirectory: () => string | null;
+  documentDirectory: () => string | null;
   exists: (uri: string) => Promise<boolean>;
   size: (uri: string) => Promise<number>;
   download: (
@@ -82,6 +83,29 @@ export type WatchMediaCachePort = {
   readText: (uri: string) => Promise<string | null>;
   writeText: (uri: string, text: string) => Promise<void>;
   move: (from: string, to: string) => Promise<void>;
+  copy: (from: string, to: string) => Promise<void>;
+};
+
+/** Expo FileSystem/legacy shape used by the production Watch cache port. */
+export type ExpoWatchFileSystemLike = {
+  cacheDirectory: string | null;
+  documentDirectory: string | null;
+  getInfoAsync: (
+    uri: string
+  ) => Promise<{ exists: boolean; size?: number }>;
+  downloadAsync: (
+    sourceUrl: string,
+    destUri: string
+  ) => Promise<{ uri: string; status: number }>;
+  deleteAsync: (uri: string, options?: { idempotent?: boolean }) => Promise<void>;
+  moveAsync: (options: { from: string; to: string }) => Promise<void>;
+  copyAsync: (options: { from: string; to: string }) => Promise<void>;
+  makeDirectoryAsync: (
+    uri: string,
+    options?: { intermediates?: boolean }
+  ) => Promise<void>;
+  readAsStringAsync: (uri: string) => Promise<string>;
+  writeAsStringAsync: (uri: string, text: string) => Promise<void>;
 };
 
 export type WatchCachePlanItem = {
@@ -449,28 +473,16 @@ async function downloadWatchCacheFile(
 
 let defaultWatchMediaCachePort: WatchMediaCachePort | null = null;
 
-export function createFileSystemWatchMediaCachePort(): WatchMediaCachePort {
+export function createFileSystemWatchMediaCachePort(
+  fileSystem?: ExpoWatchFileSystemLike
+): WatchMediaCachePort {
   // Lazy so unit tests that inject a memory port never touch native FS.
-  const FileSystem = require("expo-file-system/legacy") as {
-    cacheDirectory: string | null;
-    getInfoAsync: (
-      uri: string
-    ) => Promise<{ exists: boolean; size?: number }>;
-    downloadAsync: (
-      sourceUrl: string,
-      destUri: string
-    ) => Promise<{ uri: string; status: number }>;
-    deleteAsync: (uri: string, options?: { idempotent?: boolean }) => Promise<void>;
-    moveAsync: (options: { from: string; to: string }) => Promise<void>;
-    makeDirectoryAsync: (
-      uri: string,
-      options?: { intermediates?: boolean }
-    ) => Promise<void>;
-    readAsStringAsync: (uri: string) => Promise<string>;
-    writeAsStringAsync: (uri: string, text: string) => Promise<void>;
-  };
+  const FileSystem =
+    fileSystem ??
+    (require("expo-file-system/legacy") as ExpoWatchFileSystemLike);
   return {
     cacheDirectory: () => FileSystem.cacheDirectory,
+    documentDirectory: () => FileSystem.documentDirectory,
     exists: async (uri) => {
       const info = await FileSystem.getInfoAsync(uri);
       return info.exists === true;
@@ -497,6 +509,7 @@ export function createFileSystemWatchMediaCachePort(): WatchMediaCachePort {
     },
     writeText: (uri, text) => FileSystem.writeAsStringAsync(uri, text),
     move: (from, to) => FileSystem.moveAsync({ from, to }),
+    copy: (from, to) => FileSystem.copyAsync({ from, to }),
   };
 }
 
@@ -525,14 +538,16 @@ export function __setWatchMediaCachePortForTests(
 }
 
 export function createMemoryWatchMediaCachePort(
-  root = "file:///cache/"
+  cacheRoot = "file:///cache/",
+  documentRoot = "file:///documents/"
 ): WatchMediaCachePort & { files: Map<string, string>; downloads: string[] } {
   const files = new Map<string, string>();
   const downloads: string[] = [];
   return {
     files,
     downloads,
-    cacheDirectory: () => root,
+    cacheDirectory: () => cacheRoot,
+    documentDirectory: () => documentRoot,
     exists: async (uri) => files.has(uri),
     size: async (uri) => files.get(uri)?.length ?? 0,
     download: async (sourceUrl, destUri) => {
@@ -542,6 +557,10 @@ export function createMemoryWatchMediaCachePort(
     },
     delete: async (uri) => {
       files.delete(uri);
+      if (!uri.endsWith("/")) return;
+      for (const key of [...files.keys()]) {
+        if (key.startsWith(uri)) files.delete(key);
+      }
     },
     ensureDir: async () => undefined,
     readText: async (uri) => files.get(uri) ?? null,
@@ -553,6 +572,11 @@ export function createMemoryWatchMediaCachePort(
       if (text == null) return;
       files.set(to, text);
       files.delete(from);
+    },
+    copy: async (from, to) => {
+      const text = files.get(from);
+      if (text == null) return;
+      files.set(to, text);
     },
   };
 }

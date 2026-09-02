@@ -24,6 +24,8 @@ PRODUCTION_TOUCHED = NO
 
 Video files alone are insufficient. Cold start offline cannot load Watch feed metadata, so retained cached videos never appear. This task persists an account-scoped offline manifest of the five most recently watched real videos and bootstraps Watch from it when the remote feed fails.
 
+Authoritative retained-five manifest and video files now live under `documentDirectory` (`umtuba-watch-retained/<hashed-account>/`). Prefetch neighbors may stay in purgeable `cacheDirectory`. Writes are tmp → backup → promote → verify. EAS was not started.
+
 ## Do not
 
 - Claim PASS / BLACK_VIDEO_FIXED / BINDING_FIXED / OWNER_QA_READY

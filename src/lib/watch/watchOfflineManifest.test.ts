@@ -12,15 +12,28 @@ import {
   watchShareOverlayUsesHostWindow,
   watchShareSheetRemountsWatch,
 } from "@/src/lib/social/watchShareSheet";
-import { createMemoryWatchMediaCachePort } from "./androidWatchMediaCache";
 import {
+  createFileSystemWatchMediaCachePort,
+  createMemoryWatchMediaCachePort,
+  type ExpoWatchFileSystemLike,
+} from "./androidWatchMediaCache";
+import {
+  WATCH_OFFLINE_DURABLE_ROOT,
+  WATCH_OFFLINE_MANIFEST_FILE,
   WATCH_OFFLINE_MANIFEST_TARGET,
+  WATCH_OFFLINE_VIDEOS_DIR,
   clearWatchOfflineManifestForAccount,
+  hashWatchOfflineAccountId,
   loadWatchOfflineManifest,
   offlineBootstrapUsesFileUrisOnly,
   persistWatchOfflineManifest,
   rememberWatchedOfflineVideo,
   resolveWatchStartupFeed,
+  sanitizeWatchOfflineAccountId,
+  watchOfflineAccountDirName,
+  watchOfflineDurableVideoUri,
+  watchOfflineManifestBackupUri,
+  watchOfflineManifestTempUri,
   watchOfflineManifestUri,
   watchVideosFromOfflineManifest,
 } from "./watchOfflineManifest";
@@ -85,13 +98,52 @@ function snapshotPort(
 }
 
 function restorePort(
-  entries: Array<[string, string]>
+  entries: Array<[string, string]>,
+  cacheRoot = "file:///cache/",
+  documentRoot = "file:///documents/"
 ): ReturnType<typeof createMemoryWatchMediaCachePort> {
-  const port = createMemoryWatchMediaCachePort();
+  const port = createMemoryWatchMediaCachePort(cacheRoot, documentRoot);
   for (const [uri, text] of entries) {
     port.files.set(uri, text);
   }
   return port;
+}
+
+function manifestUri(
+  port: ReturnType<typeof createMemoryWatchMediaCachePort>,
+  accountId: string
+) {
+  return watchOfflineManifestUri(port.documentDirectory(), accountId);
+}
+
+function durableVideoUri(
+  port: ReturnType<typeof createMemoryWatchMediaCachePort>,
+  accountId: string,
+  index: number
+) {
+  return watchOfflineDurableVideoUri(
+    port.documentDirectory(),
+    accountId,
+    `post-${index}`
+  );
+}
+
+function stubExpoFileSystem(input: {
+  cacheDirectory: string;
+  documentDirectory: string;
+}): ExpoWatchFileSystemLike {
+  return {
+    cacheDirectory: input.cacheDirectory,
+    documentDirectory: input.documentDirectory,
+    getInfoAsync: async () => ({ exists: false }),
+    downloadAsync: async (_sourceUrl, destUri) => ({ uri: destUri, status: 200 }),
+    deleteAsync: async () => undefined,
+    moveAsync: async () => undefined,
+    copyAsync: async () => undefined,
+    makeDirectoryAsync: async () => undefined,
+    readAsStringAsync: async () => "",
+    writeAsStringAsync: async () => undefined,
+  };
 }
 
 describe("Watch retained-five offline manifest", () => {
@@ -115,14 +167,17 @@ describe("Watch retained-five offline manifest", () => {
       expect(entry.author.name).toMatch(/^Creator /);
       expect(entry.remoteUri.startsWith("https://")).toBe(true);
       expect(entry.localUri.startsWith("file://")).toBe(true);
+      expect(entry.localUri.startsWith(port.documentDirectory()!)).toBe(true);
       expect(entry.cachedAt).toBeGreaterThan(0);
       expect(entry.lastWatchedAt).toBeGreaterThan(0);
       expect(entry.durationMs).toBeGreaterThan(0);
     }
-    const dest = watchOfflineManifestUri("file:///cache/", "acct-a");
+    const dest = manifestUri(port, "acct-a");
     expect(dest).toBeTruthy();
+    expect(dest?.startsWith(port.documentDirectory()!)).toBe(true);
     expect(port.files.has(dest!)).toBe(true);
     expect(port.files.has(`${dest!}.tmp`)).toBe(false);
+    expect(port.files.has(`${dest!}.bak`)).toBe(false);
   });
 
   it("restores the same five after a process-restart re-read", async () => {
@@ -190,12 +245,12 @@ describe("Watch retained-five offline manifest", () => {
     ).toBe(true);
   });
 
-  it("removes only the invalid entry when its local file is missing", async () => {
+  it("removes only the invalid entry when its durable file is missing", async () => {
     const port = createMemoryWatchMediaCachePort();
     for (let i = 1; i <= 5; i += 1) {
       await retain(port, "acct-a", i, i * 1000);
     }
-    port.files.delete("file:///cache/umtuba-watch-media/post-3.mp4");
+    port.files.delete(durableVideoUri(port, "acct-a", 3)!);
     const manifest = await loadWatchOfflineManifest({
       accountId: "acct-a",
       port,
@@ -212,7 +267,7 @@ describe("Watch retained-five offline manifest", () => {
     expect(again.entries.map((row) => row.postId).sort()).toEqual([1, 2, 4, 5]);
   });
 
-  it("evicts only the oldest when a sixth watched video is retained", async () => {
+  it("evicts only the oldest durable file when a sixth watched video is retained", async () => {
     const port = createMemoryWatchMediaCachePort();
     for (let i = 1; i <= 5; i += 1) {
       await retain(port, "acct-a", i, i * 1000);
@@ -227,10 +282,9 @@ describe("Watch retained-five offline manifest", () => {
     expect(manifest.entries.map((row) => row.postId).sort()).toEqual([
       2, 3, 4, 5, 6,
     ]);
+    expect(port.files.has(durableVideoUri(port, "acct-a", 1)!)).toBe(false);
+    expect(port.files.has(durableVideoUri(port, "acct-a", 6)!)).toBe(true);
     expect(port.files.has("file:///cache/umtuba-watch-media/post-1.mp4")).toBe(
-      false
-    );
-    expect(port.files.has("file:///cache/umtuba-watch-media/post-6.mp4")).toBe(
       true
     );
   });
@@ -240,7 +294,7 @@ describe("Watch retained-five offline manifest", () => {
     for (let i = 1; i <= 5; i += 1) {
       await retain(port, "acct-a", i, i * 1000);
     }
-    const dest = watchOfflineManifestUri("file:///cache/", "acct-a");
+    const dest = manifestUri(port, "acct-a");
     const before = dest ? port.files.get(dest) : null;
     const filesBefore = snapshotPort(port);
 
@@ -296,10 +350,11 @@ describe("Watch retained-five offline manifest", () => {
       port,
     });
     expect(afterLogout.entries).toHaveLength(0);
-    const aUri = watchOfflineManifestUri("file:///cache/", "acct-a");
-    const bUri = watchOfflineManifestUri("file:///cache/", "acct-b");
+    const aUri = manifestUri(port, "acct-a");
+    const bUri = manifestUri(port, "acct-b");
     expect(aUri).not.toBe(bUri);
     expect(port.files.has(aUri!)).toBe(false);
+    expect(port.files.has(durableVideoUri(port, "acct-a", 1)!)).toBe(false);
   });
 
   it("online feed reconcile prefers verified local src for retained posts", async () => {
@@ -333,9 +388,10 @@ describe("Watch retained-five offline manifest", () => {
       now: 1000,
       port,
     });
-    const dest = watchOfflineManifestUri("file:///cache/", "acct-a");
+    const dest = manifestUri(port, "acct-a");
     expect(dest).toBeTruthy();
     expect(port.files.has(`${dest!}.tmp`)).toBe(false);
+    expect(port.files.has(`${dest!}.bak`)).toBe(false);
     expect(port.files.get(dest!)?.includes('"accountId":"acct-a"')).toBe(true);
     await persistWatchOfflineManifest({
       accountId: "acct-a",
@@ -350,3 +406,216 @@ describe("Watch retained-five offline manifest", () => {
     ).toBe(true);
   });
 });
+
+describe("Watch durable documentDirectory store", () => {
+  it("production FileSystem adapter path builders bind documentDirectory (expo-file-system cannot run in vitest)", () => {
+    const expoCache = "file:///data/user/0/com.umtuba.app/cache/";
+    const expoDocuments = "file:///data/user/0/com.umtuba.app/files/";
+    const port = createFileSystemWatchMediaCachePort(
+      stubExpoFileSystem({
+        cacheDirectory: expoCache,
+        documentDirectory: expoDocuments,
+      })
+    );
+    expect(port.documentDirectory()).toBe(expoDocuments);
+    expect(port.cacheDirectory()).toBe(expoCache);
+
+    const email = "owner+qa@umtuba.com";
+    const dest = watchOfflineManifestUri(port.documentDirectory(), email);
+    const videoUri = watchOfflineDurableVideoUri(
+      port.documentDirectory(),
+      email,
+      "post-41"
+    );
+    const folder = watchOfflineAccountDirName(email);
+    expect(dest).toBe(
+      `${expoDocuments}${WATCH_OFFLINE_DURABLE_ROOT}${folder}/${WATCH_OFFLINE_MANIFEST_FILE}`
+    );
+    expect(videoUri).toBe(
+      `${expoDocuments}${WATCH_OFFLINE_DURABLE_ROOT}${folder}/${WATCH_OFFLINE_VIDEOS_DIR}post-41.mp4`
+    );
+    expect(dest?.includes(expoCache)).toBe(false);
+    expect(videoUri?.includes(expoCache)).toBe(false);
+    expect(dest?.includes(email)).toBe(false);
+    expect(videoUri?.includes(email)).toBe(false);
+    expect(dest?.includes("owner")).toBe(false);
+    expect(folder).toBe(
+      `acct-${hashWatchOfflineAccountId(sanitizeWatchOfflineAccountId(email)!)}`
+    );
+    expect(folder?.includes("@")).toBe(false);
+    expect(WATCH_OFFLINE_DURABLE_ROOT).toBe("umtuba-watch-retained/");
+  });
+
+  it("durable filesystem port restart: empty cacheDirectory still restores retained five from documentDirectory", async () => {
+    const live = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(live, "acct-a", i, i * 1000);
+    }
+    const durableOnly = snapshotPort(live).filter(([uri]) =>
+      uri.startsWith(live.documentDirectory()!)
+    );
+    expect(durableOnly.length).toBeGreaterThan(5);
+    const restarted = restorePort(durableOnly);
+    restarted.files.forEach((_value, uri) => {
+      expect(uri.startsWith("file:///cache/")).toBe(false);
+    });
+    const after = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port: restarted,
+    });
+    expect(after.entries).toHaveLength(5);
+    expect(
+      after.entries.every((row) =>
+        row.localUri.startsWith(restarted.documentDirectory()!)
+      )
+    ).toBe(true);
+    for (let i = 1; i <= 5; i += 1) {
+      expect(restarted.files.has(durableVideoUri(restarted, "acct-a", i)!)).toBe(
+        true
+      );
+    }
+  });
+
+  it("primary manifest corruption recovers from backup", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(port, "acct-a", i, i * 1000);
+    }
+    const dest = manifestUri(port, "acct-a")!;
+    const backup = watchOfflineManifestBackupUri(
+      port.documentDirectory(),
+      "acct-a"
+    )!;
+    port.files.set(backup, port.files.get(dest)!);
+    port.files.set(dest, "{not-json");
+    const recovered = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port,
+    });
+    expect(recovered.entries).toHaveLength(5);
+    expect(recovered.entries.map((row) => row.postId).sort()).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+    expect(tryJson(port.files.get(dest))).toBe(true);
+  });
+
+  it("interrupted promotion recovers without losing the previous manifest", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(port, "acct-a", i, i * 1000);
+    }
+    const dest = manifestUri(port, "acct-a")!;
+    const backup = watchOfflineManifestBackupUri(
+      port.documentDirectory(),
+      "acct-a"
+    )!;
+    const temp = watchOfflineManifestTempUri(port.documentDirectory(), "acct-a")!;
+    const previous = port.files.get(dest)!;
+    port.files.set(backup, previous);
+    port.files.set(
+      temp,
+      JSON.stringify({
+        version: 1,
+        accountId: "acct-a",
+        target: 5,
+        entries: [],
+      })
+    );
+    port.files.delete(dest);
+    const recovered = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port,
+    });
+    expect(recovered.entries).toHaveLength(5);
+    expect(recovered.entries.map((row) => row.postId).sort()).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+    expect(tryJson(port.files.get(dest))).toBe(true);
+  });
+
+  it("purgeable cache directory empty still restores retained five", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(port, "acct-a", i, i * 1000);
+    }
+    for (const uri of [...port.files.keys()]) {
+      if (uri.startsWith(port.cacheDirectory()!)) port.files.delete(uri);
+    }
+    expect(
+      [...port.files.keys()].some((uri) => uri.startsWith("file:///cache/"))
+    ).toBe(false);
+    const restored = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port,
+    });
+    expect(restored.entries).toHaveLength(5);
+    const startup = await resolveWatchStartupFeed({
+      accountId: "acct-a",
+      port,
+      fetchFeed: async () => {
+        throw new Error("offline");
+      },
+    });
+    expect(startup.videos).toHaveLength(5);
+    expect(offlineBootstrapUsesFileUrisOnly(startup.videos)).toBe(true);
+  });
+
+  it("five durable video files exist after restart", async () => {
+    const live = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(live, "acct-a", i, i * 1000);
+    }
+    const restarted = restorePort(snapshotPort(live));
+    const after = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port: restarted,
+    });
+    const durableVideos = [...restarted.files.keys()].filter((uri) =>
+      uri.includes(`/${WATCH_OFFLINE_VIDEOS_DIR}`)
+    );
+    expect(after.entries).toHaveLength(5);
+    expect(durableVideos).toHaveLength(5);
+    expect(
+      durableVideos.every((uri) => uri.startsWith(restarted.documentDirectory()!))
+    ).toBe(true);
+  });
+
+  it("logout deletes only that account retained directory", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    for (let i = 1; i <= 5; i += 1) {
+      await retain(port, "acct-a", i, i * 1000);
+      await retain(port, "acct-b", i + 10, i * 1000);
+    }
+    await clearWatchOfflineManifestForAccount({ accountId: "acct-a", port });
+    const afterA = await loadWatchOfflineManifest({
+      accountId: "acct-a",
+      port,
+    });
+    const afterB = await loadWatchOfflineManifest({
+      accountId: "acct-b",
+      port,
+    });
+    expect(afterA.entries).toHaveLength(0);
+    expect(afterB.entries).toHaveLength(5);
+    expect(port.files.has(manifestUri(port, "acct-a")!)).toBe(false);
+    expect(port.files.has(manifestUri(port, "acct-b")!)).toBe(true);
+    expect(port.files.has(durableVideoUri(port, "acct-b", 11)!)).toBe(true);
+    expect(
+      [...port.files.keys()].some(
+        (uri) =>
+          uri.startsWith(port.documentDirectory()!) &&
+          uri.includes(watchOfflineAccountDirName("acct-a")!)
+      )
+    ).toBe(false);
+  });
+});
+
+function tryJson(raw: string | undefined): boolean {
+  if (!raw) return false;
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}

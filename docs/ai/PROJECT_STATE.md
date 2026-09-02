@@ -4,7 +4,7 @@
 
 **`WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1`**
 
-Account-scoped Watch offline manifest for the five most recently watched real videos. Local implementation + tests only. No EAS. V3 owner QA cancelled — do not claim PASS.
+Account-scoped Watch offline manifest for the five most recently watched real videos. Authoritative store is `documentDirectory` (hashed account dir + recoverable manifest writes). Local implementation + tests only. No EAS. V3 owner QA cancelled — do not claim PASS.
 
 ```
 TASK_ID = WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1
