@@ -145,6 +145,7 @@ import {
   preserveWatchPostAcrossLayoutSession,
   reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
+  resolveManualFirstWatchNativePin,
   resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
 import {
@@ -709,7 +710,22 @@ export default function WatchScreen() {
       itemCount: videosLengthRef.current,
     });
     if (index == null) return;
+    const fromIndex = activeIndexRef.current;
     claimActiveIndexRef.current(index);
+    const frozenItemHeight =
+      viewportFrozenRef.current.height ?? itemHeightRef.current;
+    const pinOffset = resolveManualFirstWatchNativePin({
+      fromIndex,
+      toIndex: index,
+      frozenItemHeight,
+    });
+    if (pinOffset == null) return;
+    programmaticAdvanceUntilRef.current =
+      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
+    listRef.current?.scrollToOffset({
+      offset: pinOffset,
+      animated: false,
+    });
   }, []);
 
   const onWatchScroll = useCallback(

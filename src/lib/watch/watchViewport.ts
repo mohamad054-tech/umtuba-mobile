@@ -7,7 +7,9 @@
 
 import {
   resolveWatchIndexFromScrollOffset,
+  resolveWatchScrollOffset,
   sanitizeWatchListIndex,
+  shouldAcceptViewableIndexUpdate,
   toWatchListPixels,
 } from "./playbackPolicy";
 
@@ -156,4 +158,59 @@ export function resolveWatchNativePage(
   itemCount: number
 ): number | null {
   return resolveWatchIndexFromScrollOffset(offset, itemHeight, itemCount);
+}
+
+/** Real manual first swipe only. Later pages and auto-advance stay out. */
+export function isManualFirstWatchPageTransition(input: {
+  fromIndex: number;
+  toIndex: number;
+}): boolean {
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const to = sanitizeWatchListIndex(input.toIndex);
+  return from === 0 && to === 1;
+}
+
+/** Pin Native FlatList to page 1 using the frozen paging height. */
+export function resolveManualFirstWatchNativePin(input: {
+  fromIndex: number;
+  toIndex: number;
+  frozenItemHeight: number;
+}): number | null {
+  if (!isManualFirstWatchPageTransition(input)) return null;
+  return resolveWatchScrollOffset(1, input.frozenItemHeight);
+}
+
+/**
+ * Manual settle/viewability commit. During the first-page lock, stale
+ * callbacks must not restore page 0. Later swipes never pin or lock.
+ */
+export function resolveWatchManualSettleCommit(input: {
+  fromIndex: number;
+  incomingIndex: number;
+  frozenItemHeight: number;
+  nowMs: number;
+  lockUntilMs: number;
+}): {
+  acceptIndex: boolean;
+  pinOffset: number | null;
+  lock: boolean;
+} {
+  if (
+    !shouldAcceptViewableIndexUpdate({
+      nowMs: input.nowMs,
+      lockUntilMs: input.lockUntilMs,
+    })
+  ) {
+    return { acceptIndex: false, pinOffset: null, lock: false };
+  }
+  const pinOffset = resolveManualFirstWatchNativePin({
+    fromIndex: input.fromIndex,
+    toIndex: input.incomingIndex,
+    frozenItemHeight: input.frozenItemHeight,
+  });
+  return {
+    acceptIndex: true,
+    pinOffset,
+    lock: pinOffset != null,
+  };
 }

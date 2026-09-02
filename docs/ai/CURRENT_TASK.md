@@ -2,32 +2,31 @@
 
 ## Task title
 
-WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1
+CENTRAL_WATCH_FIRST_MANUAL_SWIPE_NATIVE_PAGE_LOCK_V1
 
 ## Status
 
-**SOURCE IMPLEMENTATION + LOCAL GATES. NO EAS. V3 owner QA remains cancelled. Do not claim BLACK_VIDEO_FIXED / BINDING_FIXED / OWNER_QA_READY.**
+**SOURCE READY FOR OWNER REVIEW. NO EAS. NO FOLD6 BUILD.**
 
 ```
-TASK_ID = WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1
-BRANCH = desktop/watch-interaction-foundation-v1-part1f
-WORKTREE = C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-FOLD6-WATCH-VIDEO-FIT-V1
+TASK_ID = CENTRAL_WATCH_FIRST_MANUAL_SWIPE_NATIVE_PAGE_LOCK_V1
+BRANCH = central/watch-first-manual-swipe-native-page-lock-v1
+WORKTREE = D:\umtuba-central\repos\umtuba-mobile-watch-first-manual-swipe-native-page-lock-v1
+BASE_SOURCE = origin/desktop/watch-interaction-foundation-v1-part1f @ b9a40acfdfcd5e31d4fa59a8b2517f3798602786
+HISTORICAL_CENTRAL_SHA = 17cbfefbc8c77d5286efdf2c9b941101db84b6c3
 EAS_STARTED = NO
-OWNER_FOLD6_QA = CANCELLED (V3)
-WATCH_FOUNDATION_COMPLETE = NO
-DEPLOYED = NO
-PLAY_UPLOAD = NO
-PRODUCTION_TOUCHED = NO
+PUSHED = NO
+BLACK_VIDEO_FIXED = NOT_CLAIMED_UNTIL_FOLD6_QA
+READY_FOR_BUILD_REVIEW = YES
 ```
 
 ## Why
 
-Video files alone are insufficient. Cold start offline cannot load Watch feed metadata, so retained cached videos never appear. This task persists an account-scoped offline manifest of the five most recently watched real videos and bootstraps Watch from it when the remote feed fails.
-
-Authoritative retained-five manifest and video files now live under `documentDirectory` (`umtuba-watch-retained/<hashed-account>/`). Prefetch neighbors may stay in purgeable `cacheDirectory`. Writes are tmp → backup → promote → verify. EAS was not started.
+Fold6 first manual swipe plays video 2 audio (JS `activeIndex=1` is correct) while the visible Native FlatList page stays or returns to 0. Pin Native offset to page 1 on real manual `0→1` and reuse the existing `scrollToWatchIndex` lock so stale settle/viewability cannot restore page 0 during TextureView swap.
 
 ## Do not
 
-- Claim PASS / BLACK_VIDEO_FIXED / BINDING_FIXED / OWNER_QA_READY
-- Start EAS, adb install, Play upload, or Fold6 swipe QA
-- Production / Play / deploy / production DB
+- Start EAS / APK / Play / Production / push
+- Touch cache / offline manifest / Share / ExoPlayer / surfaceType
+- Change later swipes or auto-advance
+- Claim BLACK_VIDEO_FIXED before Fold6 QA

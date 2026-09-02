@@ -20,9 +20,12 @@ import {
 } from "@/src/lib/social/watchShareSheet";
 import {
   findWatchIndexByPostIdentity,
+  isManualFirstWatchPageTransition,
   preserveWatchPostAcrossLayoutSession,
   reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
+  resolveManualFirstWatchNativePin,
+  resolveWatchManualSettleCommit,
   resolveWatchNativePage,
   resolveWatchPagingMetrics,
   shouldApplyTextureViewSizeToItemHeight,
@@ -173,5 +176,110 @@ describe("9 Share Cancel/Back preserves the same post", () => {
 describe("10 five-video rolling cache is unchanged", () => {
   it("keeps ANDROID_WATCH_CACHE_TARGET at 5", () => {
     expect(ANDROID_WATCH_CACHE_TARGET).toBe(5);
+  });
+});
+
+describe("manual first swipe 0 → 1 pins Native page 1", () => {
+  it("pins frozen offset on page 1 and ignores later pages", () => {
+    expect(
+      isManualFirstWatchPageTransition({ fromIndex: 0, toIndex: 1 })
+    ).toBe(true);
+    expect(
+      resolveManualFirstWatchNativePin({
+        fromIndex: 0,
+        toIndex: 1,
+        frozenItemHeight: FROZEN_HEIGHT,
+      })
+    ).toBe(FROZEN_HEIGHT);
+    expect(resolveWatchScrollOffset(1, FROZEN_HEIGHT)).toBe(FROZEN_HEIGHT);
+    expect(
+      resolveManualFirstWatchNativePin({
+        fromIndex: 1,
+        toIndex: 2,
+        frozenItemHeight: FROZEN_HEIGHT,
+      })
+    ).toBeNull();
+    expect(
+      resolveManualFirstWatchNativePin({
+        fromIndex: 2,
+        toIndex: 3,
+        frozenItemHeight: FROZEN_HEIGHT,
+      })
+    ).toBeNull();
+    expect(
+      resolveManualFirstWatchNativePin({
+        fromIndex: 0,
+        toIndex: 2,
+        frozenItemHeight: FROZEN_HEIGHT,
+      })
+    ).toBeNull();
+  });
+
+  it("locks stale settle/viewability so page 0 cannot restore", () => {
+    const first = resolveWatchManualSettleCommit({
+      fromIndex: 0,
+      incomingIndex: 1,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 1000,
+      lockUntilMs: 0,
+    });
+    expect(first.acceptIndex).toBe(true);
+    expect(first.pinOffset).toBe(FROZEN_HEIGHT);
+    expect(first.lock).toBe(true);
+
+    const lockUntilMs = 1000 + 750;
+    const staleToZero = resolveWatchManualSettleCommit({
+      fromIndex: 1,
+      incomingIndex: 0,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 1100,
+      lockUntilMs,
+    });
+    expect(staleToZero.acceptIndex).toBe(false);
+    expect(staleToZero.pinOffset).toBeNull();
+    expect(staleToZero.lock).toBe(false);
+
+    const staleSamePage = resolveWatchManualSettleCommit({
+      fromIndex: 1,
+      incomingIndex: 1,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 1400,
+      lockUntilMs,
+    });
+    expect(staleSamePage.acceptIndex).toBe(false);
+  });
+
+  it("leaves later manual swipes and auto-advance unlock path unchanged", () => {
+    const later = resolveWatchManualSettleCommit({
+      fromIndex: 1,
+      incomingIndex: 2,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 2000,
+      lockUntilMs: 0,
+    });
+    expect(later.acceptIndex).toBe(true);
+    expect(later.pinOffset).toBeNull();
+    expect(later.lock).toBe(false);
+
+    const third = resolveWatchManualSettleCommit({
+      fromIndex: 2,
+      incomingIndex: 3,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 2500,
+      lockUntilMs: 0,
+    });
+    expect(third.acceptIndex).toBe(true);
+    expect(third.pinOffset).toBeNull();
+    expect(third.lock).toBe(false);
+
+    const afterAutoAdvanceLock = resolveWatchManualSettleCommit({
+      fromIndex: 0,
+      incomingIndex: 1,
+      frozenItemHeight: FROZEN_HEIGHT,
+      nowMs: 1000,
+      lockUntilMs: 1750,
+    });
+    expect(afterAutoAdvanceLock.acceptIndex).toBe(false);
+    expect(afterAutoAdvanceLock.pinOffset).toBeNull();
   });
 });

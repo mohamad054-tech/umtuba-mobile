@@ -1,18 +1,18 @@
-# UMTUBA Project State (AI Handoff) — Fold6 Watch worktree
+# UMTUBA Project State (AI Handoff) — Central Watch first-swipe native page lock
 
 ## LAST ASSIGNED TASK (2026-09-02)
 
-**`WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1`**
+**`CENTRAL_WATCH_FIRST_MANUAL_SWIPE_NATIVE_PAGE_LOCK_V1`**
 
-Account-scoped Watch offline manifest for the five most recently watched real videos. Authoritative store is `documentDirectory` (hashed account dir + recoverable manifest writes). Local implementation + tests only. No EAS. V3 owner QA cancelled — do not claim PASS.
+Isolated from current Watch source `b9a40ac` (Desktop part1f; merge-base with historical Central `17cbfef` = `17cbfef`). Pins Native page 1 on real manual `0→1` only. No EAS. No push.
 
 ```
-TASK_ID = WATCH_RETAINED_FIVE_OFFLINE_MANIFEST_V1
-BRANCH = desktop/watch-interaction-foundation-v1-part1f
-WORKTREE = C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-FOLD6-WATCH-VIDEO-FIT-V1
+TASK_ID = CENTRAL_WATCH_FIRST_MANUAL_SWIPE_NATIVE_PAGE_LOCK_V1
+BRANCH = central/watch-first-manual-swipe-native-page-lock-v1
+WORKTREE = D:\umtuba-central\repos\umtuba-mobile-watch-first-manual-swipe-native-page-lock-v1
 EAS_STARTED = NO
-WATCH_FOUNDATION_COMPLETE = NO
-OWNER_FOLD6_QA = CANCELLED
+PUSHED = NO
+BLACK_VIDEO_FIXED = NOT_CLAIMED_UNTIL_FOLD6_QA
 ```
 
 ## Safety
@@ -22,4 +22,5 @@ PRODUCTION_DATABASE_TOUCHED = NO
 PLAY_UPLOAD = NO
 APP_STORE_UPLOAD = NO
 MIGRATIONS_CREATED = NO
+CACHE_OFFLINE_SHARE_TOUCHED = NO
 ```
