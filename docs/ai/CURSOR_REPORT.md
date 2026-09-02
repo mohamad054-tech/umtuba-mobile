@@ -2,16 +2,15 @@
 
 ## Summary
 
-V3 closes the two accepted causes only: `readyToPlay` bypassing the surface/binding gate (black + audio), and TextureView-driven itemHeight/snap desync (swipe 2→3 snaps to video 1). Owner Fold6 QA is still required. Do not claim PASS.
+V3 source `2a977686` gates every Watch play start on the active attached surface and freezes paging height so TextureView cannot snap the list back to video 1. EAS `c6eb9f2c` FINISHED on that SHA, `adb install -r` on RFCX718LVHK, app data preserved, MainActivity launched. Owner Fold6 QA is still required. Do not claim PASS.
 
 ## Tests
 
-`tsc --noEmit` PASS. Watch suite 154 PASS, including the ten required V3 assertions.
+`tsc --noEmit` PASS. Watch suite 154 PASS.
 
 ## Open issues
 
 - Owner Fold6 QA not done. Do not claim BLACK_VIDEO_FIXED or BINDING_FIXED.
-- EAS preview / `adb install -r` follow the source commit in this turn.
 - Part1E sound-return still DEVICE_QA_BLOCKED_DATA.
 - Foundation V1 not complete.
 
