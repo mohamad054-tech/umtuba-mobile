@@ -62,10 +62,13 @@ import {
   shouldPlayVideo,
   shouldExposeWatchScrub,
   shouldPlayWithUserPause,
-  watchItemKey,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
-import { isWatchCellBindingAligned, watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
+import {
+  isWatchCellBindingAligned,
+  resolveWatchBoundCellSource,
+  watchMediaIdentity,
+} from "@/src/lib/watch/watchCellBinding";
 import {
   markWatchCellBind,
   markWatchTransition,
@@ -425,10 +428,13 @@ function WatchPlayerPane({
     onPlayerStatus?.(status, errorMessage);
   }, [errorMessage, onPlayerStatus, status]);
 
-  const playerSource =
-    nativePlatform === "android"
-      ? { uri: src, useCaching: !isLocalWatchPlaybackUri(src) }
-      : src;
+  const playerSource = useMemo(
+    () =>
+      nativePlatform === "android"
+        ? { uri: src, useCaching: !isLocalWatchPlaybackUri(src) }
+        : src,
+    [nativePlatform, src]
+  );
   const player = useVideoPlayer(playerSource, (p) => {
     // New SharedObject starts silent. Ownership effect unmutes only the active post.
     p.loop = false;
@@ -615,6 +621,15 @@ function WatchPlayerPane({
     };
   }, [player]);
 
+  const attachSurface = shouldAttachWatchSurface({
+    loadPlayer,
+    preparePlayer,
+    itemReady: status === "ready" || nativeStatusRef.current === "readyToPlay",
+    warmNextSurface,
+    isNextItem,
+    platform: nativePlatform,
+  });
+
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;
     const itemReady = status === "ready";
@@ -627,6 +642,9 @@ function WatchPlayerPane({
       playerAlive: true,
       ownerGeneration: ownershipGeneration,
       commandGeneration: ownershipGeneration,
+      surfaceAttached: attachSurface,
+      playerMediaId: mediaId,
+      visibleMediaId: mediaId,
     });
     if (!isActive || !shouldPlay) {
       applyWatchInactiveTeardown(player, {
@@ -709,6 +727,8 @@ function WatchPlayerPane({
     nativePlatform,
     onTimeline,
     playbackRate,
+    attachSurface,
+    mediaId,
   ]);
 
   useEffect(() => {
@@ -753,14 +773,6 @@ function WatchPlayerPane({
   }, [seekRequest, player, onTimeline]);
 
   const { t } = useTranslation();
-  const attachSurface = shouldAttachWatchSurface({
-    loadPlayer,
-    preparePlayer,
-    itemReady: status === "ready" || nativeStatusRef.current === "readyToPlay",
-    warmNextSurface,
-    isNextItem,
-    platform: nativePlatform,
-  });
 
   useEffect(() => {
     if (attachSurface) {
@@ -932,7 +944,24 @@ function WatchVideoCardComponent({
   const seekTokenRef = useRef(0);
   const scrubTargetRatioRef = useRef<number | null>(null);
   const [playerEpoch, setPlayerEpoch] = useState(0);
+  const mediaId = watchMediaIdentity(video);
+  const [boundMediaId, setBoundMediaId] = useState(mediaId);
   const [epochSrc, setEpochSrc] = useState(video.src);
+  const boundSource = resolveWatchBoundCellSource({
+    cellMediaId: mediaId,
+    cellSrc: video.src,
+    playerMediaId: boundMediaId,
+    playerSrc: epochSrc,
+  });
+  if (boundSource.mustReplace) {
+    setBoundMediaId(boundSource.mediaId);
+    setEpochSrc(boundSource.src);
+    setPlayerEpoch((prev) => nextPlayerInstanceGeneration(prev));
+  }
+  const boundSrc = boundSource.src;
+  const boundEpoch = boundSource.mustReplace
+    ? nextPlayerInstanceGeneration(playerEpoch)
+    : playerEpoch;
   const [paneStatus, setPaneStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >("loading");
@@ -942,11 +971,10 @@ function WatchVideoCardComponent({
   const expiredRefreshAttemptedRef = useRef(false);
   const mountPlayer = shouldMountWatchPlayer({
     shouldLoadPlayer: loadPlayer || preparePlayer,
-    src: epochSrc,
+    src: boundSrc,
   });
 
   useEffect(() => {
-    setEpochSrc(video.src);
     expiredRefreshAttemptedRef.current = false;
   }, [video.src]);
 
@@ -1256,9 +1284,9 @@ function WatchVideoCardComponent({
     >
       {mountPlayer ? (
         <WatchPlayerPane
-          key={`watch-player-${watchItemKey(video)}-${playerEpoch}`}
-          src={epochSrc}
-          mediaId={watchMediaIdentity(video)}
+          key={`watch-player-${mediaId}-${boundEpoch}`}
+          src={boundSrc}
+          mediaId={mediaId}
           listIndex={listIndex ?? -1}
           isActive={isActive}
           shouldPlay={shouldPlay}

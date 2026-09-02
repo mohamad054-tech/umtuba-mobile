@@ -232,6 +232,18 @@ describe("5 ACTIVE_ITEM_PRIORITY", () => {
       })
     ).toBe(false);
     expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: true,
+        shouldPlay: true,
+        playerAlive: true,
+        ownerGeneration: 3,
+        commandGeneration: 3,
+        surfaceAttached: false,
+      })
+    ).toBe(false);
+    expect(
       resolveNativePlayerStatusCatchup({
         bound: true,
         nativeStatus: "readyToPlay",

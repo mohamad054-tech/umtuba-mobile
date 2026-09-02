@@ -9,6 +9,7 @@ import {
   clampUnitRatio,
   formatPlaybackClock,
   isLikelyExpiredPlaybackUrl,
+  dedupeWatchVideosPreserveOrder,
   mergeWatchVideos,
   parseWatchAutoNextPreference,
   parseWatchMutedPreference,
@@ -27,6 +28,7 @@ import {
   WATCH_SCRUB_LAYOUT_DIRECTION,
   resolveSeekTime,
   resolveSeekTimeOrNull,
+  resolveWatchIndexFromScrollOffset,
   resolveWatchScrollOffset,
   sanitizePlaybackError,
   serializeWatchAutoNextPreference,
@@ -183,13 +185,22 @@ describe("Android next-surface warm and gated handoff", () => {
         isNextItem: true,
         platform: "android",
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldAttachWatchSurface({
         loadPlayer: false,
         preparePlayer: true,
         itemReady: true,
         warmNextSurface: true,
+        platform: "android",
+      })
+    ).toBe(false);
+    expect(
+      shouldAttachWatchSurface({
+        loadPlayer: true,
+        preparePlayer: true,
+        itemReady: false,
+        warmNextSurface: false,
         platform: "android",
       })
     ).toBe(true);
@@ -239,7 +250,7 @@ describe("Android next-surface warm and gated handoff", () => {
 });
 
 describe("mergeWatchVideos", () => {
-  it("dedupes by video id", () => {
+  it("dedupes by media/post id without reordering", () => {
     const a = video("post-1", 1);
     const b = video("post-2", 2);
     const dup = video("post-1", 1);
@@ -247,6 +258,10 @@ describe("mergeWatchVideos", () => {
       "post-1",
       "post-2",
     ]);
+    const alias = video("clip-alias", 1);
+    expect(
+      dedupeWatchVideosPreserveOrder([a, b, alias]).map((v) => watchItemKey(v))
+    ).toEqual(["post-1", "post-2"]);
   });
 });
 
@@ -405,6 +420,12 @@ describe("auto-next preference and end-of-clip policy", () => {
     expect(resolveWatchScrollOffset(-1, 800)).toBeNull();
     expect(resolveWatchScrollOffset(2, 873.333)).toBe(1746);
     expect(resolveWatchScrollOffset(1.25, 800)).toBeNull();
+    expect(resolveWatchIndexFromScrollOffset(0, 800, 4)).toBe(0);
+    expect(resolveWatchIndexFromScrollOffset(800, 800, 4)).toBe(1);
+    expect(resolveWatchIndexFromScrollOffset(1600, 800, 4)).toBe(2);
+    expect(resolveWatchIndexFromScrollOffset(790, 800, 4)).toBe(1);
+    expect(resolveWatchIndexFromScrollOffset(400, 800, 4)).toBe(1);
+    expect(resolveWatchIndexFromScrollOffset(399, 800, 4)).toBe(0);
   });
 
   it("locks viewability updates during programmatic advance", () => {

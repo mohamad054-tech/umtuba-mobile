@@ -22,6 +22,8 @@ import {
   Text,
   View,
   type AppStateStatus,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -109,6 +111,7 @@ import {
   mergeWatchVideos,
   quantizeWatchVolume,
   resolveNextWatchIndex,
+  resolveWatchIndexFromScrollOffset,
   resolveWatchScrollOffset,
   sanitizeWatchListIndex,
   saveWatchAutoNextPreference,
@@ -235,6 +238,7 @@ export default function WatchScreen() {
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
   const lastLaidOutHeightRef = useRef(WINDOW_HEIGHT);
+  const scrollOffsetRef = useRef(0);
   const cacheSyncGenerationRef = useRef(0);
   const programmaticAdvanceUntilRef = useRef(0);
   const armedUntilMsRef = useRef<number | null>(null);
@@ -307,8 +311,17 @@ export default function WatchScreen() {
     const previous = lastLaidOutHeightRef.current;
     lastLaidOutHeightRef.current = itemHeight;
     if (previous === itemHeight) return;
-    const offset = resolveWatchScrollOffset(activeIndexRef.current, itemHeight);
+    const inferred = resolveWatchIndexFromScrollOffset(
+      scrollOffsetRef.current,
+      previous,
+      videosLengthRef.current
+    );
+    const target = inferred ?? activeIndexRef.current;
+    const offset = resolveWatchScrollOffset(target, itemHeight);
     if (offset == null) return;
+    if (inferred != null) {
+      claimActiveIndexRef.current(inferred);
+    }
     listRef.current?.scrollToOffset({ offset, animated: false });
   }, [itemHeight]);
 
@@ -598,7 +611,7 @@ export default function WatchScreen() {
           limit: 12,
         });
         urlGenerationRef.current += 1;
-        setVideos(page.videos);
+        setVideos(mergeWatchVideos([], page.videos));
         setCursor(page.nextCursor);
         setEndReached(!page.nextCursor);
         claimActiveIndex(0);
@@ -638,22 +651,44 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
+  const commitIndexFromScrollOffset = useCallback((offset: number) => {
+    if (
+      !shouldAcceptViewableIndexUpdate({
+        nowMs: Date.now(),
+        lockUntilMs: programmaticAdvanceUntilRef.current,
+      })
+    ) {
+      return;
+    }
+    const index = resolveWatchIndexFromScrollOffset(
+      offset,
+      itemHeightRef.current,
+      videosLengthRef.current
+    );
+    if (index == null) return;
+    claimActiveIndexRef.current(index);
+  }, []);
+
+  const onWatchScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+    },
+    []
+  );
+
+  const onWatchScrollSettle = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offset = event.nativeEvent.contentOffset.y;
+      scrollOffsetRef.current = offset;
+      commitIndexFromScrollOffset(offset);
+    },
+    [commitIndexFromScrollOffset]
+  );
+
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (
-        !shouldAcceptViewableIndexUpdate({
-          nowMs: Date.now(),
-          lockUntilMs: programmaticAdvanceUntilRef.current,
-        })
-      ) {
-        return;
-      }
-      const first = viewableItems.find(
-        (item) => item.isViewable && item.index != null
-      );
-      if (first?.index != null) {
-        claimActiveIndexRef.current(first.index);
-      }
+      void viewableItems;
+      commitIndexFromScrollOffset(scrollOffsetRef.current);
     }
   ).current;
 
@@ -1527,6 +1562,10 @@ export default function WatchScreen() {
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+        onScroll={onWatchScroll}
+        onMomentumScrollEnd={onWatchScrollSettle}
+        onScrollEndDrag={onWatchScrollSettle}
+        scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

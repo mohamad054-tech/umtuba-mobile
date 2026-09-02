@@ -108,10 +108,10 @@ export function shouldWarmAndroidNextSurface(input: {
 
 /**
  * Surface mount.
- * iOS stays on the load window.
- * Android attaches the active TextureView immediately, and the next
- * prepared neighbor as soon as it is READY. Waiting for near-end warm
- * left swipe 1→2 with item-2 audio and a black surface on Fold6.
+ * Only load-window cells get a TextureView. Android load window is the
+ * active item only. Attaching the next prepared neighbor while still on
+ * item 1 changed Fold6 cell height, snapped the list back to video 1,
+ * and left video 2 as a black surface.
  */
 export function shouldAttachWatchSurface(input: {
   loadPlayer: boolean;
@@ -121,20 +121,12 @@ export function shouldAttachWatchSurface(input: {
   isNextItem?: boolean;
   platform?: string | null;
 }): boolean {
-  if (input.loadPlayer) return true;
-  if (input.platform !== "android") return false;
-  if (
-    input.preparePlayer === true &&
-    input.itemReady === true &&
-    input.isNextItem === true
-  ) {
-    return true;
-  }
-  return (
-    input.preparePlayer === true &&
-    input.itemReady === true &&
-    input.warmNextSurface === true
-  );
+  void input.preparePlayer;
+  void input.itemReady;
+  void input.warmNextSurface;
+  void input.isNextItem;
+  void input.platform;
+  return input.loadPlayer === true;
 }
 
 export type WatchHandoffReadiness =
@@ -166,20 +158,30 @@ export function shouldHandoffWatchAdvance(input: {
   return input.waitedMs >= max;
 }
 
-/** Append page results without duplicating post ids. */
+/** First-seen media/post identity wins. Later duplicates are dropped. */
+export function dedupeWatchVideosPreserveOrder(
+  videos: readonly WatchVideo[]
+): WatchVideo[] {
+  const seen = new Set<string>();
+  const next: WatchVideo[] = [];
+  for (const video of videos) {
+    const key = watchItemKey(video);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(video);
+  }
+  return next;
+}
+
+/** Append page results without duplicating post/media ids or reordering. */
 export function mergeWatchVideos(
   existing: WatchVideo[],
   incoming: WatchVideo[]
 ): WatchVideo[] {
-  if (incoming.length === 0) return existing;
-  const seen = new Set(existing.map((v) => v.id));
-  const merged = existing.slice();
-  for (const video of incoming) {
-    if (seen.has(video.id)) continue;
-    seen.add(video.id);
-    merged.push(video);
+  if (incoming.length === 0) {
+    return dedupeWatchVideosPreserveOrder(existing);
   }
-  return merged;
+  return dedupeWatchVideosPreserveOrder([...existing, ...incoming]);
 }
 
 /** Stable FlatList key — prefer post id, fall back to video id. */
@@ -405,6 +407,25 @@ export function resolveWatchScrollOffset(
   const pixels = toWatchListPixels(itemHeight);
   if (safeIndex == null || pixels == null) return null;
   return safeIndex * pixels;
+}
+
+/**
+ * Authoritative paging index from the settled scroll offset.
+ * Viewability's first 80%-visible item stays one page late on Fold6.
+ */
+export function resolveWatchIndexFromScrollOffset(
+  offset: number,
+  itemHeight: number,
+  itemCount: number
+): number | null {
+  if (!Number.isFinite(offset) || offset < 0) return null;
+  if (!Number.isFinite(itemCount) || itemCount <= 0) return null;
+  const pixels = toWatchListPixels(itemHeight);
+  if (pixels == null) return null;
+  const raw = Math.round(offset / pixels);
+  if (raw < 0) return 0;
+  if (raw >= itemCount) return itemCount - 1;
+  return raw;
 }
 
 /**
