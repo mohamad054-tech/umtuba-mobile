@@ -147,6 +147,7 @@ import {
   resolveFrozenWatchViewport,
   resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
+import { resolveManualWatchNativePin } from "@/src/lib/watch/watchManualPageLock";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -709,7 +710,19 @@ export default function WatchScreen() {
       itemCount: videosLengthRef.current,
     });
     if (index == null) return;
+    const previousIndex = activeIndexRef.current;
     claimActiveIndexRef.current(index);
+    const pin = resolveManualWatchNativePin({
+      previousIndex,
+      claimedIndex: index,
+      itemHeight: itemHeightRef.current,
+    });
+    if (!pin.pin) return;
+    programmaticAdvanceUntilRef.current = Date.now() + pin.lockMs;
+    listRef.current?.scrollToOffset({
+      offset: pin.offset,
+      animated: false,
+    });
   }, []);
 
   const onWatchScroll = useCallback(
