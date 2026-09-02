@@ -4,6 +4,10 @@ import type { WatchVideo } from "@/src/contracts/watch";
 import { isLocalWatchPlaybackUri } from "@/src/lib/feed/videoStoragePath";
 
 import { watchMediaIdentity } from "./watchCellBinding";
+import {
+  loadWatchOfflineManifest,
+  rememberWatchedOfflineVideo,
+} from "./watchOfflineManifest";
 import { markWatchCache } from "./watchTransitionTrace";
 
 /** Bounded Media3 disk cache for Android Watch. LRU, not a gallery download. */
@@ -77,6 +81,7 @@ export type WatchMediaCachePort = {
   ensureDir: (uri: string) => Promise<void>;
   readText: (uri: string) => Promise<string | null>;
   writeText: (uri: string, text: string) => Promise<void>;
+  move: (from: string, to: string) => Promise<void>;
 };
 
 export type WatchCachePlanItem = {
@@ -267,6 +272,8 @@ export async function syncAndroidWatchRollingCache(input: {
   platform?: string | null;
   videos: WatchVideo[];
   activeIndex: number;
+  accountId?: string | null;
+  now?: number;
   port?: WatchMediaCachePort;
   onResolved?: (videoId: string, localUri: string) => void;
 }): Promise<WatchCacheSyncResult> {
@@ -294,6 +301,18 @@ export async function syncAndroidWatchRollingCache(input: {
   const mediaDir = `${dir}${ANDROID_WATCH_CACHE_DIR_NAME}`;
   await port.ensureDir(mediaDir);
 
+  const retainedMediaIds = new Set<string>();
+  if (input.accountId) {
+    const offline = await loadWatchOfflineManifest({
+      accountId: input.accountId,
+      port,
+      verifyFiles: false,
+    });
+    for (const row of offline.entries) {
+      retainedMediaIds.add(row.mediaId);
+    }
+  }
+
   const nextEntries: WatchCacheEntry[] = [];
   const hits: string[] = [];
   const misses: string[] = [];
@@ -302,10 +321,12 @@ export async function syncAndroidWatchRollingCache(input: {
   for (const entry of manifest.entries) {
     if (plan.evictIds.includes(entry.mediaId)) {
       evicted.push(entry.mediaId);
-      try {
-        await port.delete(entry.uri);
-      } catch {
-        // Best-effort eviction.
+      if (!retainedMediaIds.has(entry.mediaId)) {
+        try {
+          await port.delete(entry.uri);
+        } catch {
+          // Best-effort eviction.
+        }
       }
       continue;
     }
@@ -359,6 +380,27 @@ export async function syncAndroidWatchRollingCache(input: {
     entries: nextEntries.slice(0, ANDROID_WATCH_CACHE_TARGET),
   };
   await writeManifest(port, manifestUri, nextManifest);
+
+  if (input.accountId) {
+    const now = input.now ?? Date.now();
+    const activeVideo = input.videos[input.activeIndex];
+    const activeMediaId = activeVideo ? watchMediaIdentity(activeVideo) : null;
+    for (const video of input.videos) {
+      const mediaId = watchMediaIdentity(video);
+      const cached = nextManifest.entries.find((row) => row.mediaId === mediaId);
+      if (!cached) continue;
+      const remoteUri = isLocalWatchPlaybackUri(video.src) ? undefined : video.src;
+      await rememberWatchedOfflineVideo({
+        accountId: input.accountId,
+        video,
+        localUri: cached.uri,
+        remoteUri,
+        now,
+        touchWatched: mediaId === activeMediaId,
+        port,
+      });
+    }
+  }
 
   const result: WatchCacheSyncResult = {
     target: ANDROID_WATCH_CACHE_TARGET,
@@ -419,6 +461,7 @@ export function createFileSystemWatchMediaCachePort(): WatchMediaCachePort {
       destUri: string
     ) => Promise<{ uri: string; status: number }>;
     deleteAsync: (uri: string, options?: { idempotent?: boolean }) => Promise<void>;
+    moveAsync: (options: { from: string; to: string }) => Promise<void>;
     makeDirectoryAsync: (
       uri: string,
       options?: { intermediates?: boolean }
@@ -453,6 +496,7 @@ export function createFileSystemWatchMediaCachePort(): WatchMediaCachePort {
       }
     },
     writeText: (uri, text) => FileSystem.writeAsStringAsync(uri, text),
+    move: (from, to) => FileSystem.moveAsync({ from, to }),
   };
 }
 
@@ -466,6 +510,12 @@ function resolvePort(port?: WatchMediaCachePort): WatchMediaCachePort | null {
     }
   }
   return defaultWatchMediaCachePort;
+}
+
+export function resolveWatchMediaCachePort(
+  port?: WatchMediaCachePort
+): WatchMediaCachePort | null {
+  return resolvePort(port);
 }
 
 export function __setWatchMediaCachePortForTests(
@@ -497,6 +547,12 @@ export function createMemoryWatchMediaCachePort(
     readText: async (uri) => files.get(uri) ?? null,
     writeText: async (uri, text) => {
       files.set(uri, text);
+    },
+    move: async (from, to) => {
+      const text = files.get(from);
+      if (text == null) return;
+      files.set(to, text);
+      files.delete(from);
     },
   };
 }

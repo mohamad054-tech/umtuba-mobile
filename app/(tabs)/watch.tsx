@@ -139,6 +139,7 @@ import {
   peekAndroidWatchCacheHits,
   syncAndroidWatchRollingCache,
 } from "@/src/lib/watch/androidWatchMediaCache";
+import { resolveWatchStartupFeed } from "@/src/lib/watch/watchOfflineManifest";
 import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
 import {
   preserveWatchPostAcrossLayoutSession,
@@ -630,14 +631,27 @@ export default function WatchScreen() {
       setError(null);
       try {
         const supabase = getSupabase();
-        const page = await fetchWatchFeedPage(supabase, {
-          focusPostId,
-          limit: 12,
+        const startup = await resolveWatchStartupFeed({
+          accountId: user?.id ?? null,
+          fetchFeed: () =>
+            fetchWatchFeedPage(supabase, {
+              focusPostId,
+              limit: 12,
+            }),
         });
         urlGenerationRef.current += 1;
-        setVideos(mergeWatchVideos([], page.videos));
-        setCursor(page.nextCursor);
-        setEndReached(!page.nextCursor);
+        if (startup.source === "offline" && startup.videos.length === 0) {
+          setError(t("watch.loadFailed"));
+          return;
+        }
+        setVideos(mergeWatchVideos([], startup.videos));
+        if (startup.page) {
+          setCursor(startup.page.nextCursor);
+          setEndReached(!startup.page.nextCursor);
+        } else {
+          setCursor(null);
+          setEndReached(true);
+        }
         claimActiveIndex(0);
       } catch (err) {
         setError(getErrorMessage(err, t("watch.loadFailed")));
@@ -796,6 +810,7 @@ export default function WatchScreen() {
       platform: "android",
       videos: snapshot,
       activeIndex,
+      accountId: user?.id ?? null,
       onResolved: (videoId, localUri) => {
         if (cacheSyncGenerationRef.current !== generation) return;
         const current = visibleVideosRef.current.find(
@@ -805,7 +820,7 @@ export default function WatchScreen() {
         patchVideo(videoId, { src: localUri });
       },
     });
-  }, [activeIndex, patchVideo, playbackIdentity]);
+  }, [activeIndex, patchVideo, playbackIdentity, user?.id]);
 
   const onToggleLike = useCallback(
     async (video: WatchVideo) => {

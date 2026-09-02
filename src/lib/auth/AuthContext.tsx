@@ -34,6 +34,7 @@ import { shouldSkipInitialSessionClobber } from "@/src/lib/auth/sessionHydration
 import type { UserProfile } from "@/src/lib/auth/types";
 import { unregisterPushOnLogout } from "@/src/lib/push/service";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { clearWatchOfflineManifestForAccount } from "@/src/lib/watch/watchOfflineManifest";
 
 type AuthContextValue = {
   session: Session | null;
@@ -332,6 +333,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await unregisterPushOnLogout(currentUserId);
     } catch (err) {
       console.warn("push unregister on logout failed:", err);
+    }
+    try {
+      await clearWatchOfflineManifestForAccount({ accountId: currentUserId });
+    } catch (err) {
+      console.warn("watch offline manifest logout cleanup failed:", err);
     }
     const supabase = getSupabase();
     const { error: signOutError } = await supabase.auth.signOut();
