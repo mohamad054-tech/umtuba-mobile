@@ -6,6 +6,10 @@ import {
 
 import type { WatchMediaCachePort } from "./androidWatchMediaCache";
 import { watchMediaIdentity } from "./watchCellBinding";
+import {
+  resolveRetainedWatchPlaybackSrc,
+  retainedWatchEntryMatchesFeedItem,
+} from "./watchRetainedPlaybackFallback";
 
 /** Account-scoped Watch offline snapshots. Complements rolling file cache. */
 export const WATCH_OFFLINE_MANIFEST_TARGET = 5;
@@ -382,18 +386,102 @@ export function reconcileWatchFeedWithOfflineManifest(
 ): WatchVideo[] {
   if (retained.length === 0) return feed;
   const byPostId = new Map<number, WatchVideo>();
-  const byId = new Map<string, WatchVideo>();
   for (const video of retained) {
     if (video.postId != null) byPostId.set(video.postId, video);
-    byId.set(video.id, video);
   }
   return feed.map((video) => {
-    const hit =
-      (video.postId != null ? byPostId.get(video.postId) : undefined) ??
-      byId.get(video.id);
+    const hit = video.postId != null ? byPostId.get(video.postId) : undefined;
     if (!hit || !isLocalWatchPlaybackUri(hit.src)) return video;
+    if (
+      !retainedWatchEntryMatchesFeedItem(
+        {
+          postId: hit.postId ?? -1,
+          videoId: hit.id,
+          mediaId: watchMediaIdentity(hit),
+        },
+        video
+      )
+    ) {
+      return video;
+    }
     return { ...video, src: hit.src };
   });
+}
+
+export async function applyRetainedLocalSourcesToFeed(input: {
+  feed: WatchVideo[];
+  retained: WatchOfflineManifestEntry[];
+  port: WatchMediaCachePort;
+}): Promise<{ videos: WatchVideo[]; prunedMediaIds: string[] }> {
+  const prunedMediaIds: string[] = [];
+  const videos: WatchVideo[] = [];
+  for (const video of input.feed) {
+    const entry = input.retained.find((row) =>
+      retainedWatchEntryMatchesFeedItem(row, video)
+    );
+    if (!entry) {
+      videos.push(video);
+      continue;
+    }
+    const resolved = await resolveRetainedWatchPlaybackSrc({
+      video,
+      retained: entry,
+      port: input.port,
+    });
+    if (resolved.invalidated) {
+      prunedMediaIds.push(entry.mediaId);
+    }
+    videos.push({ ...video, src: resolved.src || video.src });
+  }
+  return { videos, prunedMediaIds };
+}
+
+export async function invalidateStaleWatchRetainedSources(input: {
+  accountId: string | null | undefined;
+  mediaId: string;
+  port?: WatchMediaCachePort | null;
+}): Promise<void> {
+  const port = await resolveOptionalPort(input.port);
+  if (!port || !input.mediaId) return;
+  await invalidateStaleWatchOfflineEntries({
+    accountId: input.accountId,
+    mediaIds: [input.mediaId],
+    port,
+  });
+  const { invalidateStaleAndroidWatchCacheEntries } = await import(
+    "./androidWatchMediaCache"
+  );
+  await invalidateStaleAndroidWatchCacheEntries({
+    mediaIds: [input.mediaId],
+    port,
+  });
+}
+
+export async function invalidateStaleWatchOfflineEntries(input: {
+  accountId: string | null | undefined;
+  mediaIds: string[];
+  port?: WatchMediaCachePort | null;
+}): Promise<WatchOfflineManifest> {
+  const accountId = sanitizeWatchOfflineAccountId(input.accountId);
+  const empty = emptyWatchOfflineManifest(accountId ?? "");
+  if (!accountId || input.mediaIds.length === 0) return empty;
+  const port = await resolveOptionalPort(input.port);
+  if (!port) return empty;
+  const current = await loadWatchOfflineManifest({
+    accountId,
+    port,
+    verifyFiles: false,
+  });
+  const drop = new Set(input.mediaIds);
+  const next: WatchOfflineManifest = {
+    ...current,
+    accountId,
+    entries: current.entries.filter((row) => !drop.has(row.mediaId)),
+  };
+  if (next.entries.length !== current.entries.length) {
+    await persistWatchOfflineManifest({ accountId, manifest: next, port });
+  }
+  return next;
 }
 
 export function offlineBootstrapUsesFileUrisOnly(
@@ -668,6 +756,8 @@ export async function rememberWatchedOfflineVideo(input: {
     port,
     verifyFiles: false,
   });
+  const sourceOk = await existsWithSize(port, input.localUri);
+  if (!sourceOk) return { manifest: current, evicted: [] };
   const durableUri = await copyWatchVideoToDurableStore({
     accountId,
     sourceUri: input.localUri,
@@ -675,6 +765,9 @@ export async function rememberWatchedOfflineVideo(input: {
     port,
   });
   if (!durableUri) return { manifest: current, evicted: [] };
+  if (!(await existsWithSize(port, durableUri))) {
+    return { manifest: current, evicted: [] };
+  }
   const existing =
     current.entries.find(
       (row) =>
@@ -782,12 +875,33 @@ export async function resolveWatchStartupFeed<
   });
   const retained = watchVideosFromOfflineManifest(retainedManifest);
   const timeoutMs = input.timeoutMs ?? WATCH_FEED_BOOTSTRAP_TIMEOUT_MS;
+  const port = await resolveOptionalPort(input.port);
 
   try {
     const page = await withTimeout(input.fetchFeed(), timeoutMs);
+    if (!port) {
+      return {
+        page,
+        videos: reconcileWatchFeedWithOfflineManifest(page.videos, retained),
+        source: "feed",
+        timedOut: false,
+      };
+    }
+    const applied = await applyRetainedLocalSourcesToFeed({
+      feed: page.videos,
+      retained: retainedManifest.entries,
+      port,
+    });
+    if (applied.prunedMediaIds.length > 0) {
+      await invalidateStaleWatchOfflineEntries({
+        accountId: input.accountId,
+        mediaIds: applied.prunedMediaIds,
+        port,
+      });
+    }
     return {
       page,
-      videos: reconcileWatchFeedWithOfflineManifest(page.videos, retained),
+      videos: applied.videos,
       source: "feed",
       timedOut: false,
     };

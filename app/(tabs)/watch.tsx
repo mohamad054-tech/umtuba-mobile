@@ -36,6 +36,7 @@ import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { REPORT_REASON_KEYS, useTranslation } from "@/src/lib/i18n";
+import { isLocalWatchPlaybackUri } from "@/src/lib/feed/videoStoragePath";
 import {
   prepareWatchPlaybackUrls,
   shouldApplyResolvedWatchSrc,
@@ -137,10 +138,19 @@ import {
   ANDROID_WATCH_CACHE_TARGET,
   ensureAndroidWatchVideoCache,
   peekAndroidWatchCacheHits,
+  resolveWatchMediaCachePort,
   syncAndroidWatchRollingCache,
 } from "@/src/lib/watch/androidWatchMediaCache";
-import { resolveWatchStartupFeed } from "@/src/lib/watch/watchOfflineManifest";
+import {
+  invalidateStaleWatchRetainedSources,
+  resolveWatchStartupFeed,
+} from "@/src/lib/watch/watchOfflineManifest";
 import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
+import {
+  inspectLocalWatchPlaybackFile,
+  isolatePrefetchFailureFromActiveCell,
+  shouldApplyLocalWatchUriToVideo,
+} from "@/src/lib/watch/watchRetainedPlaybackFallback";
 import {
   preserveWatchPostAcrossLayoutSession,
   reconcileWatchActiveIndex,
@@ -779,13 +789,34 @@ export default function WatchScreen() {
       isCurrent: () => urlGenerationRef.current === generation,
       onResolved: (id, src) => {
         if (urlGenerationRef.current !== generation) return;
-        const current = visibleVideosRef.current.find((video) => video.id === id)
-          ?.src;
-        if (!shouldApplyResolvedWatchSrc(current, src)) return;
-        patchVideo(id, { src });
+        const video = visibleVideosRef.current.find((row) => row.id === id);
+        const current = video?.src;
+        void (async () => {
+          const port = resolveWatchMediaCachePort();
+          let currentLocalUsable: boolean | undefined;
+          if (isLocalWatchPlaybackUri(current) && port) {
+            currentLocalUsable = (
+              await inspectLocalWatchPlaybackFile(port, current)
+            ).usable;
+            if (!currentLocalUsable && video) {
+              await invalidateStaleWatchRetainedSources({
+                accountId: user?.id ?? null,
+                mediaId: watchMediaIdentity(video),
+                port,
+              });
+            }
+          }
+          if (urlGenerationRef.current !== generation) return;
+          if (
+            !shouldApplyResolvedWatchSrc(current, src, { currentLocalUsable })
+          ) {
+            return;
+          }
+          patchVideo(id, { src });
+        })();
       },
     });
-  }, [activeIndex, patchVideo, playbackIdentity]);
+  }, [activeIndex, patchVideo, playbackIdentity, user?.id]);
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
@@ -795,10 +826,20 @@ export default function WatchScreen() {
     void peekAndroidWatchCacheHits({ videos: snapshot }).then((hits) => {
       if (cancelled) return;
       for (const hit of hits) {
-        const current = visibleVideosRef.current.find(
-          (video) => video.id === hit.videoId
-        )?.src;
-        if (current === hit.uri) continue;
+        const video = visibleVideosRef.current.find(
+          (row) => row.id === hit.videoId
+        );
+        if (!video || video.src === hit.uri) continue;
+        if (
+          !shouldApplyLocalWatchUriToVideo({
+            video,
+            candidateMediaId: hit.mediaId,
+            candidateUri: hit.uri,
+            fileUsable: true,
+          })
+        ) {
+          continue;
+        }
         patchVideo(hit.videoId, { src: hit.uri });
       }
       if (hits.length > 0) {
@@ -829,12 +870,31 @@ export default function WatchScreen() {
       accountId: user?.id ?? null,
       onResolved: (videoId, localUri) => {
         if (cacheSyncGenerationRef.current !== generation) return;
-        const current = visibleVideosRef.current.find(
-          (video) => video.id === videoId
-        )?.src;
-        if (current === localUri) return;
+        const video = visibleVideosRef.current.find(
+          (row) => row.id === videoId
+        );
+        if (!video || video.src === localUri) return;
+        if (
+          !shouldApplyLocalWatchUriToVideo({
+            video,
+            candidateMediaId: watchMediaIdentity(video),
+            candidateUri: localUri,
+            fileUsable: true,
+          })
+        ) {
+          return;
+        }
         patchVideo(videoId, { src: localUri });
       },
+    }).catch(() => {
+      const active = visibleVideosRef.current[activeIndex];
+      if (!active) return;
+      isolatePrefetchFailureFromActiveCell({
+        failedMediaId: "prefetch",
+        activeMediaId: watchMediaIdentity(active),
+        activeSrc: active.src,
+        activeError: null,
+      });
     });
   }, [activeIndex, patchVideo, playbackIdentity, user?.id]);
 

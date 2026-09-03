@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { WatchVideo } from "@/src/contracts/watch";
-import { isLocalWatchPlaybackUri } from "@/src/lib/feed/videoStoragePath";
+import {
+  isLegacyHttpPlaybackUrl,
+  isLocalWatchPlaybackUri,
+} from "@/src/lib/feed/videoStoragePath";
 import {
   createSignedUrlCache,
   watchSignedUrlCache,
@@ -34,12 +37,21 @@ const defaultDeduper = createInflightDeduper<string | null>();
 /** Skip patching a card when the signed URL did not actually change. */
 export function shouldApplyResolvedWatchSrc(
   currentSrc: string | null | undefined,
-  nextSrc: string | null | undefined
+  nextSrc: string | null | undefined,
+  options?: { currentLocalUsable?: boolean }
 ): boolean {
   const current = (currentSrc ?? "").trim();
   const next = (nextSrc ?? "").trim();
   if (!next) return false;
-  if (isLocalWatchPlaybackUri(current)) return false;
+  if (isLocalWatchPlaybackUri(current)) {
+    if (
+      options?.currentLocalUsable === false &&
+      isLegacyHttpPlaybackUrl(next)
+    ) {
+      return true;
+    }
+    return false;
+  }
   return current !== next;
 }
 

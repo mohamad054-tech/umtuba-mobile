@@ -9,6 +9,10 @@ import {
   rememberWatchedOfflineVideo,
 } from "./watchOfflineManifest";
 import { markWatchCache } from "./watchTransitionTrace";
+import {
+  inspectLocalWatchPlaybackFile,
+  shouldApplyLocalWatchUriToVideo,
+} from "./watchRetainedPlaybackFallback";
 
 /** Bounded Media3 disk cache for Android Watch. LRU, not a gallery download. */
 export const ANDROID_WATCH_VIDEO_CACHE_BYTES = 192 * 1024 * 1024;
@@ -283,13 +287,55 @@ export async function peekAndroidWatchCacheHits(input: {
   if (!port) return [];
   const { manifest } = await readManifest(port);
   const hits: WatchCacheHit[] = [];
+  const staleMediaIds: string[] = [];
   for (const video of input.videos) {
     const mediaId = watchMediaIdentity(video);
     const entry = manifest.entries.find((row) => row.mediaId === mediaId);
-    if (!entry || !(await entryStillOnDisk(port, entry))) continue;
+    if (!entry) continue;
+    const check = await inspectLocalWatchPlaybackFile(port, entry.uri);
+    if (!check.usable) {
+      staleMediaIds.push(mediaId);
+      continue;
+    }
+    if (
+      !shouldApplyLocalWatchUriToVideo({
+        video,
+        candidateMediaId: entry.mediaId,
+        candidateUri: entry.uri,
+        fileUsable: true,
+      })
+    ) {
+      continue;
+    }
     hits.push({ videoId: video.id, mediaId, uri: entry.uri });
   }
+  if (staleMediaIds.length > 0) {
+    await invalidateStaleAndroidWatchCacheEntries({
+      mediaIds: staleMediaIds,
+      port,
+    });
+  }
   return hits;
+}
+
+export async function invalidateStaleAndroidWatchCacheEntries(input: {
+  mediaIds: string[];
+  port?: WatchMediaCachePort;
+}): Promise<WatchCacheManifest> {
+  const port = resolvePort(input.port);
+  if (!port || input.mediaIds.length === 0) {
+    return emptyWatchCacheManifest();
+  }
+  const { manifestUri, manifest } = await readManifest(port);
+  const drop = new Set(input.mediaIds);
+  const next: WatchCacheManifest = {
+    target: ANDROID_WATCH_CACHE_TARGET,
+    entries: manifest.entries.filter((row) => !drop.has(row.mediaId)),
+  };
+  if (next.entries.length !== manifest.entries.length) {
+    await writeManifest(port, manifestUri, next);
+  }
+  return next;
 }
 
 export async function syncAndroidWatchRollingCache(input: {
@@ -330,7 +376,7 @@ export async function syncAndroidWatchRollingCache(input: {
     const offline = await loadWatchOfflineManifest({
       accountId: input.accountId,
       port,
-      verifyFiles: false,
+      verifyFiles: true,
     });
     for (const row of offline.entries) {
       retainedMediaIds.add(row.mediaId);
@@ -366,7 +412,17 @@ export async function syncAndroidWatchRollingCache(input: {
     const existing = nextEntries.find((row) => row.mediaId === mediaId);
     if (existing) {
       hits.push(mediaId);
-      if (!isLocalWatchPlaybackUri(video.src)) {
+      const usable = await inspectLocalWatchPlaybackFile(port, existing.uri);
+      if (
+        usable.usable &&
+        shouldApplyLocalWatchUriToVideo({
+          video,
+          candidateMediaId: existing.mediaId,
+          candidateUri: existing.uri,
+          fileUsable: true,
+        }) &&
+        !isLocalWatchPlaybackUri(video.src)
+      ) {
         input.onResolved?.(video.id, existing.uri);
       }
       continue;
@@ -391,6 +447,22 @@ export async function syncAndroidWatchRollingCache(input: {
       cachedAt: Date.now(),
     };
     if (!isValidWatchCacheEntry(entry)) {
+      try {
+        await port.delete(downloaded);
+      } catch {
+        // Drop incomplete cache files so they cannot be served later.
+      }
+      misses.push(mediaId);
+      continue;
+    }
+    if (
+      !shouldApplyLocalWatchUriToVideo({
+        video,
+        candidateMediaId: entry.mediaId,
+        candidateUri: entry.uri,
+        fileUsable: true,
+      })
+    ) {
       misses.push(mediaId);
       continue;
     }
@@ -456,12 +528,38 @@ async function downloadWatchCacheFile(
       if (await port.exists(destUri)) {
         const size = await port.size(destUri);
         if (size > 0) return destUri;
+        try {
+          await port.delete(destUri);
+        } catch {
+          // Replace a zero-byte leftover before writing.
+        }
       }
       const downloaded = await port.download(src, destUri);
-      if (downloaded.status < 200 || downloaded.status >= 300) return null;
+      if (downloaded.status < 200 || downloaded.status >= 300) {
+        try {
+          await port.delete(destUri);
+        } catch {
+          // Interrupted / failed download must not remain as a hit.
+        }
+        return null;
+      }
       if (!isLocalWatchPlaybackUri(downloaded.uri)) return null;
+      const size = await port.size(downloaded.uri);
+      if (!(size > 0)) {
+        try {
+          await port.delete(downloaded.uri);
+        } catch {
+          // Zero-byte dest is not a cache hit.
+        }
+        return null;
+      }
       return downloaded.uri;
     } catch {
+      try {
+        await port.delete(destUri);
+      } catch {
+        // Best-effort cleanup after an interrupted download.
+      }
       return null;
     } finally {
       inflightDownloads.delete(mediaId);
