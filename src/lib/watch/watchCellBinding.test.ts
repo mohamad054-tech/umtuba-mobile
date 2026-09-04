@@ -109,7 +109,7 @@ describe("Watch 1 → 2 swipe binding", () => {
         playerMediaId: "post-2",
         visibleMediaId: "post-2",
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -258,7 +258,7 @@ describe("recycled cell source replacement", () => {
         playerMediaId: "post-1",
         visibleMediaId: "post-2",
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -292,7 +292,7 @@ describe("Android surface attach", () => {
         warmNextSurface: true,
         platform: "android",
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 

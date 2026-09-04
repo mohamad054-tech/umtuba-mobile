@@ -107,11 +107,10 @@ export function shouldWarmAndroidNextSurface(input: {
 }
 
 /**
- * Surface mount.
- * Only load-window cells get a TextureView. Android load window is the
- * active item only. Attaching the next prepared neighbor while still on
- * item 1 changed Fold6 cell height, snapped the list back to video 1,
- * and left video 2 as a black surface.
+ * Surface mount from the last owner-working Watch runtime (b5cba17).
+ * Active load-window cells always attach. Android may also attach the
+ * next prepared neighbor once it is READY and warmed — that handoff
+ * TextureView must not own paging or activeIndex.
  */
 export function shouldAttachWatchSurface(input: {
   loadPlayer: boolean;
@@ -121,12 +120,14 @@ export function shouldAttachWatchSurface(input: {
   isNextItem?: boolean;
   platform?: string | null;
 }): boolean {
-  void input.preparePlayer;
-  void input.itemReady;
-  void input.warmNextSurface;
   void input.isNextItem;
-  void input.platform;
-  return input.loadPlayer === true;
+  if (input.loadPlayer) return true;
+  if (input.platform !== "android") return false;
+  return (
+    input.preparePlayer === true &&
+    input.itemReady === true &&
+    input.warmNextSurface === true
+  );
 }
 
 export type WatchHandoffReadiness =
@@ -410,8 +411,8 @@ export function resolveWatchScrollOffset(
 }
 
 /**
- * Authoritative paging index from the settled scroll offset.
- * Viewability's first 80%-visible item stays one page late on Fold6.
+ * Diagnostic helper only. Watch paging ownership is viewability +
+ * claimActiveIndex. Cache / scroll-offset math must not write activeIndex.
  */
 export function resolveWatchIndexFromScrollOffset(
   offset: number,
@@ -440,6 +441,28 @@ export function shouldAcceptViewableIndexUpdate(input: {
     return true;
   }
   return input.nowMs >= input.lockUntilMs;
+}
+
+/** First 80%-visible item is the only manual paging source. */
+export function resolveWatchActiveIndexFromViewableItems(input: {
+  viewableIndexes: readonly (number | null | undefined)[];
+  nowMs: number;
+  lockUntilMs: number;
+}): number | null {
+  if (
+    !shouldAcceptViewableIndexUpdate({
+      nowMs: input.nowMs,
+      lockUntilMs: input.lockUntilMs,
+    })
+  ) {
+    return null;
+  }
+  for (const index of input.viewableIndexes) {
+    if (index == null) continue;
+    const safe = sanitizeWatchListIndex(index);
+    if (safe != null) return safe;
+  }
+  return null;
 }
 
 /** Clamp a unit scrub ratio to 0..1. */

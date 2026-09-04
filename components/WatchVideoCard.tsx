@@ -66,7 +66,6 @@ import {
 } from "@/src/lib/watch/playbackPolicy";
 import {
   isWatchCellBindingAligned,
-  resolveWatchBoundCellSource,
   watchMediaIdentity,
 } from "@/src/lib/watch/watchCellBinding";
 import {
@@ -1011,21 +1010,12 @@ function WatchVideoCardComponent({
   const mediaId = watchMediaIdentity(video);
   const [boundMediaId, setBoundMediaId] = useState(mediaId);
   const [epochSrc, setEpochSrc] = useState(video.src);
-  const boundSource = resolveWatchBoundCellSource({
-    cellMediaId: mediaId,
-    cellSrc: video.src,
-    playerMediaId: boundMediaId,
-    playerSrc: epochSrc,
-  });
-  if (boundSource.mustReplace) {
-    setBoundMediaId(boundSource.mediaId);
-    setEpochSrc(boundSource.src);
-    setPlayerEpoch((prev) => nextPlayerInstanceGeneration(prev));
-  }
-  const boundSrc = boundSource.src;
-  const boundEpoch = boundSource.mustReplace
-    ? nextPlayerInstanceGeneration(playerEpoch)
-    : playerEpoch;
+  useEffect(() => {
+    setBoundMediaId(mediaId);
+    setEpochSrc(video.src);
+  }, [mediaId, video.src]);
+  const boundSrc = epochSrc;
+  const boundEpoch = playerEpoch;
   const [paneStatus, setPaneStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >("loading");

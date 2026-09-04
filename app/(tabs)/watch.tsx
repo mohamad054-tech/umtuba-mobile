@@ -23,8 +23,6 @@ import {
   View,
   type AppStateStatus,
   type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -153,10 +151,7 @@ import {
 } from "@/src/lib/watch/watchRetainedPlaybackFallback";
 import {
   preserveWatchPostAcrossLayoutSession,
-  reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
-  resolveManualFirstWatchNativePin,
-  resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
 import {
   previousRouteNameFromState,
@@ -259,7 +254,6 @@ export default function WatchScreen() {
     height: number | null;
     width: number | null;
   }>({ height: null, width: null });
-  const scrollOffsetRef = useRef(0);
   const cacheSyncGenerationRef = useRef(0);
   const programmaticAdvanceUntilRef = useRef(0);
   const armedUntilMsRef = useRef<number | null>(null);
@@ -700,64 +694,22 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
-  const commitIndexFromScrollOffset = useCallback((offset: number) => {
-    if (
-      !shouldAcceptViewableIndexUpdate({
-        nowMs: Date.now(),
-        lockUntilMs: programmaticAdvanceUntilRef.current,
-      })
-    ) {
-      return;
-    }
-    const nativePage = resolveWatchNativePage(
-      offset,
-      itemHeightRef.current,
-      videosLengthRef.current
-    );
-    const index = reconcileWatchActiveIndex({
-      nativePage,
-      activeIndex: activeIndexRef.current,
-      itemCount: videosLengthRef.current,
-    });
-    if (index == null) return;
-    const fromIndex = activeIndexRef.current;
-    claimActiveIndexRef.current(index);
-    const frozenItemHeight =
-      viewportFrozenRef.current.height ?? itemHeightRef.current;
-    const pinOffset = resolveManualFirstWatchNativePin({
-      fromIndex,
-      toIndex: index,
-      frozenItemHeight,
-    });
-    if (pinOffset == null) return;
-    programmaticAdvanceUntilRef.current =
-      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
-    listRef.current?.scrollToOffset({
-      offset: pinOffset,
-      animated: false,
-    });
-  }, []);
-
-  const onWatchScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-    },
-    []
-  );
-
-  const onWatchScrollSettle = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offset = event.nativeEvent.contentOffset.y;
-      scrollOffsetRef.current = offset;
-      commitIndexFromScrollOffset(offset);
-    },
-    [commitIndexFromScrollOffset]
-  );
-
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      void viewableItems;
-      commitIndexFromScrollOffset(scrollOffsetRef.current);
+      if (
+        !shouldAcceptViewableIndexUpdate({
+          nowMs: Date.now(),
+          lockUntilMs: programmaticAdvanceUntilRef.current,
+        })
+      ) {
+        return;
+      }
+      const first = viewableItems.find(
+        (item) => item.isViewable && item.index != null
+      );
+      if (first?.index != null) {
+        claimActiveIndexRef.current(first.index);
+      }
     }
   ).current;
 
@@ -1677,10 +1629,6 @@ export default function WatchScreen() {
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
-        onScroll={onWatchScroll}
-        onMomentumScrollEnd={onWatchScrollSettle}
-        onScrollEndDrag={onWatchScrollSettle}
-        scrollEventThrottle={16}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

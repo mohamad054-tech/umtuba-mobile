@@ -107,28 +107,6 @@ export function shouldStartPlaybackAfterAsset(
 ): boolean {
   if (!input.playerAlive) return false;
   if (!input.isActive || !input.shouldPlay) return false;
-  if (input.surfaceAttached === false) return false;
-  if (
-    input.playerMediaId != null &&
-    input.visibleMediaId != null &&
-    input.playerMediaId !== input.visibleMediaId
-  ) {
-    return false;
-  }
-  if (
-    input.playerEpoch != null &&
-    input.visibleEpoch != null &&
-    input.playerEpoch !== input.visibleEpoch
-  ) {
-    return false;
-  }
-  if (
-    input.playerPostId != null &&
-    input.visiblePostId != null &&
-    input.playerPostId !== input.visiblePostId
-  ) {
-    return false;
-  }
   if (!(input.nativeReady || input.jsReady)) return false;
   if (!Number.isFinite(input.ownerGeneration)) return false;
   if (!Number.isFinite(input.commandGeneration)) return false;

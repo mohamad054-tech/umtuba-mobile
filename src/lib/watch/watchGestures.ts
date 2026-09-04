@@ -6,6 +6,9 @@
 /** Short enough that play/pause still feels immediate. */
 export const WATCH_DOUBLE_TAP_WINDOW_MS = 240;
 
+/** Below this movement a pointer is a tap, never a swipe. */
+export const WATCH_SWIPE_MOVE_THRESHOLD_PX = 8;
+
 export const WATCH_LIKE_ACK_MS = 320;
 
 /** Above the double-tap window so long-press cannot be a second tap. */
@@ -69,6 +72,21 @@ export function shouldDispatchWatchVideoTap(
   surface: WatchGestureSurface
 ): boolean {
   return surface === "video";
+}
+
+/**
+ * FlatList owns vertical paging. A tap without meaningful movement
+ * must never be classified as a swipe.
+ */
+export function shouldTreatWatchPointerAsSwipe(input: {
+  movedPx: number;
+  thresholdPx?: number;
+}): boolean {
+  const threshold =
+    typeof input.thresholdPx === "number" && input.thresholdPx > 0
+      ? input.thresholdPx
+      : WATCH_SWIPE_MOVE_THRESHOLD_PX;
+  return Number.isFinite(input.movedPx) && Math.abs(input.movedPx) >= threshold;
 }
 
 export function shouldMountWatchVideoTapLayer(input: {

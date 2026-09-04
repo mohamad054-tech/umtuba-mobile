@@ -8,6 +8,7 @@ import {
   shouldDispatchWatchVideoTap,
   shouldEnableWatchPullToRefresh,
   shouldMountWatchVideoTapLayer,
+  shouldTreatWatchPointerAsSwipe,
   type WatchGestureSurface,
 } from "./watchGestures";
 
@@ -115,6 +116,15 @@ describe("Watch gesture surfaces", () => {
         }),
       })
     ).toBe(true);
+  });
+});
+
+describe("tap vs swipe", () => {
+  it("does not treat a tap without meaningful movement as a swipe", () => {
+    expect(shouldTreatWatchPointerAsSwipe({ movedPx: 0 })).toBe(false);
+    expect(shouldTreatWatchPointerAsSwipe({ movedPx: 3 })).toBe(false);
+    expect(shouldTreatWatchPointerAsSwipe({ movedPx: 8 })).toBe(true);
+    expect(shouldTreatWatchPointerAsSwipe({ movedPx: -12 })).toBe(true);
   });
 });
 

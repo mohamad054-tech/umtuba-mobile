@@ -29,23 +29,23 @@ const GATE_BASE = {
   loop: false,
 };
 
-describe("1 readyToPlay without surface is not audible", () => {
-  it("blocks play when surfaceAttached is false", () => {
+describe("1 readyToPlay can start without a surface-gate stall", () => {
+  it("starts when surfaceAttached is false so tap pause/play stays live", () => {
     expect(
       shouldStartPlaybackAfterAsset({
         ...GATE_BASE,
         surfaceAttached: false,
       })
-    ).toBe(false);
+    ).toBe(true);
     const intent = resolveGatedWatchPlaybackIntent({
       ...GATE_BASE,
       surfaceAttached: false,
       firstFrameConfirmed: false,
     });
-    expect(intent).toBeNull();
+    expect(intent?.shouldPlay).toBe(true);
     const session = createPlayerSession();
     if (intent) applyPlaybackIntent(session.player, intent);
-    expect(session.calls).not.toContain("play");
+    expect(session.calls).toContain("play");
   });
 });
 
@@ -131,32 +131,21 @@ describe("4 stale player/post event is ignored", () => {
       })
     ).toBe(false);
     expect(
-      resolveGatedWatchPlaybackIntent({
-        ...GATE_BASE,
-        surfaceAttached: true,
-        firstFrameConfirmed: true,
-        playerMediaId: "post-1",
-        visibleMediaId: "post-2",
+      shouldHonorWatchStatusEvent({
+        playerAlive: true,
+        bound: true,
+        eventPostId: 1,
+        boundPostId: 2,
       })
-    ).toBeNull();
+    ).toBe(false);
     expect(
-      resolveGatedWatchPlaybackIntent({
-        ...GATE_BASE,
-        surfaceAttached: true,
-        firstFrameConfirmed: true,
-        playerPostId: 1,
-        visiblePostId: 2,
+      shouldHonorWatchStatusEvent({
+        playerAlive: true,
+        bound: true,
+        eventEpoch: 3,
+        boundEpoch: 4,
       })
-    ).toBeNull();
-    expect(
-      resolveGatedWatchPlaybackIntent({
-        ...GATE_BASE,
-        surfaceAttached: true,
-        firstFrameConfirmed: true,
-        playerEpoch: 3,
-        visibleEpoch: 4,
-      })
-    ).toBeNull();
+    ).toBe(false);
     expect(
       shouldStartPlaybackAfterAsset({
         ...GATE_BASE,

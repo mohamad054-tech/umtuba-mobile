@@ -194,7 +194,7 @@ describe("Android next-surface warm and gated handoff", () => {
         warmNextSurface: true,
         platform: "android",
       })
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldAttachWatchSurface({
         loadPlayer: true,

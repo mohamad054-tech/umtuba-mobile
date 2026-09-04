@@ -21,7 +21,12 @@ export const ANDROID_WATCH_FORWARD_BUFFER_SECONDS = 8;
 export const ANDROID_WATCH_MIN_BUFFER_SECONDS = 1;
 export const ANDROID_WATCH_MAX_BUFFER_BYTES = 12 * 1024 * 1024;
 
-/** Rolling on-device Watch window. Identity is post/media id, not list index. */
+/**
+ * Rolling on-device Watch window. Identity is post/media id, not list index.
+ * Cache may read activeIndex to choose which 5 files to retain. It must
+ * never write activeIndex, scroll FlatList, claim player ownership, or
+ * attach/detach VideoView.
+ */
 export const ANDROID_WATCH_CACHE_TARGET = 5;
 export const ANDROID_WATCH_CACHE_DIR_NAME = "umtuba-watch-media/";
 export const ANDROID_WATCH_CACHE_MANIFEST_NAME = "umtuba-watch-rolling-v1.json";
