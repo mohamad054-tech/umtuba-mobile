@@ -155,6 +155,7 @@ export type WatchVideoCardProps = {
     ready: boolean;
     firstFrame: boolean;
     surfaceAttached: boolean;
+    mediaId: string;
   }) => void;
   onRemainingMs?: (remainingMs: number | null) => void;
   /** Bumps on every active-index change so late play cannot revive the previous card. */
@@ -1144,8 +1145,9 @@ function WatchVideoCardComponent({
       ready: paneStatus === "ready",
       firstFrame: firstFrameRef.current,
       surfaceAttached: firstFrameRef.current,
+      mediaId,
     });
-  }, [paneStatus]);
+  }, [mediaId, paneStatus]);
 
   const onPlayerStatus = useCallback(
     (
@@ -1379,6 +1381,7 @@ function WatchVideoCardComponent({
               ready: paneStatus === "ready",
               firstFrame: true,
               surfaceAttached: true,
+              mediaId,
             });
           }}
           onPlayerStatus={onPlayerStatus}

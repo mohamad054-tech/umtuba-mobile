@@ -13,14 +13,26 @@ import {
   shouldLoadOwnedWatchPlayer,
 } from "./watchActiveIndexArbiter";
 import {
+  watchShareDismissPreservesActiveItem,
+  watchShareSheetRemountsWatch,
+} from "@/src/lib/social/watchShareSheet";
+
+import {
+  createManualHandoffPending,
   manualViewabilityMayWriteActiveIndex,
   resolveAndroidManualSettleAction,
   resolveManualHandoffCompletionTransaction,
+  resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveNoFirstFrameManualHandoff,
+  resolvePendingManualHandoffAction,
+  shouldAcceptPendingManualHandoff,
+  shouldCancelPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
-  shouldIgnoreStaleManualSettle,
   shouldCompleteManualHandoff,
+  shouldIgnoreStaleManualSettle,
   shouldKeepPreviousSurfaceDuringManualHandoff,
+  shouldMountOffscreenManualTargetVideoView,
   shouldReleasePreviousWatchSurface,
   shouldStartManualHandoffAudio,
   shouldWarmManualTarget,
@@ -330,5 +342,204 @@ describe("manual handoff parity with auto-advance", () => {
         surfaceAttached: true,
       })
     ).toBe(false);
+  });
+});
+
+describe("manual handoff cancel, identity, and deadlock gate", () => {
+  const pending = createManualHandoffPending({
+    navigationGeneration: 3,
+    targetIndex: 1,
+    targetMediaId: "post-2",
+  });
+
+  function readyCompletion(
+    overrides: Partial<Parameters<typeof shouldAcceptPendingManualHandoff>[0]> = {}
+  ) {
+    return shouldAcceptPendingManualHandoff({
+      pending,
+      currentNavigationGeneration: 3,
+      nativeSettledPage: 1,
+      currentTargetMediaId: "post-2",
+      firstFrameMediaId: "post-2",
+      targetSurfaceAttached: true,
+      targetFirstFrame: true,
+      screenFocused: true,
+      shareSheetOpen: false,
+      unmounted: false,
+      ...overrides,
+    });
+  }
+
+  it("cancels a drag that returns to the current page", () => {
+    expect(
+      resolveManualHandoffTarget({
+        fromIndex: 0,
+        currentOffset: 40,
+        itemHeight: 800,
+        itemCount: 5,
+      })
+    ).toBeNull();
+    expect(
+      resolveAndroidManualSettleAction({ nativePage: 0, activeIndex: 0 })
+    ).toBe("cancel");
+    expect(shouldCancelPendingManualHandoff("return-to-current")).toBe(true);
+    expect(readyCompletion({ nativeSettledPage: 0 })).toBe(false);
+  });
+
+  it("cancels when direction changes before settle", () => {
+    expect(
+      resolveManualHandoffRetarget({
+        previousTarget: 1,
+        nextTarget: null,
+        fromIndex: 0,
+      })
+    ).toBe("cancel");
+    expect(
+      resolveManualHandoffRetarget({
+        previousTarget: 1,
+        nextTarget: -1,
+        fromIndex: 1,
+      })
+    ).toBe("cancel");
+    expect(shouldCancelPendingManualHandoff("direction-change")).toBe(true);
+  });
+
+  it("retargets a rapid 0→1→2 intent and rejects the old first_frame", () => {
+    expect(
+      resolveManualHandoffRetarget({
+        previousTarget: 1,
+        nextTarget: 2,
+        fromIndex: 0,
+      })
+    ).toBe("retarget");
+    expect(shouldCancelPendingManualHandoff("rapid-retarget")).toBe(true);
+    const next = createManualHandoffPending({
+      navigationGeneration: 3,
+      targetIndex: 2,
+      targetMediaId: "post-3",
+    });
+    expect(
+      shouldAcceptPendingManualHandoff({
+        pending: next,
+        currentNavigationGeneration: 3,
+        nativeSettledPage: 2,
+        currentTargetMediaId: "post-3",
+        firstFrameMediaId: "post-2",
+        targetSurfaceAttached: true,
+        targetFirstFrame: true,
+        screenFocused: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldAcceptPendingManualHandoff({
+        pending: next,
+        currentNavigationGeneration: 3,
+        nativeSettledPage: 2,
+        currentTargetMediaId: "post-3",
+        firstFrameMediaId: "post-3",
+        targetSurfaceAttached: true,
+        targetFirstFrame: true,
+        screenFocused: true,
+      })
+    ).toBe(true);
+  });
+
+  it("cancels when Watch loses focus or unmounts", () => {
+    expect(shouldCancelPendingManualHandoff("blur-unmount")).toBe(true);
+    expect(readyCompletion({ screenFocused: false })).toBe(false);
+    expect(readyCompletion({ unmounted: true })).toBe(false);
+    expect(readyCompletion()).toBe(true);
+  });
+
+  it("cancels when feed refresh/reorder changes the target post", () => {
+    expect(shouldCancelPendingManualHandoff("feed-identity-change")).toBe(true);
+    expect(readyCompletion({ currentTargetMediaId: "post-99" })).toBe(false);
+    expect(
+      createManualHandoffPending({
+        navigationGeneration: 3,
+        targetIndex: 1,
+        targetMediaId: "",
+      })
+    ).toBeNull();
+  });
+
+  it("rejects a stale first_frame from a previous target", () => {
+    expect(resolvePendingManualHandoffAction("stale-first-frame")).toBe(
+      "reject-completion"
+    );
+    expect(readyCompletion({ firstFrameMediaId: "post-1" })).toBe(false);
+    expect(readyCompletion({ currentNavigationGeneration: 4 })).toBe(false);
+    expect(pending).toEqual({
+      navigationGeneration: 3,
+      targetIndex: 1,
+      targetMediaId: "post-2",
+    });
+  });
+
+  it("rejects completion while Share is open and does not remount Watch", () => {
+    expect(resolvePendingManualHandoffAction("share-open")).toBe(
+      "reject-completion"
+    );
+    expect(readyCompletion({ shareSheetOpen: true })).toBe(false);
+    expect(watchShareSheetRemountsWatch()).toBe(false);
+    expect(watchShareDismissPreservesActiveItem()).toBe(true);
+    expect(readyCompletion({ shareSheetOpen: false })).toBe(true);
+  });
+
+  it("never completes a black page when first_frame never arrives", () => {
+    const stuck = resolveNoFirstFrameManualHandoff({ currentActiveIndex: 0 });
+    expect(stuck.complete).toBe(false);
+    expect(stuck.claimTarget).toBe(false);
+    expect(stuck.startTargetAudio).toBe(false);
+    expect(stuck.acceptBlackAsComplete).toBe(false);
+    expect(stuck.keepCurrentIndex).toBe(0);
+    expect(readyCompletion({ targetFirstFrame: false })).toBe(false);
+    expect(
+      shouldStartManualHandoffAudio({
+        targetSurfaceAttached: false,
+        targetFirstFrame: false,
+        targetIsActive: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldAcceptPendingManualHandoff({
+        pending,
+        currentNavigationGeneration: 3,
+        nativeSettledPage: 1,
+        currentTargetMediaId: "post-99",
+        firstFrameMediaId: "post-2",
+        targetSurfaceAttached: true,
+        targetFirstFrame: true,
+      })
+    ).toBe(false);
+  });
+
+  it("mounts the warmed target VideoView before it is active", () => {
+    expect(
+      shouldMountOffscreenManualTargetVideoView({
+        itemIndex: 1,
+        activeIndex: 0,
+        warmedTargetIndex: 1,
+        src: "https://cdn.example/2.mp4",
+        platform: "android",
+      })
+    ).toBe(true);
+    expect(
+      shouldMountOffscreenManualTargetVideoView({
+        itemIndex: 1,
+        activeIndex: 0,
+        warmedTargetIndex: null,
+        src: "https://cdn.example/2.mp4",
+        platform: "android",
+      })
+    ).toBe(false);
+    expect(
+      shouldLoadOwnedWatchPlayer({
+        index: 1,
+        activeIndex: 0,
+        platform: "android",
+        warmedTargetIndex: 1,
+      })
+    ).toBe(true);
   });
 });

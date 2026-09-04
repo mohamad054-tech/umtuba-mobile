@@ -161,12 +161,15 @@ import {
   type WatchActiveIndexDecision,
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
+  createManualHandoffPending,
   resolveAndroidManualSettleAction,
+  resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
-  shouldCompleteManualHandoff,
   shouldIgnoreStaleManualSettle,
   shouldWarmManualTarget,
+  type ManualHandoffPending,
 } from "@/src/lib/watch/watchManualHandoff";
 import {
   previousRouteNameFromState,
@@ -289,6 +292,7 @@ export default function WatchScreen() {
     ready: false,
     firstFrame: false,
     surfaceAttached: false,
+    mediaId: null as string | null,
   });
   const handoffGenRef = useRef(0);
   const [warmNextSurface, setWarmNextSurface] = useState(false);
@@ -296,11 +300,9 @@ export default function WatchScreen() {
     null
   );
   const warmedTargetIndexRef = useRef<number | null>(null);
-  const pendingManualRef = useRef<{
-    targetIndex: number;
-    generation: number;
-    nativePage: number;
-  } | null>(null);
+  const pendingManualRef = useRef<
+    (ManualHandoffPending & { generation: number; nativePage: number }) | null
+  >(null);
   const manualHandoffGenRef = useRef(0);
   const dragStartIndexRef = useRef(0);
   const manualDragActiveRef = useRef(false);
@@ -315,6 +317,11 @@ export default function WatchScreen() {
   const applyWarmedTargetIndex = useCallback((next: number | null) => {
     warmedTargetIndexRef.current = next;
     setWarmedTargetIndex((prev) => (prev === next ? prev : next));
+  }, []);
+
+  const cancelPendingManualHandoff = useCallback(() => {
+    manualHandoffGenRef.current += 1;
+    pendingManualRef.current = null;
   }, []);
 
   const applyWatchIndexDecision = useCallback(
@@ -367,6 +374,7 @@ export default function WatchScreen() {
       ready: false,
       firstFrame: false,
       surfaceAttached: false,
+      mediaId: null,
     };
   }, [activeIndex, applyWarmedTargetIndex]);
 
@@ -427,6 +435,8 @@ export default function WatchScreen() {
       return () => {
         screenFocusedRef.current = false;
         setScreenFocused(false);
+        cancelPendingManualHandoff();
+        applyWarmedTargetIndex(null);
         const nextGeneration = bumpWatchLeaveGeneration(
           playbackGenerationRef.current
         );
@@ -436,7 +446,7 @@ export default function WatchScreen() {
         exitHintVisibleRef.current = false;
         setExitHintVisible(false);
       };
-    }, [])
+    }, [applyWarmedTargetIndex, cancelPendingManualHandoff])
   );
 
   useEffect(() => {
@@ -489,6 +499,17 @@ export default function WatchScreen() {
   );
   const visibleVideosRef = useRef(visibleVideos);
   visibleVideosRef.current = visibleVideos;
+
+  useEffect(() => {
+    const pending = pendingManualRef.current;
+    if (!pending) return;
+    const video = visibleVideosRef.current[pending.targetIndex];
+    const currentMediaId = video ? watchMediaIdentity(video) : null;
+    if (currentMediaId !== pending.targetMediaId) {
+      cancelPendingManualHandoff();
+      applyWarmedTargetIndex(null);
+    }
+  }, [applyWarmedTargetIndex, cancelPendingManualHandoff, playbackIdentity]);
 
   useEffect(() => {
     videosLengthRef.current = visibleVideos.length;
@@ -762,14 +783,24 @@ export default function WatchScreen() {
     if (manualHandoffGenRef.current !== pending.generation) return;
     const state = nextHandoffRef.current;
     const targetOwnsState = state.index === pending.targetIndex;
+    const targetVideo = visibleVideosRef.current[pending.targetIndex];
+    const currentTargetMediaId = targetVideo
+      ? watchMediaIdentity(targetVideo)
+      : null;
     if (
-      !shouldCompleteManualHandoff({
+      !shouldAcceptPendingManualHandoff({
+        pending,
+        currentNavigationGeneration: arbiterRef.current.navigationGeneration,
         nativeSettledPage: pending.nativePage,
-        targetIndex: pending.targetIndex,
+        currentTargetMediaId,
+        firstFrameMediaId: targetOwnsState ? state.mediaId : null,
         targetSurfaceAttached:
           targetOwnsState &&
           (state.surfaceAttached === true || state.firstFrame === true),
         targetFirstFrame: targetOwnsState && state.firstFrame === true,
+        screenFocused: screenFocusedRef.current,
+        shareSheetOpen: shareSheetOpenRef.current,
+        unmounted: false,
       })
     ) {
       return;
@@ -790,12 +821,34 @@ export default function WatchScreen() {
       watchScrollInFlightRef.current = true;
       scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
       if (!manualDragActiveRef.current) return;
-      const target = resolveManualHandoffTarget({
+      const directional = resolveManualHandoffTarget({
         fromIndex: dragStartIndexRef.current,
         currentOffset: scrollOffsetRef.current,
         itemHeight: itemHeightRef.current,
         itemCount: videosLengthRef.current,
       });
+      const nativeHint = resolveWatchNativePage(
+        scrollOffsetRef.current,
+        itemHeightRef.current,
+        videosLengthRef.current
+      );
+      const target =
+        nativeHint != null && nativeHint !== dragStartIndexRef.current
+          ? nativeHint
+          : directional;
+      const retarget = resolveManualHandoffRetarget({
+        previousTarget: warmedTargetIndexRef.current,
+        nextTarget: target,
+        fromIndex: dragStartIndexRef.current,
+      });
+      if (retarget === "cancel") {
+        pendingManualRef.current = null;
+        applyWarmedTargetIndex(null);
+        return;
+      }
+      if (retarget === "retarget") {
+        pendingManualRef.current = null;
+      }
       if (
         !shouldWarmManualTarget({
           fromIndex: dragStartIndexRef.current,
@@ -865,24 +918,38 @@ export default function WatchScreen() {
           applyWarmedTargetIndex(stillHeading);
           return;
         }
-        manualHandoffGenRef.current += 1;
-        pendingManualRef.current = null;
+        cancelPendingManualHandoff();
         applyWarmedTargetIndex(null);
         return;
       }
 
       applyWarmedTargetIndex(nativePage);
+      const targetVideo = visibleVideosRef.current[nativePage];
+      const created = createManualHandoffPending({
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        targetIndex: nativePage,
+        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
+      });
+      if (!created) {
+        cancelPendingManualHandoff();
+        return;
+      }
       const generation = manualHandoffGenRef.current + 1;
       manualHandoffGenRef.current = generation;
       pendingManualRef.current = {
-        targetIndex: nativePage,
+        ...created,
         generation,
         nativePage,
       };
       tryCompletePendingManualHandoff();
     },
-    [applyWarmedTargetIndex, tryCompletePendingManualHandoff]
+    [applyWarmedTargetIndex, cancelPendingManualHandoff, tryCompletePendingManualHandoff]
   );
+
+  useEffect(() => {
+    if (isWatchShareSheetOpen(shareSheet)) return;
+    tryCompletePendingManualHandoff();
+  }, [shareSheet, tryCompletePendingManualHandoff]);
 
   const onViewableItemsChanged = useRef(
     (_info: { viewableItems: ViewToken[] }) => {
