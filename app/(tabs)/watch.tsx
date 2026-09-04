@@ -161,6 +161,14 @@ import {
   type WatchActiveIndexDecision,
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
+  resolveAndroidManualSettleAction,
+  resolveManualHandoffTarget,
+  shouldClaimWatchIndexFromNativeSettle,
+  shouldCompleteManualHandoff,
+  shouldIgnoreStaleManualSettle,
+  shouldWarmManualTarget,
+} from "@/src/lib/watch/watchManualHandoff";
+import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
 import {
@@ -280,9 +288,34 @@ export default function WatchScreen() {
     index: -1,
     ready: false,
     firstFrame: false,
+    surfaceAttached: false,
   });
   const handoffGenRef = useRef(0);
   const [warmNextSurface, setWarmNextSurface] = useState(false);
+  const [warmedTargetIndex, setWarmedTargetIndex] = useState<number | null>(
+    null
+  );
+  const warmedTargetIndexRef = useRef<number | null>(null);
+  const pendingManualRef = useRef<{
+    targetIndex: number;
+    generation: number;
+    nativePage: number;
+  } | null>(null);
+  const manualHandoffGenRef = useRef(0);
+  const dragStartIndexRef = useRef(0);
+  const manualDragActiveRef = useRef(false);
+  const scrollToWatchIndexRef = useRef<
+    (
+      nextIndex: number,
+      attempt?: number,
+      options?: { animated?: boolean }
+    ) => void
+  >(() => {});
+
+  const applyWarmedTargetIndex = useCallback((next: number | null) => {
+    warmedTargetIndexRef.current = next;
+    setWarmedTargetIndex((prev) => (prev === next ? prev : next));
+  }, []);
 
   const applyWatchIndexDecision = useCallback(
     (decision: WatchActiveIndexDecision) => {
@@ -325,9 +358,17 @@ export default function WatchScreen() {
     remainingMsRef.current = null;
     currentEndedRef.current = false;
     handoffGenRef.current += 1;
+    manualHandoffGenRef.current += 1;
+    pendingManualRef.current = null;
+    applyWarmedTargetIndex(null);
     setWarmNextSurface(false);
-    nextHandoffRef.current = { index: -1, ready: false, firstFrame: false };
-  }, [activeIndex]);
+    nextHandoffRef.current = {
+      index: -1,
+      ready: false,
+      firstFrame: false,
+      surfaceAttached: false,
+    };
+  }, [activeIndex, applyWarmedTargetIndex]);
 
   useEffect(() => {
     const generation = registerMountedWatchInstance();
@@ -715,18 +756,64 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
+  const tryCompletePendingManualHandoff = useCallback(() => {
+    const pending = pendingManualRef.current;
+    if (!pending) return;
+    if (manualHandoffGenRef.current !== pending.generation) return;
+    const state = nextHandoffRef.current;
+    const targetOwnsState = state.index === pending.targetIndex;
+    if (
+      !shouldCompleteManualHandoff({
+        nativeSettledPage: pending.nativePage,
+        targetIndex: pending.targetIndex,
+        targetSurfaceAttached:
+          targetOwnsState &&
+          (state.surfaceAttached === true || state.firstFrame === true),
+        targetFirstFrame: targetOwnsState && state.firstFrame === true,
+      })
+    ) {
+      return;
+    }
+    pendingManualRef.current = null;
+    scrollToWatchIndexRef.current(pending.targetIndex, 0, {
+      animated: false,
+    });
+  }, []);
+
+  const onWatchScrollBeginDrag = useCallback(() => {
+    manualDragActiveRef.current = true;
+    dragStartIndexRef.current = activeIndexRef.current;
+  }, []);
+
   const onWatchScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       watchScrollInFlightRef.current = true;
       scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+      if (!manualDragActiveRef.current) return;
+      const target = resolveManualHandoffTarget({
+        fromIndex: dragStartIndexRef.current,
+        currentOffset: scrollOffsetRef.current,
+        itemHeight: itemHeightRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (
+        !shouldWarmManualTarget({
+          fromIndex: dragStartIndexRef.current,
+          targetIndex: target,
+        })
+      ) {
+        return;
+      }
+      applyWarmedTargetIndex(target);
     },
-    []
+    [applyWarmedTargetIndex]
   );
 
   const onWatchScrollSettle = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offset = event.nativeEvent.contentOffset.y;
       watchScrollInFlightRef.current = false;
+      manualDragActiveRef.current = false;
       scrollOffsetRef.current = offset;
       const nativePage = resolveWatchNativePage(
         offset,
@@ -734,17 +821,67 @@ export default function WatchScreen() {
         videosLengthRef.current
       );
       if (nativePage == null) return;
-      applyWatchIndexDecisionRef.current(
-        decideWatchActiveIndexClaim({
-          arbiter: arbiterRef.current,
-          reason: "native-settle",
-          requestedIndex: nativePage,
-          navigationGeneration: arbiterRef.current.navigationGeneration,
-          nativeSettledPage: nativePage,
+      if (
+        shouldIgnoreStaleManualSettle({
+          locked: Date.now() < programmaticAdvanceUntilRef.current,
+          nativePage,
+          activeIndex: activeIndexRef.current,
         })
-      );
+      ) {
+        return;
+      }
+
+      if (
+        shouldClaimWatchIndexFromNativeSettle({
+          platform: Platform.OS,
+          nativePage,
+          activeIndex: activeIndexRef.current,
+        })
+      ) {
+        applyWatchIndexDecisionRef.current(
+          decideWatchActiveIndexClaim({
+            arbiter: arbiterRef.current,
+            reason: "native-settle",
+            requestedIndex: nativePage,
+            navigationGeneration: arbiterRef.current.navigationGeneration,
+            nativeSettledPage: nativePage,
+          })
+        );
+        return;
+      }
+
+      const action = resolveAndroidManualSettleAction({
+        nativePage,
+        activeIndex: activeIndexRef.current,
+      });
+      if (action === "cancel") {
+        const stillHeading = resolveManualHandoffTarget({
+          fromIndex: activeIndexRef.current,
+          currentOffset: offset,
+          itemHeight: itemHeightRef.current,
+          itemCount: videosLengthRef.current,
+        });
+        if (stillHeading != null) {
+          applyWarmedTargetIndex(stillHeading);
+          return;
+        }
+        manualHandoffGenRef.current += 1;
+        pendingManualRef.current = null;
+        applyWarmedTargetIndex(null);
+        return;
+      }
+
+      applyWarmedTargetIndex(nativePage);
+      const generation = manualHandoffGenRef.current + 1;
+      manualHandoffGenRef.current = generation;
+      pendingManualRef.current = {
+        targetIndex: nativePage,
+        generation,
+        nativePage,
+      };
+      tryCompletePendingManualHandoff();
     },
-    []
+    [applyWarmedTargetIndex, tryCompletePendingManualHandoff]
   );
 
   const onViewableItemsChanged = useRef(
@@ -1317,6 +1454,7 @@ export default function WatchScreen() {
       }, 120);
     }
   }, [applyWatchIndexDecision]);
+  scrollToWatchIndexRef.current = scrollToWatchIndex;
 
   const onActiveEnded = useCallback(() => {
     const nextIndex = resolveNextWatchIndex({
@@ -1387,6 +1525,7 @@ export default function WatchScreen() {
           activeIndex,
           platform: Platform.OS,
           lastSettledNativePage,
+          warmedTargetIndex,
         })}
         shouldPreparePlayer={shouldPrepareWatchPlayer(
           index,
@@ -1396,13 +1535,15 @@ export default function WatchScreen() {
         isNextItem={index === activeIndex + 1}
         warmNextSurface={
           Platform.OS === "android" &&
-          index === activeIndex + 1 &&
-          warmNextSurface
+          (index === warmedTargetIndex ||
+            (index === activeIndex + 1 && warmNextSurface))
         }
         onHandoffState={
-          Platform.OS === "android" && index === activeIndex + 1
+          Platform.OS === "android" &&
+          (index === activeIndex + 1 || index === warmedTargetIndex)
             ? (state) => {
                 nextHandoffRef.current = { index, ...state };
+                tryCompletePendingManualHandoff();
               }
             : undefined
         }
@@ -1541,6 +1682,8 @@ export default function WatchScreen() {
       appState,
       autoNext,
       warmNextSurface,
+      warmedTargetIndex,
+      tryCompletePendingManualHandoff,
       insets.bottom,
       insets.top,
       itemHeight,
@@ -1681,12 +1824,13 @@ export default function WatchScreen() {
         getItemLayout={getItemLayout}
         onLayout={onWatchListLayout}
         onScroll={onWatchScroll}
+        onScrollBeginDrag={onWatchScrollBeginDrag}
         scrollEventThrottle={16}
         onMomentumScrollEnd={onWatchScrollSettle}
         onScrollEndDrag={onWatchScrollSettle}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${lastSettledNativePage}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+        extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

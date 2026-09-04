@@ -151,7 +151,11 @@ export type WatchVideoCardProps = {
   isNextItem?: boolean;
   /** Android: attach next TextureView off-screen once READY and current is near end. */
   warmNextSurface?: boolean;
-  onHandoffState?: (state: { ready: boolean; firstFrame: boolean }) => void;
+  onHandoffState?: (state: {
+    ready: boolean;
+    firstFrame: boolean;
+    surfaceAttached: boolean;
+  }) => void;
   onRemainingMs?: (remainingMs: number | null) => void;
   /** Bumps on every active-index change so late play cannot revive the previous card. */
   ownershipGeneration: number;
@@ -1139,6 +1143,7 @@ function WatchVideoCardComponent({
     onHandoffStateRef.current?.({
       ready: paneStatus === "ready",
       firstFrame: firstFrameRef.current,
+      surfaceAttached: firstFrameRef.current,
     });
   }, [paneStatus]);
 
@@ -1373,6 +1378,7 @@ function WatchVideoCardComponent({
             onHandoffState?.({
               ready: paneStatus === "ready",
               firstFrame: true,
+              surfaceAttached: true,
             });
           }}
           onPlayerStatus={onPlayerStatus}

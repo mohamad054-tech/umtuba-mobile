@@ -77,15 +77,20 @@ export function shouldLoadOwnedWatchPlayer(input: {
   activeIndex: number;
   platform?: string | null;
   lastSettledNativePage?: number | null;
+  warmedTargetIndex?: number | null;
 }): boolean {
   if (shouldLoadPlayer(input.index, input.activeIndex, input.platform)) {
     return true;
   }
-  return shouldRetainWatchSurface({
+  if (shouldRetainWatchSurface({
     itemIndex: input.index,
     activeIndex: input.activeIndex,
     lastSettledNativePage: input.lastSettledNativePage ?? null,
-  });
+  })) {
+    return true;
+  }
+  const warmed = sanitizeWatchListIndex(input.warmedTargetIndex ?? Number.NaN);
+  return warmed != null && input.index === warmed;
 }
 
 /**
