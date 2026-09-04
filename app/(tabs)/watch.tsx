@@ -114,16 +114,11 @@ import {
   quantizeWatchVolume,
   resolveNextWatchIndex,
   resolveWatchScrollOffset,
-  sanitizeWatchListIndex,
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
   resolveWatchHandoffReadiness,
-  resolveMostVisibleWatchIndex,
-  resolveWatchOwnedIndex,
-  shouldAcceptViewableIndexUpdate,
   shouldHandoffWatchAdvance,
-  shouldLoadPlayer,
   shouldPrepareWatchPlayer,
   shouldWarmAndroidNextSurface,
   toWatchListPixels,
@@ -155,10 +150,16 @@ import {
 } from "@/src/lib/watch/watchRetainedPlaybackFallback";
 import {
   preserveWatchPostAcrossLayoutSession,
-  reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
   resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
+import {
+  createWatchActiveIndexArbiter,
+  decideWatchActiveIndexClaim,
+  decideWatchViewabilityEvidence,
+  shouldLoadOwnedWatchPlayer,
+  type WatchActiveIndexDecision,
+} from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
   previousRouteNameFromState,
 } from "@/src/lib/nav/globalBack";
@@ -215,6 +216,9 @@ export default function WatchScreen() {
   const [videos, setVideos] = useState<WatchVideo[]>([]);
   const [cursor, setCursor] = useState<WatchFeedCursor | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lastSettledNativePage, setLastSettledNativePage] = useState<
+    number | null
+  >(null);
   const [playbackGeneration, setPlaybackGeneration] = useState(0);
   const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
   const [volume, setVolume] = useState(DEFAULT_WATCH_VOLUME);
@@ -257,8 +261,8 @@ export default function WatchScreen() {
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
   const scrollOffsetRef = useRef(0);
-  const nativeOffsetKnownRef = useRef(false);
   const watchScrollInFlightRef = useRef(false);
+  const arbiterRef = useRef(createWatchActiveIndexArbiter());
   const viewportFrozenRef = useRef<{
     height: number | null;
     width: number | null;
@@ -280,38 +284,42 @@ export default function WatchScreen() {
   const handoffGenRef = useRef(0);
   const [warmNextSurface, setWarmNextSurface] = useState(false);
 
-  const claimActiveIndex = useCallback((nextIndex: number) => {
-    const safeIndex = sanitizeWatchListIndex(nextIndex);
-    if (safeIndex == null) return;
-    nextIndex = safeIndex;
-    const nextGeneration = bumpWatchOwnerGeneration(
-      playbackGenerationRef.current,
-      activeIndexRef.current,
-      nextIndex
-    );
-    if (nextGeneration !== playbackGenerationRef.current) {
-      playbackGenerationRef.current = nextGeneration;
-      setPlaybackGeneration(nextGeneration);
-    }
-    activeIndexRef.current = nextIndex;
-    setActiveIndex(nextIndex);
-    const nextVideo = visibleVideosRef.current[nextIndex];
-    if (nextVideo && Platform.OS === "android") {
-      const mediaId = watchMediaIdentity(nextVideo);
-      markWatchCellBind("android", {
-        visibleIndex: nextIndex,
-        visibleMediaId: mediaId,
-        activeIndex: nextIndex,
-        activeMediaId: mediaId,
-        playerMediaId: mediaId,
-        surfaceAttached: true,
-        aligned: true,
-      });
-    }
-  }, []);
+  const applyWatchIndexDecision = useCallback(
+    (decision: WatchActiveIndexDecision) => {
+      if (!decision.accept || decision.next.activeIndex == null) return;
+      const nextIndex = decision.next.activeIndex;
+      arbiterRef.current = decision.next;
+      setLastSettledNativePage(decision.next.lastSettledNativePage);
+      const nextGeneration = bumpWatchOwnerGeneration(
+        playbackGenerationRef.current,
+        activeIndexRef.current,
+        nextIndex
+      );
+      if (nextGeneration !== playbackGenerationRef.current) {
+        playbackGenerationRef.current = nextGeneration;
+        setPlaybackGeneration(nextGeneration);
+      }
+      activeIndexRef.current = nextIndex;
+      setActiveIndex(nextIndex);
+      const nextVideo = visibleVideosRef.current[nextIndex];
+      if (nextVideo && Platform.OS === "android") {
+        const mediaId = watchMediaIdentity(nextVideo);
+        markWatchCellBind("android", {
+          visibleIndex: nextIndex,
+          visibleMediaId: mediaId,
+          activeIndex: nextIndex,
+          activeMediaId: mediaId,
+          playerMediaId: mediaId,
+          surfaceAttached: true,
+          aligned: true,
+        });
+      }
+    },
+    []
+  );
 
-  const claimActiveIndexRef = useRef(claimActiveIndex);
-  claimActiveIndexRef.current = claimActiveIndex;
+  const applyWatchIndexDecisionRef = useRef(applyWatchIndexDecision);
+  applyWatchIndexDecisionRef.current = applyWatchIndexDecision;
 
   useEffect(() => {
     remainingMsRef.current = null;
@@ -362,9 +370,6 @@ export default function WatchScreen() {
     });
     const offset = resolveWatchScrollOffset(keep, resolved.height);
     if (offset == null) return;
-    if (keep !== activeIndexRef.current) {
-      claimActiveIndexRef.current(keep);
-    }
     listRef.current?.scrollToOffset({ offset, animated: false });
   }, []);
 
@@ -666,7 +671,14 @@ export default function WatchScreen() {
           setCursor(null);
           setEndReached(true);
         }
-        claimActiveIndex(0);
+        applyWatchIndexDecision(
+          decideWatchActiveIndexClaim({
+            arbiter: arbiterRef.current,
+            reason: "bootstrap",
+            requestedIndex: 0,
+            navigationGeneration: arbiterRef.current.navigationGeneration,
+          })
+        );
       } catch (err) {
         setError(getErrorMessage(err, t("watch.loadFailed")));
       } finally {
@@ -675,7 +687,7 @@ export default function WatchScreen() {
         initialInFlight.current = false;
       }
     },
-    [claimActiveIndex, focusPostId, t, user?.id]
+    [applyWatchIndexDecision, focusPostId, t, user?.id]
   );
 
   useEffect(() => {
@@ -703,47 +715,8 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
-  const commitOwnedWatchIndex = useCallback(
-    (
-      offset: number,
-      viewableItems?: ViewToken[]
-    ) => {
-      if (
-        !shouldAcceptViewableIndexUpdate({
-          nowMs: Date.now(),
-          lockUntilMs: programmaticAdvanceUntilRef.current,
-        })
-      ) {
-        return;
-      }
-      const nativePage = resolveWatchNativePage(
-        offset,
-        itemHeightRef.current,
-        videosLengthRef.current
-      );
-      const mostVisible = viewableItems
-        ? resolveMostVisibleWatchIndex(viewableItems)
-        : null;
-      const owned = resolveWatchOwnedIndex({
-        nativePage,
-        mostVisibleIndex: mostVisible,
-        currentIndex: activeIndexRef.current,
-        nativeOffsetKnown: nativeOffsetKnownRef.current,
-      });
-      const index = reconcileWatchActiveIndex({
-        nativePage: owned,
-        activeIndex: activeIndexRef.current,
-        itemCount: videosLengthRef.current,
-      });
-      if (index == null) return;
-      claimActiveIndexRef.current(index);
-    },
-    []
-  );
-
   const onWatchScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      nativeOffsetKnownRef.current = true;
       watchScrollInFlightRef.current = true;
       scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
     },
@@ -753,24 +726,30 @@ export default function WatchScreen() {
   const onWatchScrollSettle = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offset = event.nativeEvent.contentOffset.y;
-      nativeOffsetKnownRef.current = true;
       watchScrollInFlightRef.current = false;
       scrollOffsetRef.current = offset;
-      commitOwnedWatchIndex(offset);
+      const nativePage = resolveWatchNativePage(
+        offset,
+        itemHeightRef.current,
+        videosLengthRef.current
+      );
+      if (nativePage == null) return;
+      applyWatchIndexDecisionRef.current(
+        decideWatchActiveIndexClaim({
+          arbiter: arbiterRef.current,
+          reason: "native-settle",
+          requestedIndex: nativePage,
+          navigationGeneration: arbiterRef.current.navigationGeneration,
+          nativeSettledPage: nativePage,
+        })
+      );
     },
-    [commitOwnedWatchIndex]
+    []
   );
 
-  const commitOwnedWatchIndexRef = useRef(commitOwnedWatchIndex);
-  commitOwnedWatchIndexRef.current = commitOwnedWatchIndex;
-
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (watchScrollInFlightRef.current) return;
-      commitOwnedWatchIndexRef.current(
-        scrollOffsetRef.current,
-        viewableItems
-      );
+    (_info: { viewableItems: ViewToken[] }) => {
+      decideWatchViewabilityEvidence();
     }
   ).current;
 
@@ -1289,7 +1268,15 @@ export default function WatchScreen() {
 
     programmaticAdvanceUntilRef.current =
       Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
-    claimActiveIndex(nextIndex);
+    applyWatchIndexDecision(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: "programmatic",
+        requestedIndex: nextIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: nextIndex,
+      })
+    );
     markWatchTransition(Platform.OS, "next_source_activation", {
       index: nextIndex,
       readiness: resolveWatchHandoffReadiness({
@@ -1329,7 +1316,7 @@ export default function WatchScreen() {
         }
       }, 120);
     }
-  }, [claimActiveIndex]);
+  }, [applyWatchIndexDecision]);
 
   const onActiveEnded = useCallback(() => {
     const nextIndex = resolveNextWatchIndex({
@@ -1395,7 +1382,12 @@ export default function WatchScreen() {
         video={item}
         listIndex={index}
         isActive={index === activeIndex}
-        shouldLoadPlayer={shouldLoadPlayer(index, activeIndex, Platform.OS)}
+        shouldLoadPlayer={shouldLoadOwnedWatchPlayer({
+          index,
+          activeIndex,
+          platform: Platform.OS,
+          lastSettledNativePage,
+        })}
         shouldPreparePlayer={shouldPrepareWatchPlayer(
           index,
           activeIndex,
@@ -1544,6 +1536,7 @@ export default function WatchScreen() {
     ),
     [
       activeIndex,
+      lastSettledNativePage,
       playbackGeneration,
       appState,
       autoNext,
@@ -1693,7 +1686,7 @@ export default function WatchScreen() {
         onScrollEndDrag={onWatchScrollSettle}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+        extraData={`${activeIndex}:${lastSettledNativePage}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

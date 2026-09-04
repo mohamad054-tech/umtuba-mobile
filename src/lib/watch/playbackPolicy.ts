@@ -634,6 +634,56 @@ export function shouldPlayWithUserPause(input: {
   return input.feedShouldPlay && !input.userPaused;
 }
 
+/** First-video tap: handler, pause command, and latch against lifecycle resume. */
+export function resolveWatchTapPauseCommand(input: {
+  isActive: boolean;
+  feedShouldPlay: boolean;
+  paneStatus: string;
+  userPaused: boolean;
+}): {
+  invokeHandler: boolean;
+  nextUserPaused: boolean;
+  shouldPlay: boolean;
+  pauseCommand: boolean;
+} {
+  const invokeHandler =
+    input.paneStatus !== "error" &&
+    input.isActive &&
+    input.feedShouldPlay;
+  if (!invokeHandler) {
+    return {
+      invokeHandler: false,
+      nextUserPaused: input.userPaused,
+      shouldPlay: shouldPlayWithUserPause({
+        feedShouldPlay: input.feedShouldPlay,
+        userPaused: input.userPaused,
+        isActive: input.isActive,
+      }),
+      pauseCommand: false,
+    };
+  }
+  const nextUserPaused = !input.userPaused;
+  return {
+    invokeHandler: true,
+    nextUserPaused,
+    shouldPlay: shouldPlayWithUserPause({
+      feedShouldPlay: input.feedShouldPlay,
+      userPaused: nextUserPaused,
+      isActive: true,
+    }),
+    pauseCommand: nextUserPaused,
+  };
+}
+
+/** readyToPlay / status must not resume a latched user pause. */
+export function shouldLifecycleResumeAfterUserPause(input: {
+  userPaused: boolean;
+  lifecycleWantsPlay: boolean;
+}): boolean {
+  if (input.userPaused) return false;
+  return input.lifecycleWantsPlay;
+}
+
 /**
  * Effective player mute/volume so only the focused card can emit audio.
  * Inactive cards keep user preference in UI state but force silence on the player.

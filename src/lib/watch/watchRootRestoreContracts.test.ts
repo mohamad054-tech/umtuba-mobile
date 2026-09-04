@@ -17,6 +17,11 @@ import {
   shouldPlayWithUserPause,
 } from "./playbackPolicy";
 import {
+  createWatchActiveIndexArbiter,
+  decideWatchActiveIndexClaim,
+  decideWatchViewabilityEvidence,
+} from "./watchActiveIndexArbiter";
+import {
   shouldStartPlaybackAfterAsset,
   watchWindowPreparedIndexes,
 } from "./playerLifecycle";
@@ -317,6 +322,33 @@ describe("watch root restore contracts", () => {
         surfaceAttached: false,
       })
     ).toBe(false);
+  });
+
+  it("delayed viewability cannot revert settled page 1 to 0", () => {
+    let arbiter = createWatchActiveIndexArbiter();
+    arbiter = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "bootstrap",
+      requestedIndex: 0,
+      navigationGeneration: 0,
+    }).next;
+    arbiter = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "native-settle",
+      requestedIndex: 1,
+      navigationGeneration: arbiter.navigationGeneration,
+      nativeSettledPage: 1,
+    }).next;
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+    expect(
+      decideWatchActiveIndexClaim({
+        arbiter,
+        reason: "bootstrap",
+        requestedIndex: 0,
+        navigationGeneration: arbiter.navigationGeneration,
+      }).accept
+    ).toBe(false);
+    expect(arbiter.activeIndex).toBe(1);
   });
 
   it("ready/status cannot override a user pause latch", () => {

@@ -61,6 +61,7 @@ import {
   shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldExposeWatchScrub,
+  resolveWatchTapPauseCommand,
   shouldPlayWithUserPause,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
@@ -207,6 +208,7 @@ type PlayerPaneProps = {
   src: string;
   isActive: boolean;
   shouldPlay: boolean;
+  userPauseLatchRef?: { current: boolean };
   loadPlayer: boolean;
   preparePlayer: boolean;
   isNextItem: boolean;
@@ -390,6 +392,7 @@ function WatchPlayerPane({
   src,
   isActive,
   shouldPlay,
+  userPauseLatchRef,
   loadPlayer,
   preparePlayer,
   isNextItem,
@@ -432,7 +435,8 @@ function WatchPlayerPane({
   const loopRef = useRef(loop);
   const firstFrameRef = useRef(false);
   isActiveRef.current = isActive;
-  shouldPlayRef.current = shouldPlay;
+  shouldPlayRef.current =
+    shouldPlay && userPauseLatchRef?.current !== true;
   ownershipGenerationRef.current = ownershipGeneration;
   mediaIdRef.current = mediaId;
   postIdRef.current = postId;
@@ -981,6 +985,7 @@ function WatchVideoCardComponent({
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const [selectedSoundUri, setSelectedSoundUri] = useState<string | null>(null);
   const [userPaused, setUserPaused] = useState(false);
+  const userPauseLatchRef = useRef(false);
   const trimEndedRef = useRef(false);
   const edit = useMemo(
     () => watchEditFromPipeline(video.mediaPipeline, video.durationMs ?? null),
@@ -1081,6 +1086,7 @@ function WatchVideoCardComponent({
   useEffect(() => {
     if (!isActive) {
       tapClassifierRef.current.cancel();
+      userPauseLatchRef.current = false;
       setUserPaused(false);
       setFeedback(null);
       setLikeAck(false);
@@ -1179,13 +1185,16 @@ function WatchVideoCardComponent({
   }, [isActive, onRetryPlayback, paneError, paneStatus]);
 
   const onTogglePlayPause = useCallback(() => {
-    if (paneStatus === "error") return;
-    if (!isActive || !feedShouldPlay) return;
-    setUserPaused((paused) => {
-      const next = !paused;
-      showFeedback(next ? "pause" : "play");
-      return next;
+    const decision = resolveWatchTapPauseCommand({
+      isActive,
+      feedShouldPlay,
+      paneStatus,
+      userPaused: userPauseLatchRef.current,
     });
+    if (!decision.invokeHandler) return;
+    userPauseLatchRef.current = decision.nextUserPaused;
+    setUserPaused(decision.nextUserPaused);
+    showFeedback(decision.pauseCommand ? "pause" : "play");
   }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
 
   const showLikeAck = useCallback(() => {
@@ -1346,6 +1355,7 @@ function WatchVideoCardComponent({
           listIndex={listIndex ?? -1}
           isActive={isActive}
           shouldPlay={shouldPlay}
+          userPauseLatchRef={userPauseLatchRef}
           loadPlayer={loadPlayer}
           preparePlayer={preparePlayer}
           isNextItem={isNextItem}
