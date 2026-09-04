@@ -108,6 +108,7 @@ export function shouldStartPlaybackAfterAsset(
   if (!input.playerAlive) return false;
   if (!input.isActive || !input.shouldPlay) return false;
   if (!(input.nativeReady || input.jsReady)) return false;
+  if (input.surfaceAttached === false) return false;
   if (!Number.isFinite(input.ownerGeneration)) return false;
   if (!Number.isFinite(input.commandGeneration)) return false;
   return input.ownerGeneration === input.commandGeneration;

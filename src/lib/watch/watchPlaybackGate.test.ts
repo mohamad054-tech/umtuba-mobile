@@ -29,23 +29,20 @@ const GATE_BASE = {
   loop: false,
 };
 
-describe("1 readyToPlay can start without a surface-gate stall", () => {
-  it("starts when surfaceAttached is false so tap pause/play stays live", () => {
+describe("1 readyToPlay cannot start without the visible surface", () => {
+  it("blocks play when surfaceAttached is false", () => {
     expect(
       shouldStartPlaybackAfterAsset({
         ...GATE_BASE,
         surfaceAttached: false,
       })
-    ).toBe(true);
+    ).toBe(false);
     const intent = resolveGatedWatchPlaybackIntent({
       ...GATE_BASE,
       surfaceAttached: false,
       firstFrameConfirmed: false,
     });
-    expect(intent?.shouldPlay).toBe(true);
-    const session = createPlayerSession();
-    if (intent) applyPlaybackIntent(session.player, intent);
-    expect(session.calls).toContain("play");
+    expect(intent).toBeNull();
   });
 });
 

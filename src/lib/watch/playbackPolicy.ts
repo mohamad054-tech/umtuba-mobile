@@ -443,6 +443,63 @@ export function shouldAcceptViewableIndexUpdate(input: {
   return input.nowMs >= input.lockUntilMs;
 }
 
+/** Highest percentVisible viewable cell. Never the first array hit. */
+export function resolveMostVisibleWatchIndex(
+  items: ReadonlyArray<{
+    index?: number | null;
+    isViewable?: boolean;
+    percentVisible?: number | null;
+  }>
+): number | null {
+  let bestIndex: number | null = null;
+  let bestPercent = -1;
+  for (const item of items) {
+    if (item.isViewable === false) continue;
+    const safe = sanitizeWatchListIndex(item.index ?? Number.NaN);
+    if (safe == null) continue;
+    const percent =
+      typeof item.percentVisible === "number" &&
+      Number.isFinite(item.percentVisible)
+        ? item.percentVisible
+        : item.isViewable === true
+          ? 80
+          : 0;
+    if (percent > bestPercent) {
+      bestPercent = percent;
+      bestIndex = safe;
+    }
+  }
+  return bestIndex;
+}
+
+/**
+ * Native settled page owns activeIndex. A stale lower-index viewability
+ * hit cannot steal the page after a real 0→1 swipe.
+ */
+export function resolveWatchOwnedIndex(input: {
+  nativePage: number | null;
+  mostVisibleIndex: number | null;
+  currentIndex?: number | null;
+  nativeOffsetKnown?: boolean;
+}): number | null {
+  const native = sanitizeWatchListIndex(input.nativePage ?? Number.NaN);
+  const visible = sanitizeWatchListIndex(
+    input.mostVisibleIndex ?? Number.NaN
+  );
+  const current = sanitizeWatchListIndex(input.currentIndex ?? Number.NaN);
+
+  if (input.nativeOffsetKnown === true && native != null) {
+    return native;
+  }
+
+  if (visible != null) {
+    if (current != null && visible < current) return current;
+    return visible;
+  }
+  if (native != null) return native;
+  return current;
+}
+
 /** First 80%-visible item is the only manual paging source. */
 export function resolveWatchActiveIndexFromViewableItems(input: {
   viewableIndexes: readonly (number | null | undefined)[];
@@ -457,12 +514,12 @@ export function resolveWatchActiveIndexFromViewableItems(input: {
   ) {
     return null;
   }
-  for (const index of input.viewableIndexes) {
-    if (index == null) continue;
-    const safe = sanitizeWatchListIndex(index);
-    if (safe != null) return safe;
-  }
-  return null;
+  return resolveMostVisibleWatchIndex(
+    input.viewableIndexes.map((index) => ({
+      index,
+      isViewable: index != null,
+    }))
+  );
 }
 
 /** Clamp a unit scrub ratio to 0..1. */

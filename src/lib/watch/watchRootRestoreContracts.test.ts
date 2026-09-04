@@ -11,7 +11,9 @@ import {
   planAndroidWatchCacheWindow,
 } from "./androidWatchMediaCache";
 import {
+  resolveMostVisibleWatchIndex,
   resolveWatchActiveIndexFromViewableItems,
+  resolveWatchOwnedIndex,
   shouldPlayWithUserPause,
 } from "./playbackPolicy";
 import {
@@ -58,6 +60,31 @@ function video(src = HTTPS): WatchVideo {
 }
 
 describe("watch root restore contracts", () => {
+  it("0→1 owns the native page, not the first listed viewable", () => {
+    expect(
+      resolveMostVisibleWatchIndex([
+        { index: 0, isViewable: true, percentVisible: 18 },
+        { index: 1, isViewable: true, percentVisible: 91 },
+      ])
+    ).toBe(1);
+    expect(
+      resolveWatchOwnedIndex({
+        nativePage: 1,
+        mostVisibleIndex: 0,
+        currentIndex: 1,
+        nativeOffsetKnown: true,
+      })
+    ).toBe(1);
+    expect(
+      resolveWatchOwnedIndex({
+        nativePage: 0,
+        mostVisibleIndex: 0,
+        currentIndex: 1,
+        nativeOffsetKnown: false,
+      })
+    ).toBe(1);
+  });
+
   it("first manual 0→1 follows the first 80%-visible item", () => {
     expect(
       resolveWatchActiveIndexFromViewableItems({
@@ -248,8 +275,69 @@ describe("watch root restore contracts", () => {
         playerAlive: true,
         ownerGeneration: 4,
         commandGeneration: 4,
-        surfaceAttached: false,
+        surfaceAttached: true,
       })
     ).toBe(true);
+    expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: true,
+        shouldPlay: true,
+        playerAlive: true,
+        ownerGeneration: 4,
+        commandGeneration: 4,
+        surfaceAttached: false,
+      })
+    ).toBe(false);
+  });
+
+  it("off-screen first-frame does not authorize audio", () => {
+    expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: false,
+        shouldPlay: true,
+        playerAlive: true,
+        ownerGeneration: 2,
+        commandGeneration: 2,
+        surfaceAttached: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: true,
+        shouldPlay: true,
+        playerAlive: true,
+        ownerGeneration: 2,
+        commandGeneration: 2,
+        surfaceAttached: false,
+      })
+    ).toBe(false);
+  });
+
+  it("ready/status cannot override a user pause latch", () => {
+    expect(
+      shouldPlayWithUserPause({
+        feedShouldPlay: true,
+        userPaused: true,
+        isActive: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: true,
+        shouldPlay: false,
+        playerAlive: true,
+        ownerGeneration: 3,
+        commandGeneration: 3,
+        surfaceAttached: true,
+      })
+    ).toBe(false);
   });
 });

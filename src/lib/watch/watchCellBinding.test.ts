@@ -109,7 +109,7 @@ describe("Watch 1 → 2 swipe binding", () => {
         playerMediaId: "post-2",
         visibleMediaId: "post-2",
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

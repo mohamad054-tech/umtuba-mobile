@@ -242,7 +242,7 @@ describe("5 ACTIVE_ITEM_PRIORITY", () => {
         commandGeneration: 3,
         surfaceAttached: false,
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(
       resolveNativePlayerStatusCatchup({
         bound: true,

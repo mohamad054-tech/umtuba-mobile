@@ -23,6 +23,8 @@ import {
   View,
   type AppStateStatus,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -117,6 +119,8 @@ import {
   saveWatchMutedPreference,
   saveWatchVolumePreference,
   resolveWatchHandoffReadiness,
+  resolveMostVisibleWatchIndex,
+  resolveWatchOwnedIndex,
   shouldAcceptViewableIndexUpdate,
   shouldHandoffWatchAdvance,
   shouldLoadPlayer,
@@ -151,7 +155,9 @@ import {
 } from "@/src/lib/watch/watchRetainedPlaybackFallback";
 import {
   preserveWatchPostAcrossLayoutSession,
+  reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
+  resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
 import {
   previousRouteNameFromState,
@@ -250,6 +256,9 @@ export default function WatchScreen() {
   const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
+  const scrollOffsetRef = useRef(0);
+  const nativeOffsetKnownRef = useRef(false);
+  const watchScrollInFlightRef = useRef(false);
   const viewportFrozenRef = useRef<{
     height: number | null;
     width: number | null;
@@ -694,8 +703,11 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const commitOwnedWatchIndex = useCallback(
+    (
+      offset: number,
+      viewableItems?: ViewToken[]
+    ) => {
       if (
         !shouldAcceptViewableIndexUpdate({
           nowMs: Date.now(),
@@ -704,12 +716,61 @@ export default function WatchScreen() {
       ) {
         return;
       }
-      const first = viewableItems.find(
-        (item) => item.isViewable && item.index != null
+      const nativePage = resolveWatchNativePage(
+        offset,
+        itemHeightRef.current,
+        videosLengthRef.current
       );
-      if (first?.index != null) {
-        claimActiveIndexRef.current(first.index);
-      }
+      const mostVisible = viewableItems
+        ? resolveMostVisibleWatchIndex(viewableItems)
+        : null;
+      const owned = resolveWatchOwnedIndex({
+        nativePage,
+        mostVisibleIndex: mostVisible,
+        currentIndex: activeIndexRef.current,
+        nativeOffsetKnown: nativeOffsetKnownRef.current,
+      });
+      const index = reconcileWatchActiveIndex({
+        nativePage: owned,
+        activeIndex: activeIndexRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (index == null) return;
+      claimActiveIndexRef.current(index);
+    },
+    []
+  );
+
+  const onWatchScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      nativeOffsetKnownRef.current = true;
+      watchScrollInFlightRef.current = true;
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+    },
+    []
+  );
+
+  const onWatchScrollSettle = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offset = event.nativeEvent.contentOffset.y;
+      nativeOffsetKnownRef.current = true;
+      watchScrollInFlightRef.current = false;
+      scrollOffsetRef.current = offset;
+      commitOwnedWatchIndex(offset);
+    },
+    [commitOwnedWatchIndex]
+  );
+
+  const commitOwnedWatchIndexRef = useRef(commitOwnedWatchIndex);
+  commitOwnedWatchIndexRef.current = commitOwnedWatchIndex;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (watchScrollInFlightRef.current) return;
+      commitOwnedWatchIndexRef.current(
+        scrollOffsetRef.current,
+        viewableItems
+      );
     }
   ).current;
 
@@ -1626,6 +1687,10 @@ export default function WatchScreen() {
         decelerationRate="fast"
         getItemLayout={getItemLayout}
         onLayout={onWatchListLayout}
+        onScroll={onWatchScroll}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={onWatchScrollSettle}
+        onScrollEndDrag={onWatchScrollSettle}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}

@@ -28,7 +28,9 @@ import {
   WATCH_SCRUB_LAYOUT_DIRECTION,
   resolveSeekTime,
   resolveSeekTimeOrNull,
+  resolveMostVisibleWatchIndex,
   resolveWatchIndexFromScrollOffset,
+  resolveWatchOwnedIndex,
   resolveWatchScrollOffset,
   sanitizePlaybackError,
   serializeWatchAutoNextPreference,
@@ -426,6 +428,39 @@ describe("auto-next preference and end-of-clip policy", () => {
     expect(resolveWatchIndexFromScrollOffset(790, 800, 4)).toBe(1);
     expect(resolveWatchIndexFromScrollOffset(400, 800, 4)).toBe(1);
     expect(resolveWatchIndexFromScrollOffset(399, 800, 4)).toBe(0);
+  });
+
+  it("owns the settled native page over a stale first viewable", () => {
+    expect(
+      resolveMostVisibleWatchIndex([
+        { index: 0, isViewable: true, percentVisible: 12 },
+        { index: 1, isViewable: true, percentVisible: 88 },
+      ])
+    ).toBe(1);
+    expect(
+      resolveWatchOwnedIndex({
+        nativePage: 1,
+        mostVisibleIndex: 0,
+        currentIndex: 1,
+        nativeOffsetKnown: true,
+      })
+    ).toBe(1);
+    expect(
+      resolveWatchOwnedIndex({
+        nativePage: 0,
+        mostVisibleIndex: 0,
+        currentIndex: 1,
+        nativeOffsetKnown: false,
+      })
+    ).toBe(1);
+    expect(
+      resolveWatchOwnedIndex({
+        nativePage: 0,
+        mostVisibleIndex: 0,
+        currentIndex: 1,
+        nativeOffsetKnown: true,
+      })
+    ).toBe(0);
   });
 
   it("locks viewability updates during programmatic advance", () => {
