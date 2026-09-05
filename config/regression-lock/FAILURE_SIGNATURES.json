@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "signatures": [
+    {
+      "id": "BLACK_VIDEO_SURFACE",
+      "symptom": "Watch cell shows a black video surface on arbitrary feed items, not only video 2.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchCellBinding.ts",
+        "src/lib/watch/playerLifecycle.ts",
+        "src/lib/watch/watchActiveIndexArbiter.ts"
+      ],
+      "reference_builds": [
+        "1c56aca / 9c1b9429 (installed rollback)",
+        "7536c11 / bcb12f31 (rejected)"
+      ],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchCellBinding.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "symptom": "Old video audio continues briefly after the next video is visible.",
+      "likely_modules": [
+        "src/lib/watch/playerLifecycle.ts",
+        "src/lib/watch/watchManualHandoff.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "reference_builds": ["1c56aca / 9c1b9429"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/playerLifecycle.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "VISIBLE_VIDEO_ACTIVE_INDEX_MISMATCH",
+      "symptom": "Visible Native page and JS activeIndex disagree.",
+      "likely_modules": [
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchViewport.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "reference_builds": ["1c56aca / 9c1b9429", "7536c11 / bcb12f31"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "VIDEO2_BLACK_AUDIO_PRESENT",
+      "symptom": "Video 2 is black while audio may still be present.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchCellBinding.ts"
+      ],
+      "reference_builds": ["7536c11 / bcb12f31"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchCellBinding.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "NEXT_SWIPE_SNAPBACK_TO_FIRST",
+      "symptom": "Attempting to move from black video 2 to video 3 snaps or returns to video 1.",
+      "likely_modules": [
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchViewport.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "reference_builds": ["7536c11 / bcb12f31"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "WATCH_HISTORY_GROWS_PER_SWIPE",
+      "symptom": "Each Watch swipe pushes navigation history.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/nav/WatchEntryTracker.tsx"
+      ],
+      "reference_builds": ["1c56aca audit: native task depth stayed 1"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchRootRestoreContracts.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "WRONG_AUTHOR_PROFILE",
+      "symptom": "Watch author chip opens the wrong profile.",
+      "likely_modules": [
+        "src/lib/profile/resolveTarget.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "reference_builds": [],
+      "resolved": false,
+      "prevention_test": null,
+      "device_required": true
+    },
+    {
+      "id": "FOLD6_HORIZONTAL_CROP",
+      "symptom": "Folded Fold6 Watch frame is cropped left/right (cover/ZOOM).",
+      "likely_modules": ["src/lib/watch/watchVideoFit.ts"],
+      "reference_builds": [],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchVideoFit.ts",
+      "device_required": true
+    },
+    {
+      "id": "FOLD6_VERTICAL_CROP",
+      "symptom": "Unfolded Fold6 Watch frame is cropped top/bottom (cover/ZOOM).",
+      "likely_modules": ["src/lib/watch/watchVideoFit.ts"],
+      "reference_builds": [],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchVideoFit.ts",
+      "device_required": true
+    },
+    {
+      "id": "PROGRESS_RTL_REVERSED",
+      "symptom": "Watch progress/seek runs the wrong horizontal direction.",
+      "likely_modules": ["src/lib/watch/playbackPolicy.ts"],
+      "reference_builds": [],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/playbackPolicy.test.ts",
+      "device_required": false
+    },
+    {
+      "id": "DOUBLE_BACK_REARMS",
+      "symptom": "Second hardware Back re-arms instead of exiting when expected.",
+      "likely_modules": ["app/(tabs)/watch.tsx", "app/_layout.tsx"],
+      "reference_builds": ["1c56aca Fold6 nav audit"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchRootRestoreContracts.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "80_PERCENT_HANDOFF_MISSING",
+      "symptom": "Old video stays active until effectively 100% snap/settle. 80% handoff absent on device.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "reference_builds": [
+        "1c56aca / 9c1b9429 (callback discarded)",
+        "7536c11 / bcb12f31 (source restore, device fail)"
+      ],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
+      "device_required": true
+    }
+  ]
+}

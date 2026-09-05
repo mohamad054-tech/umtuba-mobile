@@ -1,0 +1,36 @@
+{
+  "task_id": "UMTUBA_REGRESSION_LOCKED_DEVELOPMENT_SYSTEM_V1",
+  "owner_goal": "Install the regression-lock governance system. Do not change product behavior.",
+  "base_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
+  "product_area": "regression_lock",
+  "allowed_files": [
+    "config/regression-lock/**",
+    "docs/ai/**",
+    "scripts/regression-lock/**",
+    "src/lib/regressionLock/**",
+    "package.json",
+    "tsconfig.json",
+    ".cursor/**",
+    "AGENTS.md"
+  ],
+  "allowed_modules": ["regression_lock"],
+  "forbidden_modules": [
+    "watch",
+    "create_editor",
+    "store",
+    "learning",
+    "um_streak"
+  ],
+  "protected_contracts": [],
+  "required_tests": ["src/lib/regressionLock/**/*.test.ts"],
+  "required_device_gates": [],
+  "eas_allowed": false,
+  "play_allowed": false,
+  "production_allowed": false,
+  "push_allowed": false,
+  "max_eas_builds": 1,
+  "authorized_sha": null,
+  "owner_status_claim": "NONE",
+  "device_evidence": null,
+  "notes": "Governance only. Current Fold6 Watch remains DEVICE_FAIL."
+}

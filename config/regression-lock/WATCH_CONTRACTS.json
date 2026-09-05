@@ -1,0 +1,358 @@
+{
+  "schema_version": 1,
+  "product_area": "watch",
+  "current_fold6_watch_status": "DEVICE_FAIL",
+  "open_owner_failures": [
+    "random black video surface",
+    "missing 80% handoff",
+    "old audio bleeding into next video"
+  ],
+  "contracts": [
+    {
+      "id": "WATCH_PLAYER_BINDING",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Unit tests for playerLifecycle / activePlayerOwnership. No current Fold6 OWNER_PASS.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": "desktop/restore-a1ceb9d-keep-um-streak-v1",
+      "regression_tests": [
+        "src/lib/watch/playerLifecycle.test.ts",
+        "src/lib/watch/activePlayerOwnership.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "VISIBLE_VIDEO_ACTIVE_INDEX_MISMATCH",
+      "owning_files": [
+        "src/lib/watch/playerLifecycle.ts",
+        "src/lib/watch/playerSession.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/watchActiveIndexArbiter.ts"]
+    },
+    {
+      "id": "WATCH_VISIBLE_SURFACE_BINDING",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: black surface on arbitrary feed videos. 7536c11 also failed video 2 black.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/watchCellBinding.test.ts",
+        "src/lib/watch/playerLifecycle.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchCellBinding.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchActiveIndexArbiter.ts"]
+    },
+    {
+      "id": "WATCH_AUDIO_BINDING",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: old audio continues briefly into next video.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/playerLifecycle.test.ts",
+        "src/lib/watch/watchManualHandoff.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "owning_files": [
+        "src/lib/watch/playerLifecycle.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    },
+    {
+      "id": "WATCH_80_PERCENT_HANDOFF",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Reference 4547d6bb: itemVisiblePercentThreshold 80, first isViewable claims activeIndex. Installed 1c56aca discards callback. 7536c11 source restore DEVICE_FAIL.",
+      "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
+      "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
+      "regression_tests": [
+        "src/lib/watch/watchActiveIndexArbiter.test.ts",
+        "src/lib/watch/watchManualHandoff.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "80_PERCENT_HANDOFF_MISSING",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchViewport.ts"]
+    },
+    {
+      "id": "WATCH_5_VIDEO_ROLLING_CACHE",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Source-equivalent to 4547d6bb / a1ceb9d. ANDROID_WATCH_CACHE_TARGET=5. Not owner-certified.",
+      "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
+      "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
+      "regression_tests": [
+        "src/lib/watch/androidWatchMediaCache.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": ["src/lib/watch/androidWatchMediaCache.ts"],
+      "dependent_files": [
+        "src/lib/watch/watchOfflineManifest.ts",
+        "app/(tabs)/watch.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_BACKWARD_RETENTION",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "N-1 retention tests. Not owner-certified.",
+      "reference_sha": "d5a40f51f4c5fd989da4cda90437380fca1660ab",
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/watchRetainedPlaybackFallback.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": [
+        "src/lib/watch/androidWatchMediaCache.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchOfflineManifest.ts"]
+    },
+    {
+      "id": "WATCH_NO_REDOWLOAD_RETAINED",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Valid cache hits do not re-download in unit tests. Device/network evidence required for OWNER_PASS.",
+      "reference_sha": "711b01b",
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/androidWatchMediaCache.test.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": [
+        "src/lib/watch/androidWatchMediaCache.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchOfflineManifest.ts"]
+    },
+    {
+      "id": "WATCH_VOLUME_VERTICAL_SIDE_CONTROL",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "volumeLayout unit tests. Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/volumeLayout.test.ts"],
+      "device_required": false,
+      "failure_signature": null,
+      "owning_files": ["src/lib/watch/volumeLayout.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_PROGRESS_DIRECTION",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "WATCH_SCRUB_LAYOUT_DIRECTION=ltr unit tests.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/playbackPolicy.test.ts"],
+      "device_required": false,
+      "failure_signature": "PROGRESS_RTL_REVERSED",
+      "owning_files": ["src/lib/watch/playbackPolicy.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_SEEK_DIRECTION",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Scrub layout direction unit tests.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/playbackPolicy.test.ts"],
+      "device_required": false,
+      "failure_signature": "PROGRESS_RTL_REVERSED",
+      "owning_files": ["src/lib/watch/playbackPolicy.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_FOLD6_CONTAIN_FOLDED",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "WATCH_VIDEO_CONTENT_FIT=contain. Folded cell 968x2376. Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchVideoFit.ts"],
+      "device_required": true,
+      "failure_signature": "FOLD6_HORIZONTAL_CROP",
+      "owning_files": ["src/lib/watch/watchVideoFit.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_FOLD6_CONTAIN_UNFOLDED",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Unfolded cell 1856x2160 contain/FIT. Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchVideoFit.ts"],
+      "device_required": true,
+      "failure_signature": "FOLD6_VERTICAL_CROP",
+      "owning_files": ["src/lib/watch/watchVideoFit.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_FOLD_TRANSITION",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Frozen viewport session; TextureView jitter must not rewrite itemHeight.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchViewport.test.ts"],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": ["src/lib/watch/watchViewport.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_BACK_DOUBLE_PRESS",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Fold6 nav audit on 1c56aca: second back can re-arm when canGoBack. Not OWNER_PASS.",
+      "reference_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
+      "reference_branch": "desktop/restore-a1ceb9d-keep-um-streak-v1",
+      "regression_tests": ["src/lib/watch/watchRootRestoreContracts.test.ts"],
+      "device_required": true,
+      "failure_signature": "DOUBLE_BACK_REARMS",
+      "owning_files": ["app/(tabs)/watch.tsx", "app/_layout.tsx"],
+      "dependent_files": ["src/lib/nav/WatchEntryTracker.tsx"]
+    },
+    {
+      "id": "WATCH_NO_HISTORY_PER_SWIPE",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "1c56aca Fold6 audit: swipe does not push native task. Still not OWNER_PASS.",
+      "reference_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRootRestoreContracts.test.ts"],
+      "device_required": true,
+      "failure_signature": "WATCH_HISTORY_GROWS_PER_SWIPE",
+      "owning_files": ["app/(tabs)/watch.tsx"],
+      "dependent_files": ["src/lib/nav/WatchEntryTracker.tsx"]
+    },
+    {
+      "id": "WATCH_PROFILE_RETURN",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Profile nav helpers exist. Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/profile/profileNav.ts"],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": ["src/lib/profile/profileNav.ts", "app/(tabs)/watch.tsx"],
+      "dependent_files": ["app/profile/user.tsx"]
+    },
+    {
+      "id": "WATCH_COMMENTS_RETURN",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRootRestoreContracts.test.ts"],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": ["app/(tabs)/watch.tsx"],
+      "dependent_files": ["src/lib/nav/**"]
+    },
+    {
+      "id": "WATCH_SHARE_RETURN",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "watchShareCacheSurvival tests. Share dismiss keeps rolling cache.",
+      "reference_sha": "436e7f9",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchShareCacheSurvival.test.ts"],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": ["app/(tabs)/watch.tsx"],
+      "dependent_files": ["src/lib/watch/androidWatchMediaCache.ts"]
+    },
+    {
+      "id": "WATCH_PLAY_PAUSE",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "playbackPolicy / gate unit tests.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchPlaybackGate.test.ts"],
+      "device_required": false,
+      "failure_signature": null,
+      "owning_files": ["src/lib/watch/watchPlaybackGate.ts", "app/(tabs)/watch.tsx"],
+      "dependent_files": []
+    },
+    {
+      "id": "WATCH_DOUBLE_TAP_LIKE",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "watchGestures unit tests.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchGestures.test.ts"],
+      "device_required": false,
+      "failure_signature": null,
+      "owning_files": ["src/lib/watch/watchGestures.ts"],
+      "dependent_files": ["app/(tabs)/watch.tsx"]
+    },
+    {
+      "id": "WATCH_AUTHOR_PROFILE_TARGET",
+      "owner_status": "SOURCE_PASS_ONLY",
+      "last_known_accepted_evidence": "profile resolveTarget helpers. Not current owner-certified.",
+      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
+      "reference_branch": null,
+      "regression_tests": ["src/lib/profile/resolveTarget.ts"],
+      "device_required": true,
+      "failure_signature": "WRONG_AUTHOR_PROFILE",
+      "owning_files": ["src/lib/profile/resolveTarget.ts", "app/(tabs)/watch.tsx"],
+      "dependent_files": ["app/profile/user.tsx"]
+    },
+    {
+      "id": "WATCH_NO_BLACK_SURFACE",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL on 1c56aca: black video surface on arbitrary feed videos. 7536c11 also failed.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/watchCellBinding.test.ts",
+        "src/lib/watch/playerLifecycle.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchCellBinding.ts"
+      ],
+      "dependent_files": ["src/lib/watch/playerLifecycle.ts"]
+    },
+    {
+      "id": "WATCH_NO_AUDIO_BLEED",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: previous video audio continues briefly into the next video.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/playerLifecycle.test.ts"],
+      "device_required": true,
+      "failure_signature": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "owning_files": [
+        "src/lib/watch/playerLifecycle.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    },
+    {
+      "id": "WATCH_NO_SNAPBACK",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "7536c11 owner FAIL: move from black video 2 to 3 snaps/returns to video 1.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": [
+        "src/lib/watch/watchActiveIndexArbiter.test.ts",
+        "src/lib/watch/watchViewport.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "NEXT_SWIPE_SNAPBACK_TO_FIRST",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchViewport.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    }
+  ]
+}

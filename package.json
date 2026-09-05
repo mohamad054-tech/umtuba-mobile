@@ -10,7 +10,15 @@
     "web": "expo start --web",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "regression:task-check": "node scripts/regression-lock/run.mjs task-check",
+    "regression:baseline-check": "node scripts/regression-lock/run.mjs baseline-check",
+    "regression:scope-check": "node scripts/regression-lock/run.mjs scope-check",
+    "regression:contracts": "node scripts/regression-lock/run.mjs contracts",
+    "regression:pre-eas": "node scripts/regression-lock/run.mjs pre-eas",
+    "regression:snapshot": "node scripts/regression-lock/run.mjs snapshot",
+    "regression:device-required": "node scripts/regression-lock/run.mjs device-required",
+    "regression:build-lock": "node scripts/regression-lock/run.mjs build-lock"
   },
   "expo": {
     "doctor": {

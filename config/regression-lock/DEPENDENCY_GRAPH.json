@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "areas": {
+    "watch": {
+      "globs": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/**",
+        "src/lib/nav/WatchEntryTracker.tsx"
+      ],
+      "depends_on": ["media_video", "audio", "cache", "navigation"],
+      "expands_tests": [
+        "src/lib/watch/**/*.test.ts"
+      ],
+      "expands_contracts": [
+        "WATCH_PLAYER_BINDING",
+        "WATCH_VISIBLE_SURFACE_BINDING",
+        "WATCH_AUDIO_BINDING",
+        "WATCH_80_PERCENT_HANDOFF",
+        "WATCH_NO_BLACK_SURFACE",
+        "WATCH_NO_AUDIO_BLEED",
+        "WATCH_NO_SNAPBACK",
+        "WATCH_5_VIDEO_ROLLING_CACHE"
+      ]
+    },
+    "create_editor": {
+      "globs": ["app/(tabs)/create.tsx", "src/lib/video/**"],
+      "depends_on": ["media_video", "audio"],
+      "expands_tests": ["src/lib/video/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "messages": {
+      "globs": [
+        "app/(tabs)/messages.tsx",
+        "app/messages/**",
+        "src/lib/messenger/**"
+      ],
+      "depends_on": ["navigation", "auth", "supabase_client"],
+      "expands_tests": ["src/lib/messenger/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "um_streak": {
+      "globs": ["src/lib/umStreak/**", "app/messages/streak-camera.tsx"],
+      "depends_on": ["messages", "auth", "supabase_client"],
+      "expands_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "profile": {
+      "globs": ["app/(tabs)/profile.tsx", "app/profile/**", "src/lib/profile/**"],
+      "depends_on": ["navigation", "auth"],
+      "expands_tests": ["src/lib/profile/**/*.test.ts"],
+      "expands_contracts": ["WATCH_PROFILE_RETURN", "WATCH_AUTHOR_PROFILE_TARGET"]
+    },
+    "navigation": {
+      "globs": ["app/_layout.tsx", "app/(tabs)/_layout.tsx", "src/lib/nav/**"],
+      "depends_on": [],
+      "expands_tests": [
+        "src/lib/watch/watchRootRestoreContracts.test.ts",
+        "src/lib/messenger/**/*.test.ts",
+        "src/lib/umStreak/**/*.test.ts"
+      ],
+      "expands_contracts": [
+        "WATCH_BACK_DOUBLE_PRESS",
+        "WATCH_NO_HISTORY_PER_SWIPE",
+        "WATCH_PROFILE_RETURN",
+        "WATCH_COMMENTS_RETURN",
+        "WATCH_SHARE_RETURN"
+      ]
+    },
+    "media_video": {
+      "globs": ["src/lib/video/**", "src/lib/feed/videoStoragePath.ts"],
+      "depends_on": ["audio", "cache"],
+      "expands_tests": [
+        "src/lib/watch/playerLifecycle.test.ts",
+        "src/lib/watch/watchCellBinding.test.ts",
+        "src/lib/video/**/*.test.ts"
+      ],
+      "expands_contracts": [
+        "WATCH_PLAYER_BINDING",
+        "WATCH_AUDIO_BINDING",
+        "WATCH_5_VIDEO_ROLLING_CACHE"
+      ]
+    },
+    "supabase_client": {
+      "globs": ["src/lib/supabase/**"],
+      "depends_on": ["auth"],
+      "expands_tests": ["src/lib/umStreak/**/*.test.ts", "src/lib/messenger/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "cache": {
+      "globs": [
+        "src/lib/watch/androidWatchMediaCache.ts",
+        "src/lib/watch/watchOfflineManifest.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.ts"
+      ],
+      "depends_on": ["media_video"],
+      "expands_tests": [
+        "src/lib/watch/androidWatchMediaCache.test.ts",
+        "src/lib/watch/watchOfflineManifest.test.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.test.ts"
+      ],
+      "expands_contracts": [
+        "WATCH_5_VIDEO_ROLLING_CACHE",
+        "WATCH_BACKWARD_RETENTION",
+        "WATCH_NO_REDOWLOAD_RETAINED"
+      ]
+    },
+    "audio": {
+      "globs": ["src/lib/watch/playerLifecycle.ts", "src/lib/watch/playbackPolicy.ts"],
+      "depends_on": [],
+      "expands_tests": [
+        "src/lib/watch/playerLifecycle.test.ts",
+        "src/lib/watch/playbackPolicy.test.ts"
+      ],
+      "expands_contracts": ["WATCH_AUDIO_BINDING", "WATCH_NO_AUDIO_BLEED"]
+    },
+    "auth": {
+      "globs": ["app/(auth)/**", "src/lib/auth/**", "src/lib/supabase/authStorage.ts"],
+      "depends_on": ["supabase_client"],
+      "expands_tests": ["src/lib/auth/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "store": {
+      "globs": ["src/lib/economy/**", "src/lib/world/commerce/**"],
+      "depends_on": [],
+      "expands_tests": ["src/lib/economy/**/*.test.ts"],
+      "expands_contracts": []
+    },
+    "learning": {
+      "globs": ["src/lib/learning/**"],
+      "depends_on": [],
+      "expands_tests": [],
+      "expands_contracts": []
+    },
+    "regression_lock": {
+      "globs": [
+        "config/regression-lock/**",
+        "docs/ai/**",
+        "scripts/regression-lock/**",
+        "src/lib/regressionLock/**",
+        "package.json",
+        ".cursor/rules/**"
+      ],
+      "depends_on": [],
+      "expands_tests": ["src/lib/regressionLock/**/*.test.ts"],
+      "expands_contracts": []
+    }
+  }
+}

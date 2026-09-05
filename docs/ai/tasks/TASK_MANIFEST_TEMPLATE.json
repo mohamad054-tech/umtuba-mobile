@@ -1,0 +1,21 @@
+{
+  "task_id": "REPLACE_WITH_TASK_ID",
+  "owner_goal": "One sentence owner goal.",
+  "base_sha": "REPLACE_WITH_FULL_SHA",
+  "product_area": "watch | um_streak | messages | create_editor | profile | navigation | store | learning | regression_lock",
+  "allowed_files": ["src/lib/example/**"],
+  "allowed_modules": ["example"],
+  "forbidden_modules": ["watch", "create_editor", "store"],
+  "protected_contracts": [],
+  "required_tests": ["src/lib/example/**/*.test.ts"],
+  "required_device_gates": [],
+  "eas_allowed": false,
+  "play_allowed": false,
+  "production_allowed": false,
+  "push_allowed": false,
+  "max_eas_builds": 1,
+  "authorized_sha": null,
+  "owner_status_claim": "NONE",
+  "device_evidence": null,
+  "notes": "No valid manifest = NO PRODUCT EDIT."
+}

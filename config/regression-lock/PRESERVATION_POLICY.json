@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "never": [
+    "force push",
+    "reset --hard preserved work",
+    "git clean preserved worktrees",
+    "destroy owner-pass branch without replacement evidence"
+  ],
+  "source_pass": {
+    "commit_required": true,
+    "push_to_task_branch_required_unless_owner_forbids": true
+  },
+  "owner_pass": {
+    "preserve_task_branch": true,
+    "tag_or_manifest_baseline": true,
+    "record_eas_apk_device_evidence": true,
+    "force_push": false
+  },
+  "default_max_eas_builds": 1
+}
