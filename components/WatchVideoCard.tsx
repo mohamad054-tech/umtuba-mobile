@@ -14,12 +14,11 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { WatchSideVolumeControl } from "@/components/WatchSideVolumeControl";
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
   canSeekWithDuration,
-  clampWatchVolume,
   formatPlaybackClock,
-  quantizeWatchVolume,
   resolveAutoNextButtonText,
   resolveEffectiveAudio,
   resolveMuteButtonText,
@@ -29,9 +28,12 @@ import {
   resolveScrubRatioFromPageX,
   resolveSeekTimeOrNull,
   sanitizePlaybackError,
+  scrubFillWidthPercent,
+  scrubThumbLeftPercent,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
   shouldPlayWithUserPause,
+  WATCH_SCRUB_LAYOUT_DIRECTION,
   type AppLifecycleState,
 } from "@/src/lib/watch/playbackPolicy";
 import {
@@ -106,8 +108,6 @@ type ScrubBarProps = {
   fillColor?: string;
   /** Larger hit target for timeline seeking. */
   tall?: boolean;
-  /** Extra-wide volume control. */
-  wide?: boolean;
 };
 
 function ScrubBar({
@@ -118,7 +118,6 @@ function ScrubBar({
   trackColor = "rgba(255,255,255,0.28)",
   fillColor = colors.accentCyan,
   tall = false,
-  wide = false,
 }: ScrubBarProps) {
   const trackRef = useRef<View>(null);
   const frameRef = useRef({ x: 0, width: 1 });
@@ -213,7 +212,7 @@ function ScrubBar({
       style={[
         styles.scrubHit,
         tall && styles.scrubHitTall,
-        wide && styles.scrubHitWide,
+        { direction: WATCH_SCRUB_LAYOUT_DIRECTION },
       ]}
       onLayout={onLayout}
       collapsable={false}
@@ -226,18 +225,26 @@ function ScrubBar({
       }}
       {...panResponder.panHandlers}
     >
-      <View style={[styles.scrubTrack, { backgroundColor: trackColor }]}>
+      <View
+        style={[
+          styles.scrubTrack,
+          {
+            backgroundColor: trackColor,
+            direction: WATCH_SCRUB_LAYOUT_DIRECTION,
+          },
+        ]}
+      >
         <View
           style={[
             styles.scrubFill,
-            { width: `${localRatio * 100}%`, backgroundColor: fillColor },
+            { width: scrubFillWidthPercent(localRatio), backgroundColor: fillColor },
           ]}
         />
         <View
           style={[
             styles.scrubThumb,
             tall && styles.scrubThumbTall,
-            { left: `${localRatio * 100}%` },
+            { left: scrubThumbLeftPercent(localRatio) },
           ]}
         />
       </View>
@@ -543,13 +550,6 @@ function WatchVideoCardComponent({
     [timeline.duration]
   );
 
-  const onVolumeSeek = useCallback(
-    (ratio: number) => {
-      onVolumeChange(quantizeWatchVolume(clampWatchVolume(ratio)));
-    },
-    [onVolumeChange]
-  );
-
   const onScrubActive = useCallback(
     (active: boolean) => {
       onScrubGestureChange?.(active);
@@ -648,22 +648,14 @@ function WatchVideoCardComponent({
           </Pressable>
         </View>
 
-        <View
-          style={[styles.volumeBlock, { top: Math.max(72, topInset + 64) }]}
-          pointerEvents="box-none"
-        >
-          <Text style={styles.volumeLabel}>
-            Volume {Math.round(volume * 100)}%
-          </Text>
-          <ScrubBar
-            ratio={volume}
-            accessibilityLabel="In-app volume"
-            onSeekRatio={onVolumeSeek}
-            onGestureActiveChange={onScrubActive}
-            tall
-            wide
-          />
-        </View>
+        <WatchSideVolumeControl
+          volume={volume}
+          muted={muted}
+          topInset={topInset}
+          bottomInset={bottomInset}
+          onVolumeChange={onVolumeChange}
+          onGestureActiveChange={onScrubActive}
+        />
 
         <View
           style={[styles.meta, { marginBottom: timelineBottom + 36 }]}
@@ -676,7 +668,19 @@ function WatchVideoCardComponent({
             accessibilityLabel={`Profile ${video.author.username}`}
             accessibilityState={{ disabled: !onOpenProfile }}
             hitSlop={8}
+            style={styles.authorRow}
           >
+            <View
+              style={styles.authorAvatar}
+              accessibilityLabel={`Avatar ${video.author.username}`}
+            >
+              <Text style={styles.authorAvatarText} accessible={false}>
+                {(video.author.avatar || video.author.username || "?").replace(
+                  /^@/,
+                  ""
+                ).charAt(0) || "?"}
+              </Text>
+            </View>
             <Text style={styles.username} numberOfLines={1}>
               {video.author.username}
             </Text>
@@ -907,18 +911,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  volumeBlock: {
-    position: "absolute",
-    right: 16,
-    width: 240,
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    zIndex: 6,
+    maxWidth: "100%",
   },
-  volumeLabel: {
+  authorAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  authorAvatarText: {
     color: colors.text,
     fontSize: 13,
     fontWeight: "700",
-    textAlign: "right",
   },
   meta: {
     maxWidth: "72%",
@@ -997,15 +1009,12 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingVertical: 14,
   },
-  scrubHitWide: {
-    minHeight: 52,
-    paddingVertical: 16,
-  },
   scrubTrack: {
     height: 5,
     borderRadius: 999,
     overflow: "visible",
     justifyContent: "center",
+    direction: WATCH_SCRUB_LAYOUT_DIRECTION,
   },
   scrubFill: {
     height: 5,

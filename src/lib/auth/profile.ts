@@ -2,6 +2,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { normalizeUsername } from "@/src/contracts/validation";
 import type { UserProfile } from "@/src/lib/auth/types";
+import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { getSupabase } from "@/src/lib/supabase/client";
 
 const PROFILE_COLUMNS =
@@ -35,6 +36,60 @@ function mapProfileRow(row: {
     avatar_initial:
       row.avatar_initial || displayName.charAt(0).toUpperCase() || "U",
   };
+}
+
+export async function getProfileByUsername(
+  username: string
+): Promise<UserProfile | null> {
+  const key = normalizeUsername(username);
+  if (!key) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("username", key)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapProfileRow(data as Parameters<typeof mapProfileRow>[0]);
+}
+
+export async function getProfileById(
+  userId: string
+): Promise<UserProfile | null> {
+  const id = parseProfileUserId(userId);
+  if (!id) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return mapProfileRow(data as Parameters<typeof mapProfileRow>[0]);
+}
+
+export async function fetchOtherProfile(target: {
+  username: string;
+  userId?: string;
+}): Promise<UserProfile | null> {
+  if (target.userId) {
+    const byId = await getProfileById(target.userId);
+    if (byId) return byId;
+  }
+  if (target.username) {
+    return getProfileByUsername(target.username);
+  }
+  return null;
 }
 
 export async function getProfileForUser(user: User): Promise<UserProfile> {

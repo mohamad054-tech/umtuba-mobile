@@ -28,6 +28,7 @@ import {
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { planWatchAuthorProfileNavigation } from "@/src/lib/profile/watchProfileNav";
 import {
   applySuccessfulDeleteToList,
   deletePostForOwner,
@@ -85,7 +86,7 @@ function toLifecycleState(state: AppStateStatus): AppLifecycleState {
 export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const params = useLocalSearchParams<{ post?: string }>();
   const focusPostId =
@@ -614,10 +615,15 @@ export default function WatchScreen() {
             : undefined
         }
         onOpenProfile={() => {
-          const username = item.author.username.replace(/^@/, "");
-          if (username) {
-            router.push(`/profile?u=${encodeURIComponent(username)}` as never);
+          const plan = planWatchAuthorProfileNavigation({
+            author: item.author,
+            signedInUserId: user?.id ?? null,
+            signedInUsername: profile?.username ?? null,
+          });
+          if (plan.action !== "push") {
+            return;
           }
+          router.push(plan.href as never);
         }}
         onRefreshSrc={() => refreshSrcFor(item)}
         style={{ height: itemHeight }}
@@ -643,6 +649,7 @@ export default function WatchScreen() {
       onToggleMute,
       onToggleSave,
       user?.id,
+      profile?.username,
       onVolumeChange,
       refreshSrcFor,
       router,
