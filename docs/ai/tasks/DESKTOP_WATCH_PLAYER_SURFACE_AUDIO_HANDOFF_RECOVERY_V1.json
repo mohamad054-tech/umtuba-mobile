@@ -1,24 +1,14 @@
 {
-  "task_id": "DESKTOP_WATCH_PLAYER_SURFACE_AUDIO_HANDOFF_IMPLEMENTATION_V1",
-  "owner_goal": "Implement one Watch handoff state machine that commits activeIndex only when the target is presentation-ready, with early silent N+1 prepare, 80% intent, exclusive audio, and no snapback.",
+  "task_id": "DESKTOP_WATCH_PLAYER_SURFACE_AUDIO_HANDOFF_RECOVERY_V1",
+  "owner_goal": "Phase A only: design one coherent Watch player/surface/audio/80% handoff recovery. No product source edits.",
   "base_sha": "a88640d956bf2b354ebc67b4fb7bfc48358e70a7",
   "product_area": "watch",
   "allowed_files": [
-    "app/(tabs)/watch.tsx",
-    "src/lib/watch/watchManualHandoff.ts",
-    "src/lib/watch/watchManualHandoff.test.ts",
-    "src/lib/watch/watchActiveIndexArbiter.ts",
-    "src/lib/watch/watchActiveIndexArbiter.test.ts",
-    "src/lib/watch/playerLifecycle.ts",
-    "src/lib/watch/playerLifecycle.test.ts",
-    "src/lib/watch/watchHandoffMachine.test.ts",
-    "src/lib/watch/watchRootRestoreContracts.test.ts",
     "docs/ai/tasks/**",
     "src/lib/regressionLock/**"
   ],
   "allowed_modules": [
     "watch",
-    "audio",
     "regression_lock"
   ],
   "forbidden_modules": [
@@ -51,10 +41,8 @@
     "WATCH_NO_SNAPBACK"
   ],
   "required_tests": [
-    "src/lib/watch/**/*.test.ts",
     "src/lib/regressionLock/**/*.test.ts",
-    "src/lib/profile/profileNav.ts",
-    "src/lib/profile/resolveTarget.ts"
+    "src/lib/watch/**/*.test.ts"
   ],
   "required_device_gates": [
     "WATCH_NO_BLACK_SURFACE",
@@ -73,5 +61,5 @@
   "authorized_sha": null,
   "owner_status_claim": "NONE",
   "device_evidence": null,
-  "notes": "Repairing DEVICE_FAIL contracts WATCH_NO_BLACK_SURFACE, WATCH_80_PERCENT_HANDOFF, WATCH_NO_AUDIO_BLEED via one handoff machine. Cache/volume/seek/contain/UM Streak/nav remain protected. No EAS."
+  "notes": "Repairing DEVICE_FAIL contracts: WATCH_NO_BLACK_SURFACE, WATCH_80_PERCENT_HANDOFF, WATCH_NO_AUDIO_BLEED. Phase A is read-only product."
 }

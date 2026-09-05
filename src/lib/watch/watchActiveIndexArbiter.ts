@@ -5,6 +5,7 @@ import {
 
 /** The only reasons that may write Watch activeIndex. */
 export type WatchIndexClaimReason =
+  | "handoff-commit"
   | "native-settle"
   | "programmatic"
   | "bootstrap";
@@ -34,8 +35,8 @@ export function createWatchActiveIndexArbiter(): WatchActiveIndexArbiter {
 }
 
 /**
- * Delayed viewability / find() on index 0 must never write activeIndex.
- * Visibility is evidence only.
+ * Viewability never writes activeIndex. It is an INTENT input to the
+ * handoff machine. The machine may later commit via handoff-commit.
  */
 export function decideWatchViewabilityEvidence(): {
   mayClaimActiveIndex: false;
@@ -78,6 +79,7 @@ export function shouldLoadOwnedWatchPlayer(input: {
   platform?: string | null;
   lastSettledNativePage?: number | null;
   warmedTargetIndex?: number | null;
+  prepareAdjacentNeighbors?: boolean;
 }): boolean {
   if (shouldLoadPlayer(input.index, input.activeIndex, input.platform)) {
     return true;
@@ -90,12 +92,25 @@ export function shouldLoadOwnedWatchPlayer(input: {
     return true;
   }
   const warmed = sanitizeWatchListIndex(input.warmedTargetIndex ?? Number.NaN);
-  return warmed != null && input.index === warmed;
+  if (warmed != null && input.index === warmed) {
+    return true;
+  }
+  if (input.prepareAdjacentNeighbors === true) {
+    return Math.abs(input.index - input.activeIndex) === 1;
+  }
+  return false;
+}
+
+export function isIndependentWatchIndexWriter(
+  reason: WatchIndexClaimReason
+): boolean {
+  return reason === "native-settle" || reason === "programmatic";
 }
 
 /**
- * Single writer for activeIndex. Stale generations and delayed bootstrap
- * / index-0 claims are rejected.
+ * Single writer for activeIndex. Watch transitions commit only through
+ * handoff-commit. Bootstrap is the initial mount. Settle / programmatic /
+ * viewability / first_frame / scrollToIndex are not writers.
  */
 export function decideWatchActiveIndexClaim(input: {
   arbiter: WatchActiveIndexArbiter;
@@ -117,6 +132,14 @@ export function decideWatchActiveIndexClaim(input: {
       accept: false,
       next: input.arbiter,
       rejectReason: "stale-generation",
+    };
+  }
+
+  if (isIndependentWatchIndexWriter(input.reason)) {
+    return {
+      accept: false,
+      next: input.arbiter,
+      rejectReason: "independent-writer-forbidden",
     };
   }
 
@@ -142,35 +165,11 @@ export function decideWatchActiveIndexClaim(input: {
     };
   }
 
-  if (input.reason === "programmatic") {
-    const native = sanitizeWatchListIndex(
-      input.nativeSettledPage ?? requested
-    );
-    return {
-      accept: true,
-      next: {
-        activeIndex: requested,
-        navigationGeneration: input.arbiter.navigationGeneration + 1,
-        lastSettledNativePage: native,
-        userInteracted: true,
-        pageClaimed: true,
-      },
-    };
-  }
-
-  const proven = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
-  if (proven == null) {
-    return {
-      accept: false,
-      next: input.arbiter,
-      rejectReason: "missing-native-page",
-    };
-  }
   if (
     shouldRejectStaleIndexZero({
-      requestedIndex: proven,
+      requestedIndex: requested,
       lastSettledNativePage: input.arbiter.lastSettledNativePage,
-      provenNativePage: proven,
+      provenNativePage: input.nativeSettledPage ?? null,
     })
   ) {
     return {
@@ -179,13 +178,24 @@ export function decideWatchActiveIndexClaim(input: {
       rejectReason: "stale-index-zero",
     };
   }
+
+  if (requested === input.arbiter.activeIndex) {
+    return {
+      accept: false,
+      next: input.arbiter,
+      rejectReason: "already-committed",
+    };
+  }
+
   return {
     accept: true,
     next: {
-      activeIndex: proven,
-      navigationGeneration: input.arbiter.navigationGeneration,
-      lastSettledNativePage: proven,
-      userInteracted: input.arbiter.userInteracted || proven > 0,
+      activeIndex: requested,
+      navigationGeneration: input.arbiter.navigationGeneration + 1,
+      lastSettledNativePage:
+        sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN) ??
+        input.arbiter.lastSettledNativePage,
+      userInteracted: true,
       pageClaimed: true,
     },
   };

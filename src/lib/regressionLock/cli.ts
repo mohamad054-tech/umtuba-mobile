@@ -15,6 +15,7 @@ import {
   recordBuild,
   resolveManifestPath,
   selectRegressionTests,
+  vitestArgsForSelectedTests,
   snapshotAfter,
   snapshotBefore,
   writeLedger,
@@ -75,7 +76,7 @@ function main(): void {
     }
     const run = spawnSync(
       "npx",
-      ["vitest", "run", ...selected.tests],
+      ["vitest", "run", ...vitestArgsForSelectedTests(selected.tests)],
       { cwd: root, stdio: "inherit", shell: true }
     );
     print({

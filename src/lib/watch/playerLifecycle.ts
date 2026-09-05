@@ -100,6 +100,7 @@ export type WatchPlaybackStartGate = {
   visibleEpoch?: number | null;
   playerPostId?: number | null;
   visiblePostId?: number | null;
+  itemIndex?: number;
 };
 
 export function shouldStartPlaybackAfterAsset(
@@ -107,6 +108,15 @@ export function shouldStartPlaybackAfterAsset(
 ): boolean {
   if (!input.playerAlive) return false;
   if (!input.isActive || !input.shouldPlay) return false;
+  if (
+    input.itemIndex != null &&
+    !mayAllowWatchHandoffAudio({
+      index: input.itemIndex,
+      isActive: input.isActive,
+    })
+  ) {
+    return false;
+  }
   if (!(input.nativeReady || input.jsReady)) return false;
   if (input.surfaceAttached === false) return false;
   if (!Number.isFinite(input.ownerGeneration)) return false;
@@ -185,9 +195,19 @@ export function shouldUnmuteWatchAfterFirstFrame(input: {
   surfaceAttached: boolean;
   playerMediaId?: string | null;
   visibleMediaId?: string | null;
+  itemIndex?: number;
 }): boolean {
   if (!input.firstFrameConfirmed) return false;
   if (!input.isActive || !input.shouldPlay) return false;
+  if (
+    input.itemIndex != null &&
+    !mayAllowWatchHandoffAudio({
+      index: input.itemIndex,
+      isActive: input.isActive,
+    })
+  ) {
+    return false;
+  }
   if (!input.surfaceAttached) return false;
   if (input.userMuted) return false;
   if (
@@ -226,6 +246,56 @@ export function applyWatchInactiveTeardown(
     });
   }
   return applyInactiveAudioTeardown(player, { resetPosition: false });
+}
+
+let watchHandoffAudibleOwner: number | null = null;
+
+export function resetWatchHandoffAudibleOwner(): void {
+  watchHandoffAudibleOwner = null;
+}
+
+export function getWatchHandoffAudibleOwner(): number | null {
+  return watchHandoffAudibleOwner;
+}
+
+export function mayAllowWatchHandoffAudio(input: {
+  index: number;
+  isActive: boolean;
+}): boolean {
+  if (input.isActive !== true) return false;
+  if (watchHandoffAudibleOwner == null) return true;
+  return input.index === watchHandoffAudibleOwner;
+}
+
+/**
+ * Ownership transfer: mute/pause the previous owner first, then allow
+ * the next index to become the sole audible owner. No overlap window.
+ */
+export function applyWatchHandoffAudioTransfer(input: {
+  previousPlayer: PlayerLike | null | undefined;
+  previousIndex: number;
+  nextIndex: number;
+  platform: WatchNativePlatform;
+  previousItemReady: boolean;
+}): {
+  previousSilenced: true;
+  nextMayBecomeAudible: boolean;
+  audibleOwnerIndex: number;
+  simultaneousAudible: false;
+} {
+  if (input.previousPlayer) {
+    applyWatchInactiveTeardown(input.previousPlayer, {
+      platform: input.platform,
+      itemReady: input.previousItemReady,
+    });
+  }
+  watchHandoffAudibleOwner = input.nextIndex;
+  return {
+    previousSilenced: true,
+    nextMayBecomeAudible: true,
+    audibleOwnerIndex: input.nextIndex,
+    simultaneousAudible: false,
+  };
 }
 
 /** Silence first, then drop JS bindings. Safe if the object is already dead. */

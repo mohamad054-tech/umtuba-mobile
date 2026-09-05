@@ -15,13 +15,13 @@ import {
   shouldRetainWatchSurface,
 } from "./watchActiveIndexArbiter";
 
-function settle(
+function commit(
   arbiter: ReturnType<typeof createWatchActiveIndexArbiter>,
   page: number
 ) {
   return decideWatchActiveIndexClaim({
     arbiter,
-    reason: "native-settle",
+    reason: "handoff-commit",
     requestedIndex: page,
     navigationGeneration: arbiter.navigationGeneration,
     nativeSettledPage: page,
@@ -41,7 +41,7 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
     arbiter = boot.next;
     expect(arbiter.activeIndex).toBe(0);
 
-    const toOne = settle(arbiter, 1);
+    const toOne = commit(arbiter, 1);
     expect(toOne.accept).toBe(true);
     arbiter = toOne.next;
     expect(arbiter.activeIndex).toBe(1);
@@ -67,7 +67,17 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
       nativeSettledPage: null,
     });
     expect(staleOffsetZero.accept).toBe(false);
+    expect(staleOffsetZero.rejectReason).toBe("independent-writer-forbidden");
     expect(staleOffsetZero.next.activeIndex).toBe(1);
+    expect(
+      decideWatchActiveIndexClaim({
+        arbiter,
+        reason: "handoff-commit",
+        requestedIndex: 0,
+        navigationGeneration: arbiter.navigationGeneration,
+        nativeSettledPage: null,
+      }).accept
+    ).toBe(false);
 
     expect(
       shouldRejectStaleIndexZero({
@@ -113,14 +123,14 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
       requestedIndex: 0,
       navigationGeneration: 0,
     }).next;
-    arbiter = settle(arbiter, 1).next;
-    const back = settle(arbiter, 0);
+    arbiter = commit(arbiter, 1).next;
+    const back = commit(arbiter, 0);
     expect(back.accept).toBe(true);
     expect(back.next.activeIndex).toBe(0);
     expect(back.next.lastSettledNativePage).toBe(0);
   });
 
-  it("rejects a stale programmatic generation after auto-advance", () => {
+  it("rejects a stale handoff generation after auto-advance", () => {
     let arbiter = createWatchActiveIndexArbiter();
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
@@ -130,16 +140,24 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
     }).next;
     const first = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 2,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 2,
     });
     expect(first.accept).toBe(true);
     arbiter = first.next;
+    expect(
+      decideWatchActiveIndexClaim({
+        arbiter,
+        reason: "programmatic",
+        requestedIndex: 0,
+        navigationGeneration: arbiter.navigationGeneration,
+      }).rejectReason
+    ).toBe("independent-writer-forbidden");
     const stale = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 0,
       navigationGeneration: 0,
     });

@@ -13,6 +13,7 @@ import {
   snapshotAfter,
   snapshotBefore,
   validateTaskManifest,
+  vitestArgsForSelectedTests,
 } from "./engine";
 import { matchGlob, parseGitStatusPath } from "./globs";
 import type {
@@ -406,6 +407,21 @@ describe("snapshot drift", () => {
       baselineDrift: "OUT_OF_SCOPE",
     });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("vitest argv expansion", () => {
+  it("strips **/*.test.ts so Windows Vitest can find files", () => {
+    expect(vitestArgsForSelectedTests(["src/lib/watch/**/*.test.ts"])).toEqual([
+      "src/lib/watch",
+    ]);
+    expect(
+      vitestArgsForSelectedTests([
+        "src/lib/watch/**/*.test.ts",
+        "src/lib/profile/profileNav.ts",
+        "src/lib/watch/watchVideoFit.ts",
+      ])
+    ).toEqual(["src/lib/watch"]);
   });
 });
 

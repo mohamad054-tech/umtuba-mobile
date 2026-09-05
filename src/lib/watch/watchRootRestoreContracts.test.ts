@@ -334,7 +334,7 @@ describe("watch root restore contracts", () => {
     }).next;
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "native-settle",
+      reason: "handoff-commit",
       requestedIndex: 1,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,

@@ -143,7 +143,7 @@ describe("manual handoff parity with auto-advance", () => {
     ).toBe(false);
     expect(
       shouldCompleteManualHandoff({
-        nativeSettledPage: 1,
+        nativeSettledPage: null,
         targetIndex: 1,
         targetSurfaceAttached: true,
         targetFirstFrame: false,
@@ -151,7 +151,7 @@ describe("manual handoff parity with auto-advance", () => {
     ).toBe(false);
     expect(
       shouldCompleteManualHandoff({
-        nativeSettledPage: 1,
+        nativeSettledPage: null,
         targetIndex: 1,
         targetSurfaceAttached: true,
         targetFirstFrame: true,
@@ -166,7 +166,7 @@ describe("manual handoff parity with auto-advance", () => {
     ).toBe(true);
   });
 
-  it("manual settle runs claim + lock + native offset pin only after first_frame", () => {
+  it("manual settle never writes activeIndex on any platform", () => {
     expect(
       shouldClaimWatchIndexFromNativeSettle({
         platform: "android",
@@ -182,16 +182,16 @@ describe("manual handoff parity with auto-advance", () => {
     ).toBe("cancel");
     expect(
       shouldCompleteManualHandoff({
-        nativeSettledPage: 1,
+        nativeSettledPage: null,
         targetIndex: 1,
         targetSurfaceAttached: true,
         targetFirstFrame: false,
       })
     ).toBe(false);
     expect(resolveManualHandoffCompletionTransaction()).toEqual({
-      claimReason: "programmatic",
-      applyViewabilityLock: true,
-      pinNativeOffset: true,
+      claimReason: "handoff-commit",
+      applyViewabilityLock: false,
+      pinNativeOffset: false,
     });
     expect(
       shouldClaimWatchIndexFromNativeSettle({
@@ -199,7 +199,7 @@ describe("manual handoff parity with auto-advance", () => {
         nativePage: 1,
         activeIndex: 0,
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("manual settle 0→1 and 1→2 then back 2→1", () => {
@@ -236,7 +236,7 @@ describe("manual handoff parity with auto-advance", () => {
     }).next;
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 1,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,
@@ -244,7 +244,7 @@ describe("manual handoff parity with auto-advance", () => {
     expect(arbiter.activeIndex).toBe(1);
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 2,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 2,
@@ -252,7 +252,7 @@ describe("manual handoff parity with auto-advance", () => {
     expect(arbiter.activeIndex).toBe(2);
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 1,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,
@@ -270,7 +270,7 @@ describe("manual handoff parity with auto-advance", () => {
     }).next;
     arbiter = decideWatchActiveIndexClaim({
       arbiter,
-      reason: "programmatic",
+      reason: "handoff-commit",
       requestedIndex: 1,
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,
@@ -366,6 +366,7 @@ describe("manual handoff cancel, identity, and deadlock gate", () => {
       screenFocused: true,
       shareSheetOpen: false,
       unmounted: false,
+      committedIndex: 0,
       ...overrides,
     });
   }

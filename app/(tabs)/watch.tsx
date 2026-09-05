@@ -118,7 +118,6 @@ import {
   saveWatchMutedPreference,
   saveWatchVolumePreference,
   resolveWatchHandoffReadiness,
-  shouldHandoffWatchAdvance,
   shouldPrepareWatchPlayer,
   shouldWarmAndroidNextSurface,
   toWatchListPixels,
@@ -161,15 +160,17 @@ import {
   type WatchActiveIndexDecision,
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
-  createManualHandoffPending,
+  createWatchHandoffMachine,
+  reduceWatchHandoff,
   resolveAndroidManualSettleAction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
-  shouldAcceptPendingManualHandoff,
+  resolveProactivePrepareIndexes,
+  resolveWatchHandoffIntentFromViewability,
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
   shouldWarmManualTarget,
-  type ManualHandoffPending,
+  type WatchHandoffEvent,
 } from "@/src/lib/watch/watchManualHandoff";
 import {
   previousRouteNameFromState,
@@ -184,7 +185,11 @@ import {
   shouldInterceptWatchRootBack,
 } from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
-import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
+import {
+  applyWatchHandoffAudioTransfer,
+  bumpWatchLeaveGeneration,
+  resetWatchHandoffAudibleOwner,
+} from "@/src/lib/watch/playerLifecycle";
 import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
 import { watchLightHaptic } from "@/src/lib/watch/watchHaptics";
 import {
@@ -300,10 +305,7 @@ export default function WatchScreen() {
     null
   );
   const warmedTargetIndexRef = useRef<number | null>(null);
-  const pendingManualRef = useRef<
-    (ManualHandoffPending & { generation: number; nativePage: number }) | null
-  >(null);
-  const manualHandoffGenRef = useRef(0);
+  const handoffMachineRef = useRef(createWatchHandoffMachine());
   const dragStartIndexRef = useRef(0);
   const manualDragActiveRef = useRef(false);
   const scrollToWatchIndexRef = useRef<
@@ -319,13 +321,8 @@ export default function WatchScreen() {
     setWarmedTargetIndex((prev) => (prev === next ? prev : next));
   }, []);
 
-  const cancelPendingManualHandoff = useCallback(() => {
-    manualHandoffGenRef.current += 1;
-    pendingManualRef.current = null;
-  }, []);
-
   const applyWatchIndexDecision = useCallback(
-    (decision: WatchActiveIndexDecision) => {
+    (decision: WatchActiveIndexDecision, surfaceReady = false) => {
       if (!decision.accept || decision.next.activeIndex == null) return;
       const nextIndex = decision.next.activeIndex;
       arbiterRef.current = decision.next;
@@ -350,8 +347,8 @@ export default function WatchScreen() {
           activeIndex: nextIndex,
           activeMediaId: mediaId,
           playerMediaId: mediaId,
-          surfaceAttached: true,
-          aligned: true,
+          surfaceAttached: surfaceReady,
+          aligned: surfaceReady,
         });
       }
     },
@@ -361,14 +358,85 @@ export default function WatchScreen() {
   const applyWatchIndexDecisionRef = useRef(applyWatchIndexDecision);
   applyWatchIndexDecisionRef.current = applyWatchIndexDecision;
 
+  const pinWatchNativeOffset = useCallback((
+    nextIndex: number,
+    attempt = 0,
+    options?: { animated?: boolean }
+  ) => {
+    const height = itemHeightRef.current;
+    const offset = resolveWatchScrollOffset(nextIndex, height);
+    if (offset == null) return;
+    programmaticAdvanceUntilRef.current =
+      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
+    const animated = options?.animated ?? attempt === 0;
+    try {
+      listRef.current?.scrollToOffset({ offset, animated });
+    } catch (err) {
+      console.warn("Watch native pin failed:", err);
+      if (attempt < 3) {
+        setTimeout(
+          () => pinWatchNativeOffset(nextIndex, attempt + 1, options),
+          80 * (attempt + 1)
+        );
+      }
+    }
+  }, []);
+
+  const dispatchWatchHandoff = useCallback((event: WatchHandoffEvent) => {
+    const result = reduceWatchHandoff(handoffMachineRef.current, event);
+    handoffMachineRef.current = result.next;
+    if (result.action !== "silence-then-commit" || !result.commit) {
+      return;
+    }
+    const fromIndex = result.commit.fromIndex;
+    applyWatchHandoffAudioTransfer({
+      previousPlayer: null,
+      previousIndex: fromIndex,
+      nextIndex: result.commit.toIndex,
+      platform: Platform.OS === "ios" ? "ios" : "android",
+      previousItemReady: true,
+    });
+    applyWatchIndexDecisionRef.current(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: "handoff-commit",
+        requestedIndex: result.commit.toIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: arbiterRef.current.lastSettledNativePage,
+      }),
+      true
+    );
+    if (result.commit.pinNativeOffset) {
+      pinWatchNativeOffset(result.commit.toIndex, 0, { animated: false });
+    }
+  }, [pinWatchNativeOffset]);
+
+  const dispatchWatchHandoffRef = useRef(dispatchWatchHandoff);
+  dispatchWatchHandoffRef.current = dispatchWatchHandoff;
+
+  const prepareAdjacentNeighbors = useCallback((committedIndex: number) => {
+    const adjacent = resolveProactivePrepareIndexes({
+      committedIndex,
+      itemCount: videosLengthRef.current,
+    });
+    applyWarmedTargetIndex(adjacent.find((index) => index === committedIndex + 1) ?? adjacent[0] ?? null);
+    setWarmNextSurface(adjacent.length > 0);
+    for (const index of adjacent) {
+      const video = visibleVideosRef.current[index];
+      if (!video) continue;
+      dispatchWatchHandoffRef.current({
+        type: "prepare",
+        index,
+        mediaId: watchMediaIdentity(video),
+        generation: playbackGenerationRef.current,
+      });
+    }
+  }, [applyWarmedTargetIndex]);
+
   useEffect(() => {
     remainingMsRef.current = null;
     currentEndedRef.current = false;
     handoffGenRef.current += 1;
-    manualHandoffGenRef.current += 1;
-    pendingManualRef.current = null;
-    applyWarmedTargetIndex(null);
-    setWarmNextSurface(false);
     nextHandoffRef.current = {
       index: -1,
       ready: false,
@@ -376,7 +444,8 @@ export default function WatchScreen() {
       surfaceAttached: false,
       mediaId: null,
     };
-  }, [activeIndex, applyWarmedTargetIndex]);
+    prepareAdjacentNeighbors(activeIndex);
+  }, [activeIndex, prepareAdjacentNeighbors]);
 
   useEffect(() => {
     const generation = registerMountedWatchInstance();
@@ -435,8 +504,11 @@ export default function WatchScreen() {
       return () => {
         screenFocusedRef.current = false;
         setScreenFocused(false);
-        cancelPendingManualHandoff();
-        applyWarmedTargetIndex(null);
+        dispatchWatchHandoffRef.current({
+          type: "cancel",
+          reason: "blur-unmount",
+        });
+        prepareAdjacentNeighbors(activeIndexRef.current);
         const nextGeneration = bumpWatchLeaveGeneration(
           playbackGenerationRef.current
         );
@@ -446,7 +518,7 @@ export default function WatchScreen() {
         exitHintVisibleRef.current = false;
         setExitHintVisible(false);
       };
-    }, [applyWarmedTargetIndex, cancelPendingManualHandoff])
+    }, [prepareAdjacentNeighbors])
   );
 
   useEffect(() => {
@@ -501,15 +573,18 @@ export default function WatchScreen() {
   visibleVideosRef.current = visibleVideos;
 
   useEffect(() => {
-    const pending = pendingManualRef.current;
-    if (!pending) return;
-    const video = visibleVideosRef.current[pending.targetIndex];
+    const intent = handoffMachineRef.current.intent ?? handoffMachineRef.current.prepared;
+    if (!intent) return;
+    const video = visibleVideosRef.current[intent.index];
     const currentMediaId = video ? watchMediaIdentity(video) : null;
-    if (currentMediaId !== pending.targetMediaId) {
-      cancelPendingManualHandoff();
-      applyWarmedTargetIndex(null);
+    if (currentMediaId !== intent.mediaId) {
+      dispatchWatchHandoffRef.current({
+        type: "cancel",
+        reason: "feed-identity-change",
+      });
+      prepareAdjacentNeighbors(activeIndexRef.current);
     }
-  }, [applyWarmedTargetIndex, cancelPendingManualHandoff, playbackIdentity]);
+  }, [playbackIdentity, prepareAdjacentNeighbors]);
 
   useEffect(() => {
     videosLengthRef.current = visibleVideos.length;
@@ -733,6 +808,14 @@ export default function WatchScreen() {
           setCursor(null);
           setEndReached(true);
         }
+        const first = visibleVideosRef.current[0] ?? startup.videos[0];
+        resetWatchHandoffAudibleOwner();
+        handoffMachineRef.current = createWatchHandoffMachine({
+          committedIndex: 0,
+          committedMediaId: first ? watchMediaIdentity(first) : "",
+          committedGeneration: playbackGenerationRef.current,
+          navigationGeneration: arbiterRef.current.navigationGeneration,
+        });
         applyWatchIndexDecision(
           decideWatchActiveIndexClaim({
             arbiter: arbiterRef.current,
@@ -777,37 +860,43 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
-  const tryCompletePendingManualHandoff = useCallback(() => {
-    const pending = pendingManualRef.current;
-    if (!pending) return;
-    if (manualHandoffGenRef.current !== pending.generation) return;
-    const state = nextHandoffRef.current;
-    const targetOwnsState = state.index === pending.targetIndex;
-    const targetVideo = visibleVideosRef.current[pending.targetIndex];
-    const currentTargetMediaId = targetVideo
-      ? watchMediaIdentity(targetVideo)
-      : null;
-    if (
-      !shouldAcceptPendingManualHandoff({
-        pending,
-        currentNavigationGeneration: arbiterRef.current.navigationGeneration,
-        nativeSettledPage: pending.nativePage,
-        currentTargetMediaId,
-        firstFrameMediaId: targetOwnsState ? state.mediaId : null,
-        targetSurfaceAttached:
-          targetOwnsState &&
-          (state.surfaceAttached === true || state.firstFrame === true),
-        targetFirstFrame: targetOwnsState && state.firstFrame === true,
-        screenFocused: screenFocusedRef.current,
-        shareSheetOpen: shareSheetOpenRef.current,
-        unmounted: false,
-      })
-    ) {
+  const reportNeighborHandoffState = useCallback((
+    index: number,
+    state: {
+      ready: boolean;
+      firstFrame: boolean;
+      surfaceAttached?: boolean;
+      mediaId?: string | null;
+    }
+  ) => {
+    nextHandoffRef.current = {
+      index,
+      ready: state.ready,
+      firstFrame: state.firstFrame,
+      surfaceAttached: state.surfaceAttached === true || state.firstFrame === true,
+      mediaId: state.mediaId ?? null,
+    };
+    const video = visibleVideosRef.current[index];
+    const mediaId = state.mediaId ?? (video ? watchMediaIdentity(video) : "");
+    if (!mediaId) return;
+    const attached = state.surfaceAttached === true || state.firstFrame === true;
+    if (state.firstFrame) {
+      dispatchWatchHandoffRef.current({
+        type: "first-frame",
+        index,
+        mediaId,
+        generation: playbackGenerationRef.current,
+        surfaceAttached: attached,
+      });
       return;
     }
-    pendingManualRef.current = null;
-    scrollToWatchIndexRef.current(pending.targetIndex, 0, {
-      animated: false,
+    dispatchWatchHandoffRef.current({
+      type: "prepare-progress",
+      index,
+      mediaId,
+      generation: playbackGenerationRef.current,
+      surfaceAttached: attached,
+      firstFrame: false,
     });
   }, []);
 
@@ -842,12 +931,18 @@ export default function WatchScreen() {
         fromIndex: dragStartIndexRef.current,
       });
       if (retarget === "cancel") {
-        pendingManualRef.current = null;
-        applyWarmedTargetIndex(null);
+        dispatchWatchHandoffRef.current({
+          type: "cancel",
+          reason: "return-to-current",
+        });
+        prepareAdjacentNeighbors(activeIndexRef.current);
         return;
       }
       if (retarget === "retarget") {
-        pendingManualRef.current = null;
+        dispatchWatchHandoffRef.current({
+          type: "cancel",
+          reason: "rapid-retarget",
+        });
       }
       if (
         !shouldWarmManualTarget({
@@ -859,7 +954,7 @@ export default function WatchScreen() {
       }
       applyWarmedTargetIndex(target);
     },
-    [applyWarmedTargetIndex]
+    [applyWarmedTargetIndex, prepareAdjacentNeighbors]
   );
 
   const onWatchScrollSettle = useCallback(
@@ -884,24 +979,20 @@ export default function WatchScreen() {
         return;
       }
 
-      if (
-        shouldClaimWatchIndexFromNativeSettle({
-          platform: Platform.OS,
-          nativePage,
-          activeIndex: activeIndexRef.current,
-        })
-      ) {
-        applyWatchIndexDecisionRef.current(
-          decideWatchActiveIndexClaim({
-            arbiter: arbiterRef.current,
-            reason: "native-settle",
-            requestedIndex: nativePage,
-            navigationGeneration: arbiterRef.current.navigationGeneration,
-            nativeSettledPage: nativePage,
-          })
-        );
-        return;
-      }
+      void shouldClaimWatchIndexFromNativeSettle({
+        platform: Platform.OS,
+        nativePage,
+        activeIndex: activeIndexRef.current,
+      });
+      setLastSettledNativePage(nativePage);
+      arbiterRef.current = {
+        ...arbiterRef.current,
+        lastSettledNativePage: nativePage,
+      };
+      dispatchWatchHandoffRef.current({
+        type: "settle",
+        nativePage,
+      });
 
       const action = resolveAndroidManualSettleAction({
         nativePage,
@@ -918,42 +1009,45 @@ export default function WatchScreen() {
           applyWarmedTargetIndex(stillHeading);
           return;
         }
-        cancelPendingManualHandoff();
-        applyWarmedTargetIndex(null);
+        prepareAdjacentNeighbors(activeIndexRef.current);
         return;
       }
 
       applyWarmedTargetIndex(nativePage);
       const targetVideo = visibleVideosRef.current[nativePage];
-      const created = createManualHandoffPending({
-        navigationGeneration: arbiterRef.current.navigationGeneration,
-        targetIndex: nativePage,
-        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
-      });
-      if (!created) {
-        cancelPendingManualHandoff();
-        return;
+      if (targetVideo) {
+        dispatchWatchHandoffRef.current({
+          type: "prepare",
+          index: nativePage,
+          mediaId: watchMediaIdentity(targetVideo),
+          generation: playbackGenerationRef.current,
+        });
       }
-      const generation = manualHandoffGenRef.current + 1;
-      manualHandoffGenRef.current = generation;
-      pendingManualRef.current = {
-        ...created,
-        generation,
-        nativePage,
-      };
-      tryCompletePendingManualHandoff();
     },
-    [applyWarmedTargetIndex, cancelPendingManualHandoff, tryCompletePendingManualHandoff]
+    [applyWarmedTargetIndex, prepareAdjacentNeighbors]
   );
 
-  useEffect(() => {
-    if (isWatchShareSheetOpen(shareSheet)) return;
-    tryCompletePendingManualHandoff();
-  }, [shareSheet, tryCompletePendingManualHandoff]);
-
   const onViewableItemsChanged = useRef(
-    (_info: { viewableItems: ViewToken[] }) => {
+    (info: { viewableItems: ViewToken[] }) => {
       decideWatchViewabilityEvidence();
+      const intent = resolveWatchHandoffIntentFromViewability({
+        viewableItems: info.viewableItems,
+        committedIndex: activeIndexRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (intent == null) return;
+      const video = visibleVideosRef.current[intent];
+      if (!video) return;
+      const state = nextHandoffRef.current;
+      const owns = state.index === intent;
+      dispatchWatchHandoffRef.current({
+        type: "viewability-80",
+        index: intent,
+        mediaId: watchMediaIdentity(video),
+        generation: playbackGenerationRef.current,
+        surfaceAttached: owns && (state.surfaceAttached === true || state.firstFrame === true),
+        firstFrame: owns && state.firstFrame === true,
+      });
     }
   ).current;
 
@@ -1460,27 +1554,10 @@ export default function WatchScreen() {
     attempt = 0,
     options?: { animated?: boolean }
   ) => {
-    const height = itemHeightRef.current;
-    const offset = resolveWatchScrollOffset(nextIndex, height);
-    if (offset == null) {
-      console.warn("Watch auto-next: invalid scroll offset", {
-        nextIndex,
-        height,
-      });
-      return;
-    }
-
-    programmaticAdvanceUntilRef.current =
-      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
-    applyWatchIndexDecision(
-      decideWatchActiveIndexClaim({
-        arbiter: arbiterRef.current,
-        reason: "programmatic",
-        requestedIndex: nextIndex,
-        navigationGeneration: arbiterRef.current.navigationGeneration,
-        nativeSettledPage: nextIndex,
-      })
-    );
+    dispatchWatchHandoffRef.current({
+      type: "scroll-to-index",
+      index: nextIndex,
+    });
     markWatchTransition(Platform.OS, "next_source_activation", {
       index: nextIndex,
       readiness: resolveWatchHandoffReadiness({
@@ -1488,39 +1565,8 @@ export default function WatchScreen() {
         nextFirstFrame: nextHandoffRef.current.firstFrame,
       }),
     });
-
-    const animated = options?.animated ?? attempt === 0;
-    const run = () => {
-      listRef.current?.scrollToOffset({
-        offset,
-        animated,
-      });
-    };
-
-    try {
-      run();
-    } catch (err) {
-      console.warn("Watch auto-next scroll failed:", err);
-      if (attempt < 3) {
-        setTimeout(
-          () => scrollToWatchIndex(nextIndex, attempt + 1, options),
-          80 * (attempt + 1)
-        );
-      }
-      return;
-    }
-
-    if (attempt < 2) {
-      setTimeout(() => {
-        try {
-          listRef.current?.scrollToOffset({ offset, animated: false });
-        } catch (err) {
-          console.warn("Watch auto-next scroll retry failed:", err);
-          scrollToWatchIndex(nextIndex, attempt + 1, options);
-        }
-      }, 120);
-    }
-  }, [applyWatchIndexDecision]);
+    pinWatchNativeOffset(nextIndex, attempt, options);
+  }, [pinWatchNativeOffset]);
   scrollToWatchIndexRef.current = scrollToWatchIndex;
 
   const onActiveEnded = useCallback(() => {
@@ -1533,34 +1579,21 @@ export default function WatchScreen() {
       return;
     }
     markWatchTransition(Platform.OS, "current_end", { index: nextIndex });
-    if (Platform.OS !== "android") {
-      scrollToWatchIndex(nextIndex);
-      return;
-    }
     currentEndedRef.current = true;
     setWarmNextSurface(true);
-    const started = Date.now();
-    const gen = handoffGenRef.current + 1;
-    handoffGenRef.current = gen;
-    const tryHandoff = () => {
-      if (handoffGenRef.current !== gen) return;
-      const waitedMs = Date.now() - started;
-      const nextState = nextHandoffRef.current;
-      const firstFrame =
-        nextState.index === nextIndex && nextState.firstFrame;
-      if (
-        shouldHandoffWatchAdvance({
-          nextFirstFrame: firstFrame,
-          waitedMs,
-        })
-      ) {
-        scrollToWatchIndex(nextIndex, 0, { animated: !firstFrame });
-        return;
-      }
-      setTimeout(tryHandoff, 32);
-    };
-    tryHandoff();
-  }, [autoNext, scrollToWatchIndex]);
+    const nextVideo = visibleVideosRef.current[nextIndex];
+    if (!nextVideo) return;
+    const nextState = nextHandoffRef.current;
+    const owns = nextState.index === nextIndex;
+    dispatchWatchHandoffRef.current({
+      type: "auto-next",
+      index: nextIndex,
+      mediaId: watchMediaIdentity(nextVideo),
+      generation: playbackGenerationRef.current,
+      surfaceAttached: owns && (nextState.surfaceAttached === true || nextState.firstFrame === true),
+      firstFrame: owns && nextState.firstFrame === true,
+    });
+  }, [autoNext]);
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
     if (!video.postId) return null;
@@ -1593,6 +1626,7 @@ export default function WatchScreen() {
           platform: Platform.OS,
           lastSettledNativePage,
           warmedTargetIndex,
+          prepareAdjacentNeighbors: true,
         })}
         shouldPreparePlayer={shouldPrepareWatchPlayer(
           index,
@@ -1602,15 +1636,14 @@ export default function WatchScreen() {
         isNextItem={index === activeIndex + 1}
         warmNextSurface={
           Platform.OS === "android" &&
-          (index === warmedTargetIndex ||
+          (Math.abs(index - activeIndex) === 1 ||
+            index === warmedTargetIndex ||
             (index === activeIndex + 1 && warmNextSurface))
         }
         onHandoffState={
-          Platform.OS === "android" &&
-          (index === activeIndex + 1 || index === warmedTargetIndex)
+          Math.abs(index - activeIndex) === 1 || index === warmedTargetIndex
             ? (state) => {
-                nextHandoffRef.current = { index, ...state };
-                tryCompletePendingManualHandoff();
+                reportNeighborHandoffState(index, state);
               }
             : undefined
         }
@@ -1750,7 +1783,7 @@ export default function WatchScreen() {
       autoNext,
       warmNextSurface,
       warmedTargetIndex,
-      tryCompletePendingManualHandoff,
+      reportNeighborHandoffState,
       insets.bottom,
       insets.top,
       itemHeight,

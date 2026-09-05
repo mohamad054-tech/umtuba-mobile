@@ -577,6 +577,15 @@ export function writeLedger(root: string, ledger: Record<string, BuildLedgerEntr
   writeFileSync(path, `${JSON.stringify(ledger, null, 2)}\n`);
 }
 
+/** Vitest on Windows does not expand repo glob argv patterns. */
+export function vitestArgsForSelectedTests(tests: string[]): string[] {
+  return tests
+    .filter((test) => test.includes(".test.") || /\/\*\*\/\*\.test\.ts$/.test(test) || /\/\*\.test\.ts$/.test(test))
+    .map((test) =>
+      test.replace(/\/\*\*\/\*\.test\.ts$/, "").replace(/\/\*\.test\.ts$/, "")
+    );
+}
+
 export function resolveManifestPath(root: string, override?: string): string {
   if (override) return override;
   if (process.env.UMTUBA_TASK_MANIFEST) return process.env.UMTUBA_TASK_MANIFEST;

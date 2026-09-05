@@ -51,21 +51,60 @@ export function shouldWarmManualTarget(input: {
   return target !== from;
 }
 
+export function resolveProactivePrepareIndexes(input: {
+  committedIndex: number;
+  itemCount: number;
+}): number[] {
+  const committed = sanitizeWatchListIndex(input.committedIndex);
+  if (committed == null || input.itemCount <= 0) return [];
+  const out: number[] = [];
+  if (committed - 1 >= 0) out.push(committed - 1);
+  if (committed + 1 < input.itemCount) out.push(committed + 1);
+  return out;
+}
+
 /** Viewability never writes activeIndex. */
 export function manualViewabilityMayWriteActiveIndex(): false {
   return decideWatchViewabilityEvidence().mayClaimActiveIndex;
 }
 
+export function isWatchPresentationReady(input: {
+  surfaceAttached: boolean;
+  firstFrame: boolean;
+  mediaId: string | null | undefined;
+  expectedMediaId: string | null | undefined;
+  generation: number;
+  expectedGeneration: number;
+}): boolean {
+  if (input.surfaceAttached !== true || input.firstFrame !== true) return false;
+  const mediaId = input.mediaId?.trim() ?? "";
+  const expected = input.expectedMediaId?.trim() ?? "";
+  if (!mediaId || !expected || mediaId !== expected) return false;
+  return (
+    Number.isFinite(input.generation) &&
+    input.generation === input.expectedGeneration
+  );
+}
+
+export function shouldRejectOwnedBlackSurface(input: {
+  ownedIndex: number;
+  targetIndex: number;
+  surfaceReady: boolean;
+}): boolean {
+  return (
+    input.ownedIndex === input.targetIndex && input.surfaceReady !== true
+  );
+}
+
 export function shouldCompleteManualHandoff(input: {
-  nativeSettledPage: number | null;
+  nativeSettledPage?: number | null;
   targetIndex: number | null;
   targetSurfaceAttached: boolean;
   targetFirstFrame: boolean;
 }): boolean {
-  const native = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
   const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
-  if (native == null || target == null) return false;
-  if (native !== target) return false;
+  if (target == null) return false;
+  void input.nativeSettledPage;
   return input.targetSurfaceAttached === true && input.targetFirstFrame === true;
 }
 
@@ -100,34 +139,44 @@ export function shouldKeepPreviousSurfaceDuringManualHandoff(input: {
 }
 
 export type ManualHandoffCompletionTransaction = {
-  claimReason: "programmatic";
-  applyViewabilityLock: true;
-  pinNativeOffset: true;
+  claimReason: "handoff-commit";
+  applyViewabilityLock: false;
+  pinNativeOffset: false;
 };
 
-/** Same claim + lock + scrollToWatchIndex pin as auto-advance. */
+/** Gesture 80% commit must not pin native offset (that fights the finger). */
 export function resolveManualHandoffCompletionTransaction(): ManualHandoffCompletionTransaction {
   return {
-    claimReason: "programmatic",
-    applyViewabilityLock: true,
+    claimReason: "handoff-commit",
+    applyViewabilityLock: false,
+    pinNativeOffset: false,
+  };
+}
+
+export function resolveAutoNextHandoffCompletionTransaction(): {
+  claimReason: "handoff-commit";
+  applyViewabilityLock: false;
+  pinNativeOffset: true;
+} {
+  return {
+    claimReason: "handoff-commit",
+    applyViewabilityLock: false,
     pinNativeOffset: true,
   };
 }
 
-/**
- * Android cross-page settle is evidence only. Claim happens later through
- * scrollToWatchIndex after the target first_frame. iOS still claims here.
- */
+/** Settle is evidence only on every platform. It never writes activeIndex. */
 export function shouldClaimWatchIndexFromNativeSettle(input: {
   platform?: string | null;
   nativePage: number | null;
   activeIndex: number;
 }): boolean {
-  if (input.nativePage == null) return false;
-  if (input.platform === "android") {
-    return false;
-  }
-  return Number.isFinite(input.activeIndex);
+  void input;
+  return false;
+}
+
+export function shouldClaimWatchIndexFromScrollToIndex(): false {
+  return false;
 }
 
 export function resolveAndroidManualSettleAction(input: {
@@ -138,12 +187,15 @@ export function resolveAndroidManualSettleAction(input: {
   return "await-target-ready";
 }
 
-/** Stale settle after scrollToWatchIndex must not retarget the previous page. */
+/** Stale settle after a later commit must not retarget the previous page. */
 export function shouldIgnoreStaleManualSettle(input: {
   locked: boolean;
   nativePage: number;
   activeIndex: number;
 }): boolean {
+  if (input.nativePage !== input.activeIndex && input.nativePage === 0) {
+    return input.activeIndex >= 1;
+  }
   return input.locked === true && input.nativePage !== input.activeIndex;
 }
 
@@ -224,6 +276,7 @@ export function shouldAcceptPendingManualHandoff(input: {
   screenFocused?: boolean;
   shareSheetOpen?: boolean;
   unmounted?: boolean;
+  committedIndex?: number;
 }): boolean {
   if (input.pending == null) return false;
   if (input.unmounted === true) return false;
@@ -234,9 +287,12 @@ export function shouldAcceptPendingManualHandoff(input: {
   ) {
     return false;
   }
+  const committed = sanitizeWatchListIndex(input.committedIndex ?? Number.NaN);
+  const native = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
   if (
-    sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN) !==
-    input.pending.targetIndex
+    committed != null &&
+    native === committed &&
+    committed !== input.pending.targetIndex
   ) {
     return false;
   }
@@ -253,7 +309,6 @@ export function shouldAcceptPendingManualHandoff(input: {
     return false;
   }
   return shouldCompleteManualHandoff({
-    nativeSettledPage: input.nativeSettledPage,
     targetIndex: input.pending.targetIndex,
     targetSurfaceAttached: input.targetSurfaceAttached,
     targetFirstFrame: input.targetFirstFrame,
@@ -285,16 +340,20 @@ export function shouldMountOffscreenManualTargetVideoView(input: {
   warmedTargetIndex: number | null;
   src: string | null | undefined;
   platform?: string | null;
+  prepareAdjacentNeighbors?: boolean;
 }): boolean {
-  if (input.warmedTargetIndex == null) return false;
-  if (input.itemIndex !== input.warmedTargetIndex) return false;
+  const adjacent =
+    input.prepareAdjacentNeighbors === true &&
+    Math.abs(input.itemIndex - input.activeIndex) === 1;
   if (input.itemIndex === input.activeIndex) return false;
+  if (input.warmedTargetIndex !== input.itemIndex && !adjacent) return false;
   if (
     !shouldLoadOwnedWatchPlayer({
       index: input.itemIndex,
       activeIndex: input.activeIndex,
       platform: input.platform,
       warmedTargetIndex: input.warmedTargetIndex,
+      prepareAdjacentNeighbors: input.prepareAdjacentNeighbors,
     })
   ) {
     return false;
@@ -314,4 +373,490 @@ export function shouldMountOffscreenManualTargetVideoView(input: {
     warmNextSurface: true,
     platform: input.platform,
   });
+}
+
+export function resolveWatchHandoffIntentFromViewability(input: {
+  viewableItems: ReadonlyArray<{
+    index?: number | null;
+    isViewable?: boolean;
+    percentVisible?: number | null;
+  }>;
+  committedIndex: number;
+  itemCount: number;
+}): number | null {
+  const committed = sanitizeWatchListIndex(input.committedIndex);
+  if (committed == null) return null;
+  const viewable: number[] = [];
+  for (const item of input.viewableItems) {
+    if (item.isViewable === false) continue;
+    const index = sanitizeWatchListIndex(item.index ?? Number.NaN);
+    if (index == null) continue;
+    if (index < 0 || index >= input.itemCount) continue;
+    viewable.push(index);
+  }
+  const next = committed + 1;
+  const prev = committed - 1;
+  if (viewable.includes(next)) return next;
+  if (viewable.includes(prev)) return prev;
+  return null;
+}
+
+export type WatchHandoffPhase = "idle" | "prepare" | "intent";
+export type WatchHandoffIntentSource = "viewability-80" | "auto-next";
+
+export type WatchHandoffTarget = {
+  index: number;
+  mediaId: string;
+  generation: number;
+  surfaceAttached: boolean;
+  firstFrame: boolean;
+  source?: WatchHandoffIntentSource;
+};
+
+export type WatchHandoffMachine = {
+  phase: WatchHandoffPhase;
+  committedIndex: number;
+  committedMediaId: string;
+  committedGeneration: number;
+  navigationGeneration: number;
+  prepared: WatchHandoffTarget | null;
+  intent: WatchHandoffTarget | null;
+};
+
+export type WatchHandoffEvent =
+  | {
+      type: "bootstrap";
+      index: number;
+      mediaId: string;
+      generation: number;
+    }
+  | {
+      type: "prepare";
+      index: number;
+      mediaId: string;
+      generation: number;
+    }
+  | {
+      type: "prepare-progress";
+      index: number;
+      mediaId: string;
+      generation: number;
+      surfaceAttached: boolean;
+      firstFrame: boolean;
+    }
+  | {
+      type: "viewability-80";
+      index: number;
+      mediaId: string;
+      generation: number;
+      surfaceAttached: boolean;
+      firstFrame: boolean;
+    }
+  | {
+      type: "auto-next";
+      index: number;
+      mediaId: string;
+      generation: number;
+      surfaceAttached: boolean;
+      firstFrame: boolean;
+    }
+  | {
+      type: "current-end";
+      index: number;
+      mediaId: string;
+      generation: number;
+      surfaceAttached: boolean;
+      firstFrame: boolean;
+    }
+  | {
+      type: "first-frame";
+      index: number;
+      mediaId: string;
+      generation: number;
+      surfaceAttached: boolean;
+    }
+  | { type: "settle"; nativePage: number }
+  | { type: "scroll-to-index"; index: number }
+  | { type: "cancel"; reason: ManualHandoffCancelReason };
+
+export type WatchHandoffCommit = {
+  fromIndex: number;
+  toIndex: number;
+  toMediaId: string;
+  claimReason: "handoff-commit";
+  pinNativeOffset: boolean;
+  silenceIndex: number;
+  allowAudioIndex: number;
+  retireIndex: number;
+};
+
+export type WatchHandoffReduceResult = {
+  next: WatchHandoffMachine;
+  action: "none" | "prepare" | "intent" | "silence-then-commit" | "reject";
+  commit?: WatchHandoffCommit;
+  rejectReason?: string;
+};
+
+export function createWatchHandoffMachine(input?: {
+  committedIndex?: number;
+  committedMediaId?: string;
+  committedGeneration?: number;
+  navigationGeneration?: number;
+}): WatchHandoffMachine {
+  return {
+    phase: "idle",
+    committedIndex: input?.committedIndex ?? 0,
+    committedMediaId: input?.committedMediaId ?? "",
+    committedGeneration: input?.committedGeneration ?? 0,
+    navigationGeneration: input?.navigationGeneration ?? 0,
+    prepared: null,
+    intent: null,
+  };
+}
+
+function matchesPreparedIdentity(
+  target: WatchHandoffTarget,
+  event: { index: number; mediaId: string; generation: number }
+): boolean {
+  return (
+    target.index === event.index &&
+    target.mediaId === event.mediaId &&
+    target.generation === event.generation
+  );
+}
+
+function asTarget(
+  event: {
+    index: number;
+    mediaId: string;
+    generation: number;
+    surfaceAttached?: boolean;
+    firstFrame?: boolean;
+  },
+  source?: WatchHandoffIntentSource
+): WatchHandoffTarget | null {
+  const index = sanitizeWatchListIndex(event.index);
+  const mediaId = event.mediaId?.trim() ?? "";
+  if (index == null || !mediaId) return null;
+  if (!Number.isFinite(event.generation)) return null;
+  return {
+    index,
+    mediaId,
+    generation: event.generation,
+    surfaceAttached: event.surfaceAttached === true,
+    firstFrame: event.firstFrame === true,
+    source,
+  };
+}
+
+function tryCommit(
+  state: WatchHandoffMachine,
+  target: WatchHandoffTarget
+): WatchHandoffReduceResult {
+  const ready = isWatchPresentationReady({
+    surfaceAttached: target.surfaceAttached,
+    firstFrame: target.firstFrame,
+    mediaId: target.mediaId,
+    expectedMediaId: target.mediaId,
+    generation: target.generation,
+    expectedGeneration: target.generation,
+  });
+  if (!ready) {
+    return {
+      next: { ...state, phase: "intent", intent: target },
+      action: "intent",
+    };
+  }
+  return {
+    next: {
+      phase: "idle",
+      committedIndex: target.index,
+      committedMediaId: target.mediaId,
+      committedGeneration: target.generation,
+      navigationGeneration: state.navigationGeneration + 1,
+      prepared: null,
+      intent: null,
+    },
+    action: "silence-then-commit",
+    commit: {
+      fromIndex: state.committedIndex,
+      toIndex: target.index,
+      toMediaId: target.mediaId,
+      claimReason: "handoff-commit",
+      pinNativeOffset: target.source === "auto-next",
+      silenceIndex: state.committedIndex,
+      allowAudioIndex: target.index,
+      retireIndex: state.committedIndex,
+    },
+  };
+}
+
+function nominate(
+  state: WatchHandoffMachine,
+  event: {
+    index: number;
+    mediaId: string;
+    generation: number;
+    surfaceAttached: boolean;
+    firstFrame: boolean;
+  },
+  source: WatchHandoffIntentSource
+): WatchHandoffReduceResult {
+  if (event.index === state.committedIndex) {
+    return { next: state, action: "none" };
+  }
+  if (Math.abs(event.index - state.committedIndex) !== 1) {
+    return {
+      next: state,
+      action: "reject",
+      rejectReason: "non-adjacent-intent",
+    };
+  }
+  const target = asTarget(event, source);
+  if (!target) {
+    return { next: state, action: "reject", rejectReason: "invalid-target" };
+  }
+  if (
+    state.prepared &&
+    state.prepared.index === target.index &&
+    (state.prepared.mediaId !== target.mediaId ||
+      state.prepared.generation !== target.generation)
+  ) {
+    return {
+      next: state,
+      action: "reject",
+      rejectReason: "wrong-media-generation",
+    };
+  }
+  const merged: WatchHandoffTarget = {
+    ...target,
+    surfaceAttached:
+      target.surfaceAttached ||
+      (state.prepared?.index === target.index &&
+        state.prepared.surfaceAttached),
+    firstFrame:
+      target.firstFrame ||
+      (state.prepared?.index === target.index && state.prepared.firstFrame),
+    source,
+  };
+  return tryCommit({ ...state, phase: "intent", intent: merged }, merged);
+}
+
+export function reduceWatchHandoff(
+  state: WatchHandoffMachine,
+  event: WatchHandoffEvent
+): WatchHandoffReduceResult {
+  switch (event.type) {
+    case "bootstrap": {
+      const target = asTarget({
+        ...event,
+        surfaceAttached: true,
+        firstFrame: true,
+      });
+      if (!target) {
+        return { next: state, action: "reject", rejectReason: "invalid-target" };
+      }
+      return {
+        next: {
+          phase: "idle",
+          committedIndex: target.index,
+          committedMediaId: target.mediaId,
+          committedGeneration: target.generation,
+          navigationGeneration: state.navigationGeneration,
+          prepared: null,
+          intent: null,
+        },
+        action: "none",
+      };
+    }
+    case "prepare": {
+      if (event.index === state.committedIndex) {
+        return { next: state, action: "none" };
+      }
+      if (Math.abs(event.index - state.committedIndex) !== 1) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "non-adjacent-prepare",
+        };
+      }
+      const target = asTarget(event);
+      if (!target) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "invalid-target",
+        };
+      }
+      return {
+        next: {
+          ...state,
+          phase: state.phase === "intent" ? "intent" : "prepare",
+          prepared: target,
+        },
+        action: "prepare",
+      };
+    }
+    case "prepare-progress": {
+      const target = asTarget(event);
+      if (!target) {
+        return { next: state, action: "reject", rejectReason: "invalid-target" };
+      }
+      if (
+        state.prepared &&
+        state.prepared.index === target.index &&
+        !matchesPreparedIdentity(state.prepared, event)
+      ) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "wrong-media-generation",
+        };
+      }
+      if (state.phase === "intent" && state.intent) {
+        if (!matchesPreparedIdentity(state.intent, event)) {
+          return {
+            next: state,
+            action: "reject",
+            rejectReason: "stale-first-frame",
+          };
+        }
+        const merged = {
+          ...state.intent,
+          surfaceAttached: target.surfaceAttached || state.intent.surfaceAttached,
+          firstFrame: target.firstFrame || state.intent.firstFrame,
+        };
+        return tryCommit(state, merged);
+      }
+      if (state.prepared && matchesPreparedIdentity(state.prepared, event)) {
+        return {
+          next: {
+            ...state,
+            prepared: {
+              ...state.prepared,
+              surfaceAttached: target.surfaceAttached,
+              firstFrame: target.firstFrame,
+            },
+          },
+          action: "none",
+        };
+      }
+      if (state.prepared == null && Math.abs(target.index - state.committedIndex) === 1) {
+        return {
+          next: {
+            ...state,
+            phase: state.phase === "idle" ? "prepare" : state.phase,
+            prepared: target,
+          },
+          action: "prepare",
+        };
+      }
+      return { next: state, action: "none" };
+    }
+    case "viewability-80":
+      return nominate(state, event, "viewability-80");
+    case "auto-next":
+    case "current-end":
+      if (event.index !== state.committedIndex + 1) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "auto-next-not-next",
+        };
+      }
+      return nominate(state, event, "auto-next");
+    case "first-frame": {
+      const target = asTarget({ ...event, firstFrame: true });
+      if (!target) {
+        return { next: state, action: "reject", rejectReason: "invalid-target" };
+      }
+      if (state.phase === "intent" && state.intent) {
+        if (!matchesPreparedIdentity(state.intent, event)) {
+          return {
+            next: state,
+            action: "reject",
+            rejectReason: "stale-first-frame",
+          };
+        }
+        return tryCommit(state, {
+          ...state.intent,
+          surfaceAttached: event.surfaceAttached || state.intent.surfaceAttached,
+          firstFrame: true,
+        });
+      }
+      if (state.prepared && matchesPreparedIdentity(state.prepared, event)) {
+        return {
+          next: {
+            ...state,
+            prepared: {
+              ...state.prepared,
+              surfaceAttached: true,
+              firstFrame: true,
+            },
+          },
+          action: "none",
+        };
+      }
+      return {
+        next: state,
+        action: "reject",
+        rejectReason: "stale-first-frame",
+      };
+    }
+    case "settle": {
+      if (event.nativePage === state.committedIndex) {
+        if (state.intent && state.intent.index !== state.committedIndex) {
+          return {
+            next: {
+              ...state,
+              phase: state.prepared ? "prepare" : "idle",
+              intent: null,
+            },
+            action: "none",
+          };
+        }
+        return { next: state, action: "none" };
+      }
+      if (
+        event.nativePage === 0 &&
+        state.committedIndex >= 1
+      ) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "stale-settle",
+        };
+      }
+      return { next: state, action: "none" };
+    }
+    case "scroll-to-index":
+      return {
+        next: state,
+        action: "reject",
+        rejectReason: "independent-writer-forbidden",
+      };
+    case "cancel":
+      return {
+        next: {
+          ...state,
+          phase: state.prepared ? "prepare" : "idle",
+          intent: null,
+        },
+        action: "none",
+      };
+    default:
+      return { next: state, action: "none" };
+  }
+}
+
+export function preparedWatchNeighborIsSilentOwner(input: {
+  itemIndex: number;
+  committedIndex: number;
+  preparedIndex: number | null;
+}): {
+  mayBecomeAudible: false;
+  mayStealActiveIndex: false;
+} {
+  void input;
+  return { mayBecomeAudible: false, mayStealActiveIndex: false };
 }

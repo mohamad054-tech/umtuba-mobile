@@ -9,17 +9,21 @@ import {
   shouldHonorLatePlayerEvent,
 } from "./activePlayerOwnership";
 import {
+  applyWatchHandoffAudioTransfer,
   applyWatchInactiveTeardown,
   detachWatchPlayerBinding,
   isRetryHitTargetClear,
+  mayAllowWatchHandoffAudio,
   nextPlayerInstanceGeneration,
   releaseWatchPlayerBinding,
+  resetWatchHandoffAudibleOwner,
   resolveInactiveTeardownMode,
   resolveRetryTargetPostId,
   shouldApplyWatchTransport,
   shouldCallPlayerMethodsOnUnmount,
   shouldRecreateWatchPlayer,
   shouldSilencePlayerBeforeDetach,
+  shouldStartPlaybackAfterAsset,
   watchWindowEvictedIndexes,
   watchWindowMountedIndexes,
   watchWindowPreparedIndexes,
@@ -508,5 +512,86 @@ describe("Retry recovery generation and hit target", () => {
     expect(
       isRetryHitTargetClear({ errorVisible: true, tapLayerBlocksRetry: false })
     ).toBe(true);
+  });
+});
+
+describe("handoff audio transfer", () => {
+  it("silences the previous owner before the next may become audible", () => {
+    resetWatchHandoffAudibleOwner();
+    const previous = createPlayerSession();
+    const next = createPlayerSession();
+    applyPlaybackIntent(previous.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: false,
+    });
+    const previousCalls = previous.calls.length;
+    const transfer = applyWatchHandoffAudioTransfer({
+      previousPlayer: previous.player,
+      previousIndex: 0,
+      nextIndex: 1,
+      platform: "android",
+      previousItemReady: true,
+    });
+    expect(transfer.previousSilenced).toBe(true);
+    expect(transfer.simultaneousAudible).toBe(false);
+    expect(transfer.nextMayBecomeAudible).toBe(true);
+    expect(transfer.audibleOwnerIndex).toBe(1);
+    expect(previous.player.muted).toBe(true);
+    expect(previous.player.volume).toBe(0);
+    expect(previous.calls.length).toBeGreaterThan(previousCalls);
+    expect(previous.calls).toContain("pause");
+    expect(
+      mayAllowWatchHandoffAudio({ index: 0, isActive: false })
+    ).toBe(false);
+    expect(
+      mayAllowWatchHandoffAudio({ index: 1, isActive: true })
+    ).toBe(true);
+    expect(
+      mayAllowWatchHandoffAudio({ index: 0, isActive: true })
+    ).toBe(false);
+    applyPlaybackIntent(
+      next.player,
+      resolveWatchPlaybackIntent({
+        isActive: true,
+        shouldPlay: true,
+        muted: false,
+        volume: 1,
+        loop: false,
+      })
+    );
+    expect(
+      audibleCount([
+        {
+          isActive: false,
+          shouldPlay: false,
+          muted: previous.player.muted,
+          volume: previous.player.volume,
+          playing: false,
+        },
+        {
+          isActive: true,
+          shouldPlay: true,
+          muted: next.player.muted,
+          volume: next.player.volume,
+          playing: true,
+        },
+      ])
+    ).toBe(1);
+    expect(
+      shouldStartPlaybackAfterAsset({
+        nativeReady: true,
+        jsReady: true,
+        isActive: true,
+        shouldPlay: true,
+        playerAlive: true,
+        ownerGeneration: 1,
+        commandGeneration: 1,
+        surfaceAttached: true,
+        itemIndex: 0,
+      })
+    ).toBe(false);
+    resetWatchHandoffAudibleOwner();
   });
 });
