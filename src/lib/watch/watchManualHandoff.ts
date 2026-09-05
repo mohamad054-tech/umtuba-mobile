@@ -1,5 +1,6 @@
 import { shouldMountWatchPlayer } from "@/src/lib/feed/videoStoragePath";
 import {
+  resolveWatchIndexFromScrollOffset,
   sanitizeWatchListIndex,
   shouldAttachWatchSurface,
 } from "./playbackPolicy";
@@ -7,6 +8,7 @@ import {
   decideWatchViewabilityEvidence,
   shouldLoadOwnedWatchPlayer,
 } from "./watchActiveIndexArbiter";
+import { resolveManualFirstWatchNativePin } from "./watchViewport";
 
 /** Direction is known once the drag crosses a fraction of one page. */
 const MANUAL_DIRECTION_PAGE_FRACTION = 0.12;
@@ -399,6 +401,134 @@ export function resolveWatchHandoffIntentFromViewability(input: {
   if (viewable.includes(next)) return next;
   if (viewable.includes(prev)) return prev;
   return null;
+}
+
+export type WatchFirstPagePinState = {
+  inFlight: boolean;
+  navigationGeneration: number;
+  targetIndex: 1;
+};
+
+export type WatchFirstPageNativePin = {
+  offset: number;
+  targetIndex: 1;
+  navigationGeneration: number;
+};
+
+export function createWatchFirstPagePinState(): WatchFirstPagePinState {
+  return {
+    inFlight: false,
+    navigationGeneration: -1,
+    targetIndex: 1,
+  };
+}
+
+/** Post-commit sync only. Does not write activeIndex. Later pages return null. */
+export function resolveFirstWatchCommitNativePin(input: {
+  fromIndex: number;
+  toIndex: number;
+  frozenItemHeight: number;
+  navigationGeneration: number;
+}): WatchFirstPageNativePin | null {
+  if (!Number.isFinite(input.navigationGeneration) || input.navigationGeneration < 0) {
+    return null;
+  }
+  const offset = resolveManualFirstWatchNativePin({
+    fromIndex: input.fromIndex,
+    toIndex: input.toIndex,
+    frozenItemHeight: input.frozenItemHeight,
+  });
+  if (offset == null) return null;
+  return {
+    offset,
+    targetIndex: 1,
+    navigationGeneration: input.navigationGeneration,
+  };
+}
+
+export function shouldApplyFirstWatchNativePin(input: {
+  pinGeneration: number;
+  currentGeneration: number;
+}): boolean {
+  return (
+    Number.isFinite(input.pinGeneration) &&
+    input.pinGeneration >= 0 &&
+    input.pinGeneration === input.currentGeneration
+  );
+}
+
+export function armWatchFirstPagePin(input: {
+  navigationGeneration: number;
+}): WatchFirstPagePinState {
+  return {
+    inFlight: true,
+    navigationGeneration: input.navigationGeneration,
+    targetIndex: 1,
+  };
+}
+
+export function clearWatchFirstPagePin(
+  pin: WatchFirstPagePinState
+): WatchFirstPagePinState {
+  return {
+    ...pin,
+    inFlight: false,
+  };
+}
+
+/**
+ * Reject index-0 backward INTENT only while the first 0→1 pin is in flight
+ * on the same generation, unless the user is genuinely dragging 1→0.
+ */
+export function shouldRejectFirstWatchIndexZeroIntent(input: {
+  nominatedIndex: number | null;
+  committedIndex: number;
+  pin: WatchFirstPagePinState;
+  currentGeneration: number;
+  reverseDragEvidence: boolean;
+}): boolean {
+  if (input.nominatedIndex !== 0) return false;
+  if (input.committedIndex !== 1) return false;
+  if (input.pin.navigationGeneration !== input.currentGeneration) {
+    return true;
+  }
+  if (!input.pin.inFlight) return false;
+  if (input.reverseDragEvidence) return false;
+  return true;
+}
+
+export function resolveWatchFirstPagePinAlignment(input: {
+  nativePage: number;
+  committedIndex: number;
+  pin: WatchFirstPagePinState;
+  currentGeneration: number;
+}): "keep" | "clear" | "ignore" {
+  if (!input.pin.inFlight) return "ignore";
+  if (input.pin.navigationGeneration !== input.currentGeneration) return "clear";
+  if (input.nativePage === 1 && input.committedIndex === 1) return "clear";
+  return "keep";
+}
+
+export function hasFirstWatchReverseDragEvidence(input: {
+  committedIndex: number;
+  dragStartIndex: number;
+  dragStartOffset: number;
+  dragTargetIndex: number | null;
+  itemHeight: number;
+}): boolean {
+  if (input.committedIndex !== 1) return false;
+  if (input.dragStartIndex !== 1) return false;
+  if (input.dragTargetIndex !== 0) return false;
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return false;
+  }
+  return (
+    resolveWatchIndexFromScrollOffset(
+      input.dragStartOffset,
+      input.itemHeight,
+      3
+    ) === 1
+  );
 }
 
 export type WatchHandoffPhase = "idle" | "prepare" | "intent";

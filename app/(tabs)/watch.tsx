@@ -160,16 +160,24 @@ import {
   type WatchActiveIndexDecision,
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
-  createWatchHandoffMachine,
+  armWatchFirstPagePin,
+  clearWatchFirstPagePin,
+  createWatchFirstPagePinState,
+  hasFirstWatchReverseDragEvidence,
   reduceWatchHandoff,
   resolveAndroidManualSettleAction,
+  resolveFirstWatchCommitNativePin,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveProactivePrepareIndexes,
+  resolveWatchFirstPagePinAlignment,
   resolveWatchHandoffIntentFromViewability,
+  shouldApplyFirstWatchNativePin,
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
+  shouldRejectFirstWatchIndexZeroIntent,
   shouldWarmManualTarget,
+  createWatchHandoffMachine,
   type WatchHandoffEvent,
 } from "@/src/lib/watch/watchManualHandoff";
 import {
@@ -307,6 +315,9 @@ export default function WatchScreen() {
   const warmedTargetIndexRef = useRef<number | null>(null);
   const handoffMachineRef = useRef(createWatchHandoffMachine());
   const dragStartIndexRef = useRef(0);
+  const dragStartOffsetRef = useRef(0);
+  const firstPinRef = useRef(createWatchFirstPagePinState());
+  const reverseDragEvidenceRef = useRef(false);
   const manualDragActiveRef = useRef(false);
   const scrollToWatchIndexRef = useRef<
     (
@@ -409,6 +420,33 @@ export default function WatchScreen() {
     if (result.commit.pinNativeOffset) {
       pinWatchNativeOffset(result.commit.toIndex, 0, { animated: false });
     }
+    const commitGeneration = handoffMachineRef.current.navigationGeneration;
+    const firstPin = resolveFirstWatchCommitNativePin({
+      fromIndex: result.commit.fromIndex,
+      toIndex: result.commit.toIndex,
+      frozenItemHeight: itemHeightRef.current,
+      navigationGeneration: commitGeneration,
+    });
+    if (
+      firstPin &&
+      shouldApplyFirstWatchNativePin({
+        pinGeneration: firstPin.navigationGeneration,
+        currentGeneration: commitGeneration,
+      })
+    ) {
+      firstPinRef.current = armWatchFirstPagePin({
+        navigationGeneration: firstPin.navigationGeneration,
+      });
+      reverseDragEvidenceRef.current = false;
+      try {
+        listRef.current?.scrollToOffset({
+          offset: firstPin.offset,
+          animated: false,
+        });
+      } catch (err) {
+        console.warn("Watch native pin failed:", err);
+      }
+    }
   }, [pinWatchNativeOffset]);
 
   const dispatchWatchHandoffRef = useRef(dispatchWatchHandoff);
@@ -508,6 +546,8 @@ export default function WatchScreen() {
           type: "cancel",
           reason: "blur-unmount",
         });
+        firstPinRef.current = clearWatchFirstPagePin(firstPinRef.current);
+        reverseDragEvidenceRef.current = false;
         prepareAdjacentNeighbors(activeIndexRef.current);
         const nextGeneration = bumpWatchLeaveGeneration(
           playbackGenerationRef.current
@@ -903,6 +943,7 @@ export default function WatchScreen() {
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
     dragStartIndexRef.current = activeIndexRef.current;
+    dragStartOffsetRef.current = scrollOffsetRef.current;
   }, []);
 
   const onWatchScroll = useCallback(
@@ -925,6 +966,18 @@ export default function WatchScreen() {
         nativeHint != null && nativeHint !== dragStartIndexRef.current
           ? nativeHint
           : directional;
+      if (
+        firstPinRef.current.inFlight &&
+        hasFirstWatchReverseDragEvidence({
+          committedIndex: activeIndexRef.current,
+          dragStartIndex: dragStartIndexRef.current,
+          dragStartOffset: dragStartOffsetRef.current,
+          dragTargetIndex: target,
+          itemHeight: itemHeightRef.current,
+        })
+      ) {
+        reverseDragEvidenceRef.current = true;
+      }
       const retarget = resolveManualHandoffRetarget({
         previousTarget: warmedTargetIndexRef.current,
         nextTarget: target,
@@ -969,6 +1022,54 @@ export default function WatchScreen() {
         videosLengthRef.current
       );
       if (nativePage == null) return;
+      const pin = firstPinRef.current;
+      const pinGeneration = handoffMachineRef.current.navigationGeneration;
+      if (pin.inFlight) {
+        const alignment = resolveWatchFirstPagePinAlignment({
+          nativePage,
+          committedIndex: activeIndexRef.current,
+          pin,
+          currentGeneration: pinGeneration,
+        });
+        if (alignment === "clear") {
+          firstPinRef.current = clearWatchFirstPagePin(pin);
+        } else if (
+          alignment === "keep" &&
+          nativePage === 0 &&
+          activeIndexRef.current === 1 &&
+          !reverseDragEvidenceRef.current
+        ) {
+          const again = resolveFirstWatchCommitNativePin({
+            fromIndex: 0,
+            toIndex: 1,
+            frozenItemHeight: itemHeightRef.current,
+            navigationGeneration: pin.navigationGeneration,
+          });
+          if (
+            again &&
+            shouldApplyFirstWatchNativePin({
+              pinGeneration: again.navigationGeneration,
+              currentGeneration: pinGeneration,
+            })
+          ) {
+            try {
+              listRef.current?.scrollToOffset({
+                offset: again.offset,
+                animated: false,
+              });
+            } catch (err) {
+              console.warn("Watch native pin failed:", err);
+            }
+          }
+        }
+        if (
+          nativePage === 0 &&
+          activeIndexRef.current === 1 &&
+          !reverseDragEvidenceRef.current
+        ) {
+          return;
+        }
+      }
       if (
         shouldIgnoreStaleManualSettle({
           locked: Date.now() < programmaticAdvanceUntilRef.current,
@@ -1036,6 +1137,17 @@ export default function WatchScreen() {
         itemCount: videosLengthRef.current,
       });
       if (intent == null) return;
+      if (
+        shouldRejectFirstWatchIndexZeroIntent({
+          nominatedIndex: intent,
+          committedIndex: activeIndexRef.current,
+          pin: firstPinRef.current,
+          currentGeneration: handoffMachineRef.current.navigationGeneration,
+          reverseDragEvidence: reverseDragEvidenceRef.current,
+        })
+      ) {
+        return;
+      }
       const video = visibleVideosRef.current[intent];
       if (!video) return;
       const state = nextHandoffRef.current;
