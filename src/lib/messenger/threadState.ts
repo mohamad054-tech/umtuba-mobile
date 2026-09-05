@@ -98,6 +98,8 @@ export function createOptimisticMessage(input: {
   text: string;
   clientId: string;
   sentAt?: string;
+  messageType?: string;
+  visual?: Message["visual"];
 }): Message {
   return {
     id: `optimistic-${input.clientId}`,
@@ -108,7 +110,8 @@ export function createOptimisticMessage(input: {
     isMine: true,
     status: "sending",
     clientId: input.clientId,
-    messageType: "text",
+    messageType: input.messageType ?? "text",
+    visual: input.visual ?? null,
   };
 }
 

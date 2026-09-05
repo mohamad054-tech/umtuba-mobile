@@ -24,9 +24,9 @@ type MockChannel = {
 function createMockRealtimeClient() {
   const channels = new Map<string, MockChannel>();
 
-  const createChannel = (topic: string): MockChannel => {
+  const createChannel = (name: string): MockChannel => {
     const channel: MockChannel = {
-      topic,
+      topic: `realtime:${name}`,
       state: "closed",
       onCalls: 0,
       subscribeCalls: 0,
@@ -53,15 +53,22 @@ function createMockRealtimeClient() {
 
   return {
     channels,
-    channel(topic: string) {
-      const existing = channels.get(topic);
+    getChannels() {
+      return Array.from(channels.values());
+    },
+    channel(name: string) {
+      const existing = channels.get(name);
       if (existing) return existing;
-      const next = createChannel(topic);
-      channels.set(topic, next);
+      const next = createChannel(name);
+      channels.set(name, next);
       return next;
     },
     removeChannel(channel: MockChannel) {
-      channels.delete(channel.topic);
+      for (const [key, value] of channels) {
+        if (value === channel || value.topic === channel.topic) {
+          channels.delete(key);
+        }
+      }
       channel.state = "closed";
     },
   };
@@ -143,7 +150,11 @@ describe("subscribeMessengerRealtime", () => {
       subscribeMessengerRealtime(supabase as never, {
         conversationId: CONVO,
         currentUserId: USER,
-        handlers,
+        handlers: {
+          onMessageInsert: () => undefined,
+          onMessageUpdate: () => undefined,
+          onResync: () => undefined,
+        },
       });
     }).not.toThrow();
 
@@ -156,15 +167,15 @@ describe("subscribeMessengerRealtime", () => {
     listCleanup();
   });
 
-  it("skips .on() if the same topic is already joined (re-subscribe race)", () => {
+  it("evicts a joined topic instead of adding postgres_changes after subscribe", () => {
     const supabase = createMockRealtimeClient();
     const first = subscribeMessengerRealtime(supabase as never, {
       conversationId: CONVO,
       currentUserId: USER,
       handlers,
     });
-    const onAfterFirst = supabase.channels.get(messengerThreadTopic(CONVO))
-      ?.onCalls;
+    const firstChannel = supabase.channels.get(messengerThreadTopic(CONVO));
+    expect(firstChannel?.state).toBe("joined");
 
     expect(() => {
       subscribeMessengerRealtime(supabase as never, {
@@ -174,9 +185,11 @@ describe("subscribeMessengerRealtime", () => {
       });
     }).not.toThrow();
 
-    expect(supabase.channels.get(messengerThreadTopic(CONVO))?.onCalls).toBe(
-      onAfterFirst
-    );
+    const live = supabase.channels.get(messengerThreadTopic(CONVO));
+    expect(live).toBeTruthy();
+    expect(live).not.toBe(firstChannel);
+    expect(live?.lastOnBeforeSubscribe).toBe(true);
+    expect(firstChannel?.state).toBe("closed");
     first();
   });
 });

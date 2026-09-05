@@ -42,6 +42,15 @@ function mapMessengerPath(pathWithQuery: string): string | null {
     return "/(tabs)/messages";
   }
 
+  if (normalized === "/messages/streak-camera") {
+    const params = new URLSearchParams(query);
+    const conversationId = params.get("conversationId");
+    if (conversationId && UUID_RE.test(conversationId)) {
+      return `/messages/streak-camera?conversationId=${conversationId}`;
+    }
+    return "/messages/streak-camera";
+  }
+
   const thread = normalized.match(/^\/messages\/([^/]+)$/i);
   if (thread && UUID_RE.test(thread[1]!)) {
     const params = new URLSearchParams(query);
@@ -70,4 +79,14 @@ export function conversationThreadHref(
     return `/messages/${conversationId}?message=${messageId}`;
   }
   return `/messages/${conversationId}`;
+}
+
+export function streakCameraHref(
+  conversationId?: string | null
+): string | null {
+  if (!conversationId) {
+    return "/messages/streak-camera";
+  }
+  if (!UUID_RE.test(conversationId)) return null;
+  return `/messages/streak-camera?conversationId=${conversationId}`;
 }

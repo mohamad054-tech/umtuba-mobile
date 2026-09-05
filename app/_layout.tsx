@@ -197,6 +197,10 @@ function LocalizedStack() {
         name="messages/[id]"
         options={{ title: t("nav.conversation") }}
       />
+      <Stack.Screen
+        name="messages/streak-camera"
+        options={{ title: "UM Streak", headerShown: false }}
+      />
       <Stack.Screen name="sound/[id]" options={{ title: t("sound.title") }} />
       <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
     </Stack>

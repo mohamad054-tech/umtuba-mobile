@@ -95,6 +95,9 @@ describe("messenger destinations", () => {
     expect(mapMessengerDestination("https://evil.example/messages")).toBeNull();
     expect(mapMessengerDestination("/messages/not-a-uuid")).toBeNull();
     expect(conversationThreadHref("bad")).toBeNull();
+    expect(mapMessengerDestination("/messages/streak-camera")).toBe(
+      "/messages/streak-camera"
+    );
   });
 });
 
@@ -122,7 +125,7 @@ describe("message preview / time formatting", () => {
         conversation_id: "c1",
         sender_id: "u1",
         body: null,
-        message_type: "image",
+        message_type: "sticker",
         created_at: "2026-07-26T10:00:00.000Z",
         deleted_at: null,
         client_id: null,
@@ -130,5 +133,32 @@ describe("message preview / time formatting", () => {
       "u1"
     );
     expect(mapped.text).toBe("Unsupported message");
+    expect(mapped.visual).toBeNull();
+  });
+
+  it("maps private visual messages without minting a preview URL", () => {
+    const mapped = mapMessengerMessageRow(
+      {
+        id: "m2",
+        conversation_id: "c1",
+        sender_id: "u2",
+        body: "hello",
+        message_type: "image",
+        created_at: "2026-07-26T10:00:00.000Z",
+        deleted_at: null,
+        client_id: null,
+        visual_opened_at: null,
+        visual_expiration_policy: "view_once",
+      },
+      "u1"
+    );
+    expect(mapped.visual).toMatchObject({
+      mediaType: "image",
+      caption: "hello",
+      viewed: false,
+      previewUrl: null,
+      expirationPolicy: "view_once",
+    });
+    expect(mapped.text).toBe("hello");
   });
 });

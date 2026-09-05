@@ -1,4 +1,4 @@
-import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getErrorMessage } from "@/src/contracts/validation";
 import { isMessengerBackendMissing } from "@/src/lib/messenger/backend";
@@ -12,9 +12,9 @@ import {
   type MessengerMessageRow,
 } from "@/src/lib/messenger/mapMessage";
 import {
-  planMessengerRealtimeChannels,
-  realtimeChannelAllowsNewCallbacks,
-} from "@/src/lib/messenger/realtimeSubscribe";
+  subscribeMessengerRealtime as subscribeMessengerRealtimeImpl,
+  type MessengerRealtimeHandlers,
+} from "@/src/lib/messenger/realtime";
 import {
   MESSAGE_MAX_LENGTH,
   MESSAGE_PAGE_SIZE,
@@ -571,21 +571,11 @@ export async function assertConversationMembership(
   return { ok: true };
 }
 
-export type MessengerRealtimeHandlers = {
-  onMessageInsert: (row: MessengerMessageRow) => void;
-  onMessageUpdate: (row: MessengerMessageRow) => void;
-  onInboxParticipantChange?: (row: {
-    conversation_id?: string;
-    unread_count?: number | null;
-  }) => void;
-  onResync?: () => void;
-};
+export type { MessengerRealtimeHandlers };
 
 /**
- * Subscribe to thread messages or inbox participant updates — never both on
- * the same live channel. `.on()` must run before `.subscribe()`, and must not
- * run on a channel supabase-js already joined (list + thread share one client).
- * Caller must invoke the returned cleanup.
+ * Inbox and thread must never attach postgres_changes to a reused subscribed
+ * channel. Implementation evicts/creates an unsubscribed topic first.
  */
 export function subscribeMessengerRealtime(
   supabase: SupabaseClient,
@@ -595,85 +585,7 @@ export function subscribeMessengerRealtime(
     handlers: MessengerRealtimeHandlers;
   }
 ): () => void {
-  const channels: RealtimeChannel[] = [];
-  const plan = planMessengerRealtimeChannels({
-    conversationId: input.conversationId,
-    currentUserId: input.currentUserId,
-  });
-
-  if (plan.threadTopic && input.conversationId) {
-    const conversationId = input.conversationId;
-    const thread = supabase.channel(plan.threadTopic);
-    if (realtimeChannelAllowsNewCallbacks(thread.state)) {
-      thread
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload) => {
-            input.handlers.onMessageInsert(
-              payload.new as MessengerMessageRow
-            );
-          }
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "messages",
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload) => {
-            input.handlers.onMessageUpdate(
-              payload.new as MessengerMessageRow
-            );
-          }
-        )
-        .subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            input.handlers.onResync?.();
-          }
-        });
-      channels.push(thread);
-    }
-  }
-
-  if (plan.inboxTopic) {
-    const inbox = supabase.channel(plan.inboxTopic);
-    if (realtimeChannelAllowsNewCallbacks(inbox.state)) {
-      inbox
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "conversation_participants",
-            filter: `user_id=eq.${input.currentUserId}`,
-          },
-          (payload) => {
-            input.handlers.onInboxParticipantChange?.(
-              payload.new as {
-                conversation_id?: string;
-                unread_count?: number | null;
-              }
-            );
-          }
-        )
-        .subscribe();
-      channels.push(inbox);
-    }
-  }
-
-  return () => {
-    for (const channel of channels) {
-      void supabase.removeChannel(channel);
-    }
-  };
+  return subscribeMessengerRealtimeImpl(supabase, input);
 }
 
 export function newClientId(): string {

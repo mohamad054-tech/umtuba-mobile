@@ -20,7 +20,15 @@ import {
   listConversationsForUser,
   subscribeMessengerRealtime,
 } from "@/src/lib/messenger/api";
-import { conversationThreadHref } from "@/src/lib/messenger/mapDestination";
+import {
+  conversationThreadHref,
+  streakCameraHref,
+} from "@/src/lib/messenger/mapDestination";
+import { umStreakText } from "@/src/lib/umStreak/copy";
+import {
+  detectUmStreakLocale,
+  umStreakWritingStyle,
+} from "@/src/lib/umStreak/locale";
 import {
   dedupeConversations,
   preserveDeepLinkMessageId,
@@ -53,6 +61,7 @@ export default function MessagesInboxScreen() {
   const [phase, setPhase] = useState<InboxPhase>("loading");
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const locale = detectUmStreakLocale();
   const inFlight = useRef(false);
   const openedDeepLink = useRef<string | null>(null);
 
@@ -216,6 +225,26 @@ export default function MessagesInboxScreen() {
 
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
+      <Pressable
+        style={styles.streakEntry}
+        onPress={() => {
+          const href = streakCameraHref();
+          if (href) router.push(href as never);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={umStreakText("camera", locale)}
+      >
+        <Text
+          style={[styles.streakEntryText, umStreakWritingStyle(locale)]}
+        >
+          {umStreakText("camera", locale)}
+        </Text>
+        <Text
+          style={[styles.streakEntryHint, umStreakWritingStyle(locale)]}
+        >
+          {umStreakText("notPublic", locale)}
+        </Text>
+      </Pressable>
       {error && phase === "ready" ? (
         <Text style={styles.banner} accessibilityRole="alert">
           {error}
@@ -275,6 +304,28 @@ export default function MessagesInboxScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  streakEntry: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.3)",
+    backgroundColor: "rgba(251,191,36,0.08)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  streakEntryText: {
+    color: colors.accentAmber,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  streakEntryHint: {
+    color: colors.textSubtle,
+    fontSize: 12,
+  },
   center: {
     flex: 1,
     backgroundColor: colors.bg,
