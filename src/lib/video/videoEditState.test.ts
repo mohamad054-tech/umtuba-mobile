@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { createTextOverlay } from "./videoOverlays";
+import { createTextOverlay, removeOverlay } from "./videoOverlays";
 import {
+  applyTrimEnvelope,
   clampTrimWindow,
+  clearAddedSound,
   createInitialEditState,
   editedDurationMs,
   hasEdits,
+  parseEditFromMediaPipeline,
   sanitizeVideoEditState,
   serializeEditIntoMediaPipeline,
 } from "./videoEditState";
@@ -67,5 +70,40 @@ describe("VIDEO_EDIT_STATE", () => {
     expect(state.soundId).toBe("11111111-1111-4111-8111-111111111111");
     expect(state.mix.originalAudioVolume).toBe(0.25);
     expect(state.mix.addedSoundVolume).toBe(1);
+  });
+
+  it("deletes an overlay and removes added sound without dropping the original file", () => {
+    const overlay = createTextOverlay({ text: "bye" });
+    const withSound = {
+      ...createInitialEditState(5_000),
+      overlays: [overlay],
+      soundId: "11111111-1111-4111-8111-111111111111",
+    };
+    expect(removeOverlay(withSound.overlays, overlay.id)).toEqual([]);
+    expect(clearAddedSound(withSound).soundId).toBeNull();
+    const trimmed = applyTrimEnvelope(withSound, 1000, 4000, 5000);
+    expect(trimmed.trimStartMs).toBe(1000);
+    expect(trimmed.trimEndMs).toBe(4000);
+  });
+
+  it("loads existing edit metadata and keeps playback working when absent", () => {
+    const overlay = createTextOverlay({ text: "kept" });
+    const pipeline = serializeEditIntoMediaPipeline(
+      { hls: null },
+      {
+        ...createInitialEditState(8000),
+        trimStartMs: 250,
+        trimEndMs: 6000,
+        segments: [{ startMs: 250, endMs: 6000 }],
+        overlays: [overlay],
+      }
+    );
+    const loaded = parseEditFromMediaPipeline(pipeline, 8000);
+    expect(loaded.trimStartMs).toBe(250);
+    expect(loaded.overlays[0]?.text).toBe("kept");
+    const absent = parseEditFromMediaPipeline(null, 8000);
+    expect(absent.trimStartMs).toBe(0);
+    expect(absent.trimEndMs).toBe(8000);
+    expect(absent.overlays).toEqual([]);
   });
 });

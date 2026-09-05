@@ -938,6 +938,7 @@ export default function CreateScreen() {
               applySelectedSoundToEditState(current, sound)
             );
           }}
+          onClearSound={() => setSelectedSound(null)}
         />
       ) : null}
     </SafeAreaView>

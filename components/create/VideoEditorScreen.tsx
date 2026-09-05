@@ -18,6 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { SoundLibrarySheet } from "@/components/create/SoundLibrarySheet";
 import { VideoOverlayLayer } from "@/components/create/VideoOverlayLayer";
+import { VideoTrimTimeline } from "@/components/create/VideoTrimTimeline";
 import { SelectedSoundPlayer } from "@/components/sounds/SelectedSoundPlayer";
 import {
   localeTextAlign,
@@ -48,9 +49,17 @@ import {
 } from "@/src/lib/video/editorKeyboard";
 import { OVERLAY_INTERACTION_LAYOUT_DIRECTION } from "@/src/lib/video/overlayDrag";
 import {
-  clampTrimWindow,
+  applyTrimEnvelope,
+  clearAddedSound,
   type VideoEditState,
 } from "@/src/lib/video/videoEditState";
+import {
+  deleteKeepSegment,
+  popEditUndo,
+  pushEditUndo,
+  splitKeepSegmentAt,
+  type VideoKeepSegment,
+} from "@/src/lib/video/videoSegments";
 import {
   addOverlay,
   createStickerOverlay,
@@ -75,6 +84,10 @@ type VideoEditorScreenProps = {
   onOpenSounds: () => void;
   onCloseSounds: () => void;
   onSelectSound: (sound: SocialSound) => void;
+  onClearSound?: () => void;
+  mode?: "create" | "published";
+  onSave?: () => void;
+  saving?: boolean;
 };
 
 export function VideoEditorScreen({
@@ -89,6 +102,10 @@ export function VideoEditorScreen({
   onOpenSounds,
   onCloseSounds,
   onSelectSound,
+  onClearSound,
+  mode = "create",
+  onSave,
+  saving = false,
 }: VideoEditorScreenProps) {
   const { t, locale } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -97,6 +114,11 @@ export function VideoEditorScreen({
   const [textFocused, setTextFocused] = useState(false);
   const [stage, setStage] = useState({ width: 0, height: 0 });
   const [closing, setClosing] = useState(false);
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number | null>(
+    null
+  );
+  const undoRef = useRef<VideoKeepSegment[][]>([]);
   const exitGuard = useRef(createEditorExitGuard()).current;
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -175,8 +197,34 @@ export function VideoEditorScreen({
     });
   }, [originalAudio.muted, originalAudio.volume, player, visible]);
 
+  function seekPreview(ms: number) {
+    setPlayheadMs(ms);
+    if (!isPlayerAlive(player)) return;
+    try {
+      player.currentTime = Math.max(0, ms / 1000);
+    } catch {
+      // Preview seek is best-effort.
+    }
+  }
+
   function commit(next: VideoEditState) {
     onChange(next);
+  }
+
+  function commitSegments(nextSegments: VideoKeepSegment[]) {
+    undoRef.current = pushEditUndo(undoRef.current, draft.segments);
+    const envelope = nextSegments[0]
+      ? {
+          trimStartMs: nextSegments[0].startMs,
+          trimEndMs: nextSegments[nextSegments.length - 1]!.endMs,
+        }
+      : { trimStartMs: draft.trimStartMs, trimEndMs: draft.trimEndMs };
+    commit({
+      ...draft,
+      segments: nextSegments,
+      trimStartMs: envelope.trimStartMs,
+      trimEndMs: envelope.trimEndMs,
+    });
   }
 
   function commitAndContinue() {
@@ -203,7 +251,22 @@ export function VideoEditorScreen({
     Keyboard.dismiss();
   }
 
+  function discardPublished() {
+    onClose();
+  }
+
   function askClose() {
+    if (mode === "published") {
+      Alert.alert(
+        t("create.editorDiscardTitle"),
+        t("create.editorDiscardPublishedBody"),
+        [
+          { text: t("create.editorKeep"), style: "cancel" },
+          { text: t("actions.cancel"), style: "destructive", onPress: discardPublished },
+        ]
+      );
+      return;
+    }
     Alert.alert(t("create.editorDiscardTitle"), t("create.editorDiscardBody"), [
       { text: t("create.editorKeep"), style: "cancel" },
       { text: t("create.editorDone"), onPress: commitAndContinue },
@@ -238,14 +301,18 @@ export function VideoEditorScreen({
               {t("create.editorTitle")}
             </Text>
             <Pressable
-              onPress={commitAndContinue}
-              disabled={closing}
+              onPress={mode === "published" ? discardPublished : commitAndContinue}
+              disabled={closing || saving}
               accessibilityRole="button"
-              accessibilityLabel={t("create.editorDone")}
-              accessibilityState={{ disabled: closing }}
+              accessibilityLabel={
+                mode === "published" ? t("actions.cancel") : t("create.editorDone")
+              }
+              accessibilityState={{ disabled: closing || saving }}
               style={styles.barBtn}
             >
-              <Text style={styles.barBtnText}>{t("create.editorDone")}</Text>
+              <Text style={styles.barBtnText}>
+                {mode === "published" ? t("actions.cancel") : t("create.editorDone")}
+              </Text>
             </Pressable>
           </View>
 
@@ -300,18 +367,87 @@ export function VideoEditorScreen({
           >
             <Text style={styles.section}>{t("create.trim")}</Text>
             <Text style={styles.meta}>{durationLabel}</Text>
+            <VideoTrimTimeline
+              durationMs={durationMs ?? 0}
+              inMs={draft.trimStartMs}
+              outMs={draft.trimEndMs}
+              playheadMs={playheadMs}
+              segments={draft.segments}
+              selectedSegmentIndex={selectedSegmentIndex}
+              onTrimChange={({ inMs, outMs }) => {
+                commit(applyTrimEnvelope(draft, inMs, outMs, durationMs));
+              }}
+              onPlayheadChange={seekPreview}
+              onSelectSegment={setSelectedSegmentIndex}
+              startLabel={t("create.trimStart")}
+              endLabel={t("create.trimEnd")}
+              durationLabel={t("create.trimDuration")}
+            />
             <View style={styles.row}>
               <Pressable
                 style={styles.chip}
-                onPress={() =>
+                onPress={() => {
+                  const next = splitKeepSegmentAt(
+                    draft.segments,
+                    playheadMs,
+                    durationMs ?? 0
+                  );
+                  if (!next) return;
+                  commitSegments(next);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.split")}
+              >
+                <Text style={styles.chipText}>{t("create.split")}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.chip}
+                onPress={() => {
+                  if (selectedSegmentIndex == null) return;
+                  const next = deleteKeepSegment(
+                    draft.segments,
+                    selectedSegmentIndex
+                  );
+                  if (!next) return;
+                  commitSegments(next);
+                  setSelectedSegmentIndex(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.deleteSegment")}
+              >
+                <Text style={styles.chipText}>{t("create.deleteSegment")}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.chip}
+                onPress={() => {
+                  const undo = popEditUndo(undoRef.current);
+                  undoRef.current = undo.nextHistory;
+                  if (!undo.previous) return;
                   commit({
                     ...draft,
-                    ...clampTrimWindow(
+                    segments: undo.previous,
+                    trimStartMs: undo.previous[0]?.startMs ?? draft.trimStartMs,
+                    trimEndMs:
+                      undo.previous[undo.previous.length - 1]?.endMs ??
+                      draft.trimEndMs,
+                  });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.undo")}
+              >
+                <Text style={styles.chipText}>{t("create.undo")}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.chip}
+                onPress={() =>
+                  commit(
+                    applyTrimEnvelope(
+                      draft,
                       draft.trimStartMs + 500,
                       draft.trimEndMs,
                       durationMs
-                    ),
-                  })
+                    )
+                  )
                 }
                 accessibilityRole="button"
                 accessibilityLabel={t("create.trimStart")}
@@ -321,14 +457,14 @@ export function VideoEditorScreen({
               <Pressable
                 style={styles.chip}
                 onPress={() =>
-                  commit({
-                    ...draft,
-                    ...clampTrimWindow(
+                  commit(
+                    applyTrimEnvelope(
+                      draft,
                       draft.trimStartMs,
                       draft.trimEndMs - 500,
                       durationMs
-                    ),
-                  })
+                    )
+                  )
                 }
                 accessibilityRole="button"
                 accessibilityLabel={t("create.trimEnd")}
@@ -527,14 +663,29 @@ export function VideoEditorScreen({
                 ? selectedSound.title
                 : t("create.noLicensedSounds")}
             </Text>
-            <Pressable
-              style={styles.primary}
-              onPress={onOpenSounds}
-              accessibilityRole="button"
-              accessibilityLabel={t("create.openSoundLibrary")}
-            >
-              <Text style={styles.primaryText}>{t("create.openSoundLibrary")}</Text>
-            </Pressable>
+            <View style={styles.row}>
+              <Pressable
+                style={styles.primary}
+                onPress={onOpenSounds}
+                accessibilityRole="button"
+                accessibilityLabel={t("create.openSoundLibrary")}
+              >
+                <Text style={styles.primaryText}>{t("create.openSoundLibrary")}</Text>
+              </Pressable>
+              {draft.soundId ? (
+                <Pressable
+                  style={styles.chip}
+                  onPress={() => {
+                    commit(clearAddedSound(draft));
+                    onClearSound?.();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("create.removeSound")}
+                >
+                  <Text style={styles.chipText}>{t("create.removeSound")}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </ScrollView>
 
           <View
@@ -544,16 +695,32 @@ export function VideoEditorScreen({
             ]}
           >
             <Pressable
-              onPress={commitAndContinue}
-              disabled={closing}
+              onPress={() => {
+                if (mode === "published") {
+                  onSave?.();
+                  return;
+                }
+                commitAndContinue();
+              }}
+              disabled={closing || saving}
               accessibilityRole="button"
-              accessibilityLabel={t("create.editorContinue")}
-              accessibilityHint={t("create.editorContinueHint")}
-              accessibilityState={{ disabled: closing, busy: closing }}
-              style={[styles.footerCta, closing && styles.footerCtaDisabled]}
+              accessibilityLabel={
+                mode === "published"
+                  ? t("actions.save")
+                  : t("create.editorContinue")
+              }
+              accessibilityHint={
+                mode === "published"
+                  ? t("create.editorSaveHint")
+                  : t("create.editorContinueHint")
+              }
+              accessibilityState={{ disabled: closing || saving, busy: closing || saving }}
+              style={[styles.footerCta, (closing || saving) && styles.footerCtaDisabled]}
             >
               <Text style={styles.footerCtaText} numberOfLines={2}>
-                {t("create.editorContinue")}
+                {mode === "published"
+                  ? t("actions.save")
+                  : t("create.editorContinue")}
               </Text>
             </Pressable>
           </View>

@@ -19,14 +19,21 @@ export function isWatchShareSheetOpen(
 export function isWatchInPlaceOverlayOpen(input: {
   commentsOpen: boolean;
   shareSheetOpen: boolean;
+  publishedEditorOpen?: boolean;
 }): boolean {
-  return input.commentsOpen === true || input.shareSheetOpen === true;
+  return (
+    input.commentsOpen === true ||
+    input.shareSheetOpen === true ||
+    input.publishedEditorOpen === true
+  );
 }
 
 export function resolveWatchInPlaceOverlayClose(input: {
   commentsOpen: boolean;
   shareSheetOpen: boolean;
-}): "comments" | "share" | null {
+  publishedEditorOpen?: boolean;
+}): "comments" | "share" | "published-editor" | null {
+  if (input.publishedEditorOpen) return "published-editor";
   if (input.commentsOpen) return "comments";
   if (input.shareSheetOpen) return "share";
   return null;

@@ -30,6 +30,7 @@ type Props = {
   onReport?: () => void;
   onShare?: () => void;
   onFollow?: () => void;
+  onEditVideo?: () => void;
 };
 
 export function WatchQuickActions({
@@ -48,6 +49,7 @@ export function WatchQuickActions({
   onReport,
   onShare,
   onFollow,
+  onEditVideo,
 }: Props) {
   const { t, locale } = useTranslation();
   const align = localeTextAlign(locale);
@@ -120,6 +122,15 @@ export function WatchQuickActions({
             </View>
           ) : null}
           <View style={styles.grid}>
+            {actions.includes("edit-video") && onEditVideo ? (
+              <ActionRow
+                label={t("watch.editVideo")}
+                onPress={() => {
+                  watchLightHaptic();
+                  onEditVideo();
+                }}
+              />
+            ) : null}
             {actions.includes("save") ? (
               <ActionRow
                 label={saved ? t("watch.unsave") : t("watch.save")}

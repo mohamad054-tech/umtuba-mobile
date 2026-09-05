@@ -78,6 +78,8 @@ describe("Watch quick-action catalog", () => {
     expect(
       resolveWatchQuickActions({ canFollow: true, canReport: true })
     ).toContain("follow");
+    expect(resolveWatchQuickActions({ canEdit: true })[0]).toBe("edit-video");
+    expect(resolveWatchQuickActions({})).not.toContain("edit-video");
     expect(hasWatchCaptionTrack()).toBe(false);
     expect(WATCH_CAPTIONS_MODE).toBe("post-caption-overlay");
   });

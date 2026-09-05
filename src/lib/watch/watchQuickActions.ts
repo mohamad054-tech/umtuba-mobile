@@ -13,7 +13,8 @@ export type WatchQuickActionId =
   | "captions"
   | "report"
   | "share"
-  | "follow";
+  | "follow"
+  | "edit-video";
 
 /**
  * Current media has no subtitle track. Captions toggles a larger
@@ -46,9 +47,11 @@ export function resolveWatchQuickActions(input: {
   canReport?: boolean;
   canShare?: boolean;
   canFollow?: boolean;
+  canEdit?: boolean;
 }): WatchQuickActionId[] {
   const actions: WatchQuickActionId[] = ["save", "not-interested", "speed", "captions"];
   if (input.canShare !== false) actions.push("share");
+  if (input.canEdit) actions.unshift("edit-video");
   if (input.canReport) actions.push("report");
   if (input.canFollow) actions.push("follow");
   return actions;

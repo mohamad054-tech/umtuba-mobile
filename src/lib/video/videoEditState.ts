@@ -14,6 +14,13 @@ import {
   serializeOverlays,
   type VideoOverlayElement,
 } from "@/src/lib/video/videoOverlays";
+import {
+  defaultKeepSegments,
+  envelopeFromSegments,
+  normalizeKeepSegments,
+  selectedKeepDurationMs,
+  type VideoKeepSegment,
+} from "@/src/lib/video/videoSegments";
 
 export const VIDEO_EDIT_STATE_VERSION = 1 as const;
 
@@ -21,6 +28,8 @@ export type VideoEditState = {
   version: typeof VIDEO_EDIT_STATE_VERSION;
   trimStartMs: number;
   trimEndMs: number;
+  /** Kept ranges on the original file. Watch plays these in order. */
+  segments: VideoKeepSegment[];
   overlays: VideoOverlayElement[];
   originalAudioVolume: number;
   soundId: string | null;
@@ -32,10 +41,13 @@ export type VideoEditState = {
 
 export function createInitialEditState(durationMs: number | null): VideoEditState {
   const end = durationMs != null && durationMs > 0 ? Math.round(durationMs) : 0;
+  const segments = defaultKeepSegments(end);
+  const envelope = envelopeFromSegments(segments);
   return {
     version: VIDEO_EDIT_STATE_VERSION,
-    trimStartMs: 0,
-    trimEndMs: end,
+    trimStartMs: envelope.trimStartMs,
+    trimEndMs: envelope.trimEndMs || end,
+    segments,
     overlays: [],
     originalAudioVolume: 1,
     soundId: null,
@@ -62,6 +74,9 @@ export function clampTrimWindow(
 
 export function editedDurationMs(state: VideoEditState, durationMs: number | null): number | null {
   if (durationMs == null || durationMs <= 0) return durationMs;
+  if (state.segments.length > 1) {
+    return selectedKeepDurationMs(state.segments);
+  }
   const { trimStartMs, trimEndMs } = clampTrimWindow(
     state.trimStartMs,
     state.trimEndMs,
@@ -75,6 +90,12 @@ export function hasEdits(state: VideoEditState, durationMs: number | null): bool
   return (
     state.trimStartMs !== initial.trimStartMs ||
     state.trimEndMs !== initial.trimEndMs ||
+    state.segments.length !== initial.segments.length ||
+    state.segments.some(
+      (seg, i) =>
+        seg.startMs !== initial.segments[i]?.startMs ||
+        seg.endMs !== initial.segments[i]?.endMs
+    ) ||
     state.overlays.length > 0 ||
     state.originalAudioVolume !== 1 ||
     state.mix.originalAudioEnabled === false ||
@@ -97,6 +118,15 @@ export function sanitizeVideoEditState(
     durationMs
   );
   const mix = sanitizeVideoSoundMix(raw.mix ?? raw.sound_mix ?? raw);
+  const rawSegments = Array.isArray(raw.segments) ? raw.segments : [];
+  const segments = normalizeKeepSegments(
+    rawSegments.length > 1
+      ? rawSegments
+      : [{ startMs: trim.trimStartMs, endMs: trim.trimEndMs }],
+    durationMs ?? trim.trimEndMs
+  );
+  const envelope =
+    segments.length > 1 ? envelopeFromSegments(segments) : trim;
   const soundId =
     typeof raw.soundId === "string" && raw.soundId
       ? raw.soundId
@@ -105,8 +135,9 @@ export function sanitizeVideoEditState(
         : null;
   return {
     version: VIDEO_EDIT_STATE_VERSION,
-    trimStartMs: trim.trimStartMs,
-    trimEndMs: trim.trimEndMs,
+    trimStartMs: envelope.trimStartMs,
+    trimEndMs: envelope.trimEndMs,
+    segments,
     overlays: sanitizeOverlayElements(raw.overlays),
     originalAudioVolume: mix.originalAudioVolume,
     soundId,
@@ -131,6 +162,10 @@ export function serializeEditIntoMediaPipeline(
       version: VIDEO_EDIT_STATE_VERSION,
       trimStartMs: state.trimStartMs,
       trimEndMs: state.trimEndMs,
+      segments:
+        state.segments.length > 1
+          ? state.segments
+          : [{ startMs: state.trimStartMs, endMs: state.trimEndMs }],
       originalAudioVolume: state.originalAudioVolume,
       soundId: state.soundId,
       soundTrack: null,
@@ -160,4 +195,42 @@ export function parseEditFromMediaPipeline(
     },
     durationMs
   );
+}
+
+export function clearAddedSound(state: VideoEditState): VideoEditState {
+  return {
+    ...state,
+    soundId: null,
+    soundVolume: 1,
+    mix: {
+      ...state.mix,
+      addedSoundVolume: 1,
+    },
+  };
+}
+
+export function applyTrimEnvelope(
+  state: VideoEditState,
+  inMs: number,
+  outMs: number,
+  durationMs: number | null
+): VideoEditState {
+  const duration = durationMs != null && durationMs > 0 ? durationMs : outMs;
+  const trim = clampTrimWindow(inMs, outMs, duration);
+  const segments = normalizeKeepSegments(
+    state.segments.length > 0
+      ? state.segments.map((seg) => ({
+          startMs: Math.max(seg.startMs, trim.trimStartMs),
+          endMs: Math.min(seg.endMs, trim.trimEndMs),
+        }))
+      : [{ startMs: trim.trimStartMs, endMs: trim.trimEndMs }],
+    duration
+  );
+  const envelope = envelopeFromSegments(segments);
+  return {
+    ...state,
+    trimStartMs: envelope.trimStartMs,
+    trimEndMs: envelope.trimEndMs,
+    segments,
+  };
 }

@@ -34,6 +34,8 @@ import {
 import { getSupabase } from "@/src/lib/supabase/client";
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import {
+  nextWatchSegmentIndex,
+  resolveWatchPlaybackSegments,
   resolveWatchTrimBounds,
   shouldEndAtTrim,
   shouldSeekToTrimStart,
@@ -182,6 +184,8 @@ export type WatchVideoCardProps = {
   onShare?: () => void;
   /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
   onDeleteOwn?: () => void;
+  /** Owner-only published video edit. Same editor as Create. */
+  onEditOwn?: () => void;
   /** Other people's content only — Guideline 1.2 report. */
   onReport?: () => void;
   /** Other accounts only — Guideline 1.2 block. */
@@ -947,6 +951,7 @@ function WatchVideoCardComponent({
   onOpenComments,
   onShare,
   onDeleteOwn,
+  onEditOwn,
   onReport,
   onBlockUser,
   onOpenProfile,
@@ -972,6 +977,7 @@ function WatchVideoCardComponent({
   const railActionCount =
     4 +
     (onDeleteOwn ? 1 : 0) +
+    (onEditOwn ? 1 : 0) +
     (onReport ? 1 : 0) +
     (onBlockUser ? 1 : 0);
   const compactRail =
@@ -992,6 +998,7 @@ function WatchVideoCardComponent({
   const [userPaused, setUserPaused] = useState(false);
   const userPauseLatchRef = useRef(false);
   const trimEndedRef = useRef(false);
+  const segmentIndexRef = useRef(0);
   const edit = useMemo(
     () => watchEditFromPipeline(video.mediaPipeline, video.durationMs ?? null),
     [video.durationMs, video.mediaPipeline]
@@ -1099,11 +1106,13 @@ function WatchVideoCardComponent({
       setTimeline({ currentTime: 0, duration: 0, ratio: 0 });
       setSeekRequest(null);
       trimEndedRef.current = false;
+      segmentIndexRef.current = 0;
     }
   }, [isActive]);
 
   useEffect(() => {
     trimEndedRef.current = false;
+    segmentIndexRef.current = 0;
   }, [video.id]);
 
   useEffect(() => {
@@ -1247,7 +1256,10 @@ function WatchVideoCardComponent({
     const durationMs =
       video.durationMs ??
       (state.duration > 0 ? Math.round(state.duration * 1000) : null);
-    const bounds = resolveWatchTrimBounds(edit, durationMs);
+    const segments = resolveWatchPlaybackSegments(edit, durationMs);
+    const bounds =
+      segments[segmentIndexRef.current] ??
+      resolveWatchTrimBounds(edit, durationMs);
     if (bounds && shouldSeekToTrimStart(state.currentTime, bounds)) {
       const duration = state.duration || bounds.endSec;
       if (duration > 0) {
@@ -1263,19 +1275,38 @@ function WatchVideoCardComponent({
       shouldEndAtTrim(state.currentTime, bounds) &&
       !trimEndedRef.current
     ) {
-      trimEndedRef.current = true;
-      if (loop) {
-        const duration = state.duration || bounds.endSec;
-        if (duration > 0) {
+      const nextIndex = nextWatchSegmentIndex(
+        segmentIndexRef.current,
+        segments.length
+      );
+      if (nextIndex != null) {
+        const next = segments[nextIndex];
+        segmentIndexRef.current = nextIndex;
+        const duration = state.duration || next?.endSec || bounds.endSec;
+        if (next && duration > 0) {
           seekTokenRef.current += 1;
           setSeekRequest({
             token: seekTokenRef.current,
-            ratio: bounds.startSec / duration,
+            ratio: next.startSec / duration,
           });
         }
-        trimEndedRef.current = false;
       } else {
-        onEnded?.();
+        trimEndedRef.current = true;
+        if (loop) {
+          segmentIndexRef.current = 0;
+          const first = segments[0] ?? bounds;
+          const duration = state.duration || first.endSec;
+          if (duration > 0) {
+            seekTokenRef.current += 1;
+            setSeekRequest({
+              token: seekTokenRef.current,
+              ratio: first.startSec / duration,
+            });
+          }
+          trimEndedRef.current = false;
+        } else {
+          onEnded?.();
+        }
       }
     }
     const target = scrubTargetRatioRef.current;
@@ -1684,6 +1715,21 @@ function WatchVideoCardComponent({
               </Text>
             )}
           </Pressable>
+          {onEditOwn ? (
+            <Pressable
+              style={styles.action}
+              onPress={onEditOwn}
+              accessibilityRole="button"
+              accessibilityLabel={t("watch.editVideo")}
+            >
+              <Text style={styles.actionIcon}>✎</Text>
+              {compactRail ? null : (
+                <Text style={styles.actionCount} numberOfLines={1}>
+                  {t("actions.edit")}
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
           {onDeleteOwn ? (
             <Pressable
               style={styles.action}
@@ -1815,6 +1861,7 @@ function WatchVideoCardComponent({
           canShare: Boolean(onShare),
           canReport: Boolean(onReport),
           canFollow: showFollow && Boolean(onEnsureFollow),
+          canEdit: Boolean(onEditOwn),
         })}
         saved={video.savedByMe === true}
         following={following}
@@ -1855,6 +1902,14 @@ function WatchVideoCardComponent({
             ? () => {
                 setQuickActionsOpen(false);
                 onEnsureFollow();
+              }
+            : undefined
+        }
+        onEditVideo={
+          onEditOwn
+            ? () => {
+                setQuickActionsOpen(false);
+                onEditOwn();
               }
             : undefined
         }

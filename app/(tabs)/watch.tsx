@@ -30,6 +30,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CommentsSheet } from "@/components/CommentsSheet";
+import { VideoEditorScreen } from "@/components/create/VideoEditorScreen";
 import { WatchShareSheet } from "@/components/WatchShareSheet";
 import { IdentityHeader } from "@/components/IdentityHeader";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
@@ -59,6 +60,19 @@ import {
   deletePostForOwner,
   viewerMaySeeDeleteControl,
 } from "@/src/lib/social/deleteOwnedPost";
+import {
+  saveOwnedVideoEditState,
+  viewerMaySeeEditControl,
+} from "@/src/lib/social/editOwnedPost";
+import { markOwnedPostEdited } from "@/src/lib/social/ownedPostEditSignal";
+import { applySelectedSoundToEditState } from "@/src/lib/sounds/socialSoundPlayback";
+import { fetchSocialSoundById, type SocialSound } from "@/src/lib/sounds/socialSounds";
+import {
+  applySavedPipelineToWatchVideo,
+  buildPublishedSavePipeline,
+  loadPublishedEditorDraft,
+} from "@/src/lib/video/publishedVideoEdit";
+import type { VideoEditState } from "@/src/lib/video/videoEditState";
 import {
   ensureProfileFollow,
   getProfileFollowSnapshot,
@@ -252,6 +266,14 @@ export default function WatchScreen() {
     () => new Set()
   );
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [publishedEditor, setPublishedEditor] = useState<{
+    video: WatchVideo;
+    draft: VideoEditState;
+    selectedSound: SocialSound | null;
+  } | null>(null);
+  const [publishedSoundLibraryOpen, setPublishedSoundLibraryOpen] =
+    useState(false);
+  const [publishedSaving, setPublishedSaving] = useState(false);
   const [shareSheet, setShareSheet] = useState<WatchShareSheetSnapshot | null>(
     null
   );
@@ -284,6 +306,7 @@ export default function WatchScreen() {
   const screenFocusedRef = useRef(true);
   const commentPostIdRef = useRef<number | null>(null);
   const shareSheetOpenRef = useRef(false);
+  const publishedEditorOpenRef = useRef(false);
   const exitHintVisibleRef = useRef(false);
   const remainingMsRef = useRef<number | null>(null);
   const currentEndedRef = useRef(false);
@@ -458,6 +481,10 @@ export default function WatchScreen() {
   }, [shareSheet]);
 
   useEffect(() => {
+    publishedEditorOpenRef.current = publishedEditor != null;
+  }, [publishedEditor]);
+
+  useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
       setAppState(toLifecycleState(next));
     });
@@ -590,7 +617,13 @@ export default function WatchScreen() {
     const target = resolveWatchInPlaceOverlayClose({
       commentsOpen: commentPostIdRef.current != null,
       shareSheetOpen: shareSheetOpenRef.current,
+      publishedEditorOpen: publishedEditorOpenRef.current,
     });
+    if (target === "published-editor") {
+      setPublishedEditor(null);
+      setPublishedSoundLibraryOpen(false);
+      return true;
+    }
     if (target === "comments") {
       setCommentPostId(null);
       return true;
@@ -627,6 +660,7 @@ export default function WatchScreen() {
       nestedOverlayOpen: isWatchInPlaceOverlayOpen({
         commentsOpen: commentPostIdRef.current != null,
         shareSheetOpen: shareSheetOpenRef.current,
+        publishedEditorOpen: publishedEditorOpenRef.current,
       }),
       atWatchRoot: screenFocusedRef.current,
     });
@@ -1280,6 +1314,64 @@ export default function WatchScreen() {
     [t]
   );
 
+  const onEditOwn = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId || !user?.id) return;
+      if (!viewerMaySeeEditControl(user.id, video.author.id)) return;
+      if (!video.src) {
+        Alert.alert(t("edit.loadFailed"));
+        return;
+      }
+      const draft = loadPublishedEditorDraft(
+        video.mediaPipeline,
+        video.durationMs ?? null
+      );
+      setPublishedEditor({ video, draft, selectedSound: null });
+      if (!draft.soundId) return;
+      void fetchSocialSoundById(getSupabase(), draft.soundId, user.id).then(
+        (sound) => {
+          if (!sound) return;
+          setPublishedEditor((current) =>
+            current && current.video.id === video.id
+              ? { ...current, selectedSound: sound }
+              : current
+          );
+        }
+      );
+    },
+    [t, user?.id]
+  );
+
+  const onSavePublishedEdit = useCallback(async () => {
+    if (!publishedEditor || !user?.id || !publishedEditor.video.postId) return;
+    setPublishedSaving(true);
+    try {
+      const result = await saveOwnedVideoEditState(
+        getSupabase(),
+        user.id,
+        publishedEditor.video.postId,
+        publishedEditor.draft
+      );
+      if (!result.ok) {
+        Alert.alert(t("edit.saveFailed"), result.message);
+        return;
+      }
+      const pipeline = buildPublishedSavePipeline(
+        publishedEditor.video.mediaPipeline,
+        publishedEditor.draft
+      );
+      const next = applySavedPipelineToWatchVideo(publishedEditor.video, pipeline);
+      patchVideo(publishedEditor.video.id, {
+        mediaPipeline: next.mediaPipeline,
+      });
+      markOwnedPostEdited(publishedEditor.video.postId);
+      setPublishedEditor(null);
+      setPublishedSoundLibraryOpen(false);
+    } finally {
+      setPublishedSaving(false);
+    }
+  }, [patchVideo, publishedEditor, t, user?.id]);
+
   const onDeleteOwn = useCallback(
     (video: WatchVideo) => {
       if (!video.postId || !user?.id) return;
@@ -1635,7 +1727,7 @@ export default function WatchScreen() {
         autoNext={autoNext}
         isLastItem={index >= visibleVideos.length - 1}
         appState={appState}
-        screenFocused={screenFocused}
+        screenFocused={screenFocused && publishedEditor == null}
         onToggleMute={onToggleMute}
         onVolumeChange={onVolumeChange}
         onToggleAutoNext={onToggleAutoNext}
@@ -1669,6 +1761,11 @@ export default function WatchScreen() {
         onShare={
           isWatchShareEntryEnabled({ postId: item.postId })
             ? () => void onShare(item)
+            : undefined
+        }
+        onEditOwn={
+          viewerMaySeeEditControl(user?.id, item.author.id)
+            ? () => onEditOwn(item)
             : undefined
         }
         onDeleteOwn={
@@ -1760,6 +1857,7 @@ export default function WatchScreen() {
       onToggleAutoNext,
       onBlockUser,
       onDeleteOwn,
+      onEditOwn,
       onReport,
       onShare,
       onEnsureLike,
@@ -1776,6 +1874,7 @@ export default function WatchScreen() {
       refreshSrcFor,
       router,
       screenFocused,
+      publishedEditor,
       visibleVideos.length,
       volume,
     ]
@@ -1950,6 +2049,46 @@ export default function WatchScreen() {
         </View>
       ) : null}
       {exitHint}
+      {publishedEditor ? (
+        <VideoEditorScreen
+          visible
+          mode="published"
+          uri={publishedEditor.video.src}
+          durationMs={publishedEditor.video.durationMs ?? null}
+          draft={publishedEditor.draft}
+          selectedSound={publishedEditor.selectedSound}
+          soundLibraryOpen={publishedSoundLibraryOpen}
+          saving={publishedSaving}
+          onChange={(draft) =>
+            setPublishedEditor((current) =>
+              current ? { ...current, draft } : current
+            )
+          }
+          onClose={() => {
+            setPublishedEditor(null);
+            setPublishedSoundLibraryOpen(false);
+          }}
+          onOpenSounds={() => setPublishedSoundLibraryOpen(true)}
+          onCloseSounds={() => setPublishedSoundLibraryOpen(false)}
+          onSelectSound={(sound) => {
+            setPublishedEditor((current) =>
+              current
+                ? {
+                    ...current,
+                    selectedSound: sound,
+                    draft: applySelectedSoundToEditState(current.draft, sound),
+                  }
+                : current
+            );
+          }}
+          onClearSound={() =>
+            setPublishedEditor((current) =>
+              current ? { ...current, selectedSound: null } : current
+            )
+          }
+          onSave={() => void onSavePublishedEdit()}
+        />
+      ) : null}
       {shouldMountWatchShareOverlay(shareSheet) ? (
         <WatchShareSheet
           visible

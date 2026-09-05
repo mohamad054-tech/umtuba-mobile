@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { createInitialEditState, serializeEditIntoMediaPipeline } from "./videoEditState";
 import {
+  nextWatchSegmentIndex,
+  resolveWatchPlaybackSegments,
   resolveWatchTrimBounds,
   shouldEndAtTrim,
   shouldSeekToTrimStart,
@@ -79,5 +81,23 @@ describe("watch edit playback composite", () => {
     expect(edit.soundId).toBe("11111111-1111-4111-8111-111111111111");
     expect(watchEditAudioScale(edit)).toBe(0);
     expect(watchAddedSoundScale(edit)).toBe(1);
+  });
+
+  it("plays deleted-middle segments in source order", () => {
+    const state = {
+      ...createInitialEditState(10_000),
+      segments: [
+        { startMs: 0, endMs: 3000 },
+        { startMs: 7000, endMs: 10_000 },
+      ],
+    };
+    const pipeline = serializeEditIntoMediaPipeline(null, state);
+    const edit = watchEditFromPipeline(pipeline, 10_000);
+    expect(resolveWatchPlaybackSegments(edit, 10_000)).toEqual([
+      { startSec: 0, endSec: 3 },
+      { startSec: 7, endSec: 10 },
+    ]);
+    expect(nextWatchSegmentIndex(0, 2)).toBe(1);
+    expect(nextWatchSegmentIndex(1, 2)).toBeNull();
   });
 });

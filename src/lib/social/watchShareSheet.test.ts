@@ -92,6 +92,20 @@ describe("Watch in-place share sheet", () => {
     ).toBe("comments");
     expect(watchShareOverlayPausesPlayback()).toBe(false);
     expect(
+      isWatchInPlaceOverlayOpen({
+        commentsOpen: false,
+        shareSheetOpen: false,
+        publishedEditorOpen: true,
+      })
+    ).toBe(true);
+    expect(
+      resolveWatchInPlaceOverlayClose({
+        commentsOpen: false,
+        shareSheetOpen: false,
+        publishedEditorOpen: true,
+      })
+    ).toBe("published-editor");
+    expect(
       shouldPlayVideo({
         isActive: true,
         appState: "active",
