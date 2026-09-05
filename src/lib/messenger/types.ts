@@ -1,5 +1,9 @@
 /** Messenger DTOs + pure helpers (mirrors umtuba-web app/messages/types). */
 
+import type { VisualMessageView } from "@/src/lib/umStreak/types";
+
+export type { VisualMessageView };
+
 export type MessageStatus = "sending" | "sent" | "failed";
 
 /** Delivery / read ticks for own messages (peer last_read cursor). */
@@ -19,6 +23,7 @@ export type Message = {
   editedAt?: string | null;
   deletedAt?: string | null;
   isDeleted?: boolean;
+  visual?: VisualMessageView | null;
 };
 
 export type Conversation = {

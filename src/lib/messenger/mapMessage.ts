@@ -14,6 +14,9 @@ export type MessengerMessageRow = {
   deleted_at: string | null;
   edited_at?: string | null;
   client_id: string | null;
+  visual_opened_at?: string | null;
+  visual_expires_at?: string | null;
+  visual_expiration_policy?: string | null;
 };
 
 export function deletedMessagePlaceholder(): string {
@@ -32,9 +35,14 @@ export function mapMessengerMessageRow(
   const isMine = row.sender_id === currentUserId;
   const status = options?.status ?? "sent";
 
+  const isVisual =
+    row.message_type === "image" || row.message_type === "video";
+
   let text: string;
   if (isDeleted) {
     text = deletedMessagePlaceholder();
+  } else if (isVisual) {
+    text = row.body?.trim() || "";
   } else if (row.message_type === "text" && row.body?.trim()) {
     text = row.body;
   } else if (row.message_type === "text") {
@@ -57,6 +65,19 @@ export function mapMessengerMessageRow(
     editedAt: row.edited_at ?? null,
     deletedAt: row.deleted_at,
     isDeleted,
+    visual: isVisual
+      ? {
+          mediaType: row.message_type as "image" | "video",
+          caption: isDeleted ? null : row.body?.trim() || null,
+          viewed: Boolean(row.visual_opened_at),
+          openedAt: row.visual_opened_at ?? null,
+          expirationPolicy:
+            row.visual_expiration_policy === "disappear_after_view"
+              ? "disappear_after_view"
+              : "view_once",
+          previewUrl: null,
+        }
+      : null,
     receiptStatus: computeReceiptStatus({
       isMine,
       sentAt: row.created_at,

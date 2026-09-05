@@ -16,6 +16,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { UmStreakBadges } from "@/components/messenger/UmStreakBadges";
+import { UmStreakStatus } from "@/components/messenger/UmStreakStatus";
+import { VisualMessageBubble } from "@/components/messenger/VisualMessageBubble";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   assertConversationMembership,
@@ -27,6 +30,7 @@ import {
   setConversationTyping,
   subscribeMessengerRealtime,
 } from "@/src/lib/messenger/api";
+import { streakCameraHref } from "@/src/lib/messenger/mapDestination";
 import { clearDraft, loadDraft, saveDraft } from "@/src/lib/messenger/drafts";
 import { mapMessengerMessageRow } from "@/src/lib/messenger/mapMessage";
 import {
@@ -48,6 +52,13 @@ import {
   type Message,
 } from "@/src/lib/messenger/types";
 import { getSupabase } from "@/src/lib/supabase/client";
+import {
+  getConversationUmStreak,
+  openVisualMessage,
+} from "@/src/lib/umStreak/api";
+import { umStreakText } from "@/src/lib/umStreak/copy";
+import { detectUmStreakLocale } from "@/src/lib/umStreak/locale";
+import type { UmStreakViewerStatus } from "@/src/lib/umStreak/types";
 import { colors } from "@/src/theme/colors";
 
 export default function ConversationThreadScreen() {
@@ -77,6 +88,9 @@ export default function ConversationThreadScreen() {
   const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [appActive, setAppActive] = useState(true);
+  const [streak, setStreak] = useState<UmStreakViewerStatus | null>(null);
+  const [openingVisualId, setOpeningVisualId] = useState<string | null>(null);
+  const locale = detectUmStreakLocale();
 
   const scrollToEnd = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -132,6 +146,15 @@ export default function ConversationThreadScreen() {
       setHasMore(page.hasMore);
       setCursor(page.nextCursor);
       setLoading(false);
+
+      const streakResult = await getConversationUmStreak(
+        getSupabase(),
+        user.id,
+        conversationId
+      );
+      if (streakResult.ok) {
+        setStreak(streakResult.streak);
+      }
 
       if (
         shouldMarkReadAfterLoad({
@@ -201,6 +224,13 @@ export default function ConversationThreadScreen() {
           if (row.sender_id !== user.id) {
             void markConversationRead(getSupabase(), conversationId, row.id);
           }
+          void getConversationUmStreak(
+            getSupabase(),
+            user.id,
+            conversationId
+          ).then((result) => {
+            if (result.ok) setStreak(result.streak);
+          });
           scrollToEnd(true);
         },
         onMessageUpdate: (row) => {
@@ -333,6 +363,54 @@ export default function ConversationThreadScreen() {
     [conversationId, draft, scrollToEnd, sending, user]
   );
 
+  const openCamera = useCallback(() => {
+    const href = streakCameraHref(conversationId);
+    if (href) router.push(href as never);
+  }, [conversationId, router]);
+
+  const onOpenVisual = useCallback(
+    async (message: Message) => {
+      if (!user || openingVisualId) return;
+      setOpeningVisualId(message.id);
+      try {
+        const result = await openVisualMessage(
+          getSupabase(),
+          user.id,
+          message.id
+        );
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        setMessages((prev) =>
+          prev.map((item) => {
+            if (item.id !== message.id) {
+              if (item.visual?.previewUrl) {
+                return {
+                  ...item,
+                  visual: { ...item.visual, previewUrl: null },
+                };
+              }
+              return item;
+            }
+            return {
+              ...result.message,
+              visual: result.message.visual
+                ? {
+                    ...result.message.visual,
+                    previewUrl: result.signedUrl,
+                  }
+                : result.message.visual,
+            };
+          })
+        );
+      } finally {
+        setOpeningVisualId(null);
+      }
+    },
+    [openingVisualId, user]
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -393,6 +471,12 @@ export default function ConversationThreadScreen() {
             {error}
           </Text>
         ) : null}
+        {streak ? (
+          <View style={styles.streakHeader}>
+            <UmStreakStatus streak={streak} />
+            <UmStreakBadges streak={streak} />
+          </View>
+        ) : null}
         <FlatList
           ref={listRef}
           data={messages}
@@ -434,7 +518,11 @@ export default function ConversationThreadScreen() {
                 item.isMine ? styles.mineWrap : styles.theirsWrap,
                 highlightId === item.id && styles.highlight,
               ]}
-              accessibilityLabel={`${item.isMine ? "You" : "Them"}: ${item.text}`}
+              accessibilityLabel={`${item.isMine ? "You" : "Them"}: ${
+                item.visual
+                  ? item.visual.caption || umStreakText("viewOnce", locale)
+                  : item.text
+              }`}
             >
               <View
                 style={[
@@ -443,14 +531,22 @@ export default function ConversationThreadScreen() {
                   item.status === "failed" && styles.failedBubble,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.bubbleText,
-                    item.isMine ? styles.mineText : styles.theirsText,
-                  ]}
-                >
-                  {item.text}
-                </Text>
+                {item.visual && !item.isDeleted ? (
+                  <VisualMessageBubble
+                    message={item}
+                    onOpen={(next) => void onOpenVisual(next)}
+                    busy={openingVisualId === item.id}
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.bubbleText,
+                      item.isMine ? styles.mineText : styles.theirsText,
+                    ]}
+                  >
+                    {item.text}
+                  </Text>
+                )}
                 <Text style={styles.meta}>
                   {formatBubbleTime(item.sentAt)}
                   {item.status === "sending"
@@ -485,6 +581,14 @@ export default function ConversationThreadScreen() {
             { paddingBottom: Math.max(10, insets.bottom) },
           ]}
         >
+          <Pressable
+            style={styles.cameraBtn}
+            onPress={openCamera}
+            accessibilityRole="button"
+            accessibilityLabel={umStreakText("camera", locale)}
+          >
+            <Text style={styles.cameraBtnText}>📷</Text>
+          </Pressable>
           <TextInput
             style={styles.input}
             value={draft}
@@ -515,8 +619,7 @@ export default function ConversationThreadScreen() {
           </Pressable>
         </View>
         <Text style={styles.gateHint}>
-          Text only — attachments, voice notes, stickers, groups, and calls are
-          not available yet.
+          {umStreakText("notPublic", locale)}
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -604,6 +707,13 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
   retryChip: { alignSelf: "flex-end", marginTop: 4, minHeight: 44, justifyContent: "center" },
+  streakHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -614,6 +724,17 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
+  cameraBtn: {
+    minWidth: 48,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.3)",
+    backgroundColor: "rgba(251,191,36,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cameraBtnText: { fontSize: 18 },
   input: {
     flex: 1,
     minHeight: 48,

@@ -220,6 +220,10 @@ export default function RootLayout() {
                 options={{ title: "Conversation" }}
               />
               <Stack.Screen
+                name="messages/streak-camera"
+                options={{ title: "UM Streak", headerShown: false }}
+              />
+              <Stack.Screen
                 name="invite/[code]"
                 options={{ headerShown: false }}
               />

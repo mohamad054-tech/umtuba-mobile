@@ -27,7 +27,11 @@ const config: ExpoConfig = {
       CFBundleDisplayName: "UMTUBA",
       UIStatusBarStyle: "UIStatusBarStyleLightContent",
       NSPhotoLibraryUsageDescription:
-        "UMTUBA needs photo library access so you can choose a video to publish.",
+        "UMTUBA needs photo library access so you can choose a video to publish or send a private UM Streak visual in Messages.",
+      NSCameraUsageDescription:
+        "UMTUBA needs camera access so you can send a private UM Streak photo or video in Messages.",
+      NSMicrophoneUsageDescription:
+        "UMTUBA needs microphone access so you can record a private UM Streak video in Messages.",
       NSUserNotificationsUsageDescription:
         "UMTUBA can notify you about likes, rewards, and account activity.",
     },
@@ -111,7 +115,11 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission:
-          "UMTUBA needs photo library access so you can choose a video to publish.",
+          "UMTUBA needs photo library access so you can choose a video to publish or send a private UM Streak visual in Messages.",
+        cameraPermission:
+          "UMTUBA needs camera access so you can send a private UM Streak photo or video in Messages.",
+        microphonePermission:
+          "UMTUBA needs microphone access so you can record a private UM Streak video in Messages.",
       },
     ],
     [
