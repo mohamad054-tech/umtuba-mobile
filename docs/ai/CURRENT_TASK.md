@@ -2,14 +2,14 @@
 
 ```text
 TASK_ID = UMTUBA_WATCH_VIDEO_OWNER_PROFILE_NAV_REGRESSION_V1
-STATUS = SOURCE_FIXED_TESTS_PASS_AWAITING_EAS
+STATUS = SOURCE_FIXED_TESTS_PASS_EAS_BUNDLE_FAILED
 WORKTREE = C:\Users\Giga store\Desktop\umtuba\umtuba-mobile-um-streak-integration-v1
 BRANCH = pc2/watch-owner-profile-volume-progress-v1
 BASE_HEAD = d62b7ad78aead1d306a756caee14b375e71af7ff
 DEVICE = RFCX718LVHK
 ANDROID_PACKAGE = com.umtuba.app
 OLD_BUILD = 59c6652e-3557-4b27-b057-21c36810c356
-NEW_BUILD = PENDING_ONE_PREVIEW
+NEW_BUILD = NONE_EAS_BUNDLE_FAILED
 PRODUCTION = STRICTLY_FORBIDDEN
 PUSH = NO
 DEPLOY = NO
@@ -37,4 +37,4 @@ Restore last accepted Watch behavior. Do not invent new Watch/Profile/volume/tim
 
 ## Next
 
-ONE preview EAS APK after tests PASS, then `adb install -r` on RFCX718LVHK. Stop for owner IMAN tap confirmation.
+One preview EAS `41945bdb-6108-4ec5-b58d-3e9b544f4a1a` failed in Bundle JavaScript. No APK. Do not claim owner PASS. Need owner GO for a second preview after reading Expo bundle logs. Source fix remains committed at `f0f20b7`.

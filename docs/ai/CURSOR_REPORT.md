@@ -2,10 +2,10 @@
 
 ```text
 TASK_ID = UMTUBA_WATCH_VIDEO_OWNER_PROFILE_NAV_REGRESSION_V1
-STATUS = SOURCE_FIXED_TESTS_PASS_AWAITING_EAS
+STATUS = SOURCE_FIXED_TESTS_PASS_EAS_BUNDLE_FAILED
 DEVICE = RFCX718LVHK
 OLD_BUILD = 59c6652e-3557-4b27-b057-21c36810c356
-NEW_BUILD = PENDING_ONE_PREVIEW
+NEW_BUILD = NONE
 VIDEO_ID = NOT_CAPTURED_DEVICE_WAS_ON_STREAK_CAMERA
 DISPLAYED_AUTHOR_ID = posts.user_id via mapRowToWatchVideo (IMAN on owner video)
 DISPLAYED_AUTHOR_NAME = IMAN (owner evidence; card shows video.author.username / author_name)
@@ -25,13 +25,13 @@ WATCH_TESTS = PASS
 PROFILE_TESTS = PASS
 UM_STREAK_REGRESSION = PASS (targeted umStreak + messenger realtime/foundation/upload)
 TYPECHECK = PASS
-EAS_RUN = PENDING
-EAS_BUILD_ID = PENDING
-ADB_INSTALL = PENDING
+EAS_RUN = FAIL_BUNDLE_JAVASCRIPT
+EAS_BUILD_ID = 41945bdb-6108-4ec5-b58d-3e9b544f4a1a
+ADB_INSTALL = NO
 PRODUCTION_DB_CHANGED = NO
 PUSHED = NO
 PLAY_TOUCHED = NO
-READY_FOR_OWNER_IMAN_PROFILE_RETEST = AFTER_ONE_PREVIEW_INSTALL
+READY_FOR_OWNER_IMAN_PROFILE_RETEST = NO
 VOLUME_UI_BEFORE = mute chip only (pre-90e01fd) then later accepted compact left-side control
 VOLUME_UI_WRONG_CURRENT = wide horizontal ScrubBar volumeBlock (90e01fd, still on this tip)
 LAST_KNOWN_ACCEPTED_VOLUME_UI = WatchSideVolumeControl 3370411
@@ -49,8 +49,8 @@ VIDEO_PROGRESS_TESTS = PASS
 SEEK_TEST = PASS (pageX left=0 right=1; seek 0/1 → 0/duration)
 RTL_PROGRESS_TEST = PASS (direction locked ltr; fill% equals thumb%)
 LTR_PROGRESS_TEST = PASS
-BLOCKERS = Owner visual IMAN retest after one preview APK
-NEXT_ACTION = ONE preview EAS then adb install -r; owner taps IMAN
+BLOCKERS = EAS preview 41945bdb failed Bundle JavaScript; no APK; owner visual IMAN retest blocked
+NEXT_ACTION = Read Expo bundle logs; owner GO required before a second preview EAS
 ```
 
 ## Summary
@@ -115,7 +115,7 @@ Full `npx vitest run`: 463 passed, 2 failed pre-existing and out of scope (`ios/
 
 ## Build
 
-EAS preview pending (one APK after this report).
+One preview EAS ran and failed: `41945bdb-6108-4ec5-b58d-3e9b544f4a1a` (`Bundle JavaScript`, no archive). Local `expo export` is not conclusive here because this worktree `node_modules` is a junction into `umtuba-mobile` and Metro leaked `umtuba-mobile-um-life-home-entry-v1`. That junction is not uploaded to EAS. No second EAS started.
 
 ## git diff --check
 
