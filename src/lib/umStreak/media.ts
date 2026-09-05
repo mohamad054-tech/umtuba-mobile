@@ -74,7 +74,8 @@ export function inferMessageMediaMime(input: {
   uri?: string | null;
   mediaType?: "image" | "video" | null;
 }): string {
-  const trimmed = (input.mimeType || "").trim().toLowerCase();
+  const raw = (input.mimeType || "").trim().toLowerCase();
+  const trimmed = raw === "image/jpg" ? "image/jpeg" : raw;
   if (classifyMessageMediaMime(trimmed).ok) {
     return trimmed;
   }

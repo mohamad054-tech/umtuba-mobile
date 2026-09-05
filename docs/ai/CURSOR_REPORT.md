@@ -1,82 +1,56 @@
-# CURSOR_REPORT — PC2_UMTUBA_UM_STREAK_MOBILE_INTEGRATION_V1
+# CURSOR_REPORT — PC2_UM_STREAK_FOLD6_END_TO_END_AUTO_FIX_V1
 
 ```text
-TASK_ID = PC2_UMTUBA_UM_STREAK_MOBILE_INTEGRATION_V1
-MOBILE_INTEGRATION_STATUS = INTEGRATED_LOCAL_ONLY
-MOBILE_BASE_SHA = 09e94f80775855d7e2036fa7d83d63b9202fb8a4
-MOBILE_INTEGRATION_BRANCH = pc2/um-streak-mobile-integration-v1
-MOBILE_INTEGRATION_SHA = ad2d1a279fb083bb632322eea8f69f32ffb31d12
-MOBILE_WORKTREE = C:\Users\Giga store\Desktop\umtuba\umtuba-mobile-um-streak-integration-v1
-COMMUNICATIONS_REUSED = YES
-REAL_CAMERA_IMPLEMENTED = YES
-PHOTO = YES
-VIDEO = YES
-PRIVATE_VISUAL_SEND = YES
-VIEW_ONCE = YES
-VISUAL_REPLY = YES
-STREAK_STATE = YES
-STREAK_BADGE = YES
-ARABIC_RTL = YES
-PRIVACY_BLOCKING = YES
-TESTS = PASS (40)
-TYPECHECK = PASS
-ANDROID_CHECK = SKIPPED
-SOURCE_CLEAN = YES_ON_ISOLATED_BRANCH
-EAS_RUN = NO
-PRODUCTION_TOUCHED = NO
+TASK_ID = PC2_UM_STREAK_FOLD6_END_TO_END_AUTO_FIX_V1
+STATUS = SOURCE_FIXED_EAS_PENDING
+DEVICE = RFCX718LVHK
+INSTALLED_BUILD_BEFORE = 6ef7445c-fb82-46fa-a76b-c8aa4bad89e8
+INSTALLED_BUILD_AFTER = PENDING
+FAILURE_STAGE = STORAGE_UPLOAD
+ROOT_CAUSE = RN_SUPABASE_BLOB_FORMDATA_UPLOAD
+EXACT_ERROR_CODE = SWALLOWED_BY_RELEASE_APK
+EXACT_ERROR_MESSAGE = تعذّر رفع الرسالة البصرية.
+SOURCE_FIX_REQUIRED = YES
+BACKEND_FIX_REQUIRED = NO
+BACKEND_CHANGE = NONE
+EAS_RUN = PENDING
 PUSHED = NO
-READY_FOR_ONE_EAS_FOLD6_BUILD = YES
-BLOCKERS = NONE
-NEXT_ACTION = Operator may run one EAS Fold6 build from this isolated SHA. Do not install an old APK. Do not claim Fold6 camera PASS until that device build is tested.
-WEB_CANDIDATE_SHA = 28a4c2a6ce9c99a4bec3fab22a2168910a24849c
-WEB_PRODUCT_SHA = 7d5003d1b1a7efa27b37205c48d5323b5401e783
-CONTRACTS = 20260937 then 20260938
-TIMEZONE_POLICY = utc_calendar_day
+PLAY_TOUCHED = NO
+UNRELATED_PRODUCTION_TOUCHED = NO
+READY_FOR_OWNER_RETEST = NO
 ```
 
 ## Summary
 
-Preserved the dirty authoritative mobile checkout (`pc2/eas-preview-config-v1` at `77e9e28`) and created an isolated worktree from `origin/master` (`09e94f8`). Integrated the completed UM Streak candidate into the existing mobile Communications inbox and 1:1 thread. No parallel messenger. No EAS. No push. No production SQL.
-
-The mobile flow reuses existing auth, Conversations, expo-image-picker camera/library, supabase upload patterns, Android back, and UGC block list, then calls the already-proven RPCs: `send_um_visual_message`, `open_um_visual_message`, `get_um_streak_for_conversation`. Private media goes to `message-media/{userId}/{conversationId}/…`, never the public UM Life / `post-videos` bucket. View-once does not mint a fresh signed URL after the recipient has opened. Badges are 3/7/30/100/365 only — no money or points. New UM Streak UI is bilingual English/Arabic with RTL layout.
+Fold6 still fails on Send after 20260937/20260938 with the Storage-stage Arabic string. Live hosted checks show the UM Streak RPC, tables, private `message-media` bucket, MIME list, and upload/read/delete policies are present and match the mobile contract. The installed APK uploads via `fetch(uri).blob()` + `supabase.storage.upload(blob)`. `@supabase/storage-js` documents that React Native Blob/File/FormData uploads do not work and requires an ArrayBuffer body. That is the remaining source bug. The helper now reads bytes through Expo FileSystem (copying `content://` first) and uploads ArrayBuffer with explicit `contentType`. `image/jpg` is normalized to `image/jpeg`. Product UI stays the existing Arabic `uploadFailed` string; Storage errors are also printed to logcat for the next build.
 
 ## Exact files changed
 
-- `app.config.ts`
-- `app/(tabs)/messages.tsx`
-- `app/_layout.tsx`
-- `app/messages/[id].tsx`
-- `app/messages/streak-camera.tsx`
-- `components/messenger/UmStreakBadges.tsx`
-- `components/messenger/UmStreakStatus.tsx`
-- `components/messenger/VisualMessageBubble.tsx`
-- `src/lib/messenger/foundation.test.ts`
-- `src/lib/messenger/mapDestination.ts`
-- `src/lib/messenger/mapMessage.ts`
-- `src/lib/messenger/threadState.ts`
-- `src/lib/messenger/types.ts`
-- `src/lib/umStreak/*`
+- `src/lib/umStreak/upload.ts`
+- `src/lib/umStreak/base64.ts`
+- `src/lib/umStreak/base64.test.ts`
+- `src/lib/umStreak/upload.test.ts`
+- `src/lib/umStreak/media.ts`
+- `src/lib/umStreak/media.test.ts`
 - `docs/ai/CURRENT_TASK.md`
 - `docs/ai/CURSOR_REPORT.md`
 
+Local evidence only, do not commit: `docs/ai/pc2-fold6-e2e-autofix/`, `docs/ai/pc2-fold6-camera-upload-audit/`.
+
 ## Migrations created
 
-None. Mobile consumes existing `20260937` / `20260938`. Production SQL was not applied.
+None. Hosted 20260937/20260938 were already applied; no in-place policy patch required.
 
 ## Security review
 
-- Visual send/open/streak RPCs are server-authoritative; client cannot award streak days.
-- Blocked peers are gated locally and by `ugc_users_are_blocked` on the server.
-- View-once replay returns `signedUrl: null` for an already-opened recipient.
-- Upload path is owned `message-media` only; no public UM Life publish path.
-- No secrets, `.env`, APKs, or service-role keys committed.
-- Camera/mic usage strings are private-Messages scoped.
+- Still private `message-media` only. Path remains `{auth.uid()}/{conversationId}/{fileId}.ext`.
+- No public bucket, no service-role, no new tables.
+- Read-only hosted SQL via logged-in Supabase CLI. No secrets printed.
+- `content://` is copied into app cache before read; no extra entitlements.
 
 ## Tests
 
-`npx vitest run src/lib/umStreak src/lib/messenger/foundation.test.ts src/lib/messenger/threadState.test.ts` — 5 files, 40 passed.
-
-Covered: streak engine (duplicate, one-sided, bilateral increment, UTC day, badges, blocking), view-once signed-URL contract, private media path, Arabic copy/RTL, messenger visual mapping.
+`npx vitest run src/lib/umStreak` — 6 files, 28 passed.
 
 ## TypeScript
 
@@ -84,18 +58,18 @@ Covered: streak engine (duplicate, one-sided, bilateral increment, UTC day, badg
 
 ## Build
 
-Not run. EAS forbidden this gate. `npm run lint` is `tsc --noEmit` (pass). Android gradle lint skipped because it would trigger a full native build.
+Pending one Android `preview` EAS after commit.
 
 ## git diff --check
 
-Pass.
+Pass on `src/lib/umStreak`.
 
 ## git status --short
 
-Clean on `pc2/um-streak-mobile-integration-v1` after the integration commit. Authoritative `umtuba-mobile` checkout left dirty and untouched.
+Source + docs staged for the authorized fix. Evidence folders remain untracked.
 
 ## Open issues
 
-- Fold6 camera/device QA is not claimed. Next gate is one EAS preview build from this SHA.
-- Live viewfinder is the system camera (`launchCameraAsync`) from the existing expo-image-picker stack, plus library fallback. In-app `expo-camera` preview was not added so the next EAS does not require a new native module.
-- Inbox/thread chrome still uses existing English messenger strings; new UM Streak surfaces are bilingual.
+- New APK is required; current installed build still has the Blob upload.
+- Do not claim owner visual PASS until the new APK is installed and the owner retests Send.
+- Release APK still will not print the old Storage body; new build logs `UM Streak message-media upload failed` if Storage rejects again.

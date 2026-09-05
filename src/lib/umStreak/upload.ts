@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import * as FileSystem from "expo-file-system/legacy";
 
+import { decodeBase64ToArrayBuffer } from "./base64";
 import { umStreakText } from "./copy";
 import {
   buildMessageMediaPath,
@@ -21,16 +23,50 @@ export type PrivateVisualUploadResult =
     }
   | { ok: false; message: string };
 
-async function readUriAsBlob(uri: string): Promise<Blob> {
-  const response = await fetch(uri);
-  if (!response.ok) {
-    throw new Error(umStreakText("uploadFailed"));
+async function resolveReadableUri(uri: string): Promise<string> {
+  const trimmed = uri.trim();
+  if (!trimmed.startsWith("content://") || !FileSystem.cacheDirectory) {
+    return trimmed;
   }
-  const blob = await response.blob();
-  if (!blob || blob.size <= 0) {
-    throw new Error(umStreakText("uploadFailed"));
+  const dest = `${FileSystem.cacheDirectory}um-streak-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  await FileSystem.copyAsync({ from: trimmed, to: dest });
+  return dest;
+}
+
+/**
+ * React Native supabase-js cannot upload Blob/File/FormData (storage-js
+ * wraps those in FormData, which RN does not send correctly). Read bytes
+ * via Expo FileSystem and return ArrayBuffer for the raw-body upload path.
+ */
+export async function readUriAsUploadBody(uri: string): Promise<ArrayBuffer> {
+  const source = await resolveReadableUri(uri);
+  try {
+    const base64 = await FileSystem.readAsStringAsync(source, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    if (!base64) {
+      throw new Error("empty-base64");
+    }
+    const buffer = decodeBase64ToArrayBuffer(base64);
+    if (buffer.byteLength <= 0) {
+      throw new Error("empty-buffer");
+    }
+    return buffer;
+  } catch (fileError) {
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw fileError instanceof Error ? fileError : new Error("read-failed");
+    }
+    if (typeof response.arrayBuffer === "function") {
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > 0) {
+        return buffer;
+      }
+    }
+    throw fileError instanceof Error ? fileError : new Error("read-failed");
   }
-  return blob;
 }
 
 /**
@@ -59,11 +95,11 @@ export async function uploadPrivateVisualMedia(input: {
   });
 
   let byteSize = input.byteSize ?? 0;
-  let body: Blob;
+  let body: ArrayBuffer;
   try {
-    body = await readUriAsBlob(input.uri);
+    body = await readUriAsUploadBody(input.uri);
     if (!byteSize || byteSize <= 0) {
-      byteSize = body.size;
+      byteSize = body.byteLength;
     }
   } catch {
     return { ok: false, message: umStreakText("uploadFailed") };
@@ -99,16 +135,12 @@ export async function uploadPrivateVisualMedia(input: {
     });
 
   if (error) {
-    const text = (error.message || "").toLowerCase();
-    return {
-      ok: false,
-      message:
-        text.includes("row-level security") ||
-        text.includes("not found") ||
-        text.includes("bucket")
-          ? umStreakText("uploadFailed")
-          : umStreakText("uploadFailed"),
-    };
+    console.error("UM Streak message-media upload failed", {
+      statusCode: "statusCode" in error ? error.statusCode : undefined,
+      name: error.name,
+      message: error.message,
+    });
+    return { ok: false, message: umStreakText("uploadFailed") };
   }
 
   return {
