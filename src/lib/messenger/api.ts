@@ -1,4 +1,4 @@
-import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getErrorMessage } from "@/src/contracts/validation";
 import { isMessengerBackendMissing } from "@/src/lib/messenger/backend";
@@ -551,97 +551,8 @@ export async function assertConversationMembership(
   return { ok: true };
 }
 
-export type MessengerRealtimeHandlers = {
-  onMessageInsert: (row: MessengerMessageRow) => void;
-  onMessageUpdate: (row: MessengerMessageRow) => void;
-  onInboxParticipantChange?: (row: {
-    conversation_id?: string;
-    unread_count?: number | null;
-  }) => void;
-  onResync?: () => void;
-};
-
-/**
- * Subscribe to thread messages + own inbox participant updates.
- * Caller must invoke the returned cleanup (prevents duplicate channels).
- */
-export function subscribeMessengerRealtime(
-  supabase: SupabaseClient,
-  input: {
-    conversationId: string | null;
-    currentUserId: string;
-    handlers: MessengerRealtimeHandlers;
-  }
-): () => void {
-  const channels: RealtimeChannel[] = [];
-
-  if (input.conversationId) {
-    const thread = supabase
-      .channel(`messenger:${input.conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${input.conversationId}`,
-        },
-        (payload) => {
-          input.handlers.onMessageInsert(
-            payload.new as MessengerMessageRow
-          );
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${input.conversationId}`,
-        },
-        (payload) => {
-          input.handlers.onMessageUpdate(
-            payload.new as MessengerMessageRow
-          );
-        }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          input.handlers.onResync?.();
-        }
-      });
-    channels.push(thread);
-  }
-
-  const inbox = supabase
-    .channel(`messenger-inbox:${input.currentUserId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "conversation_participants",
-        filter: `user_id=eq.${input.currentUserId}`,
-      },
-      (payload) => {
-        input.handlers.onInboxParticipantChange?.(
-          payload.new as {
-            conversation_id?: string;
-            unread_count?: number | null;
-          }
-        );
-      }
-    )
-    .subscribe();
-  channels.push(inbox);
-
-  return () => {
-    for (const channel of channels) {
-      void supabase.removeChannel(channel);
-    }
-  };
-}
+export type { MessengerRealtimeHandlers } from "@/src/lib/messenger/realtime";
+export { subscribeMessengerRealtime } from "@/src/lib/messenger/realtime";
 
 export function newClientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

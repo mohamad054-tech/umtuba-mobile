@@ -185,6 +185,13 @@ export default function ConversationThreadScreen() {
     [conversationId, highlightId, scrollToEnd, user]
   );
 
+  const peerLastReadAtRef = useRef(peerLastReadAt);
+  const loadThreadRef = useRef(loadThread);
+  const scrollToEndRef = useRef(scrollToEnd);
+  peerLastReadAtRef.current = peerLastReadAt;
+  loadThreadRef.current = loadThread;
+  scrollToEndRef.current = scrollToEnd;
+
   useEffect(() => {
     markedRead.current = false;
     void loadThread();
@@ -211,42 +218,43 @@ export default function ConversationThreadScreen() {
 
   useEffect(() => {
     if (!user || !conversationId) return;
+    const userId = user.id;
 
     const cleanup = subscribeMessengerRealtime(getSupabase(), {
       conversationId,
-      currentUserId: user.id,
+      currentUserId: userId,
       handlers: {
         onMessageInsert: (row) => {
-          const mapped = mapMessengerMessageRow(row, user.id, {
-            peerLastReadAt,
+          const mapped = mapMessengerMessageRow(row, userId, {
+            peerLastReadAt: peerLastReadAtRef.current,
           });
           setMessages((prev) => mergeMessages(prev, [mapped]));
-          if (row.sender_id !== user.id) {
+          if (row.sender_id !== userId) {
             void markConversationRead(getSupabase(), conversationId, row.id);
           }
           void getConversationUmStreak(
             getSupabase(),
-            user.id,
+            userId,
             conversationId
           ).then((result) => {
             if (result.ok) setStreak(result.streak);
           });
-          scrollToEnd(true);
+          scrollToEndRef.current(true);
         },
         onMessageUpdate: (row) => {
-          const mapped = mapMessengerMessageRow(row, user.id, {
-            peerLastReadAt,
+          const mapped = mapMessengerMessageRow(row, userId, {
+            peerLastReadAt: peerLastReadAtRef.current,
           });
           setMessages((prev) => mergeMessages(prev, [mapped]));
         },
         onResync: () => {
-          void loadThread({ soft: true });
+          void loadThreadRef.current({ soft: true });
         },
       },
     });
 
     return cleanup;
-  }, [conversationId, loadThread, peerLastReadAt, scrollToEnd, user]);
+  }, [conversationId, user]);
 
   useEffect(() => {
     if (!conversationId || !appActive) return;

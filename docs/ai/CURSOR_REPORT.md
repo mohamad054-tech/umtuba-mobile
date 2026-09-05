@@ -1,79 +1,64 @@
-# CURSOR_REPORT — PC2_UM_STREAK_FOLD6_END_TO_END_AUTO_FIX_V1
+# CURSOR_REPORT — PC2_UMTUBA_FOLD6_MESSENGER_REALTIME_CRASH_AUTO_FIX_V1
 
 ```text
-TASK_ID = PC2_UM_STREAK_FOLD6_END_TO_END_AUTO_FIX_V1
-STATUS = SOURCE_FIXED_DEVICE_RETESTED
+TASK_ID = PC2_UMTUBA_FOLD6_MESSENGER_REALTIME_CRASH_AUTO_FIX_V1
+STATUS = SOURCE_FIXED_GATES_PASSED
 DEVICE = RFCX718LVHK
-INSTALLED_BUILD_BEFORE = 6ef7445c-fb82-46fa-a76b-c8aa4bad89e8
-INSTALLED_BUILD_AFTER = 52e38325-045a-4d8c-9fa5-8c0b28b899a0
-FAILURE_STAGE = STORAGE_UPLOAD
-ROOT_CAUSE = RN_SUPABASE_BLOB_FORMDATA_UPLOAD
-EXACT_ERROR_CODE = SWALLOWED_BY_RELEASE_APK
-EXACT_ERROR_MESSAGE = تعذّر رفع الرسالة البصرية.
-SOURCE_FIX_REQUIRED = YES
-BACKEND_FIX_REQUIRED = NO
-FILES_CHANGED = src/lib/umStreak/upload.ts, src/lib/umStreak/base64.ts, src/lib/umStreak/base64.test.ts, src/lib/umStreak/upload.test.ts, src/lib/umStreak/media.ts, src/lib/umStreak/media.test.ts, docs/ai/CURRENT_TASK.md, docs/ai/CURSOR_REPORT.md
-BACKEND_CHANGE = NONE
-TESTS = PASS (28)
+OLD_BUILD = 52e38325-045a-4d8c-9fa5-8c0b28b899a0
+NEW_BUILD = PENDING_EAS
+REALTIME_ERROR_REPRODUCED = YES_FROM_PRIOR_LOGCAT
+ROOT_CAUSE = REUSED_SUBSCRIBED_CHANNEL
+FILES_CHANGED = src/lib/messenger/realtime.ts, src/lib/messenger/realtime.test.ts, src/lib/messenger/api.ts, app/messages/[id].tsx, docs/ai/CURRENT_TASK.md, docs/ai/CURSOR_REPORT.md
+FIX = Fresh channel + all postgres_changes before subscribe; inbox only when requested; remount evicts instead of mutating subscribed topic
+HANDLERS_BEFORE_SUBSCRIBE = YES
+DUPLICATE_CHANNEL_PROTECTED = YES
+CLEANUP_VERIFIED = YES
+MESSENGER_REALTIME = SOURCE_PRESERVED
+UM_STREAK_REALTIME = SEPARATE_TOPIC_PLUS_MESSAGE_INSERT_REFRESH
+VISUAL_UPLOAD_REGRESSION = PASS
+TESTS = PASS (33)
 TYPECHECK = PASS
-EAS_RUN = YES
-EAS_BUILD_ID = 52e38325-045a-4d8c-9fa5-8c0b28b899a0
-ADB_INSTALL = SUCCESS_REPLACE
-STORAGE_UPLOAD = PASS
-MESSAGE_RPC = PASS
-MESSAGE_ROW_CREATED = YES
-ATTACHMENT_CREATED = YES
-CAMERA = PASS
-CAPTURE_PREVIEW = PASS
-SEND_AFTER_FIX = PASS
+EAS_BUILD_ID = PENDING
+ADB_INSTALL = PENDING
+BACKEND_CHANGED = NO
+PRODUCTION_DB_CHANGED = NO
 PUSHED = NO
 PLAY_TOUCHED = NO
-UNRELATED_PRODUCTION_TOUCHED = NO
-READY_FOR_OWNER_RETEST = YES
-BLOCKERS = Thread screen hit pre-existing realtime postgres_changes error after successful send
-NEXT_ACTION = Owner visual retest of Fold6 Send. Optional later fix for messenger realtime subscribe error boundary.
+READY_FOR_OWNER_RETEST = NO
 ```
 
 ## Summary
 
-The remaining Fold6 failure was not backend. Hosted `tgucwnjwoyeqoxqaxmew` already has `send_um_visual_message`, private `message-media`, the 20MB MIME allow-list, and the 20260937 upload/read/delete policies. The installed APK uploaded with `fetch(uri).blob()` + supabase-js, which wraps Blob in FormData. storage-js documents that React Native Blob/FormData uploads do not work. The helper now reads bytes through Expo FileSystem (copying `content://` first), decodes to ArrayBuffer, and uploads with explicit `contentType`. `image/jpg` is normalized to `image/jpeg`.
+Owner Fold6 error `cannot add postgres_changes callbacks for realtime:messenger:<conversation_uuid> after subscribe()` is a reused subscribed Realtime channel, not an upload/RPC failure.
 
-One EAS preview `52e38325` from commit `7cf5878` was installed with `adb install -r`. A controlled cover-screen photo send at 15:15 local created:
+`supabase.channel(name)` returns the existing topic. Inbox keeps `messenger-inbox:<userId>` subscribed. Opening a 1:1 called `subscribeMessengerRealtime`, which subscribed `messenger:<conversationId>` then tried `.on('postgres_changes')` on the already-subscribed inbox topic. That throw leaked the thread channel (cleanup never returned). Reopening the same conversation then threw the owner topic `realtime:messenger:<uuid>`. Thread effect deps also included `peerLastReadAt`, so peer polling remounted the subscription against a still-subscribed channel (`removeChannel` is async).
 
-- message `66887dc7-a10c-4ced-b44d-c6f1a25b7644` (`image`, `view_once`)
-- attachment `message-media` / `{uid}/{conversationId}/v-1788610504790-4rxkmjjw.jpg` / `image/jpeg` / 2926904 bytes
-- storage object present
-- `um_streak_events` row for `2026-09-05`
-
-After navigation, the thread error-bounded on a pre-existing Realtime `postgres_changes after subscribe()` error. That is not the upload/RPC failure. Do not claim owner visual PASS.
+Minimum fix: create/configure a fresh unsubscribed channel, attach every `postgres_changes` handler, then `subscribe()`. Evict same-name leftovers; if the topic is still joined, use a generation suffix instead of mutating it. Thread no longer attaches inbox handlers. UM Streak must use `um-streak:<conversationId>`, not the messenger topic. Upload ArrayBuffer path was not touched.
 
 ## Exact files changed
 
-- `src/lib/umStreak/upload.ts`
-- `src/lib/umStreak/base64.ts`
-- `src/lib/umStreak/base64.test.ts`
-- `src/lib/umStreak/upload.test.ts`
-- `src/lib/umStreak/media.ts`
-- `src/lib/umStreak/media.test.ts`
+- `src/lib/messenger/realtime.ts`
+- `src/lib/messenger/realtime.test.ts`
+- `src/lib/messenger/api.ts`
+- `app/messages/[id].tsx`
 - `docs/ai/CURRENT_TASK.md`
 - `docs/ai/CURSOR_REPORT.md`
 
-Local evidence only, do not commit: `docs/ai/pc2-fold6-e2e-autofix/`, `docs/ai/pc2-fold6-camera-upload-audit/`.
-
 ## Migrations created
 
-None. 20260937/20260938 were already applied. No policy patch.
+None.
 
 ## Security review
 
-- Still private `message-media` only. Path remains `{auth.uid()}/{conversationId}/{fileId}.ext`.
-- No public bucket, no service-role, no new tables, no production schema invention.
-- Read-only hosted SQL via logged-in Supabase CLI. No secrets printed.
-- One controlled owner-session send on the connected device.
+- No auth weakening. Same RLS-filtered `messages` / `conversation_participants` topics.
+- No backend schema change. No secrets printed.
+- Realtime remains enabled; the exception is not swallowed.
 
 ## Tests
 
-`npx vitest run src/lib/umStreak` — 6 files, 28 passed.
+`npx vitest run src/lib/messenger/realtime.test.ts src/lib/umStreak` — 7 files, 33 passed.
+
+Proved handlers-before-subscribe, remount does not attach to a subscribed channel, cleanup removes channels, inbox+thread coexist, UM Streak stays off the messenger topic, previous visual upload tests remain PASS.
 
 ## TypeScript
 
@@ -81,17 +66,17 @@ None. 20260937/20260938 were already applied. No policy patch.
 
 ## Build
 
-One Android preview EAS: `52e38325-045a-4d8c-9fa5-8c0b28b899a0` from `7cf5878`. Finished.
+Pending one Android preview EAS after commit.
 
 ## git diff --check
 
-Pass on `src/lib/umStreak`.
+Pass on changed source files.
 
 ## git status --short
 
-Fix committed. Evidence folders remain untracked.
+Fix commit pending on isolated branch. Evidence folders remain untracked.
 
 ## Open issues
 
-- Owner should visually confirm preview, send, and open on Fold6. Automation does not claim human-eye PASS.
-- After successful send, thread UI hit `cannot add postgres_changes callbacks for realtime:messenger-inbox:... after subscribe()`. Separate messenger realtime bug; not this upload fix.
+- One EAS preview + `adb install -r` + Fold6 conversation open still required before READY_FOR_OWNER_RETEST.
+- Do not claim owner visual PASS from automation.
