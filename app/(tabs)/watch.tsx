@@ -118,6 +118,7 @@ import {
   saveWatchMutedPreference,
   saveWatchVolumePreference,
   resolveWatchHandoffReadiness,
+  shouldAcceptViewableIndexUpdate,
   shouldHandoffWatchAdvance,
   shouldPrepareWatchPlayer,
   shouldWarmAndroidNextSurface,
@@ -952,8 +953,33 @@ export default function WatchScreen() {
   }, [shareSheet, tryCompletePendingManualHandoff]);
 
   const onViewableItemsChanged = useRef(
-    (_info: { viewableItems: ViewToken[] }) => {
-      decideWatchViewabilityEvidence();
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (!decideWatchViewabilityEvidence().mayClaimActiveIndex) return;
+      if (
+        !shouldAcceptViewableIndexUpdate({
+          nowMs: Date.now(),
+          lockUntilMs: programmaticAdvanceUntilRef.current,
+        })
+      ) {
+        return;
+      }
+      const first = viewableItems.find(
+        (item) => item.isViewable && item.index != null
+      );
+      if (first?.index == null) return;
+      applyWatchIndexDecisionRef.current(
+        decideWatchActiveIndexClaim({
+          arbiter: arbiterRef.current,
+          reason: "viewability",
+          requestedIndex: first.index,
+          navigationGeneration: arbiterRef.current.navigationGeneration,
+          nativeSettledPage: resolveWatchNativePage(
+            scrollOffsetRef.current,
+            itemHeightRef.current,
+            videosLengthRef.current
+          ),
+        })
+      );
     }
   ).current;
 

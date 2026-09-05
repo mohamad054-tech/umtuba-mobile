@@ -7,7 +7,8 @@ import {
 export type WatchIndexClaimReason =
   | "native-settle"
   | "programmatic"
-  | "bootstrap";
+  | "bootstrap"
+  | "viewability";
 
 export type WatchActiveIndexArbiter = {
   activeIndex: number | null;
@@ -34,13 +35,13 @@ export function createWatchActiveIndexArbiter(): WatchActiveIndexArbiter {
 }
 
 /**
- * Delayed viewability / find() on index 0 must never write activeIndex.
- * Visibility is evidence only.
+ * First 80%-visible item may write activeIndex (b5cba17 / 4547d6b).
+ * Delayed index-0 after a later settle is still rejected in the claim.
  */
 export function decideWatchViewabilityEvidence(): {
-  mayClaimActiveIndex: false;
+  mayClaimActiveIndex: true;
 } {
-  return { mayClaimActiveIndex: false };
+  return { mayClaimActiveIndex: true };
 }
 
 /**
@@ -153,6 +154,33 @@ export function decideWatchActiveIndexClaim(input: {
         navigationGeneration: input.arbiter.navigationGeneration + 1,
         lastSettledNativePage: native,
         userInteracted: true,
+        pageClaimed: true,
+      },
+    };
+  }
+
+  if (input.reason === "viewability") {
+    const proven = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
+    if (
+      shouldRejectStaleIndexZero({
+        requestedIndex: requested,
+        lastSettledNativePage: input.arbiter.lastSettledNativePage,
+        provenNativePage: proven,
+      })
+    ) {
+      return {
+        accept: false,
+        next: input.arbiter,
+        rejectReason: "stale-index-zero",
+      };
+    }
+    return {
+      accept: true,
+      next: {
+        ...input.arbiter,
+        activeIndex: requested,
+        lastSettledNativePage: proven ?? requested,
+        userInteracted: input.arbiter.userInteracted || requested > 0,
         pageClaimed: true,
       },
     };

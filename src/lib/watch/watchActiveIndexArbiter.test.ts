@@ -47,7 +47,7 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
     expect(arbiter.activeIndex).toBe(1);
     expect(arbiter.lastSettledNativePage).toBe(1);
 
-    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(true);
 
     const delayedViewabilityZero = decideWatchActiveIndexClaim({
       arbiter,
@@ -103,6 +103,48 @@ describe("watch activeIndex arbiter — Fold6 14:29:17 / 14:29:24", () => {
     ).toBe(true);
     expect(arbiter.activeIndex).toBe(1);
     expect(arbiter.lastSettledNativePage).toBe(1);
+  });
+
+  it("80% viewability claims forward and back without waiting for full settle", () => {
+    let arbiter = createWatchActiveIndexArbiter();
+    arbiter = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "bootstrap",
+      requestedIndex: 0,
+      navigationGeneration: 0,
+    }).next;
+
+    const forward = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "viewability",
+      requestedIndex: 1,
+      navigationGeneration: arbiter.navigationGeneration,
+      nativeSettledPage: 1,
+    });
+    expect(forward.accept).toBe(true);
+    expect(forward.next.activeIndex).toBe(1);
+    arbiter = forward.next;
+
+    const staleZero = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "viewability",
+      requestedIndex: 0,
+      navigationGeneration: arbiter.navigationGeneration,
+      nativeSettledPage: 1,
+    });
+    expect(staleZero.accept).toBe(false);
+    expect(staleZero.rejectReason).toBe("stale-index-zero");
+    expect(arbiter.activeIndex).toBe(1);
+
+    const back = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "viewability",
+      requestedIndex: 0,
+      navigationGeneration: arbiter.navigationGeneration,
+      nativeSettledPage: 0,
+    });
+    expect(back.accept).toBe(true);
+    expect(back.next.activeIndex).toBe(0);
   });
 
   it("allows a real back swipe when native offset proves page 0", () => {

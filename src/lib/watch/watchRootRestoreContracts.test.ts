@@ -339,7 +339,7 @@ describe("watch root restore contracts", () => {
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,
     }).next;
-    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(true);
     expect(
       decideWatchActiveIndexClaim({
         arbiter,

@@ -51,8 +51,8 @@ export function shouldWarmManualTarget(input: {
   return target !== from;
 }
 
-/** Viewability never writes activeIndex. */
-export function manualViewabilityMayWriteActiveIndex(): false {
+/** First 80%-visible item writes activeIndex through the arbiter. */
+export function manualViewabilityMayWriteActiveIndex(): boolean {
   return decideWatchViewabilityEvidence().mayClaimActiveIndex;
 }
 

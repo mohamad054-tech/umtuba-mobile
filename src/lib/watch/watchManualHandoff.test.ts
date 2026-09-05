@@ -68,26 +68,36 @@ describe("manual handoff parity with auto-advance", () => {
       })
     ).toBe(true);
     let activeIndex = 0;
-    expect(manualViewabilityMayWriteActiveIndex()).toBe(false);
-    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+    expect(manualViewabilityMayWriteActiveIndex()).toBe(true);
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(true);
     expect(activeIndex).toBe(0);
   });
 
-  it("onViewableItemsChanged cannot write activeIndex", () => {
-    const arbiter = createWatchActiveIndexArbiter();
-    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+  it("onViewableItemsChanged may write activeIndex at 80% but not a stale index 0", () => {
+    let arbiter = createWatchActiveIndexArbiter();
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(true);
+    arbiter = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "bootstrap",
+      requestedIndex: 0,
+      navigationGeneration: 0,
+    }).next;
+    const forward = decideWatchActiveIndexClaim({
+      arbiter,
+      reason: "viewability",
+      requestedIndex: 1,
+      navigationGeneration: arbiter.navigationGeneration,
+      nativeSettledPage: 1,
+    });
+    expect(forward.accept).toBe(true);
+    expect(forward.next.activeIndex).toBe(1);
     expect(
       decideWatchActiveIndexClaim({
-        arbiter: {
-          ...arbiter,
-          activeIndex: 1,
-          pageClaimed: true,
-          lastSettledNativePage: 1,
-          userInteracted: true,
-        },
-        reason: "bootstrap",
+        arbiter: forward.next,
+        reason: "viewability",
         requestedIndex: 0,
-        navigationGeneration: 0,
+        navigationGeneration: forward.next.navigationGeneration,
+        nativeSettledPage: 1,
       }).accept
     ).toBe(false);
   });
@@ -275,7 +285,7 @@ describe("manual handoff parity with auto-advance", () => {
       navigationGeneration: arbiter.navigationGeneration,
       nativeSettledPage: 1,
     }).next;
-    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(false);
+    expect(decideWatchViewabilityEvidence().mayClaimActiveIndex).toBe(true);
     expect(
       decideWatchActiveIndexClaim({
         arbiter,
