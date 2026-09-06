@@ -21,6 +21,21 @@ describe("authoritative registries", () => {
     expect(
       config.contracts.contracts.some((row) => row.owner_status === "OWNER_PASS")
     ).toBe(false);
+    const streak = config.baselines.baselines.find(
+      (row) => row.feature_id === "UM_STREAK_LIVE_CAMERA_RETENTION_11C0719"
+    );
+    expect(streak?.owner_status).toBe("OWNER_PASS");
+    expect(streak?.accepted_sha).toBe(
+      "11c0719f70fb014e0c0219a679c5a92a1b1815af"
+    );
+    expect(streak?.accepted_eas_build_id).toBe(
+      "e6ece863-3e88-46b5-a26d-80f69a6f1eb2"
+    );
+    expect(streak?.accepted_device).toBe("RFCX718LVHK / SM-F956B");
+    const watchBaseline = config.baselines.baselines.find(
+      (row) => row.feature_id === "WATCH_DEVICE_ROLLBACK_1C56ACA"
+    );
+    expect(watchBaseline?.owner_status).toBe("DEVICE_FAIL");
     const signatures = JSON.parse(
       readFileSync(
         join(findRepoRoot(), "config/regression-lock/FAILURE_SIGNATURES.json"),

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "product_area": "um_streak",
+  "owner_pass_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+  "owner_pass_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+  "owner_pass_device": "RFCX718LVHK / SM-F956B",
+  "owner_pass_date": "2026-09-06",
+  "watch_status_preserved": "DEVICE_FAIL",
+  "contracts": [
+    {
+      "id": "UM_STREAK_LIVE_CAMERA_PREVIEW",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Real CameraView preview, not black placeholder. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_FRONT_REAR_SWITCH",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Front/rear switch works. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_PHOTO_CAPTURE",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Photo capture works. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_VIDEO_CAPTURE",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Video capture works. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_LIBRARY",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Library/Gallery works. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_CAPTION",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Caption preserved. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_SEND_FLOW",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Recipient/send flow works. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_VIEW_ONCE",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. View Once shows real media once. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_KEEP_IN_CONVERSATION",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Keep-in-chat remains visible/playable. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_IMAGE_RENDER",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Opened image is the real photo. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_VIDEO_RENDER",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Opened video is the real video. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_RETENTION_CAMERA",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Camera compose offers View Once and keep-in-conversation. SHA 11c0719 EAS e6ece863."
+    },
+    {
+      "id": "UM_STREAK_RETENTION_LIBRARY",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 PASS 2026-09-06. Library compose offers the same retention choice. SHA 11c0719 EAS e6ece863."
+    }
+  ]
+}

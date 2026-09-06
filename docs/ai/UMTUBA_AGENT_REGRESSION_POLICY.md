@@ -41,7 +41,9 @@ OPEN:
 - missing 80% handoff
 - old audio bleeding into next video
 7536c11 additionally: video 2 black, 2→3 snapback to video 1
-Installed rollback device SHA: 1c56aca4eccd5795a3aa0429a55d507b855206df
+Installed device SHA: 11c0719f70fb014e0c0219a679c5a92a1b1815af
+Watch source identity remains 1c56aca. Do not mark Watch healthy.
+UM Streak live camera + retention is OWNER_PASS at 11c0719 / e6ece863.
 ```
 
 Do not fix those failures inside a governance-only task.

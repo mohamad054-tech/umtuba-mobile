@@ -47,7 +47,21 @@
       ],
       "depends_on": ["messages", "auth", "supabase_client"],
       "expands_tests": ["src/lib/umStreak/**/*.test.ts"],
-      "expands_contracts": []
+      "expands_contracts": [
+        "UM_STREAK_LIVE_CAMERA_PREVIEW",
+        "UM_STREAK_FRONT_REAR_SWITCH",
+        "UM_STREAK_PHOTO_CAPTURE",
+        "UM_STREAK_VIDEO_CAPTURE",
+        "UM_STREAK_LIBRARY",
+        "UM_STREAK_CAPTION",
+        "UM_STREAK_SEND_FLOW",
+        "UM_STREAK_VIEW_ONCE",
+        "UM_STREAK_KEEP_IN_CONVERSATION",
+        "UM_STREAK_IMAGE_RENDER",
+        "UM_STREAK_VIDEO_RENDER",
+        "UM_STREAK_RETENTION_CAMERA",
+        "UM_STREAK_RETENTION_LIBRARY"
+      ]
     },
     "profile": {
       "globs": ["app/(tabs)/profile.tsx", "app/profile/**", "src/lib/profile/**"],

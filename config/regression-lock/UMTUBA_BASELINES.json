@@ -6,10 +6,10 @@
     "serial": "RFCX718LVHK",
     "name": "Galaxy Z Fold6"
   },
-  "current_installed_device_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
-  "current_installed_eas_build_id": "9c1b9429-958d-4d18-9412-cabe642151be",
+  "current_installed_device_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+  "current_installed_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
   "current_fold6_watch_status": "DEVICE_FAIL",
-  "notes": "OWNER_PASS is never inferred from unit tests. Device rollback APK is 1c56aca. Source HEAD may differ; do not treat newest commit as baseline.",
+  "notes": "OWNER_PASS is never inferred from unit tests. Fold6 now has 11c0719 / e6ece863. Watch blobs remain 1c56aca-identical and DEVICE_FAIL. UM Streak live camera + retention is OWNER_PASS. Do not treat newest unrelated commit as baseline.",
   "baselines": [
     {
       "feature_id": "WATCH_DEVICE_ROLLBACK_1C56ACA",
@@ -145,7 +145,7 @@
     {
       "feature_id": "UM_STREAK_MOBILE",
       "product_area": "um_streak",
-      "owner_status": "SOURCE_PASS_ONLY",
+      "owner_status": "SUPERSEDED",
       "accepted_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
       "accepted_eas_build_id": "9c1b9429-958d-4d18-9412-cabe642151be",
       "accepted_device": null,
@@ -165,8 +165,351 @@
       "dependencies": ["messages", "supabase_client", "auth"],
       "known_failure_signatures": [],
       "supersedes": [],
+      "superseded_by": "UM_STREAK_LIVE_CAMERA_RETENTION_11C0719",
+      "notes": "Ported onto 1c56aca recovery. Superseded by Fold6 OWNER_PASS at 11c0719 / e6ece863."
+    },
+    {
+      "feature_id": "UM_STREAK_LIVE_CAMERA_RETENTION_11C0719",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "src/lib/umStreak/**",
+        "app/messages/streak-camera.tsx",
+        "app/messages/[id].tsx",
+        "components/messenger/VisualMessageBubble.tsx",
+        "src/lib/messenger/mapMessage.ts"
+      ],
+      "protected_files": [
+        "src/lib/umStreak/**",
+        "app/messages/streak-camera.tsx",
+        "app/messages/[id].tsx",
+        "components/messenger/VisualMessageBubble.tsx",
+        "src/lib/messenger/mapMessage.ts"
+      ],
+      "regression_tests": [
+        "src/lib/umStreak/**/*.test.ts",
+        "src/lib/messenger/**/*.test.ts"
+      ],
+      "device_tests": [
+        "UM_STREAK_LIVE_CAMERA_PREVIEW",
+        "UM_STREAK_FRONT_REAR_SWITCH",
+        "UM_STREAK_PHOTO_CAPTURE",
+        "UM_STREAK_VIDEO_CAPTURE",
+        "UM_STREAK_LIBRARY",
+        "UM_STREAK_CAPTION",
+        "UM_STREAK_SEND_FLOW",
+        "UM_STREAK_VIEW_ONCE",
+        "UM_STREAK_KEEP_IN_CONVERSATION",
+        "UM_STREAK_IMAGE_RENDER",
+        "UM_STREAK_VIDEO_RENDER",
+        "UM_STREAK_RETENTION_CAMERA",
+        "UM_STREAK_RETENTION_LIBRARY"
+      ],
+      "dependencies": ["messages", "supabase_client", "auth"],
+      "known_failure_signatures": [],
+      "supersedes": ["UM_STREAK_MOBILE"],
       "superseded_by": null,
-      "notes": "Ported onto 1c56aca recovery. Unit PASS only. Not OWNER_PASS."
+      "notes": "Owner physical PASS on Fold6 RFCX718LVHK / SM-F956B. APK SHA 11c0719. EAS e6ece863. Watch remains DEVICE_FAIL and frozen."
+    },
+    {
+      "feature_id": "UM_STREAK_LIVE_CAMERA_PREVIEW",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/**"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/**"],
+      "regression_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "device_tests": ["UM_STREAK_LIVE_CAMERA_PREVIEW"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: real CameraView live preview, not the black placeholder."
+    },
+    {
+      "feature_id": "UM_STREAK_FRONT_REAR_SWITCH",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/retention.ts"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/retention.ts"],
+      "regression_tests": ["src/lib/umStreak/retention.test.ts"],
+      "device_tests": ["UM_STREAK_FRONT_REAR_SWITCH"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: front/rear camera switch works."
+    },
+    {
+      "feature_id": "UM_STREAK_PHOTO_CAPTURE",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "regression_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "device_tests": ["UM_STREAK_PHOTO_CAPTURE"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: photo capture still works."
+    },
+    {
+      "feature_id": "UM_STREAK_VIDEO_CAPTURE",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "regression_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "device_tests": ["UM_STREAK_VIDEO_CAPTURE"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: video capture still works."
+    },
+    {
+      "feature_id": "UM_STREAK_LIBRARY",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/capture.ts"],
+      "regression_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "device_tests": ["UM_STREAK_LIBRARY"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: Library/Gallery pick still works."
+    },
+    {
+      "feature_id": "UM_STREAK_CAPTION",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/copy.ts"],
+      "protected_files": ["app/messages/streak-camera.tsx", "src/lib/umStreak/copy.ts"],
+      "regression_tests": ["src/lib/umStreak/copy.test.ts"],
+      "device_tests": ["UM_STREAK_CAPTION"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: caption is preserved with either retention choice."
+    },
+    {
+      "feature_id": "UM_STREAK_SEND_FLOW",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/api.ts",
+        "src/lib/umStreak/upload.ts"
+      ],
+      "protected_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/api.ts"
+      ],
+      "regression_tests": ["src/lib/umStreak/**/*.test.ts"],
+      "device_tests": ["UM_STREAK_SEND_FLOW"],
+      "dependencies": ["um_streak", "messages"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: recipient/send flow works. Keep-in-conversation is sent explicitly, never silently forced to View Once."
+    },
+    {
+      "feature_id": "UM_STREAK_VIEW_ONCE",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "src/lib/umStreak/visualMessage.ts",
+        "src/lib/umStreak/api.ts",
+        "components/messenger/VisualMessageBubble.tsx"
+      ],
+      "protected_files": [
+        "src/lib/umStreak/visualMessage.ts",
+        "src/lib/umStreak/api.ts",
+        "components/messenger/VisualMessageBubble.tsx"
+      ],
+      "regression_tests": ["src/lib/umStreak/viewOnce.test.ts"],
+      "device_tests": ["UM_STREAK_VIEW_ONCE"],
+      "dependencies": ["um_streak", "messages"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: View Once opens real media once and keeps privacy."
+    },
+    {
+      "feature_id": "UM_STREAK_KEEP_IN_CONVERSATION",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/api.ts",
+        "src/lib/messenger/mapMessage.ts",
+        "app/messages/[id].tsx"
+      ],
+      "protected_files": [
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/api.ts",
+        "src/lib/messenger/mapMessage.ts",
+        "app/messages/[id].tsx"
+      ],
+      "regression_tests": [
+        "src/lib/umStreak/retention.test.ts",
+        "src/lib/messenger/foundation.test.ts"
+      ],
+      "device_tests": ["UM_STREAK_KEEP_IN_CONVERSATION"],
+      "dependencies": ["um_streak", "messages"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: keep-in-conversation remains visible/playable after reopening the thread."
+    },
+    {
+      "feature_id": "UM_STREAK_IMAGE_RENDER",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "components/messenger/VisualMessageBubble.tsx",
+        "app/messages/[id].tsx"
+      ],
+      "protected_files": [
+        "components/messenger/VisualMessageBubble.tsx",
+        "app/messages/[id].tsx"
+      ],
+      "regression_tests": ["src/lib/umStreak/viewOnce.test.ts"],
+      "device_tests": ["UM_STREAK_IMAGE_RENDER"],
+      "dependencies": ["um_streak", "messages"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: opened image shows the real photo, not a black box."
+    },
+    {
+      "feature_id": "UM_STREAK_VIDEO_RENDER",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "components/messenger/VisualMessageBubble.tsx",
+        "app/messages/[id].tsx"
+      ],
+      "protected_files": [
+        "components/messenger/VisualMessageBubble.tsx",
+        "app/messages/[id].tsx"
+      ],
+      "regression_tests": ["src/lib/umStreak/viewOnce.test.ts"],
+      "device_tests": ["UM_STREAK_VIDEO_RENDER"],
+      "dependencies": ["um_streak", "messages"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: opened video shows the real video, not a black box."
+    },
+    {
+      "feature_id": "UM_STREAK_RETENTION_CAMERA",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/copy.ts"
+      ],
+      "protected_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/copy.ts"
+      ],
+      "regression_tests": [
+        "src/lib/umStreak/retention.test.ts",
+        "src/lib/umStreak/copy.test.ts"
+      ],
+      "device_tests": ["UM_STREAK_RETENTION_CAMERA"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: camera compose shows عرض مرة واحدة and الاحتفاظ في المحادثة."
+    },
+    {
+      "feature_id": "UM_STREAK_RETENTION_LIBRARY",
+      "product_area": "um_streak",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
+      "accepted_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/copy.ts"
+      ],
+      "protected_files": [
+        "app/messages/streak-camera.tsx",
+        "src/lib/umStreak/retention.ts",
+        "src/lib/umStreak/copy.ts"
+      ],
+      "regression_tests": [
+        "src/lib/umStreak/retention.test.ts",
+        "src/lib/umStreak/copy.test.ts"
+      ],
+      "device_tests": ["UM_STREAK_RETENTION_LIBRARY"],
+      "dependencies": ["um_streak"],
+      "known_failure_signatures": [],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6: Library compose supports the same View Once vs keep-in-conversation choice."
     }
   ]
 }
