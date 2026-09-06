@@ -42,7 +42,11 @@ import {
   resolveManualHandoffTarget,
   resolveNoFirstFrameManualHandoff,
   resolvePendingManualHandoffAction,
+  resolveManual80CommitDecision,
+  resolveManualReverseAfter80Commit,
+  resolveManualReverseBefore80Commit,
   resolveWatchViewabilityIntentEffect,
+  manual80CommitRequiresFullNativeSettle,
   shouldAcceptPendingManualHandoff,
   shouldCancelPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
@@ -951,5 +955,254 @@ describe("bounded handoff commit/cancel correction", () => {
 
   it("16. cache 5 is unchanged", () => {
     expect(ANDROID_WATCH_CACHE_TARGET).toBe(5);
+  });
+});
+
+describe("manual first-swipe 80% commit without full settle", () => {
+  const pending01 = createManualHandoffPending({
+    navigationGeneration: 1,
+    targetIndex: 1,
+    targetMediaId: "post-2",
+  });
+
+  function acceptManual80(ready: boolean, percent = 80) {
+    const decision = resolveManual80CommitDecision({
+      visiblePercent: percent,
+      currentIndex: 0,
+      targetIndex: 1,
+      targetReady: ready,
+      targetMediaMatches: true,
+    });
+    const accepted = shouldAcceptPendingManualHandoff({
+      pending: pending01,
+      currentNavigationGeneration: 1,
+      nativeSettledPage: null,
+      nativePageSource: "manual-80-ready",
+      currentTargetMediaId: "post-2",
+      firstFrameMediaId: ready ? "post-2" : null,
+      targetSurfaceAttached: ready,
+      targetFirstFrame: ready,
+      screenFocused: true,
+      shareSheetOpen: false,
+      unmounted: false,
+    });
+    return { decision, accepted };
+  }
+
+  it("1. manual 79% keeps the current owner", () => {
+    const { decision } = acceptManual80(true, 79);
+    expect(decision.phase).toBe("none");
+    expect(decision.commit).toBe(false);
+    expect(decision.silenceCurrentFirst).toBe(false);
+  });
+
+  it("2. manual 80% + target ready commits without waiting for settle", () => {
+    const { decision, accepted } = acceptManual80(true, 80);
+    expect(decision.commit).toBe(true);
+    expect(decision.requireFullNativeSettle).toBe(false);
+    expect(manual80CommitRequiresFullNativeSettle()).toBe(false);
+    expect(accepted).toBe(true);
+    expect(
+      shouldCompleteManualHandoff({
+        nativeSettledPage: 0,
+        targetIndex: 1,
+        targetSurfaceAttached: true,
+        targetFirstFrame: true,
+        requireNativeSettle: false,
+      })
+    ).toBe(true);
+  });
+
+  it("3. manual 80% + target not ready stays on current with no audio leak", () => {
+    const { decision, accepted } = acceptManual80(false, 80);
+    expect(decision.phase).toBe("intent");
+    expect(decision.commit).toBe(false);
+    expect(accepted).toBe(false);
+    expect(
+      shouldStartManualHandoffAudio({
+        targetSurfaceAttached: false,
+        targetFirstFrame: false,
+        targetIsActive: false,
+        isAudioOwner: false,
+        handoffCommitted: false,
+      })
+    ).toBe(false);
+  });
+
+  it("4. manual slow 1→2 near the beginning commits at 80%", () => {
+    const slow = resolveManual80CommitDecision({
+      visiblePercent: 80,
+      currentIndex: 0,
+      targetIndex: 1,
+      targetReady: true,
+      targetMediaMatches: true,
+    });
+    expect(slow.commit).toBe(true);
+    expect(slow.requireFullNativeSettle).toBe(false);
+    expect(slow.forgeNativePage).toBe(false);
+  });
+
+  it("5. manual fast 1→2 commits safely with one audio owner", () => {
+    const fast = resolveManual80CommitDecision({
+      visiblePercent: 90,
+      currentIndex: 0,
+      targetIndex: 1,
+      targetReady: true,
+      targetMediaMatches: true,
+    });
+    expect(fast.commit).toBe(true);
+    expect(fast.silenceCurrentFirst).toBe(true);
+    expect(
+      targetMayBecomeAudible({
+        handoffCommitted: true,
+        isAudioOwner: true,
+        isPresentationOwner: true,
+        previousSilenced: true,
+      })
+    ).toBe(true);
+    expect(
+      countNativeAudibleOwners([
+        describeWatchPlayerDiagnostic({
+          playerId: "old",
+          index: 0,
+          mediaId: "post-1",
+          isOwner: false,
+          playWhenReady: false,
+          isPlaying: false,
+          muted: true,
+          volume: 0,
+          surfaceId: "s0",
+        }),
+        describeWatchPlayerDiagnostic({
+          playerId: "next",
+          index: 1,
+          mediaId: "post-2",
+          isOwner: true,
+          playWhenReady: true,
+          isPlaying: true,
+          muted: false,
+          volume: 1,
+          surfaceId: "s1",
+        }),
+      ])
+    ).toBe(1);
+  });
+
+  it("6. reverse before 80% does not commit", () => {
+    const before = resolveManualReverseBefore80Commit({ currentIndex: 0 });
+    expect(before.commit).toBe(false);
+    expect(before.restoreOwner).toBe(0);
+    expect(before.treatAsNewReverse).toBe(false);
+    expect(
+      resolveManual80CommitDecision({
+        visiblePercent: 70,
+        currentIndex: 0,
+        targetIndex: 1,
+        targetReady: true,
+        targetMediaMatches: true,
+      }).commit
+    ).toBe(false);
+  });
+
+  it("7. reverse after a committed 80% is a valid reverse handoff", () => {
+    expect(
+      resolveManualReverseAfter80Commit({
+        committedIndex: 1,
+        nextTarget: 0,
+      })
+    ).toBe("new-handoff");
+    expect(
+      resolveManualReverseAfter80Commit({
+        committedIndex: 1,
+        nextTarget: 1,
+      })
+    ).toBe("keep");
+  });
+
+  it("8. old audio is muted before the new owner is audible", () => {
+    expect(
+      targetMayBecomeAudible({
+        handoffCommitted: true,
+        isAudioOwner: true,
+        isPresentationOwner: true,
+        previousSilenced: false,
+      })
+    ).toBe(false);
+    expect(
+      targetMayBecomeAudible({
+        handoffCommitted: true,
+        isAudioOwner: true,
+        isPresentationOwner: true,
+        previousSilenced: true,
+      })
+    ).toBe(true);
+  });
+
+  it("9. native visible page converges to the committed index", () => {
+    expect(
+      isWatchOwnershipAtomic({
+        nativeVisiblePage: 1,
+        committedIndex: 1,
+        presentationOwner: 1,
+        boundMediaIndex: 1,
+        audibleOwner: 1,
+      })
+    ).toBe(true);
+    expect(resolveManualHandoffCompletionTransaction().pinNativeOffset).toBe(
+      false
+    );
+  });
+
+  it("10. first 1→2 does not snap back", () => {
+    expect(
+      shouldIgnoreStaleManualSettle({
+        locked: false,
+        nativePage: 0,
+        activeIndex: 1,
+      })
+    ).toBe(false);
+    expect(
+      isWatchOwnershipAtomic({
+        nativeVisiblePage: 0,
+        committedIndex: 1,
+        presentationOwner: 1,
+        boundMediaIndex: 1,
+        audibleOwner: 1,
+      })
+    ).toBe(false);
+  });
+
+  it("11. auto-next still works and is not proof of the manual path", () => {
+    expect(shouldHandoffWatchAdvance({ nextFirstFrame: true, waitedMs: 0 })).toBe(
+      true
+    );
+    expect(resolveManualHandoffCompletionTransaction("auto-next")).toEqual({
+      claimReason: "programmatic",
+      applyViewabilityLock: true,
+      pinNativeOffset: true,
+    });
+    expect(viewabilityMayForgeNativePage()).toBe(false);
+  });
+
+  it("12. backward still works from a retained-ready cell", () => {
+    expect(
+      shouldAcceptPendingManualHandoff({
+        pending: createManualHandoffPending({
+          navigationGeneration: 3,
+          targetIndex: 0,
+          targetMediaId: "post-1",
+        }),
+        currentNavigationGeneration: 3,
+        nativeSettledPage: 0,
+        nativePageSource: "manual-80-ready",
+        currentTargetMediaId: "post-1",
+        firstFrameMediaId: null,
+        targetSurfaceAttached: true,
+        targetFirstFrame: false,
+        targetRetainedReady: true,
+        retainedReadyMediaId: "post-1",
+        screenFocused: true,
+      })
+    ).toBe(true);
   });
 });

@@ -63,11 +63,14 @@ export function shouldCompleteManualHandoff(input: {
   targetSurfaceAttached: boolean;
   targetFirstFrame: boolean;
   targetRetainedReady?: boolean;
+  requireNativeSettle?: boolean;
 }): boolean {
-  const native = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
   const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
-  if (native == null || target == null) return false;
-  if (native !== target) return false;
+  if (target == null) return false;
+  if (input.requireNativeSettle !== false) {
+    const native = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
+    if (native == null || native !== target) return false;
+  }
   const presentationReady =
     input.targetSurfaceAttached === true &&
     (input.targetFirstFrame === true || input.targetRetainedReady === true);
@@ -250,7 +253,11 @@ export function shouldAcceptPendingManualHandoff(input: {
   targetFirstFrame: boolean;
   targetRetainedReady?: boolean;
   retainedReadyMediaId?: string | null;
-  nativePageSource?: "viewability" | "scroll-offset" | "proven-settle";
+  nativePageSource?:
+    | "viewability"
+    | "scroll-offset"
+    | "proven-settle"
+    | "manual-80-ready";
   screenFocused?: boolean;
   shareSheetOpen?: boolean;
   unmounted?: boolean;
@@ -265,9 +272,11 @@ export function shouldAcceptPendingManualHandoff(input: {
   ) {
     return false;
   }
+  const manual80Ready = input.nativePageSource === "manual-80-ready";
   if (
+    !manual80Ready &&
     sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN) !==
-    input.pending.targetIndex
+      input.pending.targetIndex
   ) {
     return false;
   }
@@ -293,6 +302,7 @@ export function shouldAcceptPendingManualHandoff(input: {
     targetSurfaceAttached: input.targetSurfaceAttached,
     targetFirstFrame: liveFirstFrame,
     targetRetainedReady: retainedReady,
+    requireNativeSettle: !manual80Ready,
   });
 }
 
@@ -386,6 +396,83 @@ export function resolveWatchViewabilityIntentEffect(visiblePercent: number): {
     setAudioOwner: false,
     unmuteTarget: false,
   };
+}
+
+/** Manual 80% may commit when the target is already presentation-ready. */
+export function manual80CommitRequiresFullNativeSettle(): false {
+  return false;
+}
+
+export function resolveManual80CommitDecision(input: {
+  visiblePercent: number;
+  currentIndex: number;
+  targetIndex: number;
+  targetReady: boolean;
+  targetMediaMatches: boolean;
+}): {
+  phase: "none" | "intent" | "committed";
+  commit: boolean;
+  requireFullNativeSettle: false;
+  forgeNativePage: false;
+  silenceCurrentFirst: boolean;
+} {
+  const current = sanitizeWatchListIndex(input.currentIndex);
+  const target = sanitizeWatchListIndex(input.targetIndex);
+  if (
+    !Number.isFinite(input.visiblePercent) ||
+    input.visiblePercent < WATCH_VIEWABILITY_PERCENT_THRESHOLD ||
+    current == null ||
+    target == null ||
+    target === current
+  ) {
+    return {
+      phase: "none",
+      commit: false,
+      requireFullNativeSettle: false,
+      forgeNativePage: false,
+      silenceCurrentFirst: false,
+    };
+  }
+  if (!input.targetReady || !input.targetMediaMatches) {
+    return {
+      phase: "intent",
+      commit: false,
+      requireFullNativeSettle: false,
+      forgeNativePage: false,
+      silenceCurrentFirst: false,
+    };
+  }
+  return {
+    phase: "committed",
+    commit: true,
+    requireFullNativeSettle: false,
+    forgeNativePage: false,
+    silenceCurrentFirst: true,
+  };
+}
+
+export function resolveManualReverseBefore80Commit(input: {
+  currentIndex: number;
+}): {
+  commit: false;
+  restoreOwner: number;
+  treatAsNewReverse: false;
+} {
+  return {
+    commit: false,
+    restoreOwner: sanitizeWatchListIndex(input.currentIndex) ?? 0,
+    treatAsNewReverse: false,
+  };
+}
+
+export function resolveManualReverseAfter80Commit(input: {
+  committedIndex: number;
+  nextTarget: number | null;
+}): "keep" | "new-handoff" {
+  const committed = sanitizeWatchListIndex(input.committedIndex);
+  const next = sanitizeWatchListIndex(input.nextTarget ?? Number.NaN);
+  if (committed == null || next == null || next === committed) return "keep";
+  return "new-handoff";
 }
 
 export function isRetainedPresentationReady(

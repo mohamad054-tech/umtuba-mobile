@@ -167,6 +167,7 @@ import {
   resolveManualHandoffCancelTransaction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualReverseAfter80Commit,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
@@ -321,6 +322,7 @@ export default function WatchScreen() {
   const dragStartIndexRef = useRef(0);
   const manualDragActiveRef = useRef(false);
   const lastProvenNativeSettleRef = useRef<number | null>(0);
+  const syncNativeAfterManual80Ref = useRef<number | null>(null);
   const scrollToWatchIndexRef = useRef<
     (
       nextIndex: number,
@@ -335,6 +337,11 @@ export default function WatchScreen() {
   }, []);
 
   const cancelPendingManualHandoff = useCallback(() => {
+    if (handoffPhaseRef.current === "committed") {
+      manualHandoffGenRef.current += 1;
+      pendingManualRef.current = null;
+      return;
+    }
     const restore = resolveManualHandoffCancelTransaction({
       currentIndex: dragStartIndexRef.current,
     });
@@ -804,38 +811,47 @@ export default function WatchScreen() {
     }
   }, [cursor, endReached, loadingMore, t]);
 
-  const tryCompletePendingManualHandoff = useCallback(() => {
-    const pending = pendingManualRef.current;
-    if (!pending) return;
-    if (manualHandoffGenRef.current !== pending.generation) return;
+  const collectManualTargetReady = useCallback((targetIndex: number, targetMediaId: string) => {
     const state = nextHandoffRef.current;
-    const targetOwnsState = state.index === pending.targetIndex;
-    const targetVideo = visibleVideosRef.current[pending.targetIndex];
+    const targetOwnsState = state.index === targetIndex;
+    const targetVideo = visibleVideosRef.current[targetIndex];
     const currentTargetMediaId = targetVideo
       ? watchMediaIdentity(targetVideo)
       : null;
-    const retained = retainedReadyRef.current[pending.targetIndex];
+    const retained = retainedReadyRef.current[targetIndex];
     const retainedReady = isRetainedPresentationReady(retained, {
-      index: pending.targetIndex,
-      mediaId: pending.targetMediaId,
+      index: targetIndex,
+      mediaId: targetMediaId,
     });
-    if (manualDragActiveRef.current) return;
-    const realNativePage = lastProvenNativeSettleRef.current;
+    return {
+      currentTargetMediaId,
+      firstFrameMediaId: targetOwnsState ? state.mediaId : null,
+      targetSurfaceAttached:
+        (targetOwnsState &&
+          (state.surfaceAttached === true || state.firstFrame === true)) ||
+        retainedReady,
+      targetFirstFrame: targetOwnsState && state.firstFrame === true,
+      targetRetainedReady: retainedReady,
+      retainedReadyMediaId: retainedReady ? retained?.mediaId ?? null : null,
+    };
+  }, []);
+
+  const tryCommitManual80Ready = useCallback(() => {
+    const pending = pendingManualRef.current;
+    if (!pending) return;
+    if (manualHandoffGenRef.current !== pending.generation) return;
+    if (handoffPhaseRef.current === "committed") return;
+    const ready = collectManualTargetReady(
+      pending.targetIndex,
+      pending.targetMediaId
+    );
     if (
       !shouldAcceptPendingManualHandoff({
         pending,
         currentNavigationGeneration: arbiterRef.current.navigationGeneration,
-        nativeSettledPage: realNativePage,
-        nativePageSource: "proven-settle",
-        currentTargetMediaId,
-        firstFrameMediaId: targetOwnsState ? state.mediaId : null,
-        targetSurfaceAttached:
-          (targetOwnsState &&
-            (state.surfaceAttached === true || state.firstFrame === true)) ||
-          retainedReady,
-        targetFirstFrame: targetOwnsState && state.firstFrame === true,
-        targetRetainedReady: retainedReady,
-        retainedReadyMediaId: retainedReady ? retained?.mediaId ?? null : null,
+        nativeSettledPage: null,
+        nativePageSource: "manual-80-ready",
+        ...ready,
         screenFocused: screenFocusedRef.current,
         shareSheetOpen: shareSheetOpenRef.current,
         unmounted: false,
@@ -845,6 +861,51 @@ export default function WatchScreen() {
     }
     pendingManualRef.current = null;
     handoffPhaseRef.current = "committed";
+    dragStartIndexRef.current = pending.targetIndex;
+    syncNativeAfterManual80Ref.current = pending.targetIndex;
+    applyWatchIndexDecisionRef.current(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: "programmatic",
+        requestedIndex: pending.targetIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: pending.targetIndex,
+      })
+    );
+  }, [collectManualTargetReady]);
+
+  const tryCompletePendingManualHandoff = useCallback(() => {
+    const pending = pendingManualRef.current;
+    if (!pending) return;
+    if (manualHandoffGenRef.current !== pending.generation) return;
+    if (handoffPhaseRef.current === "committed") return;
+    const ready = collectManualTargetReady(
+      pending.targetIndex,
+      pending.targetMediaId
+    );
+    if (manualDragActiveRef.current) {
+      tryCommitManual80Ready();
+      return;
+    }
+    const realNativePage = lastProvenNativeSettleRef.current;
+    if (
+      !shouldAcceptPendingManualHandoff({
+        pending,
+        currentNavigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: realNativePage,
+        nativePageSource: "proven-settle",
+        ...ready,
+        screenFocused: screenFocusedRef.current,
+        shareSheetOpen: shareSheetOpenRef.current,
+        unmounted: false,
+      })
+    ) {
+      tryCommitManual80Ready();
+      return;
+    }
+    pendingManualRef.current = null;
+    handoffPhaseRef.current = "committed";
+    dragStartIndexRef.current = pending.targetIndex;
     applyWatchIndexDecisionRef.current(
       decideWatchActiveIndexClaim({
         arbiter: arbiterRef.current,
@@ -854,7 +915,10 @@ export default function WatchScreen() {
         nativeSettledPage: realNativePage,
       })
     );
-  }, []);
+  }, [collectManualTargetReady, tryCommitManual80Ready]);
+
+  const tryCommitManual80ReadyRef = useRef(tryCommitManual80Ready);
+  tryCommitManual80ReadyRef.current = tryCommitManual80Ready;
 
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
@@ -886,6 +950,19 @@ export default function WatchScreen() {
         nextTarget: target,
         fromIndex: dragStartIndexRef.current,
       });
+      if (handoffPhaseRef.current === "committed") {
+        const reverse = resolveManualReverseAfter80Commit({
+          committedIndex: dragStartIndexRef.current,
+          nextTarget: target,
+        });
+        if (reverse === "new-handoff") {
+          applyWarmedTargetIndex(target);
+          return;
+        }
+        if (retarget === "cancel") {
+          return;
+        }
+      }
       if (retarget === "cancel") {
         cancelPendingManualHandoff();
         applyWarmedTargetIndex(null);
@@ -920,6 +997,21 @@ export default function WatchScreen() {
       );
       if (nativePage == null) return;
       lastProvenNativeSettleRef.current = nativePage;
+      const syncTo = syncNativeAfterManual80Ref.current;
+      if (syncTo != null) {
+        syncNativeAfterManual80Ref.current = null;
+        if (nativePage !== syncTo) {
+          const height = itemHeightRef.current;
+          const offset = resolveWatchScrollOffset(syncTo, height);
+          if (offset != null) {
+            listRef.current?.scrollToOffset({ offset, animated: false });
+          }
+        }
+        return;
+      }
+      if (handoffPhaseRef.current === "committed") {
+        return;
+      }
       if (
         shouldIgnoreStaleManualSettle({
           locked: Date.now() < programmaticAdvanceUntilRef.current,
@@ -1039,6 +1131,7 @@ export default function WatchScreen() {
         ...created,
         generation,
       };
+      tryCommitManual80ReadyRef.current();
     }
   ).current;
 
@@ -1732,6 +1825,7 @@ export default function WatchScreen() {
                   index === previousIndex
                 ) {
                   nextHandoffRef.current = { index, ...state };
+                  tryCommitManual80Ready();
                   tryCompletePendingManualHandoff();
                 }
               }
@@ -1876,6 +1970,7 @@ export default function WatchScreen() {
       warmNextSurface,
       warmedTargetIndex,
       tryCompletePendingManualHandoff,
+      tryCommitManual80Ready,
       insets.bottom,
       insets.top,
       itemHeight,
