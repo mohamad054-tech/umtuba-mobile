@@ -56,10 +56,15 @@ import {
   shouldMountOffscreenManualTargetVideoView,
   shouldRejectStaleManualHandoffEvent,
   shouldReleasePreviousWatchSurface,
+  shouldRecordManualHandoffReadyProof,
   shouldStartManualHandoffAudio,
   shouldWarmManualTarget,
+  shouldCommitFromManualScrollProgress,
+  shouldPinCommittedPageOnSettle,
+  resolveManualScrollProgress,
   targetMayBecomeAudible,
   viewabilityMayCommitHandoff,
+  viewabilityMayCommitManualHandoff,
   viewabilityMayForgeNativePage,
 } from "./watchManualHandoff";
 
@@ -1204,5 +1209,83 @@ describe("manual first-swipe 80% commit without full settle", () => {
         screenFocused: true,
       })
     ).toBe(true);
+  });
+
+  it("13. scroll 80% is the commit source, not viewability or 50% native page", () => {
+    const mid = resolveManualScrollProgress({
+      fromIndex: 0,
+      currentOffset: 400,
+      itemHeight: 800,
+      itemCount: 5,
+    });
+    expect(mid.targetIndex).toBe(1);
+    expect(mid.visiblePercent).toBe(50);
+    expect(
+      shouldCommitFromManualScrollProgress({
+        visiblePercent: mid.visiblePercent,
+        targetIndex: mid.targetIndex,
+        fromIndex: 0,
+      })
+    ).toBe(false);
+    const ready = resolveManualScrollProgress({
+      fromIndex: 0,
+      currentOffset: 640,
+      itemHeight: 800,
+      itemCount: 5,
+    });
+    expect(ready.visiblePercent).toBe(80);
+    expect(
+      shouldCommitFromManualScrollProgress({
+        visiblePercent: ready.visiblePercent,
+        targetIndex: ready.targetIndex,
+        fromIndex: 0,
+      })
+    ).toBe(true);
+    expect(viewabilityMayCommitManualHandoff()).toBe(false);
+    expect(viewabilityMayCommitHandoff()).toBe(false);
+  });
+
+  it("14. ready proof is recorded before pending exists", () => {
+    expect(
+      shouldRecordManualHandoffReadyProof({
+        eventIndex: 1,
+        activeIndex: 0,
+        warmedTargetIndex: null,
+        previousIndex: null,
+      })
+    ).toBe(true);
+    expect(
+      shouldRejectStaleManualHandoffEvent({
+        eventIndex: 1,
+        pendingIndex: null,
+        pendingMediaId: null,
+        pendingGeneration: 0,
+        handoffState: "idle",
+      })
+    ).toBe(true);
+  });
+
+  it("15. bounce settle after 1→2 pins page 1 instead of snapback", () => {
+    expect(
+      shouldPinCommittedPageOnSettle({
+        handoffPhase: "committed",
+        nativePage: 0,
+        committedIndex: 1,
+      })
+    ).toBe(true);
+    expect(
+      shouldPinCommittedPageOnSettle({
+        handoffPhase: "committed",
+        nativePage: 1,
+        committedIndex: 1,
+      })
+    ).toBe(false);
+    expect(
+      shouldPinCommittedPageOnSettle({
+        handoffPhase: "intent",
+        nativePage: 0,
+        committedIndex: 0,
+      })
+    ).toBe(false);
   });
 });

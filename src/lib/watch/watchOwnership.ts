@@ -167,14 +167,9 @@ export function shouldHonorViewability80Intent(input: {
     return false;
   }
   if (input.viewableIndex === input.committedIndex) return false;
-  if (
-    input.viewableIndex < input.committedIndex &&
-    input.reverseDrag !== true
-  ) {
-    if (input.committedIndex >= 1 && input.viewableIndex === 0) {
-      return false;
-    }
-  }
+  // Viewability never reverse-commits. Bounce of page 0 after 1→2 is snapback.
+  if (input.viewableIndex < input.committedIndex) return false;
+  void input.reverseDrag;
   return true;
 }
 

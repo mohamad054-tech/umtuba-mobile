@@ -146,6 +146,13 @@ describe("FIRST_0_TO_1_NO_SNAPBACK", () => {
       })
     ).toBe(false);
     expect(
+      shouldHonorViewability80Intent({
+        viewableIndex: 0,
+        committedIndex: after.committedIndex,
+        reverseDrag: true,
+      })
+    ).toBe(false);
+    expect(
       shouldSyncNativePageAfterCommit({
         reason: "viewability-80",
         nativePage: 0,

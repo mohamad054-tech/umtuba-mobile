@@ -168,11 +168,16 @@ import {
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveManualReverseAfter80Commit,
+  resolveManualScrollProgress,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
+  shouldCommitFromManualScrollProgress,
   shouldIgnoreStaleManualSettle,
+  shouldPinCommittedPageOnSettle,
+  shouldRecordManualHandoffReadyProof,
   shouldRejectStaleManualHandoffEvent,
   shouldWarmManualTarget,
+  viewabilityMayCommitManualHandoff,
   type ManualHandoffPending,
   type ManualHandoffPhase,
   type ManualHandoffReadyProof,
@@ -348,8 +353,8 @@ export default function WatchScreen() {
     manualHandoffGenRef.current += 1;
     pendingManualRef.current = null;
     handoffPhaseRef.current = restore.handoffState;
-    pendingAudibleRef.current = null;
-    setAudibleOwner(restore.audibleOwner);
+    pendingAudibleRef.current = restore.audibleOwner;
+    setAudibleOwner(null);
   }, []);
 
   const applyWatchIndexDecision = useCallback(
@@ -393,7 +398,7 @@ export default function WatchScreen() {
     if (pending !== activeIndex) return;
     pendingAudibleRef.current = null;
     setAudibleOwner(pending);
-  }, [activeIndex]);
+  }, [activeIndex, audibleOwner]);
 
   useEffect(() => {
     remainingMsRef.current = null;
@@ -906,6 +911,7 @@ export default function WatchScreen() {
     pendingManualRef.current = null;
     handoffPhaseRef.current = "committed";
     dragStartIndexRef.current = pending.targetIndex;
+    syncNativeAfterManual80Ref.current = pending.targetIndex;
     applyWatchIndexDecisionRef.current(
       decideWatchActiveIndexClaim({
         arbiter: arbiterRef.current,
@@ -917,8 +923,37 @@ export default function WatchScreen() {
     );
   }, [collectManualTargetReady, tryCommitManual80Ready]);
 
-  const tryCommitManual80ReadyRef = useRef(tryCommitManual80Ready);
-  tryCommitManual80ReadyRef.current = tryCommitManual80Ready;
+  const armPendingManualTarget = useCallback(
+    (targetIndex: number | null) => {
+      if (targetIndex == null) return;
+      const targetVideo = visibleVideosRef.current[targetIndex];
+      const created = createManualHandoffPending({
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        targetIndex,
+        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
+      });
+      if (!created) return;
+      const existing = pendingManualRef.current;
+      if (
+        existing &&
+        existing.targetIndex === created.targetIndex &&
+        existing.targetMediaId === created.targetMediaId &&
+        existing.generation === manualHandoffGenRef.current
+      ) {
+        tryCommitManual80Ready();
+        return;
+      }
+      const generation = manualHandoffGenRef.current + 1;
+      manualHandoffGenRef.current = generation;
+      handoffPhaseRef.current = "intent";
+      pendingManualRef.current = {
+        ...created,
+        generation,
+      };
+      tryCommitManual80Ready();
+    },
+    [tryCommitManual80Ready]
+  );
 
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
@@ -957,6 +992,21 @@ export default function WatchScreen() {
         });
         if (reverse === "new-handoff") {
           applyWarmedTargetIndex(target);
+          const reverseProgress = resolveManualScrollProgress({
+            fromIndex: dragStartIndexRef.current,
+            currentOffset: scrollOffsetRef.current,
+            itemHeight: itemHeightRef.current,
+            itemCount: videosLengthRef.current,
+          });
+          if (
+            shouldCommitFromManualScrollProgress({
+              visiblePercent: reverseProgress.visiblePercent,
+              targetIndex: target,
+              fromIndex: dragStartIndexRef.current,
+            })
+          ) {
+            armPendingManualTarget(target);
+          }
           return;
         }
         if (retarget === "cancel") {
@@ -980,8 +1030,23 @@ export default function WatchScreen() {
         return;
       }
       applyWarmedTargetIndex(target);
+      const progress = resolveManualScrollProgress({
+        fromIndex: dragStartIndexRef.current,
+        currentOffset: scrollOffsetRef.current,
+        itemHeight: itemHeightRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (
+        shouldCommitFromManualScrollProgress({
+          visiblePercent: progress.visiblePercent,
+          targetIndex: target,
+          fromIndex: dragStartIndexRef.current,
+        })
+      ) {
+        armPendingManualTarget(target);
+      }
     },
-    [applyWarmedTargetIndex, cancelPendingManualHandoff]
+    [applyWarmedTargetIndex, armPendingManualTarget, cancelPendingManualHandoff]
   );
 
   const onWatchScrollSettle = useCallback(
@@ -1002,10 +1067,26 @@ export default function WatchScreen() {
         syncNativeAfterManual80Ref.current = null;
         if (nativePage !== syncTo) {
           const height = itemHeightRef.current;
-          const offset = resolveWatchScrollOffset(syncTo, height);
-          if (offset != null) {
-            listRef.current?.scrollToOffset({ offset, animated: false });
+          const pinOffset = resolveWatchScrollOffset(syncTo, height);
+          if (pinOffset != null) {
+            listRef.current?.scrollToOffset({ offset: pinOffset, animated: false });
           }
+        }
+        return;
+      }
+      if (
+        shouldPinCommittedPageOnSettle({
+          handoffPhase: handoffPhaseRef.current,
+          nativePage,
+          committedIndex: activeIndexRef.current,
+        })
+      ) {
+        const pinOffset = resolveWatchScrollOffset(
+          activeIndexRef.current,
+          itemHeightRef.current
+        );
+        if (pinOffset != null) {
+          listRef.current?.scrollToOffset({ offset: pinOffset, animated: false });
         }
         return;
       }
@@ -1102,6 +1183,7 @@ export default function WatchScreen() {
   const onViewableItemsChanged = useRef(
     (info: { viewableItems: ViewToken[] }) => {
       decideWatchViewabilityEvidence();
+      if (viewabilityMayCommitManualHandoff()) return;
       const token = info.viewableItems.find(
         (row) => row.isViewable && typeof row.index === "number"
       );
@@ -1116,22 +1198,7 @@ export default function WatchScreen() {
       ) {
         return;
       }
-      const targetVideo = visibleVideosRef.current[toIndex];
-      const created = createManualHandoffPending({
-        navigationGeneration: arbiterRef.current.navigationGeneration,
-        targetIndex: toIndex,
-        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
-      });
-      if (!created) return;
       applyWarmedTargetIndex(toIndex);
-      const generation = manualHandoffGenRef.current + 1;
-      manualHandoffGenRef.current = generation;
-      handoffPhaseRef.current = "intent";
-      pendingManualRef.current = {
-        ...created,
-        generation,
-      };
-      tryCommitManual80ReadyRef.current();
     }
   ).current;
 
@@ -1806,6 +1873,20 @@ export default function WatchScreen() {
                   };
                 }
                 if (
+                  shouldRecordManualHandoffReadyProof({
+                    eventIndex: index,
+                    activeIndex,
+                    warmedTargetIndex,
+                    previousIndex,
+                  }) &&
+                  (index === activeIndex + 1 ||
+                    index === warmedTargetIndex ||
+                    index === previousIndex)
+                ) {
+                  nextHandoffRef.current = { index, ...state };
+                  tryCommitManual80Ready();
+                }
+                if (
                   shouldRejectStaleManualHandoffEvent({
                     eventIndex: index,
                     eventMediaId: state.mediaId,
@@ -1824,8 +1905,6 @@ export default function WatchScreen() {
                   index === warmedTargetIndex ||
                   index === previousIndex
                 ) {
-                  nextHandoffRef.current = { index, ...state };
-                  tryCommitManual80Ready();
                   tryCompletePendingManualHandoff();
                 }
               }

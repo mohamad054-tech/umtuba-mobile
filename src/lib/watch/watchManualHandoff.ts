@@ -378,6 +378,74 @@ export function viewabilityMayCommitHandoff(): false {
   return false;
 }
 
+export function viewabilityMayCommitManualHandoff(): false {
+  return false;
+}
+
+/** Scroll-offset progress toward the neighbor. Not native-page rounding (50%). */
+export function resolveManualScrollProgress(input: {
+  fromIndex: number;
+  currentOffset: number;
+  itemHeight: number;
+  itemCount: number;
+}): { targetIndex: number | null; visiblePercent: number } {
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return { targetIndex: null, visiblePercent: 0 };
+  }
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  if (from == null) return { targetIndex: null, visiblePercent: 0 };
+  const fromOffset = from * input.itemHeight;
+  const delta = input.currentOffset - fromOffset;
+  const visiblePercent = Math.min(
+    100,
+    Math.max(0, (Math.abs(delta) / input.itemHeight) * 100)
+  );
+  return {
+    targetIndex: resolveManualHandoffTarget(input),
+    visiblePercent,
+  };
+}
+
+export function shouldCommitFromManualScrollProgress(input: {
+  visiblePercent: number;
+  targetIndex: number | null;
+  fromIndex: number;
+}): boolean {
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  if (target == null || from == null || target === from) return false;
+  return (
+    Number.isFinite(input.visiblePercent) &&
+    input.visiblePercent >= WATCH_VIEWABILITY_PERCENT_THRESHOLD
+  );
+}
+
+/** Ready proof must be stored even before a pending handoff exists. */
+export function shouldRecordManualHandoffReadyProof(input: {
+  eventIndex: number;
+  activeIndex: number;
+  warmedTargetIndex: number | null;
+  previousIndex: number | null;
+}): boolean {
+  return (
+    input.eventIndex === input.activeIndex ||
+    input.eventIndex === input.activeIndex + 1 ||
+    input.eventIndex === input.warmedTargetIndex ||
+    input.eventIndex === input.previousIndex
+  );
+}
+
+export function shouldPinCommittedPageOnSettle(input: {
+  handoffPhase: ManualHandoffPhase;
+  nativePage: number;
+  committedIndex: number;
+}): boolean {
+  return (
+    input.handoffPhase === "committed" &&
+    input.nativePage !== input.committedIndex
+  );
+}
+
 export function viewabilityMayForgeNativePage(): false {
   return false;
 }

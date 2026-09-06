@@ -548,7 +548,11 @@ function WatchPlayerPane({
             ? playbackRate
             : DEFAULT_WATCH_PLAYBACK_SPEED;
         });
-        if (!intent.muted && intent.volume > 0) {
+        if (
+          !intent.muted &&
+          intent.volume > 0 &&
+          isAudioOwnerRef.current === true
+        ) {
           markWatchTransition(nativePlatform, "audio_start");
         }
       } else {
