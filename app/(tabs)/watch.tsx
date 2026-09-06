@@ -161,12 +161,16 @@ import {
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
   armWatchFirstPagePin,
+  armWatchForwardCommitLock,
   clearWatchFirstPagePin,
   createWatchFirstPagePinState,
+  createWatchForwardCommitLock,
   hasFirstWatchReverseDragEvidence,
+  hasGenuineReverseDragEvidence,
   reduceWatchHandoff,
   resolveAndroidManualSettleAction,
   resolveFirstWatchCommitNativePin,
+  resolveForwardCommitNativeResyncOffset,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveProactivePrepareIndexes,
@@ -176,6 +180,8 @@ import {
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
   shouldRejectFirstWatchIndexZeroIntent,
+  shouldRejectLockedBackwardViewability,
+  shouldResyncNativeAfterStaleSettle,
   shouldWarmManualTarget,
   createWatchHandoffMachine,
   type WatchHandoffEvent,
@@ -196,6 +202,7 @@ import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership"
 import {
   applyWatchHandoffAudioTransfer,
   bumpWatchLeaveGeneration,
+  getRegisteredWatchPlayer,
   resetWatchHandoffAudibleOwner,
 } from "@/src/lib/watch/playerLifecycle";
 import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
@@ -317,6 +324,7 @@ export default function WatchScreen() {
   const dragStartIndexRef = useRef(0);
   const dragStartOffsetRef = useRef(0);
   const firstPinRef = useRef(createWatchFirstPagePinState());
+  const forwardLockRef = useRef(createWatchForwardCommitLock());
   const reverseDragEvidenceRef = useRef(false);
   const manualDragActiveRef = useRef(false);
   const scrollToWatchIndexRef = useRef<
@@ -401,7 +409,7 @@ export default function WatchScreen() {
     }
     const fromIndex = result.commit.fromIndex;
     applyWatchHandoffAudioTransfer({
-      previousPlayer: null,
+      previousPlayer: getRegisteredWatchPlayer(fromIndex),
       previousIndex: fromIndex,
       nextIndex: result.commit.toIndex,
       platform: Platform.OS === "ios" ? "ios" : "android",
@@ -421,6 +429,20 @@ export default function WatchScreen() {
       pinWatchNativeOffset(result.commit.toIndex, 0, { animated: false });
     }
     const commitGeneration = handoffMachineRef.current.navigationGeneration;
+    const forwardLock = armWatchForwardCommitLock({
+      fromIndex: result.commit.fromIndex,
+      toIndex: result.commit.toIndex,
+      navigationGeneration: commitGeneration,
+    });
+    if (forwardLock) {
+      forwardLockRef.current = forwardLock;
+      reverseDragEvidenceRef.current = false;
+      if (forwardLock.fromIndex !== 0) {
+        firstPinRef.current = clearWatchFirstPagePin(firstPinRef.current);
+      }
+    } else {
+      forwardLockRef.current = createWatchForwardCommitLock();
+    }
     const firstPin = resolveFirstWatchCommitNativePin({
       fromIndex: result.commit.fromIndex,
       toIndex: result.commit.toIndex,
@@ -547,6 +569,7 @@ export default function WatchScreen() {
           reason: "blur-unmount",
         });
         firstPinRef.current = clearWatchFirstPagePin(firstPinRef.current);
+        forwardLockRef.current = createWatchForwardCommitLock();
         reverseDragEvidenceRef.current = false;
         prepareAdjacentNeighbors(activeIndexRef.current);
         const nextGeneration = bumpWatchLeaveGeneration(
@@ -967,14 +990,23 @@ export default function WatchScreen() {
           ? nativeHint
           : directional;
       if (
-        firstPinRef.current.inFlight &&
-        hasFirstWatchReverseDragEvidence({
-          committedIndex: activeIndexRef.current,
-          dragStartIndex: dragStartIndexRef.current,
-          dragStartOffset: dragStartOffsetRef.current,
-          dragTargetIndex: target,
-          itemHeight: itemHeightRef.current,
-        })
+        (forwardLockRef.current.armed &&
+          hasGenuineReverseDragEvidence({
+            committedIndex: activeIndexRef.current,
+            lockToIndex: forwardLockRef.current.toIndex,
+            dragStartIndex: dragStartIndexRef.current,
+            dragStartOffset: dragStartOffsetRef.current,
+            dragTargetIndex: target,
+            itemHeight: itemHeightRef.current,
+          })) ||
+        (firstPinRef.current.inFlight &&
+          hasFirstWatchReverseDragEvidence({
+            committedIndex: activeIndexRef.current,
+            dragStartIndex: dragStartIndexRef.current,
+            dragStartOffset: dragStartOffsetRef.current,
+            dragTargetIndex: target,
+            itemHeight: itemHeightRef.current,
+          }))
       ) {
         reverseDragEvidenceRef.current = true;
       }
@@ -1022,6 +1054,30 @@ export default function WatchScreen() {
         videosLengthRef.current
       );
       if (nativePage == null) return;
+      if (
+        shouldResyncNativeAfterStaleSettle({
+          lock: forwardLockRef.current,
+          nativePage,
+          committedIndex: activeIndexRef.current,
+          reverseDragEvidence: reverseDragEvidenceRef.current,
+        })
+      ) {
+        const offset = resolveForwardCommitNativeResyncOffset({
+          lock: forwardLockRef.current,
+          frozenItemHeight: itemHeightRef.current,
+        });
+        if (offset != null) {
+          try {
+            listRef.current?.scrollToOffset({
+              offset,
+              animated: false,
+            });
+          } catch (err) {
+            console.warn("Watch native pin failed:", err);
+          }
+        }
+        return;
+      }
       const pin = firstPinRef.current;
       const pinGeneration = handoffMachineRef.current.navigationGeneration;
       if (pin.inFlight) {
@@ -1075,6 +1131,7 @@ export default function WatchScreen() {
           locked: Date.now() < programmaticAdvanceUntilRef.current,
           nativePage,
           activeIndex: activeIndexRef.current,
+          reverseDragEvidence: reverseDragEvidenceRef.current,
         })
       ) {
         return;
@@ -1138,6 +1195,13 @@ export default function WatchScreen() {
       });
       if (intent == null) return;
       if (
+        shouldRejectLockedBackwardViewability({
+          nominatedIndex: intent,
+          committedIndex: activeIndexRef.current,
+          lock: forwardLockRef.current,
+          currentGeneration: handoffMachineRef.current.navigationGeneration,
+          reverseDragEvidence: reverseDragEvidenceRef.current,
+        }) ||
         shouldRejectFirstWatchIndexZeroIntent({
           nominatedIndex: intent,
           committedIndex: activeIndexRef.current,
@@ -2042,7 +2106,7 @@ export default function WatchScreen() {
         onScrollEndDrag={onWatchScrollSettle}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+        extraData={`${activeIndex}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

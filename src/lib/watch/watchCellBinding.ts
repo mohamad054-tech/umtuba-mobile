@@ -147,3 +147,55 @@ export function isWatchSwipeBindingCorrect(
     && step.audioMediaId === step.visibleMediaId
     && step.playerMediaId === step.visibleMediaId;
 }
+
+/** Cached backward target must reacquire the same media/surface, never a black hole. */
+export function shouldRebindRetainedWatchSurface(input: {
+  direction: "backward" | "forward";
+  cachedHit: boolean;
+  playerMediaId: string;
+  targetMediaId: string;
+  surfaceAttached: boolean;
+}): boolean {
+  if (input.direction !== "backward") return false;
+  if (!input.cachedHit) return false;
+  if (input.playerMediaId !== input.targetMediaId) return true;
+  return input.surfaceAttached !== true;
+}
+
+export function isBackwardRetainedPlaybackCoherent(input: {
+  visibleIndex: number;
+  committedIndex: number;
+  playerMediaId: string;
+  targetMediaId: string;
+  surfaceAttached: boolean;
+  firstFrame: boolean;
+  audibleOwnerIndex: number | null;
+  blackSurface: boolean;
+}): boolean {
+  if (input.visibleIndex !== input.committedIndex) return false;
+  if (input.playerMediaId !== input.targetMediaId) return false;
+  if (!input.surfaceAttached || !input.firstFrame) return false;
+  if (input.blackSurface) return false;
+  if (
+    input.audibleOwnerIndex != null &&
+    input.audibleOwnerIndex !== input.committedIndex
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function isVisibleIndexSurfaceAudioAtomic(input: {
+  visiblePage: number;
+  committedIndex: number;
+  presentationOwner: number;
+  boundMediaId: string;
+  committedMediaId: string;
+  audibleOwnerIndex: number | null;
+}): boolean {
+  if (input.visiblePage !== input.committedIndex) return false;
+  if (input.presentationOwner !== input.committedIndex) return false;
+  if (input.boundMediaId !== input.committedMediaId) return false;
+  if (input.audibleOwnerIndex == null) return true;
+  return input.audibleOwnerIndex === input.committedIndex;
+}

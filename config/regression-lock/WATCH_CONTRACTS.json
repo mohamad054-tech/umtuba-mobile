@@ -5,7 +5,10 @@
   "open_owner_failures": [
     "random black video surface",
     "missing 80% handoff",
-    "old audio bleeding into next video"
+    "old audio bleeding into next video",
+    "first video 1→2 snapback to video 1 (42ce3a8 / 2762f1cf)",
+    "backward previously-watched video black surface",
+    "backward black video with continuing previous/current audio"
   ],
   "contracts": [
     {
@@ -30,7 +33,7 @@
     {
       "id": "WATCH_VISIBLE_SURFACE_BINDING",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL: black surface on arbitrary feed videos. 7536c11 also failed video 2 black.",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: black surface on arbitrary feed videos. 7536c11 video 2 black. 42ce3a8 / 2762f1cf: backward previously-watched video can be black.",
       "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
       "reference_branch": null,
       "regression_tests": [
@@ -38,7 +41,7 @@
         "src/lib/watch/playerLifecycle.test.ts"
       ],
       "device_required": true,
-      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "failure_signature": "BACKWARD_BLACK_SURFACE",
       "owning_files": [
         "app/(tabs)/watch.tsx",
         "src/lib/watch/watchCellBinding.ts"
@@ -48,7 +51,7 @@
     {
       "id": "WATCH_AUDIO_BINDING",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL: old audio continues briefly into next video.",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: old audio continues briefly into next video. 42ce3a8 / 2762f1cf: during backward black video, previous/current audio continues.",
       "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
       "reference_branch": null,
       "regression_tests": [
@@ -56,7 +59,7 @@
         "src/lib/watch/watchManualHandoff.test.ts"
       ],
       "device_required": true,
-      "failure_signature": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "failure_signature": "BACKWARD_AUDIO_SURFACE_MISMATCH",
       "owning_files": [
         "src/lib/watch/playerLifecycle.ts",
         "app/(tabs)/watch.tsx"
@@ -66,7 +69,7 @@
     {
       "id": "WATCH_80_PERCENT_HANDOFF",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Reference 4547d6bb: itemVisiblePercentThreshold 80, first isViewable claims activeIndex. Installed 1c56aca discards callback. 7536c11 source restore DEVICE_FAIL.",
+      "last_known_accepted_evidence": "Reference 4547d6bb: itemVisiblePercentThreshold 80. 42ce3a8 owner: 80% may have improved, but surrounding first-transition snapback remains; do not promote OWNER_PASS.",
       "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
       "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
       "regression_tests": [
@@ -101,15 +104,15 @@
     },
     {
       "id": "WATCH_BACKWARD_RETENTION",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "N-1 retention tests. Not owner-certified.",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "WATCH_BACKWARD_RETENTION_PLAYBACK owner FAIL on 42ce3a8 / 2762f1cf: returning to a previously watched video can be black while other video audio continues.",
       "reference_sha": "d5a40f51f4c5fd989da4cda90437380fca1660ab",
       "reference_branch": null,
       "regression_tests": [
         "src/lib/watch/watchRetainedPlaybackFallback.test.ts"
       ],
       "device_required": true,
-      "failure_signature": null,
+      "failure_signature": "BACKWARD_BLACK_SURFACE",
       "owning_files": [
         "src/lib/watch/androidWatchMediaCache.ts",
         "src/lib/watch/watchRetainedPlaybackFallback.ts"
@@ -305,7 +308,7 @@
     {
       "id": "WATCH_NO_BLACK_SURFACE",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL on 1c56aca: black video surface on arbitrary feed videos. 7536c11 also failed.",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL on 1c56aca and 7536c11. 42ce3a8 / 2762f1cf: backward previously-watched video can display a black screen.",
       "reference_sha": null,
       "reference_branch": null,
       "regression_tests": [
@@ -313,7 +316,7 @@
         "src/lib/watch/playerLifecycle.test.ts"
       ],
       "device_required": true,
-      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "failure_signature": "BACKWARD_BLACK_SURFACE",
       "owning_files": [
         "app/(tabs)/watch.tsx",
         "src/lib/watch/watchCellBinding.ts"
@@ -323,12 +326,12 @@
     {
       "id": "WATCH_NO_AUDIO_BLEED",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL: previous video audio continues briefly into the next video.",
+      "last_known_accepted_evidence": "Owner Fold6 FAIL: previous audio into next video. 42ce3a8 / 2762f1cf: during backward black video, currently playing/previously active audio continues.",
       "reference_sha": null,
       "reference_branch": null,
       "regression_tests": ["src/lib/watch/playerLifecycle.test.ts"],
       "device_required": true,
-      "failure_signature": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "failure_signature": "BACKWARD_AUDIO_SURFACE_MISMATCH",
       "owning_files": [
         "src/lib/watch/playerLifecycle.ts",
         "app/(tabs)/watch.tsx"
@@ -338,7 +341,7 @@
     {
       "id": "WATCH_NO_SNAPBACK",
       "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "7536c11 owner FAIL: move from black video 2 to 3 snaps/returns to video 1.",
+      "last_known_accepted_evidence": "7536c11: 2→3 snapped to video 1. 42ce3a8 / 2762f1cf: first video 1→2 shows part of video 2 then returns to video 1.",
       "reference_sha": null,
       "reference_branch": null,
       "regression_tests": [
@@ -346,13 +349,105 @@
         "src/lib/watch/watchViewport.test.ts"
       ],
       "device_required": true,
-      "failure_signature": "NEXT_SWIPE_SNAPBACK_TO_FIRST",
+      "failure_signature": "FIRST_FORWARD_SWIPE_SNAPBACK",
       "owning_files": [
         "app/(tabs)/watch.tsx",
         "src/lib/watch/watchActiveIndexArbiter.ts",
         "src/lib/watch/watchViewport.ts"
       ],
       "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    },
+    {
+      "id": "FIRST_0_TO_1_NO_SNAPBACK",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 / 2762f1cf Fold6: first 1→2 appears then snaps back to 1 after stale page-0 viewability.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "FIRST_FORWARD_SWIPE_SNAPBACK",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "dependent_files": ["src/lib/watch/watchActiveIndexArbiter.ts"]
+    },
+    {
+      "id": "FIRST_3_SINGLE_AUDIO_OWNER",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 live Fold6: three audio_start events among the first three videos.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "NEXT_AUDIO_PREVIOUS_VIDEO",
+      "owning_files": [
+        "src/lib/watch/playerLifecycle.ts",
+        "components/WatchVideoCard.tsx",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": []
+    },
+    {
+      "id": "BACKWARD_RETAINED_SURFACE_REBINDS",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 Fold6: returning to a cached video can lose the surface.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "BACKWARD_BLACK_SURFACE",
+      "owning_files": [
+        "src/lib/watch/watchCellBinding.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/playerLifecycle.ts"]
+    },
+    {
+      "id": "BACKWARD_NO_BLACK",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 Fold6: backward previously-watched video can be black.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "BACKWARD_BLACK_SURFACE",
+      "owning_files": [
+        "src/lib/watch/watchCellBinding.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": []
+    },
+    {
+      "id": "BACKWARD_CORRECT_AUDIO_OWNER",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 Fold6: backward black video can keep another video's audio.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "BACKWARD_AUDIO_SURFACE_MISMATCH",
+      "owning_files": [
+        "src/lib/watch/playerLifecycle.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    },
+    {
+      "id": "VISIBLE_INDEX_SURFACE_AUDIO_ATOMICITY",
+      "owner_status": "DEVICE_FAIL",
+      "last_known_accepted_evidence": "42ce3a8 live Fold6: native page, JS activeIndex, bound media, and audio owner diverged after remount.",
+      "reference_sha": null,
+      "reference_branch": null,
+      "regression_tests": ["src/lib/watch/watchRuntimeRecovery.test.ts"],
+      "device_required": true,
+      "failure_signature": "VISIBLE_VIDEO_ACTIVE_INDEX_MISMATCH",
+      "owning_files": [
+        "src/lib/watch/watchCellBinding.ts",
+        "src/lib/watch/watchManualHandoff.ts",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": ["src/lib/watch/playerLifecycle.ts"]
     }
   ]
 }

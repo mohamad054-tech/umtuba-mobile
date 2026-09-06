@@ -139,10 +139,50 @@
       ],
       "reference_builds": [
         "1c56aca / 9c1b9429 (callback discarded)",
-        "7536c11 / bcb12f31 (source restore, device fail)"
+        "7536c11 / bcb12f31 (source restore, device fail)",
+        "42ce3a8 / 2762f1cf (owner: 80% may have improved; do not promote OWNER_PASS)"
       ],
       "resolved": false,
       "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "FIRST_FORWARD_SWIPE_SNAPBACK",
+      "symptom": "First Watch transition video 1→2: part of video 2 appears, then Watch returns to video 1.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts",
+        "src/lib/watch/watchViewport.ts"
+      ],
+      "reference_builds": ["42ce3a8 / 2762f1cf (RFCX718LVHK / SM-F956B)"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchFirstPagePin.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "BACKWARD_BLACK_SURFACE",
+      "symptom": "Navigating backward to a previously watched video can show a black screen.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchCellBinding.ts",
+        "src/lib/watch/watchRetainedPlaybackFallback.ts"
+      ],
+      "reference_builds": ["42ce3a8 / 2762f1cf (RFCX718LVHK / SM-F956B)"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/watchCellBinding.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "BACKWARD_AUDIO_SURFACE_MISMATCH",
+      "symptom": "During a black backward video, audio from the currently playing or previously active video continues.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/playerLifecycle.ts",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "reference_builds": ["42ce3a8 / 2762f1cf (RFCX718LVHK / SM-F956B)"],
+      "resolved": false,
+      "prevention_test": "src/lib/watch/playerLifecycle.test.ts",
       "device_required": true
     }
   ]

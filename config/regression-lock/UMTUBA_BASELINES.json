@@ -6,10 +6,10 @@
     "serial": "RFCX718LVHK",
     "name": "Galaxy Z Fold6"
   },
-  "current_installed_device_sha": "1c56aca4eccd5795a3aa0429a55d507b855206df",
-  "current_installed_eas_build_id": "9c1b9429-958d-4d18-9412-cabe642151be",
+  "current_installed_device_sha": "42ce3a8eb3326260fa05db223748f05d82fe4605",
+  "current_installed_eas_build_id": "2762f1cf-eead-4841-9636-3ff69178ec92",
   "current_fold6_watch_status": "DEVICE_FAIL",
-  "notes": "OWNER_PASS is never inferred from unit tests. Device rollback APK is 1c56aca. Source HEAD may differ; do not treat newest commit as baseline.",
+  "notes": "OWNER_PASS is never inferred from unit tests. Fold6 currently has rejected 42ce3a8 / 2762f1cf. Do not treat newest commit as a healthy baseline.",
   "baselines": [
     {
       "feature_id": "WATCH_DEVICE_ROLLBACK_1C56ACA",
@@ -40,7 +40,10 @@
       "known_failure_signatures": [
         "BLACK_VIDEO_SURFACE",
         "80_PERCENT_HANDOFF_MISSING",
-        "NEXT_AUDIO_PREVIOUS_VIDEO"
+        "NEXT_AUDIO_PREVIOUS_VIDEO",
+        "FIRST_FORWARD_SWIPE_SNAPBACK",
+        "BACKWARD_BLACK_SURFACE",
+        "BACKWARD_AUDIO_SURFACE_MISMATCH"
       ],
       "supersedes": [],
       "superseded_by": null,
@@ -111,6 +114,44 @@
       "supersedes": [],
       "superseded_by": "WATCH_DEVICE_ROLLBACK_1C56ACA",
       "notes": "Source/unit PASS. Owner device FAIL. Rolled back. Do not treat as baseline."
+    },
+    {
+      "feature_id": "WATCH_42CE3A8_FIRST_PIN_REJECTED",
+      "product_area": "watch",
+      "owner_status": "DEVICE_FAIL",
+      "accepted_sha": null,
+      "installed_sha": "42ce3a8eb3326260fa05db223748f05d82fe4605",
+      "accepted_eas_build_id": "2762f1cf-eead-4841-9636-3ff69178ec92",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-06",
+      "required_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/**"
+      ],
+      "protected_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/**"
+      ],
+      "regression_tests": [
+        "src/lib/watch/**/*.test.ts"
+      ],
+      "device_tests": [
+        "WATCH_NO_BLACK_SURFACE",
+        "WATCH_NO_AUDIO_BLEED",
+        "WATCH_NO_SNAPBACK",
+        "WATCH_VISIBLE_SURFACE_BINDING",
+        "WATCH_AUDIO_BINDING",
+        "WATCH_BACKWARD_RETENTION"
+      ],
+      "dependencies": ["watch", "media_video", "audio", "cache"],
+      "known_failure_signatures": [
+        "FIRST_FORWARD_SWIPE_SNAPBACK",
+        "BACKWARD_BLACK_SURFACE",
+        "BACKWARD_AUDIO_SURFACE_MISMATCH"
+      ],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "First 0→1 native-pin candidate. Owner DEVICE_FAIL 2026-09-06: first 1→2 snapback, backward black surface, backward audio/surface mismatch. 80% may have improved; do not promote Watch or 80% to OWNER_PASS."
     },
     {
       "feature_id": "WATCH_5_VIDEO_ROLLING_CACHE",

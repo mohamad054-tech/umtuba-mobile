@@ -4,6 +4,7 @@
     "watch": {
       "globs": [
         "app/(tabs)/watch.tsx",
+        "components/WatchVideoCard.tsx",
         "src/lib/watch/**",
         "src/lib/nav/WatchEntryTracker.tsx"
       ],
@@ -19,7 +20,13 @@
         "WATCH_NO_BLACK_SURFACE",
         "WATCH_NO_AUDIO_BLEED",
         "WATCH_NO_SNAPBACK",
-        "WATCH_5_VIDEO_ROLLING_CACHE"
+        "WATCH_5_VIDEO_ROLLING_CACHE",
+        "FIRST_0_TO_1_NO_SNAPBACK",
+        "FIRST_3_SINGLE_AUDIO_OWNER",
+        "BACKWARD_RETAINED_SURFACE_REBINDS",
+        "BACKWARD_NO_BLACK",
+        "BACKWARD_CORRECT_AUDIO_OWNER",
+        "VISIBLE_INDEX_SURFACE_AUDIO_ATOMICITY"
       ]
     },
     "create_editor": {

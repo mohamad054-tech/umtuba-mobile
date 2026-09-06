@@ -116,7 +116,7 @@ describe("first 0→1 native pin + index-0 guard", () => {
     ).toBe(true);
   });
 
-  it("3. native page 1 alignment clears the first-pin guard", () => {
+  it("3. native page 1 alignment does not clear the first-pin guard", () => {
     const pin = armWatchFirstPagePin({ navigationGeneration: 1 });
     expect(
       resolveWatchFirstPagePinAlignment({
@@ -125,7 +125,7 @@ describe("first 0→1 native pin + index-0 guard", () => {
         pin,
         currentGeneration: 1,
       })
-    ).toBe("clear");
+    ).toBe("keep");
     expect(clearWatchFirstPagePin(pin).inFlight).toBe(false);
     expect(
       resolveWatchFirstPagePinAlignment({
@@ -137,19 +137,7 @@ describe("first 0→1 native pin + index-0 guard", () => {
     ).toBe("ignore");
   });
 
-  it("4. after the guard clears, genuine reverse swipe 1→0 works at 80%", () => {
-    const cleared = clearWatchFirstPagePin(
-      armWatchFirstPagePin({ navigationGeneration: 1 })
-    );
-    expect(
-      shouldRejectFirstWatchIndexZeroIntent({
-        nominatedIndex: 0,
-        committedIndex: 1,
-        pin: cleared,
-        currentGeneration: 1,
-        reverseDragEvidence: false,
-      })
-    ).toBe(false);
+  it("4. genuine reverse swipe 1→0 works at 80% while the pin stays armed", () => {
 
     let machine = reduceWatchHandoff(boot(), {
       type: "viewability-80",

@@ -82,6 +82,7 @@ import {
 import {
   applyWatchInactiveTeardown,
   nextPlayerInstanceGeneration,
+  registerWatchPlayer,
   releaseWatchPlayerBinding,
   resolveNativePlayerStatusCatchup,
   resolveGatedWatchPlaybackIntent,
@@ -526,6 +527,7 @@ function WatchPlayerPane({
         visibleEpoch: playerEpoch,
         playerPostId: postIdRef.current,
         visiblePostId: postId,
+        itemIndex: listIndex,
         platform: nativePlatform,
         firstFrameConfirmed: firstFrameRef.current,
         muted,
@@ -630,6 +632,7 @@ function WatchPlayerPane({
       });
     }
     boundPlayerRef.current = player;
+    registerWatchPlayer(listIndex, player);
     playerAliveRef.current = true;
     nativeStatusRef.current = null;
     statusRef.current = "loading";
@@ -656,6 +659,7 @@ function WatchPlayerPane({
       }
     }
     return () => {
+      registerWatchPlayer(listIndex, null);
       releaseWatchPlayerBinding({
         player,
         markDead: () => {
@@ -671,7 +675,7 @@ function WatchPlayerPane({
         },
       });
     };
-  }, [player]);
+  }, [listIndex, player]);
 
   const attachSurface = shouldAttachWatchSurface({
     loadPlayer,
@@ -728,6 +732,7 @@ function WatchPlayerPane({
       visibleEpoch: playerEpoch,
       playerPostId: postId,
       visiblePostId: postId,
+      itemIndex: listIndex,
       platform: nativePlatform,
       firstFrameConfirmed: firstFrameRef.current,
       muted,
@@ -776,6 +781,7 @@ function WatchPlayerPane({
     playbackRate,
     attachSurface,
     mediaId,
+    listIndex,
     playerEpoch,
     postId,
   ]);
@@ -877,6 +883,7 @@ function WatchPlayerPane({
         surfaceAttached: attachSurfaceRef.current,
         playerMediaId: mediaIdRef.current,
         visibleMediaId: mediaId,
+        itemIndex: listIndex,
       })
     ) {
       runAlivePlayerOp(player, (alive) => {
@@ -886,7 +893,7 @@ function WatchPlayerPane({
       markWatchTransition(nativePlatform, "audio_start");
     }
     onFirstFrame?.();
-  }, [mediaId, nativePlatform, onFirstFrame, player]);
+  }, [listIndex, mediaId, nativePlatform, onFirstFrame, player]);
 
   return (
     <View

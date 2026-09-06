@@ -194,11 +194,35 @@ export function shouldIgnoreStaleManualSettle(input: {
   locked: boolean;
   nativePage: number;
   activeIndex: number;
+  reverseDragEvidence?: boolean;
 }): boolean {
-  if (input.nativePage !== input.activeIndex && input.nativePage === 0) {
-    return input.activeIndex >= 1;
+  if (input.nativePage === input.activeIndex) return false;
+  if (input.activeIndex >= 1 && input.nativePage < input.activeIndex) {
+    if (
+      input.reverseDragEvidence === true &&
+      input.nativePage === input.activeIndex - 1
+    ) {
+      return false;
+    }
+    return true;
   }
   return input.locked === true && input.nativePage !== input.activeIndex;
+}
+
+/** Identity/generation mismatch: reject first_frame, settle, current_end, viewability. */
+export function shouldRejectStaleWatchIdentityEvent(input: {
+  eventIndex: number;
+  eventMediaId: string;
+  eventGeneration: number;
+  expectedIndex: number;
+  expectedMediaId: string;
+  expectedGeneration: number;
+}): boolean {
+  return (
+    input.eventIndex !== input.expectedIndex ||
+    input.eventMediaId !== input.expectedMediaId ||
+    input.eventGeneration !== input.expectedGeneration
+  );
 }
 
 export type ManualHandoffPending = {
@@ -505,8 +529,124 @@ export function resolveWatchFirstPagePinAlignment(input: {
 }): "keep" | "clear" | "ignore" {
   if (!input.pin.inFlight) return "ignore";
   if (input.pin.navigationGeneration !== input.currentGeneration) return "clear";
-  if (input.nativePage === 1 && input.committedIndex === 1) return "clear";
+  // Native can blip to page 1 then snap back to 0. Do not drop the guard
+  // on the first aligned sample — that manufactured the 0→1 snapback.
+  void input.nativePage;
+  void input.committedIndex;
   return "keep";
+}
+
+export type WatchForwardCommitLock = {
+  armed: boolean;
+  fromIndex: number;
+  toIndex: number;
+  navigationGeneration: number;
+};
+
+export function createWatchForwardCommitLock(): WatchForwardCommitLock {
+  return {
+    armed: false,
+    fromIndex: -1,
+    toIndex: -1,
+    navigationGeneration: -1,
+  };
+}
+
+/** Generation-bound lock after N→N+1. Not a timeout. Not cleared by a native blip. */
+export function armWatchForwardCommitLock(input: {
+  fromIndex: number;
+  toIndex: number;
+  navigationGeneration: number;
+}): WatchForwardCommitLock | null {
+  if (!Number.isFinite(input.navigationGeneration) || input.navigationGeneration < 0) {
+    return null;
+  }
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const to = sanitizeWatchListIndex(input.toIndex);
+  if (from == null || to == null) return null;
+  if (to !== from + 1) return null;
+  return {
+    armed: true,
+    fromIndex: from,
+    toIndex: to,
+    navigationGeneration: input.navigationGeneration,
+  };
+}
+
+export function shouldRejectLockedBackwardViewability(input: {
+  nominatedIndex: number | null;
+  committedIndex: number;
+  lock: WatchForwardCommitLock;
+  currentGeneration: number;
+  reverseDragEvidence: boolean;
+}): boolean {
+  if (!input.lock.armed) return false;
+  if (input.nominatedIndex == null) return false;
+  if (input.nominatedIndex !== input.lock.fromIndex) return false;
+  if (input.committedIndex !== input.lock.toIndex) return false;
+  if (input.lock.navigationGeneration !== input.currentGeneration) return true;
+  if (input.reverseDragEvidence) return false;
+  return true;
+}
+
+export function shouldClearForwardCommitLock(input: {
+  lock: WatchForwardCommitLock;
+  committedIndex: number;
+  currentGeneration: number;
+  reverseDragEvidence: boolean;
+}): boolean {
+  if (!input.lock.armed) return false;
+  if (input.lock.navigationGeneration !== input.currentGeneration) return true;
+  if (input.committedIndex !== input.lock.toIndex) return true;
+  return input.reverseDragEvidence === true;
+}
+
+export function shouldResyncNativeAfterStaleSettle(input: {
+  lock: WatchForwardCommitLock;
+  nativePage: number;
+  committedIndex: number;
+  reverseDragEvidence: boolean;
+}): boolean {
+  return (
+    input.lock.armed === true &&
+    input.reverseDragEvidence !== true &&
+    input.committedIndex === input.lock.toIndex &&
+    input.nativePage === input.lock.fromIndex
+  );
+}
+
+export function resolveForwardCommitNativeResyncOffset(input: {
+  lock: WatchForwardCommitLock;
+  frozenItemHeight: number;
+}): number | null {
+  if (!input.lock.armed) return null;
+  if (!Number.isFinite(input.frozenItemHeight) || input.frozenItemHeight <= 0) {
+    return null;
+  }
+  return input.lock.toIndex * input.frozenItemHeight;
+}
+
+export function hasGenuineReverseDragEvidence(input: {
+  committedIndex: number;
+  lockToIndex: number;
+  dragStartIndex: number;
+  dragStartOffset: number;
+  dragTargetIndex: number | null;
+  itemHeight: number;
+}): boolean {
+  if (input.committedIndex !== input.lockToIndex) return false;
+  if (input.dragStartIndex !== input.lockToIndex) return false;
+  if (input.dragTargetIndex !== input.lockToIndex - 1) return false;
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return false;
+  }
+  return (
+    resolveWatchIndexFromScrollOffset(
+      input.dragStartOffset,
+      input.itemHeight,
+      input.lockToIndex + 2
+    ) === input.lockToIndex
+  );
 }
 
 export function hasFirstWatchReverseDragEvidence(input: {
@@ -894,6 +1034,23 @@ export function reduceWatchHandoff(
           rejectReason: "auto-next-not-next",
         };
       }
+      if (
+        state.prepared &&
+        shouldRejectStaleWatchIdentityEvent({
+          eventIndex: event.index,
+          eventMediaId: event.mediaId,
+          eventGeneration: event.generation,
+          expectedIndex: state.prepared.index,
+          expectedMediaId: state.prepared.mediaId,
+          expectedGeneration: state.prepared.generation,
+        })
+      ) {
+        return {
+          next: state,
+          action: "reject",
+          rejectReason: "stale-current-end",
+        };
+      }
       return nominate(state, event, "auto-next");
     case "first-frame": {
       const target = asTarget({ ...event, firstFrame: true });
@@ -948,8 +1105,8 @@ export function reduceWatchHandoff(
         return { next: state, action: "none" };
       }
       if (
-        event.nativePage === 0 &&
-        state.committedIndex >= 1
+        state.committedIndex >= 1 &&
+        event.nativePage < state.committedIndex
       ) {
         return {
           next: state,

@@ -1,1 +1,11 @@
-{}
+{
+  "DESKTOP_WATCH_FIRST_0_TO_1_NATIVE_PIN_FOLD6_VALIDATION_V1": {
+    "task_id": "DESKTOP_WATCH_FIRST_0_TO_1_NATIVE_PIN_FOLD6_VALIDATION_V1",
+    "authorized_sha": "42ce3a8eb3326260fa05db223748f05d82fe4605",
+    "max_eas_builds": 1,
+    "build_count": 1,
+    "eas_build_ids": [
+      "2762f1cf-eead-4841-9636-3ff69178ec92"
+    ]
+  }
+}

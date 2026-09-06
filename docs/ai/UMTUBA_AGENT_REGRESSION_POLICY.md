@@ -40,8 +40,13 @@ OPEN:
 - random black video surface
 - missing 80% handoff
 - old audio bleeding into next video
+- first video 1→2 snapback to video 1
+- backward previously-watched video black surface
+- backward black video with continuing previous/current audio
 7536c11 additionally: video 2 black, 2→3 snapback to video 1
-Installed rollback device SHA: 1c56aca4eccd5795a3aa0429a55d507b855206df
+Installed rejected candidate: 42ce3a8 / 2762f1cf
+Prior rollback SHA: 1c56aca4eccd5795a3aa0429a55d507b855206df
+42ce3a8: 80% may have improved; do not promote 80% or Watch to OWNER_PASS
 ```
 
 Do not fix those failures inside a governance-only task.

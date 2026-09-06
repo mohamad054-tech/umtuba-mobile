@@ -108,13 +108,7 @@ export function shouldStartPlaybackAfterAsset(
 ): boolean {
   if (!input.playerAlive) return false;
   if (!input.isActive || !input.shouldPlay) return false;
-  if (
-    input.itemIndex != null &&
-    !mayAllowWatchHandoffAudio({
-      index: input.itemIndex,
-      isActive: input.isActive,
-    })
-  ) {
+  if (!watchAudioOwnerAllowsUnmute(input.itemIndex, input.isActive)) {
     return false;
   }
   if (!(input.nativeReady || input.jsReady)) return false;
@@ -199,13 +193,7 @@ export function shouldUnmuteWatchAfterFirstFrame(input: {
 }): boolean {
   if (!input.firstFrameConfirmed) return false;
   if (!input.isActive || !input.shouldPlay) return false;
-  if (
-    input.itemIndex != null &&
-    !mayAllowWatchHandoffAudio({
-      index: input.itemIndex,
-      isActive: input.isActive,
-    })
-  ) {
+  if (!watchAudioOwnerAllowsUnmute(input.itemIndex, input.isActive)) {
     return false;
   }
   if (!input.surfaceAttached) return false;
@@ -249,13 +237,45 @@ export function applyWatchInactiveTeardown(
 }
 
 let watchHandoffAudibleOwner: number | null = null;
+const watchPlayerRegistry = new Map<number, PlayerLike>();
 
 export function resetWatchHandoffAudibleOwner(): void {
   watchHandoffAudibleOwner = null;
 }
 
+export function resetWatchPlayerRegistry(): void {
+  watchPlayerRegistry.clear();
+}
+
 export function getWatchHandoffAudibleOwner(): number | null {
   return watchHandoffAudibleOwner;
+}
+
+export function registerWatchPlayer(
+  index: number,
+  player: PlayerLike | null | undefined
+): void {
+  if (!Number.isFinite(index)) return;
+  if (player == null) {
+    watchPlayerRegistry.delete(index);
+    return;
+  }
+  watchPlayerRegistry.set(index, player);
+}
+
+export function getRegisteredWatchPlayer(index: number): PlayerLike | null {
+  return watchPlayerRegistry.get(index) ?? null;
+}
+
+function watchAudioOwnerAllowsUnmute(
+  itemIndex: number | undefined,
+  isActive: boolean
+): boolean {
+  if (watchHandoffAudibleOwner == null) {
+    return isActive === true;
+  }
+  if (itemIndex == null) return false;
+  return mayAllowWatchHandoffAudio({ index: itemIndex, isActive });
 }
 
 export function mayAllowWatchHandoffAudio(input: {
@@ -267,9 +287,29 @@ export function mayAllowWatchHandoffAudio(input: {
   return input.index === watchHandoffAudibleOwner;
 }
 
+export function silenceRegisteredNonOwnerWatchPlayers(input: {
+  ownerIndex: number;
+  platform: WatchNativePlatform;
+  itemReady: boolean;
+}): number {
+  let silenced = 0;
+  for (const [index, player] of watchPlayerRegistry) {
+    if (index === input.ownerIndex) continue;
+    if (
+      applyWatchInactiveTeardown(player, {
+        platform: input.platform,
+        itemReady: input.itemReady,
+      })
+    ) {
+      silenced += 1;
+    }
+  }
+  return silenced;
+}
+
 /**
- * Ownership transfer: mute/pause the previous owner first, then allow
- * the next index to become the sole audible owner. No overlap window.
+ * Ownership transfer: claim the next owner first so stale first_frame
+ * cannot unmute the previous cell, then silence every non-owner.
  */
 export function applyWatchHandoffAudioTransfer(input: {
   previousPlayer: PlayerLike | null | undefined;
@@ -283,13 +323,18 @@ export function applyWatchHandoffAudioTransfer(input: {
   audibleOwnerIndex: number;
   simultaneousAudible: false;
 } {
+  watchHandoffAudibleOwner = input.nextIndex;
   if (input.previousPlayer) {
     applyWatchInactiveTeardown(input.previousPlayer, {
       platform: input.platform,
       itemReady: input.previousItemReady,
     });
   }
-  watchHandoffAudibleOwner = input.nextIndex;
+  silenceRegisteredNonOwnerWatchPlayers({
+    ownerIndex: input.nextIndex,
+    platform: input.platform,
+    itemReady: input.previousItemReady,
+  });
   return {
     previousSilenced: true,
     nextMayBecomeAudible: true,
