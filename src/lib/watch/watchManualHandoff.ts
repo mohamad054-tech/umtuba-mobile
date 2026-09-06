@@ -7,6 +7,7 @@ import {
   decideWatchViewabilityEvidence,
   shouldLoadOwnedWatchPlayer,
 } from "./watchActiveIndexArbiter";
+import { WATCH_VIEWABILITY_PERCENT_THRESHOLD } from "./watchOwnership";
 
 /** Direction is known once the drag crosses a fraction of one page. */
 const MANUAL_DIRECTION_PAGE_FRACTION = 0.12;
@@ -61,23 +62,33 @@ export function shouldCompleteManualHandoff(input: {
   targetIndex: number | null;
   targetSurfaceAttached: boolean;
   targetFirstFrame: boolean;
+  targetRetainedReady?: boolean;
 }): boolean {
   const native = sanitizeWatchListIndex(input.nativeSettledPage ?? Number.NaN);
   const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
   if (native == null || target == null) return false;
   if (native !== target) return false;
-  return input.targetSurfaceAttached === true && input.targetFirstFrame === true;
+  const presentationReady =
+    input.targetSurfaceAttached === true &&
+    (input.targetFirstFrame === true || input.targetRetainedReady === true);
+  return presentationReady;
 }
 
 export function shouldStartManualHandoffAudio(input: {
   targetSurfaceAttached: boolean;
   targetFirstFrame: boolean;
   targetIsActive: boolean;
+  isAudioOwner?: boolean;
+  handoffCommitted?: boolean;
 }): boolean {
+  if (input.isAudioOwner === false) return false;
+  if (input.handoffCommitted === false) return false;
   return (
     input.targetSurfaceAttached === true &&
     input.targetFirstFrame === true &&
-    input.targetIsActive === true
+    input.targetIsActive === true &&
+    input.isAudioOwner === true &&
+    input.handoffCommitted === true
   );
 }
 
@@ -149,10 +160,22 @@ export function shouldIgnoreStaleManualSettle(input: {
   return input.locked === true && input.nativePage !== input.activeIndex;
 }
 
+export type ManualHandoffPhase = "idle" | "intent" | "committed" | "cancelled";
+
 export type ManualHandoffPending = {
   navigationGeneration: number;
   targetIndex: number;
   targetMediaId: string;
+  phase: "intent";
+  nativePageForged: false;
+};
+
+export type ManualHandoffReadyProof = {
+  index: number;
+  mediaId: string;
+  surfaceAttached: boolean;
+  firstFrame: boolean;
+  generation: number;
 };
 
 export type ManualHandoffCancelReason =
@@ -183,6 +206,8 @@ export function createManualHandoffPending(input: {
     navigationGeneration: input.navigationGeneration,
     targetIndex,
     targetMediaId,
+    phase: "intent",
+    nativePageForged: false,
   };
 }
 
@@ -223,6 +248,9 @@ export function shouldAcceptPendingManualHandoff(input: {
   firstFrameMediaId: string | null;
   targetSurfaceAttached: boolean;
   targetFirstFrame: boolean;
+  targetRetainedReady?: boolean;
+  retainedReadyMediaId?: string | null;
+  nativePageSource?: "viewability" | "scroll-offset" | "proven-settle";
   screenFocused?: boolean;
   shareSheetOpen?: boolean;
   unmounted?: boolean;
@@ -231,6 +259,7 @@ export function shouldAcceptPendingManualHandoff(input: {
   if (input.unmounted === true) return false;
   if (input.screenFocused === false) return false;
   if (input.shareSheetOpen === true) return false;
+  if (input.nativePageSource === "viewability") return false;
   if (
     input.currentNavigationGeneration !== input.pending.navigationGeneration
   ) {
@@ -248,17 +277,22 @@ export function shouldAcceptPendingManualHandoff(input: {
   ) {
     return false;
   }
-  if (
-    !input.firstFrameMediaId ||
-    input.firstFrameMediaId !== input.pending.targetMediaId
-  ) {
+  const liveFirstFrame =
+    input.firstFrameMediaId != null &&
+    input.firstFrameMediaId === input.pending.targetMediaId &&
+    input.targetFirstFrame === true;
+  const retainedReady =
+    input.targetRetainedReady === true &&
+    input.retainedReadyMediaId === input.pending.targetMediaId;
+  if (!liveFirstFrame && !retainedReady) {
     return false;
   }
   return shouldCompleteManualHandoff({
     nativeSettledPage: input.nativeSettledPage,
     targetIndex: input.pending.targetIndex,
     targetSurfaceAttached: input.targetSurfaceAttached,
-    targetFirstFrame: input.targetFirstFrame,
+    targetFirstFrame: liveFirstFrame,
+    targetRetainedReady: retainedReady,
   });
 }
 
@@ -316,4 +350,126 @@ export function shouldMountOffscreenManualTargetVideoView(input: {
     warmNextSurface: true,
     platform: input.platform,
   });
+}
+
+export function resolveWatchViewabilityHandoffPhase(
+  visiblePercent: number
+): "none" | "intent" {
+  if (
+    !Number.isFinite(visiblePercent) ||
+    visiblePercent < WATCH_VIEWABILITY_PERCENT_THRESHOLD
+  ) {
+    return "none";
+  }
+  return "intent";
+}
+
+export function viewabilityMayCommitHandoff(): false {
+  return false;
+}
+
+export function viewabilityMayForgeNativePage(): false {
+  return false;
+}
+
+export function resolveWatchViewabilityIntentEffect(visiblePercent: number): {
+  phase: "none" | "intent";
+  commit: false;
+  forgeNativePage: false;
+  setAudioOwner: false;
+  unmuteTarget: false;
+} {
+  return {
+    phase: resolveWatchViewabilityHandoffPhase(visiblePercent),
+    commit: false,
+    forgeNativePage: false,
+    setAudioOwner: false,
+    unmuteTarget: false,
+  };
+}
+
+export function isRetainedPresentationReady(
+  proof: ManualHandoffReadyProof | null | undefined,
+  expected: { index: number; mediaId: string; generation?: number }
+): boolean {
+  if (!proof) return false;
+  if (proof.index !== expected.index) return false;
+  if (proof.mediaId !== expected.mediaId) return false;
+  if (
+    expected.generation != null &&
+    proof.generation !== expected.generation
+  ) {
+    return false;
+  }
+  return proof.surfaceAttached === true && proof.firstFrame === true;
+}
+
+export function resolveManualHandoffCancelTransaction(input: {
+  currentIndex: number;
+}): {
+  pending: null;
+  presentationOwner: number;
+  audibleOwner: number;
+  silenceTarget: true;
+  handoffState: "cancelled";
+  rejectStaleTargetEvents: true;
+} {
+  const current = sanitizeWatchListIndex(input.currentIndex) ?? 0;
+  return {
+    pending: null,
+    presentationOwner: current,
+    audibleOwner: current,
+    silenceTarget: true,
+    handoffState: "cancelled",
+    rejectStaleTargetEvents: true,
+  };
+}
+
+export function shouldRejectStaleManualHandoffEvent(input: {
+  eventIndex: number;
+  eventMediaId?: string | null;
+  eventGeneration?: number | null;
+  eventHandoffState?: ManualHandoffPhase;
+  pendingIndex: number | null;
+  pendingMediaId: string | null;
+  pendingGeneration: number;
+  handoffState: ManualHandoffPhase;
+}): boolean {
+  if (input.eventHandoffState === "cancelled") return true;
+  if (input.handoffState === "cancelled" && input.pendingIndex == null) {
+    return true;
+  }
+  if (input.handoffState === "committed") {
+    return input.eventIndex !== input.pendingIndex;
+  }
+  if (input.pendingIndex == null) return true;
+  if (input.eventIndex !== input.pendingIndex) return true;
+  if (
+    input.eventMediaId != null &&
+    input.pendingMediaId != null &&
+    input.eventMediaId !== input.pendingMediaId
+  ) {
+    return true;
+  }
+  if (
+    input.eventGeneration != null &&
+    input.eventGeneration !== input.pendingGeneration
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function targetMayBecomeAudible(input: {
+  handoffCommitted: boolean;
+  isAudioOwner: boolean;
+  isPresentationOwner: boolean;
+  previousSilenced: boolean;
+}): boolean {
+  return (
+    input.handoffCommitted === true &&
+    input.isAudioOwner === true &&
+    input.isPresentationOwner === true &&
+    input.previousSilenced === true
+  );
 }

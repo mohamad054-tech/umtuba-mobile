@@ -102,6 +102,19 @@ describe("3 first frame unmutes", () => {
         shouldPlay: true,
         userMuted: false,
         surfaceAttached: true,
+        isAudioOwner: false,
+        playerMediaId: "post-2",
+        visibleMediaId: "post-2",
+      })
+    ).toBe(false);
+    expect(
+      shouldUnmuteWatchAfterFirstFrame({
+        firstFrameConfirmed: true,
+        isActive: true,
+        shouldPlay: true,
+        userMuted: false,
+        surfaceAttached: true,
+        isAudioOwner: true,
         playerMediaId: "post-2",
         visibleMediaId: "post-2",
       })

@@ -214,6 +214,7 @@ type TimelineState = {
 type PlayerPaneProps = {
   src: string;
   isActive: boolean;
+  isAudioOwner?: boolean;
   shouldPlay: boolean;
   userPauseLatchRef?: { current: boolean };
   loadPlayer: boolean;
@@ -399,6 +400,7 @@ function ScrubBar({
 function WatchPlayerPane({
   src,
   isActive,
+  isAudioOwner = false,
   shouldPlay,
   userPauseLatchRef,
   loadPlayer,
@@ -430,6 +432,7 @@ function WatchPlayerPane({
   const statusRef = useRef(status);
   statusRef.current = status;
   const isActiveRef = useRef(isActive);
+  const isAudioOwnerRef = useRef(isAudioOwner);
   const shouldPlayRef = useRef(shouldPlay);
   const ownershipGenerationRef = useRef(ownershipGeneration);
   const playGenerationRef = useRef<number | null>(null);
@@ -444,6 +447,7 @@ function WatchPlayerPane({
   const loopRef = useRef(loop);
   const firstFrameRef = useRef(false);
   isActiveRef.current = isActive;
+  isAudioOwnerRef.current = isAudioOwner;
   shouldPlayRef.current =
     shouldPlay && userPauseLatchRef?.current !== true;
   ownershipGenerationRef.current = ownershipGeneration;
@@ -756,7 +760,7 @@ function WatchPlayerPane({
           ? playbackRate
           : DEFAULT_WATCH_PLAYBACK_SPEED;
       });
-      if (isActive && !intent.muted && intent.volume > 0) {
+      if (isActive && isAudioOwner && !intent.muted && intent.volume > 0) {
         markWatchTransition(nativePlatform, "audio_start");
       }
       return;
@@ -773,6 +777,7 @@ function WatchPlayerPane({
     volume,
     loop,
     isActive,
+    isAudioOwner,
     ownershipGeneration,
     status,
     nativePlatform,
@@ -883,6 +888,7 @@ function WatchPlayerPane({
         shouldPlay: shouldPlayRef.current,
         userMuted: mutedRef.current,
         surfaceAttached: attachSurfaceRef.current,
+        isAudioOwner: isAudioOwnerRef.current,
         playerMediaId: mediaIdRef.current,
         visibleMediaId: mediaId,
       })
@@ -1372,6 +1378,7 @@ function WatchVideoCardComponent({
           listIndex={listIndex ?? -1}
           committedActiveIndex={committedActiveIndex}
           isActive={isActive}
+          isAudioOwner={isAudioOwner}
           shouldPlay={shouldPlay}
           userPauseLatchRef={userPauseLatchRef}
           loadPlayer={loadPlayer}

@@ -183,10 +183,12 @@ export function shouldUnmuteWatchAfterFirstFrame(input: {
   shouldPlay: boolean;
   userMuted: boolean;
   surfaceAttached: boolean;
+  isAudioOwner?: boolean;
   playerMediaId?: string | null;
   visibleMediaId?: string | null;
 }): boolean {
   if (!input.firstFrameConfirmed) return false;
+  if (input.isAudioOwner !== true) return false;
   if (!input.isActive || !input.shouldPlay) return false;
   if (!input.surfaceAttached) return false;
   if (input.userMuted) return false;

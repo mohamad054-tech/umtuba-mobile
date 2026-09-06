@@ -162,14 +162,19 @@ import {
 } from "@/src/lib/watch/watchActiveIndexArbiter";
 import {
   createManualHandoffPending,
+  isRetainedPresentationReady,
   resolveAndroidManualSettleAction,
+  resolveManualHandoffCancelTransaction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
+  shouldRejectStaleManualHandoffEvent,
   shouldWarmManualTarget,
   type ManualHandoffPending,
+  type ManualHandoffPhase,
+  type ManualHandoffReadyProof,
 } from "@/src/lib/watch/watchManualHandoff";
 import {
   previousRouteNameFromState,
@@ -308,11 +313,14 @@ export default function WatchScreen() {
   );
   const warmedTargetIndexRef = useRef<number | null>(null);
   const pendingManualRef = useRef<
-    (ManualHandoffPending & { generation: number; nativePage: number }) | null
+    (ManualHandoffPending & { generation: number }) | null
   >(null);
   const manualHandoffGenRef = useRef(0);
+  const handoffPhaseRef = useRef<ManualHandoffPhase>("idle");
+  const retainedReadyRef = useRef<Record<number, ManualHandoffReadyProof>>({});
   const dragStartIndexRef = useRef(0);
   const manualDragActiveRef = useRef(false);
+  const lastProvenNativeSettleRef = useRef<number | null>(0);
   const scrollToWatchIndexRef = useRef<
     (
       nextIndex: number,
@@ -327,8 +335,14 @@ export default function WatchScreen() {
   }, []);
 
   const cancelPendingManualHandoff = useCallback(() => {
+    const restore = resolveManualHandoffCancelTransaction({
+      currentIndex: dragStartIndexRef.current,
+    });
     manualHandoffGenRef.current += 1;
     pendingManualRef.current = null;
+    handoffPhaseRef.current = restore.handoffState;
+    pendingAudibleRef.current = null;
+    setAudibleOwner(restore.audibleOwner);
   }, []);
 
   const applyWatchIndexDecision = useCallback(
@@ -800,17 +814,28 @@ export default function WatchScreen() {
     const currentTargetMediaId = targetVideo
       ? watchMediaIdentity(targetVideo)
       : null;
+    const retained = retainedReadyRef.current[pending.targetIndex];
+    const retainedReady = isRetainedPresentationReady(retained, {
+      index: pending.targetIndex,
+      mediaId: pending.targetMediaId,
+    });
+    if (manualDragActiveRef.current) return;
+    const realNativePage = lastProvenNativeSettleRef.current;
     if (
       !shouldAcceptPendingManualHandoff({
         pending,
         currentNavigationGeneration: arbiterRef.current.navigationGeneration,
-        nativeSettledPage: pending.nativePage,
+        nativeSettledPage: realNativePage,
+        nativePageSource: "proven-settle",
         currentTargetMediaId,
         firstFrameMediaId: targetOwnsState ? state.mediaId : null,
         targetSurfaceAttached:
-          targetOwnsState &&
-          (state.surfaceAttached === true || state.firstFrame === true),
+          (targetOwnsState &&
+            (state.surfaceAttached === true || state.firstFrame === true)) ||
+          retainedReady,
         targetFirstFrame: targetOwnsState && state.firstFrame === true,
+        targetRetainedReady: retainedReady,
+        retainedReadyMediaId: retainedReady ? retained?.mediaId ?? null : null,
         screenFocused: screenFocusedRef.current,
         shareSheetOpen: shareSheetOpenRef.current,
         unmounted: false,
@@ -819,13 +844,14 @@ export default function WatchScreen() {
       return;
     }
     pendingManualRef.current = null;
+    handoffPhaseRef.current = "committed";
     applyWatchIndexDecisionRef.current(
       decideWatchActiveIndexClaim({
         arbiter: arbiterRef.current,
         reason: "programmatic",
         requestedIndex: pending.targetIndex,
         navigationGeneration: arbiterRef.current.navigationGeneration,
-        nativeSettledPage: pending.targetIndex,
+        nativeSettledPage: realNativePage,
       })
     );
   }, []);
@@ -861,12 +887,12 @@ export default function WatchScreen() {
         fromIndex: dragStartIndexRef.current,
       });
       if (retarget === "cancel") {
-        pendingManualRef.current = null;
+        cancelPendingManualHandoff();
         applyWarmedTargetIndex(null);
         return;
       }
       if (retarget === "retarget") {
-        pendingManualRef.current = null;
+        cancelPendingManualHandoff();
       }
       if (
         !shouldWarmManualTarget({
@@ -878,7 +904,7 @@ export default function WatchScreen() {
       }
       applyWarmedTargetIndex(target);
     },
-    [applyWarmedTargetIndex]
+    [applyWarmedTargetIndex, cancelPendingManualHandoff]
   );
 
   const onWatchScrollSettle = useCallback(
@@ -893,6 +919,7 @@ export default function WatchScreen() {
         videosLengthRef.current
       );
       if (nativePage == null) return;
+      lastProvenNativeSettleRef.current = nativePage;
       if (
         shouldIgnoreStaleManualSettle({
           locked: Date.now() < programmaticAdvanceUntilRef.current,
@@ -965,10 +992,10 @@ export default function WatchScreen() {
       }
       const generation = manualHandoffGenRef.current + 1;
       manualHandoffGenRef.current = generation;
+      handoffPhaseRef.current = "intent";
       pendingManualRef.current = {
         ...created,
         generation,
-        nativePage,
       };
       tryCompletePendingManualHandoff();
     },
@@ -1007,12 +1034,11 @@ export default function WatchScreen() {
       applyWarmedTargetIndex(toIndex);
       const generation = manualHandoffGenRef.current + 1;
       manualHandoffGenRef.current = generation;
+      handoffPhaseRef.current = "intent";
       pendingManualRef.current = {
         ...created,
         generation,
-        nativePage: toIndex,
       };
-      tryCompletePendingManualHandoff();
     }
   ).current;
 
@@ -1669,10 +1695,45 @@ export default function WatchScreen() {
         }
         onHandoffState={
           Platform.OS === "android" &&
-          (index === activeIndex + 1 || index === warmedTargetIndex)
+          (index === activeIndex + 1 ||
+            index === warmedTargetIndex ||
+            index === previousIndex ||
+            index === activeIndex)
             ? (state) => {
-                nextHandoffRef.current = { index, ...state };
-                tryCompletePendingManualHandoff();
+                if (
+                  state.surfaceAttached &&
+                  (state.firstFrame || state.ready)
+                ) {
+                  retainedReadyRef.current[index] = {
+                    index,
+                    mediaId: state.mediaId,
+                    surfaceAttached: state.surfaceAttached,
+                    firstFrame: state.firstFrame === true,
+                    generation: playbackGeneration,
+                  };
+                }
+                if (
+                  shouldRejectStaleManualHandoffEvent({
+                    eventIndex: index,
+                    eventMediaId: state.mediaId,
+                    pendingIndex: pendingManualRef.current?.targetIndex ?? null,
+                    pendingMediaId:
+                      pendingManualRef.current?.targetMediaId ?? null,
+                    pendingGeneration:
+                      pendingManualRef.current?.generation ?? -1,
+                    handoffState: handoffPhaseRef.current,
+                  })
+                ) {
+                  return;
+                }
+                if (
+                  index === activeIndex + 1 ||
+                  index === warmedTargetIndex ||
+                  index === previousIndex
+                ) {
+                  nextHandoffRef.current = { index, ...state };
+                  tryCompletePendingManualHandoff();
+                }
               }
             : undefined
         }
