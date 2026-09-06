@@ -129,6 +129,7 @@ import {
 import {
   markWatchCache,
   markWatchCellBind,
+  markWatchDrag,
   markWatchTransition,
 } from "@/src/lib/watch/watchTransitionTrace";
 import {
@@ -168,6 +169,7 @@ import {
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveManualReverseAfter80Commit,
+  explainManual80CommitReject,
   resolveManualScrollProgress,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
@@ -177,6 +179,7 @@ import {
   shouldRecordManualHandoffReadyProof,
   shouldRejectStaleManualHandoffEvent,
   shouldWarmManualTarget,
+  viewabilityMayArmForwardManualHandoff,
   viewabilityMayCommitManualHandoff,
   type ManualHandoffPending,
   type ManualHandoffPhase,
@@ -841,15 +844,127 @@ export default function WatchScreen() {
     };
   }, []);
 
+  const lastDragLogAtRef = useRef(0);
+  const logManualDragFrame = useCallback(
+    (input: {
+      beginDrag?: boolean;
+      commitAttempt: boolean;
+      commitAccepted: boolean;
+      rejectReason: string;
+      offsetY?: number;
+      visiblePercent?: number;
+      targetIndex?: number | null;
+    }) => {
+      if (Platform.OS !== "android") return;
+      const offsetY = input.offsetY ?? scrollOffsetRef.current;
+      const pageHeight = itemHeightRef.current;
+      const fromIndex = dragStartIndexRef.current;
+      const progress =
+        input.visiblePercent == null
+          ? resolveManualScrollProgress({
+              fromIndex,
+              currentOffset: offsetY,
+              itemHeight: pageHeight,
+              itemCount: videosLengthRef.current,
+            })
+          : {
+              targetIndex: input.targetIndex ?? null,
+              visiblePercent: input.visiblePercent,
+            };
+      if (
+        !input.beginDrag &&
+        !input.commitAttempt &&
+        progress.visiblePercent < 60
+      ) {
+        return;
+      }
+      const now = Date.now();
+      if (!input.beginDrag && !input.commitAttempt && now - lastDragLogAtRef.current < 80) {
+        return;
+      }
+      lastDragLogAtRef.current = now;
+      const pending = pendingManualRef.current;
+      const ready = pending
+        ? collectManualTargetReady(pending.targetIndex, pending.targetMediaId)
+        : null;
+      markWatchDrag("android", {
+        fingerDown: manualDragActiveRef.current,
+        beginDrag: input.beginDrag === true,
+        contentOffsetY: offsetY,
+        pageHeight,
+        fromIndex,
+        targetIndex: progress.targetIndex,
+        displacementPx: Math.abs(offsetY - fromIndex * pageHeight),
+        displacementPercent: progress.visiblePercent,
+        activeIndex: activeIndexRef.current,
+        pendingTarget: pending?.targetIndex ?? null,
+        targetReady:
+          ready != null &&
+          (ready.targetFirstFrame === true || ready.targetRetainedReady === true),
+        surfaceReady: ready?.targetSurfaceAttached === true,
+        firstFrameReady: ready?.targetFirstFrame === true,
+        audioOwner: pendingAudibleRef.current,
+        commitAttempt: input.commitAttempt,
+        commitAccepted: input.commitAccepted,
+        rejectReason: input.rejectReason,
+      });
+    },
+    [collectManualTargetReady]
+  );
+
   const tryCommitManual80Ready = useCallback(() => {
     const pending = pendingManualRef.current;
-    if (!pending) return;
+    const progress = resolveManualScrollProgress({
+      fromIndex: dragStartIndexRef.current,
+      currentOffset: scrollOffsetRef.current,
+      itemHeight: itemHeightRef.current,
+      itemCount: videosLengthRef.current,
+    });
+    const ready = pending
+      ? collectManualTargetReady(pending.targetIndex, pending.targetMediaId)
+      : {
+          currentTargetMediaId: null,
+          firstFrameMediaId: null,
+          targetSurfaceAttached: false,
+          targetFirstFrame: false,
+          targetRetainedReady: false,
+          retainedReadyMediaId: null,
+        };
+    const reject = explainManual80CommitReject({
+      fingerDown: manualDragActiveRef.current,
+      visiblePercent: Math.max(
+        progress.visiblePercent,
+        pending != null ? WATCH_VIEWABILITY_PERCENT_THRESHOLD : 0
+      ),
+      fromIndex: dragStartIndexRef.current,
+      targetIndex: pending?.targetIndex ?? progress.targetIndex,
+      pendingTarget: pending?.targetIndex ?? null,
+      pendingGeneration: pending?.generation ?? null,
+      currentGeneration: manualHandoffGenRef.current,
+      handoffPhase: handoffPhaseRef.current,
+      targetReady:
+        ready.targetFirstFrame === true || ready.targetRetainedReady === true,
+      mediaMatches:
+        ready.currentTargetMediaId != null &&
+        pending != null &&
+        ready.currentTargetMediaId === pending.targetMediaId,
+      screenFocused: screenFocusedRef.current,
+      shareSheetOpen: shareSheetOpenRef.current,
+      unmounted: false,
+      nativePageSource: "manual-80-ready",
+    });
+    if (!pending) {
+      logManualDragFrame({
+        commitAttempt: true,
+        commitAccepted: false,
+        rejectReason: reject,
+        visiblePercent: progress.visiblePercent,
+        targetIndex: progress.targetIndex,
+      });
+      return;
+    }
     if (manualHandoffGenRef.current !== pending.generation) return;
     if (handoffPhaseRef.current === "committed") return;
-    const ready = collectManualTargetReady(
-      pending.targetIndex,
-      pending.targetMediaId
-    );
     if (
       !shouldAcceptPendingManualHandoff({
         pending,
@@ -862,12 +977,29 @@ export default function WatchScreen() {
         unmounted: false,
       })
     ) {
+      logManualDragFrame({
+        commitAttempt: true,
+        commitAccepted: false,
+        rejectReason: reject === "ok-commit" ? "target-not-ready" : reject,
+        visiblePercent: progress.visiblePercent,
+        targetIndex: pending.targetIndex,
+      });
       return;
     }
     pendingManualRef.current = null;
     handoffPhaseRef.current = "committed";
     dragStartIndexRef.current = pending.targetIndex;
     syncNativeAfterManual80Ref.current = pending.targetIndex;
+    logManualDragFrame({
+      commitAttempt: true,
+      commitAccepted: true,
+      rejectReason: "ok-commit",
+      visiblePercent: Math.max(
+        progress.visiblePercent,
+        WATCH_VIEWABILITY_PERCENT_THRESHOLD
+      ),
+      targetIndex: pending.targetIndex,
+    });
     applyWatchIndexDecisionRef.current(
       decideWatchActiveIndexClaim({
         arbiter: arbiterRef.current,
@@ -877,7 +1009,7 @@ export default function WatchScreen() {
         nativeSettledPage: pending.targetIndex,
       })
     );
-  }, [collectManualTargetReady]);
+  }, [collectManualTargetReady, logManualDragFrame]);
 
   const tryCompletePendingManualHandoff = useCallback(() => {
     const pending = pendingManualRef.current;
@@ -955,10 +1087,19 @@ export default function WatchScreen() {
     [tryCommitManual80Ready]
   );
 
+  const armPendingManualTargetRef = useRef(armPendingManualTarget);
+  armPendingManualTargetRef.current = armPendingManualTarget;
+
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
     dragStartIndexRef.current = activeIndexRef.current;
-  }, []);
+    logManualDragFrame({
+      beginDrag: true,
+      commitAttempt: false,
+      commitAccepted: false,
+      rejectReason: "begin-drag",
+    });
+  }, [logManualDragFrame]);
 
   const onWatchScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -1044,9 +1185,33 @@ export default function WatchScreen() {
         })
       ) {
         armPendingManualTarget(target);
+      } else {
+        logManualDragFrame({
+          commitAttempt: false,
+          commitAccepted: false,
+          rejectReason: explainManual80CommitReject({
+            fingerDown: true,
+            visiblePercent: progress.visiblePercent,
+            fromIndex: dragStartIndexRef.current,
+            targetIndex: target,
+            pendingTarget: pendingManualRef.current?.targetIndex ?? null,
+            pendingGeneration: pendingManualRef.current?.generation ?? null,
+            currentGeneration: manualHandoffGenRef.current,
+            handoffPhase: handoffPhaseRef.current,
+            targetReady: false,
+            mediaMatches: true,
+          }),
+          visiblePercent: progress.visiblePercent,
+          targetIndex: target,
+        });
       }
     },
-    [applyWarmedTargetIndex, armPendingManualTarget, cancelPendingManualHandoff]
+    [
+      applyWarmedTargetIndex,
+      armPendingManualTarget,
+      cancelPendingManualHandoff,
+      logManualDragFrame,
+    ]
   );
 
   const onWatchScrollSettle = useCallback(
@@ -1199,6 +1364,13 @@ export default function WatchScreen() {
         return;
       }
       applyWarmedTargetIndex(toIndex);
+      if (
+        viewabilityMayArmForwardManualHandoff() &&
+        manualDragActiveRef.current &&
+        toIndex !== activeIndexRef.current
+      ) {
+        armPendingManualTargetRef.current(toIndex);
+      }
     }
   ).current;
 

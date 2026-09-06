@@ -26,21 +26,7 @@
     "WATCH_80_PERCENT_HANDOFF",
     "WATCH_5_VIDEO_ROLLING_CACHE",
     "WATCH_BACKWARD_RETENTION",
-    "WATCH_NO_REDOWLOAD_RETAINED",
-    "WATCH_VOLUME_VERTICAL_SIDE_CONTROL",
-    "WATCH_PROGRESS_DIRECTION",
-    "WATCH_SEEK_DIRECTION",
-    "WATCH_FOLD6_CONTAIN_FOLDED",
-    "WATCH_FOLD6_CONTAIN_UNFOLDED",
-    "WATCH_FOLD_TRANSITION",
-    "WATCH_BACK_DOUBLE_PRESS",
-    "WATCH_NO_HISTORY_PER_SWIPE",
-    "WATCH_PROFILE_RETURN",
-    "WATCH_COMMENTS_RETURN",
-    "WATCH_SHARE_RETURN",
-    "WATCH_PLAY_PAUSE",
-    "WATCH_DOUBLE_TAP_LIKE",
-    "WATCH_AUTHOR_PROFILE_TARGET"
+    "WATCH_NO_REDOWLOAD_RETAINED"
   ],
   "required_tests": [
     "src/lib/watch/**/*.test.ts",
@@ -70,7 +56,7 @@
   "device_evidence": {
     "device": "RFCX718LVHK SM-F956B",
     "date": "2026-09-06",
-    "notes": "Instrument real drag path first. No EAS until 80% commit-before-UP is proven locally or the exact reject reason is proven. Not OWNER_PASS."
+    "notes": "Instrument real drag path first. No EAS until exact reject reason is proven. Not OWNER_PASS."
   },
-  "notes": "Do not reopen Watch architecture. Cache 5 unchanged. Fold6 remains DEVICE_FAIL until device proof."
+  "notes": "Do not reopen Watch architecture. Cache 5 unchanged."
 }

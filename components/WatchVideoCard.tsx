@@ -70,6 +70,7 @@ import {
   watchMediaIdentity,
 } from "@/src/lib/watch/watchCellBinding";
 import {
+  markWatchAudioStartOnce,
   markWatchCellBind,
   markWatchTransition,
 } from "@/src/lib/watch/watchTransitionTrace";
@@ -446,6 +447,17 @@ function WatchPlayerPane({
   const volumeRef = useRef(volume);
   const loopRef = useRef(loop);
   const firstFrameRef = useRef(false);
+  const lastAudioStartKeyRef = useRef<string | null>(null);
+  const markAudioStartOnce = () => {
+    if (isAudioOwnerRef.current !== true) return;
+    const result = markWatchAudioStartOnce(nativePlatform, {
+      index: listIndex,
+      mediaId: mediaIdRef.current,
+      generation: ownershipGenerationRef.current,
+      lastKey: lastAudioStartKeyRef.current,
+    });
+    lastAudioStartKeyRef.current = result.key;
+  };
   isActiveRef.current = isActive;
   isAudioOwnerRef.current = isAudioOwner;
   shouldPlayRef.current =
@@ -548,12 +560,8 @@ function WatchPlayerPane({
             ? playbackRate
             : DEFAULT_WATCH_PLAYBACK_SPEED;
         });
-        if (
-          !intent.muted &&
-          intent.volume > 0 &&
-          isAudioOwnerRef.current === true
-        ) {
-          markWatchTransition(nativePlatform, "audio_start");
+        if (!intent.muted && intent.volume > 0) {
+          markAudioStartOnce();
         }
       } else {
         playGenerationRef.current = null;
@@ -765,7 +773,7 @@ function WatchPlayerPane({
           : DEFAULT_WATCH_PLAYBACK_SPEED;
       });
       if (isActive && isAudioOwner && !intent.muted && intent.volume > 0) {
-        markWatchTransition(nativePlatform, "audio_start");
+        markAudioStartOnce();
       }
       return;
     }
@@ -901,7 +909,7 @@ function WatchPlayerPane({
         alive.muted = false;
         alive.volume = volumeRef.current;
       });
-      markWatchTransition(nativePlatform, "audio_start");
+      markAudioStartOnce();
     }
     onFirstFrame?.();
   }, [mediaId, nativePlatform, onFirstFrame, player]);

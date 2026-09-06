@@ -63,9 +63,11 @@ import {
   shouldPinCommittedPageOnSettle,
   resolveManualScrollProgress,
   targetMayBecomeAudible,
+  viewabilityMayArmForwardManualHandoff,
   viewabilityMayCommitHandoff,
   viewabilityMayCommitManualHandoff,
   viewabilityMayForgeNativePage,
+  explainManual80CommitReject,
 } from "./watchManualHandoff";
 
 describe("manual handoff parity with auto-advance", () => {
@@ -1263,6 +1265,69 @@ describe("manual first-swipe 80% commit without full settle", () => {
         handoffState: "idle",
       })
     ).toBe(true);
+  });
+
+  it("16. viewability arms forward commit but still does not write activeIndex", () => {
+    expect(viewabilityMayArmForwardManualHandoff()).toBe(true);
+    expect(viewabilityMayCommitManualHandoff()).toBe(false);
+    expect(manualViewabilityMayWriteActiveIndex()).toBe(false);
+    expect(
+      explainManual80CommitReject({
+        fingerDown: true,
+        visiblePercent: 80,
+        fromIndex: 0,
+        targetIndex: 1,
+        pendingTarget: 1,
+        pendingGeneration: 2,
+        currentGeneration: 2,
+        handoffPhase: "intent",
+        targetReady: true,
+        mediaMatches: true,
+        nativePageSource: "manual-80-ready",
+      })
+    ).toBe("ok-commit");
+    expect(
+      explainManual80CommitReject({
+        fingerDown: true,
+        visiblePercent: 70,
+        fromIndex: 0,
+        targetIndex: 1,
+        pendingTarget: null,
+        pendingGeneration: null,
+        currentGeneration: 0,
+        handoffPhase: "intent",
+        targetReady: true,
+        mediaMatches: true,
+      })
+    ).toBe("below-80");
+    expect(
+      explainManual80CommitReject({
+        fingerDown: true,
+        visiblePercent: 80,
+        fromIndex: 0,
+        targetIndex: 1,
+        pendingTarget: null,
+        pendingGeneration: null,
+        currentGeneration: 0,
+        handoffPhase: "intent",
+        targetReady: true,
+        mediaMatches: true,
+      })
+    ).toBe("no-pending");
+    expect(
+      explainManual80CommitReject({
+        fingerDown: false,
+        visiblePercent: 80,
+        fromIndex: 0,
+        targetIndex: 1,
+        pendingTarget: 1,
+        pendingGeneration: 1,
+        currentGeneration: 1,
+        handoffPhase: "intent",
+        targetReady: true,
+        mediaMatches: true,
+      })
+    ).toBe("drag-inactive");
   });
 
   it("15. bounce settle after 1→2 pins page 1 instead of snapback", () => {

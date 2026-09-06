@@ -382,6 +382,76 @@ export function viewabilityMayCommitManualHandoff(): false {
   return false;
 }
 
+/** Viewability still does not write activeIndex. It may arm the same tryCommit path. */
+export function viewabilityMayArmForwardManualHandoff(): true {
+  return true;
+}
+
+export type Manual80CommitRejectReason =
+  | "ok-commit"
+  | "below-80"
+  | "no-target"
+  | "target-equals-from"
+  | "drag-inactive"
+  | "no-pending"
+  | "generation-mismatch"
+  | "already-committed"
+  | "unmounted"
+  | "screen-blurred"
+  | "share-open"
+  | "viewability-forged-page"
+  | "nav-generation-mismatch"
+  | "media-mismatch"
+  | "target-not-ready"
+  | "native-settle-required";
+
+export function explainManual80CommitReject(input: {
+  fingerDown: boolean;
+  visiblePercent: number;
+  fromIndex: number;
+  targetIndex: number | null;
+  pendingTarget: number | null;
+  pendingGeneration: number | null;
+  currentGeneration: number;
+  handoffPhase: ManualHandoffPhase;
+  targetReady: boolean;
+  mediaMatches: boolean;
+  screenFocused?: boolean;
+  shareSheetOpen?: boolean;
+  unmounted?: boolean;
+  nativePageSource?:
+    | "viewability"
+    | "scroll-offset"
+    | "proven-settle"
+    | "manual-80-ready";
+}): Manual80CommitRejectReason {
+  if (input.unmounted === true) return "unmounted";
+  if (input.screenFocused === false) return "screen-blurred";
+  if (input.shareSheetOpen === true) return "share-open";
+  if (input.handoffPhase === "committed") return "already-committed";
+  if (input.nativePageSource === "viewability") return "viewability-forged-page";
+  if (!input.fingerDown) return "drag-inactive";
+  if (input.targetIndex == null) return "no-target";
+  if (input.targetIndex === input.fromIndex) return "target-equals-from";
+  if (
+    !Number.isFinite(input.visiblePercent) ||
+    input.visiblePercent < WATCH_VIEWABILITY_PERCENT_THRESHOLD
+  ) {
+    return "below-80";
+  }
+  if (input.pendingTarget == null) return "no-pending";
+  if (
+    input.pendingGeneration != null &&
+    input.pendingGeneration !== input.currentGeneration
+  ) {
+    return "generation-mismatch";
+  }
+  if (input.currentGeneration < 0) return "nav-generation-mismatch";
+  if (!input.mediaMatches) return "media-mismatch";
+  if (!input.targetReady) return "target-not-ready";
+  return "ok-commit";
+}
+
 /** Scroll-offset progress toward the neighbor. Not native-page rounding (50%). */
 export function resolveManualScrollProgress(input: {
   fromIndex: number;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  markWatchAudioStartOnce,
   markWatchCache,
   markWatchCellBind,
   markWatchTransition,
@@ -46,5 +47,29 @@ describe("markWatchTransition", () => {
     });
     expect(cache?.target).toBe(5);
     expect(JSON.stringify(cache)).not.toMatch(/https?:\/\//);
+  });
+
+  it("emits one audio_start per owner generation", () => {
+    const first = markWatchAudioStartOnce("android", {
+      index: 1,
+      mediaId: "post-826",
+      generation: 4,
+      lastKey: null,
+    });
+    expect(first.marked).toBe(true);
+    const repeat = markWatchAudioStartOnce("android", {
+      index: 1,
+      mediaId: "post-826",
+      generation: 4,
+      lastKey: first.key,
+    });
+    expect(repeat.marked).toBe(false);
+    const next = markWatchAudioStartOnce("android", {
+      index: 1,
+      mediaId: "post-826",
+      generation: 5,
+      lastKey: first.key,
+    });
+    expect(next.marked).toBe(true);
   });
 });

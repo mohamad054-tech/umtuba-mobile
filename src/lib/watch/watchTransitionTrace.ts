@@ -10,6 +10,28 @@ export type WatchTransitionPhase =
   | "surface_attached"
   | "audio_start";
 
+export type WatchDragMark = {
+  t: number;
+  phase: "WATCH_DRAG";
+  fingerDown: boolean;
+  beginDrag: boolean;
+  contentOffsetY: number;
+  pageHeight: number;
+  fromIndex: number;
+  targetIndex: number | null;
+  displacementPx: number;
+  displacementPercent: number;
+  activeIndex: number;
+  pendingTarget: number | null;
+  targetReady: boolean;
+  surfaceReady: boolean;
+  firstFrameReady: boolean;
+  audioOwner: number | null;
+  commitAttempt: boolean;
+  commitAccepted: boolean;
+  rejectReason: string;
+};
+
 export type WatchTransitionMark = {
   t: number;
   phase: WatchTransitionPhase;
@@ -64,6 +86,37 @@ export function markWatchCellBind(
   };
   console.log(`WATCH_BIND ${JSON.stringify(mark)}`);
   return mark;
+}
+
+export function markWatchDrag(
+  platform: string | null | undefined,
+  extra: Omit<WatchDragMark, "t" | "phase">
+): WatchDragMark | null {
+  if (platform !== "android") return null;
+  const mark: WatchDragMark = {
+    t: Date.now(),
+    phase: "WATCH_DRAG",
+    ...extra,
+  };
+  console.log(`WATCH_DRAG ${JSON.stringify(mark)}`);
+  return mark;
+}
+
+export function markWatchAudioStartOnce(
+  platform: string | null | undefined,
+  input: {
+    index: number;
+    mediaId: string;
+    generation: number;
+    lastKey: string | null;
+  }
+): { marked: boolean; key: string } {
+  const key = `${input.index}:${input.mediaId}:${input.generation}`;
+  if (input.lastKey === key) {
+    return { marked: false, key };
+  }
+  markWatchTransition(platform, "audio_start", { index: input.index });
+  return { marked: true, key };
 }
 
 export function markWatchCache(
