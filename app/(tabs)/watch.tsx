@@ -7,7 +7,7 @@ import {
   useSegments,
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -183,8 +183,12 @@ import {
   shouldConsumeHardwareBack,
   shouldInterceptWatchRootBack,
 } from "@/src/lib/nav/watchRootExit";
-import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
 import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
+import {
+  resolveWatchCommitExtraData,
+  shouldHonorViewability80Intent,
+  WATCH_VIEWABILITY_PERCENT_THRESHOLD,
+} from "@/src/lib/watch/watchOwnership";
 import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
 import { watchLightHaptic } from "@/src/lib/watch/watchHaptics";
 import {
@@ -231,6 +235,8 @@ export default function WatchScreen() {
     number | null
   >(null);
   const [playbackGeneration, setPlaybackGeneration] = useState(0);
+  const [audibleOwner, setAudibleOwner] = useState<number | null>(0);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
   const [volume, setVolume] = useState(DEFAULT_WATCH_VOLUME);
   const [autoNext, setAutoNext] = useState(DEFAULT_WATCH_AUTO_NEXT);
@@ -269,6 +275,7 @@ export default function WatchScreen() {
   const urlGenerationRef = useRef(0);
   const activeIndexRef = useRef(0);
   const playbackGenerationRef = useRef(0);
+  const pendingAudibleRef = useRef<number | null>(null);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
   const scrollOffsetRef = useRef(0);
@@ -330,14 +337,12 @@ export default function WatchScreen() {
       const nextIndex = decision.next.activeIndex;
       arbiterRef.current = decision.next;
       setLastSettledNativePage(decision.next.lastSettledNativePage);
-      const nextGeneration = bumpWatchOwnerGeneration(
-        playbackGenerationRef.current,
-        activeIndexRef.current,
-        nextIndex
-      );
-      if (nextGeneration !== playbackGenerationRef.current) {
-        playbackGenerationRef.current = nextGeneration;
-        setPlaybackGeneration(nextGeneration);
+      const fromIndex = activeIndexRef.current;
+      if (fromIndex !== nextIndex) {
+        setPreviousIndex(fromIndex);
+        playbackGenerationRef.current += 1;
+        setAudibleOwner(null);
+        pendingAudibleRef.current = nextIndex;
       }
       activeIndexRef.current = nextIndex;
       setActiveIndex(nextIndex);
@@ -360,6 +365,14 @@ export default function WatchScreen() {
 
   const applyWatchIndexDecisionRef = useRef(applyWatchIndexDecision);
   applyWatchIndexDecisionRef.current = applyWatchIndexDecision;
+
+  useLayoutEffect(() => {
+    const pending = pendingAudibleRef.current;
+    if (pending == null) return;
+    if (pending !== activeIndex) return;
+    pendingAudibleRef.current = null;
+    setAudibleOwner(pending);
+  }, [activeIndex]);
 
   useEffect(() => {
     remainingMsRef.current = null;
@@ -806,9 +819,15 @@ export default function WatchScreen() {
       return;
     }
     pendingManualRef.current = null;
-    scrollToWatchIndexRef.current(pending.targetIndex, 0, {
-      animated: false,
-    });
+    applyWatchIndexDecisionRef.current(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: "programmatic",
+        requestedIndex: pending.targetIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: pending.targetIndex,
+      })
+    );
   }, []);
 
   const onWatchScrollBeginDrag = useCallback(() => {
@@ -883,6 +902,16 @@ export default function WatchScreen() {
       ) {
         return;
       }
+      if (
+        !shouldHonorViewability80Intent({
+          viewableIndex: nativePage,
+          committedIndex: activeIndexRef.current,
+          reverseDrag: dragStartIndexRef.current > nativePage,
+        }) &&
+        nativePage !== activeIndexRef.current
+      ) {
+        return;
+      }
 
       if (
         shouldClaimWatchIndexFromNativeSettle({
@@ -952,13 +981,43 @@ export default function WatchScreen() {
   }, [shareSheet, tryCompletePendingManualHandoff]);
 
   const onViewableItemsChanged = useRef(
-    (_info: { viewableItems: ViewToken[] }) => {
+    (info: { viewableItems: ViewToken[] }) => {
       decideWatchViewabilityEvidence();
+      const token = info.viewableItems.find(
+        (row) => row.isViewable && typeof row.index === "number"
+      );
+      if (token?.index == null) return;
+      const toIndex = token.index;
+      if (
+        !shouldHonorViewability80Intent({
+          viewableIndex: toIndex,
+          committedIndex: activeIndexRef.current,
+          reverseDrag: dragStartIndexRef.current > toIndex,
+        })
+      ) {
+        return;
+      }
+      const targetVideo = visibleVideosRef.current[toIndex];
+      const created = createManualHandoffPending({
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        targetIndex: toIndex,
+        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
+      });
+      if (!created) return;
+      applyWarmedTargetIndex(toIndex);
+      const generation = manualHandoffGenRef.current + 1;
+      manualHandoffGenRef.current = generation;
+      pendingManualRef.current = {
+        ...created,
+        generation,
+        nativePage: toIndex,
+      };
+      tryCompletePendingManualHandoff();
     }
   ).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 80,
+    itemVisiblePercentThreshold: WATCH_VIEWABILITY_PERCENT_THRESHOLD,
     minimumViewTime: 80,
   }).current;
 
@@ -1587,12 +1646,15 @@ export default function WatchScreen() {
         video={item}
         listIndex={index}
         isActive={index === activeIndex}
+        isAudioOwner={index === audibleOwner}
+        committedActiveIndex={activeIndex}
         shouldLoadPlayer={shouldLoadOwnedWatchPlayer({
           index,
           activeIndex,
           platform: Platform.OS,
           lastSettledNativePage,
           warmedTargetIndex,
+          previousIndex,
         })}
         shouldPreparePlayer={shouldPrepareWatchPlayer(
           index,
@@ -1744,6 +1806,8 @@ export default function WatchScreen() {
     ),
     [
       activeIndex,
+      audibleOwner,
+      previousIndex,
       lastSettledNativePage,
       playbackGeneration,
       appState,
@@ -1897,7 +1961,10 @@ export default function WatchScreen() {
         onScrollEndDrag={onWatchScrollSettle}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+        extraData={resolveWatchCommitExtraData({
+          activeIndex,
+          interactionSignature: watchInteractionSignature(visibleVideos),
+        })}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         windowSize={5}

@@ -10,7 +10,7 @@ describe("authoritative registries", () => {
     const config = loadLockConfig(findRepoRoot());
     expect(config.baselines.current_fold6_watch_status).toBe("DEVICE_FAIL");
     expect(config.contracts.current_fold6_watch_status).toBe("DEVICE_FAIL");
-    expect(config.contracts.contracts).toHaveLength(24);
+    expect(config.contracts.contracts).toHaveLength(41);
     const byId = Object.fromEntries(
       config.contracts.contracts.map((row) => [row.id, row])
     );

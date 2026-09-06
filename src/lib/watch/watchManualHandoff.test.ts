@@ -191,6 +191,11 @@ describe("manual handoff parity with auto-advance", () => {
     expect(resolveManualHandoffCompletionTransaction()).toEqual({
       claimReason: "programmatic",
       applyViewabilityLock: true,
+      pinNativeOffset: false,
+    });
+    expect(resolveManualHandoffCompletionTransaction("auto-next")).toEqual({
+      claimReason: "programmatic",
+      applyViewabilityLock: true,
       pinNativeOffset: true,
     });
     expect(

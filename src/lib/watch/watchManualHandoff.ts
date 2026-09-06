@@ -102,15 +102,17 @@ export function shouldKeepPreviousSurfaceDuringManualHandoff(input: {
 export type ManualHandoffCompletionTransaction = {
   claimReason: "programmatic";
   applyViewabilityLock: true;
-  pinNativeOffset: true;
+  pinNativeOffset: boolean;
 };
 
-/** Same claim + lock + scrollToWatchIndex pin as auto-advance. */
-export function resolveManualHandoffCompletionTransaction(): ManualHandoffCompletionTransaction {
+/** User swipe commits without pin-vs-settle. Auto-next may sync native once. */
+export function resolveManualHandoffCompletionTransaction(
+  reason: "user-swipe" | "auto-next" = "user-swipe"
+): ManualHandoffCompletionTransaction {
   return {
     claimReason: "programmatic",
     applyViewabilityLock: true,
-    pinNativeOffset: true,
+    pinNativeOffset: reason === "auto-next",
   };
 }
 

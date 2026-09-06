@@ -350,12 +350,12 @@ describe("9 NO_PLAYBACK_HISTORY_GROWTH_REGRESSION", () => {
 });
 
 describe("10 PREVIOUS_dd86a3_ONE_ACTIVE_PLAYER_BEHAVIOR_PRESERVED", () => {
-  it("keeps Android active-only mount and no pause-before-ready", () => {
+  it("keeps Android active-only mount and silences non-owners even before ready", () => {
     expect(watchWindowMountedIndexes(4, 9, "android")).toEqual([4]);
     expect(shouldLoadPlayer(3, 4, "android")).toBe(false);
     expect(
       resolveInactiveTeardownMode({ platform: "android", itemReady: false })
-    ).toBe("mute-only");
+    ).toBe("mute-and-pause");
     expect(
       resolveInactiveTeardownMode({ platform: "android", itemReady: true })
     ).toBe("mute-and-pause");

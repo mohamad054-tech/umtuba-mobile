@@ -203,15 +203,16 @@ export function shouldUnmuteWatchAfterFirstFrame(input: {
 export type InactiveTeardownMode = "mute-and-pause" | "mute-only";
 
 /**
- * iOS leftover AVPlayer audio is the Build 24 overlap class — always pause.
- * Android preparing ExoPlayer must not be paused before ready (dd86a3e).
+ * Non-owners must be native-silent. Mute-only left AudioTracks started
+ * (Fold6 forensic overlap). Preparing neighbors stay paused + volume 0.
  */
 export function resolveInactiveTeardownMode(input: {
   platform: WatchNativePlatform;
   itemReady: boolean;
 }): InactiveTeardownMode {
-  if (input.platform === "ios") return "mute-and-pause";
-  return input.itemReady ? "mute-and-pause" : "mute-only";
+  void input.platform;
+  void input.itemReady;
+  return "mute-and-pause";
 }
 
 export function applyWatchInactiveTeardown(

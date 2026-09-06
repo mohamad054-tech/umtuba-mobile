@@ -143,6 +143,8 @@ export type WatchVideoCardProps = {
   video: WatchVideo;
   listIndex?: number;
   isActive: boolean;
+  isAudioOwner?: boolean;
+  committedActiveIndex?: number;
   /** Mount native player only for the platform load window (iOS ±1, Android active). */
   shouldLoadPlayer: boolean;
   /** Android previous+current+next prepare. Defaults to shouldLoadPlayer (iOS unchanged). */
@@ -222,6 +224,7 @@ type PlayerPaneProps = {
   postId: number | null;
   playerEpoch: number;
   listIndex: number;
+  committedActiveIndex?: number;
   ownershipGeneration: number;
   muted: boolean;
   volume: number;
@@ -406,6 +409,7 @@ function WatchPlayerPane({
   postId,
   playerEpoch,
   listIndex,
+  committedActiveIndex,
   ownershipGeneration,
   muted,
   volume,
@@ -828,10 +832,13 @@ function WatchPlayerPane({
       markWatchTransition(nativePlatform, "surface_attached");
     }
     if (nativePlatform !== "android") return;
+    const reportedActive =
+      committedActiveIndex ??
+      (isActive ? listIndex : isNextItem ? listIndex - 1 : listIndex);
     const aligned = isWatchCellBindingAligned({
       visibleIndex: listIndex,
       visibleMediaId: mediaId,
-      activeIndex: isActive ? listIndex : isNextItem ? listIndex - 1 : listIndex,
+      activeIndex: reportedActive,
       activeMediaId: mediaId,
       playerMediaId: mediaId,
       surfaceMediaId: attachSurface ? mediaId : null,
@@ -839,7 +846,7 @@ function WatchPlayerPane({
     markWatchCellBind("android", {
       visibleIndex: listIndex,
       visibleMediaId: mediaId,
-      activeIndex: isActive ? listIndex : isNextItem ? listIndex - 1 : listIndex,
+      activeIndex: reportedActive,
       activeMediaId: mediaId,
       playerMediaId: mediaId,
       surfaceAttached: attachSurface,
@@ -850,6 +857,7 @@ function WatchPlayerPane({
     isActive,
     isNextItem,
     listIndex,
+    committedActiveIndex,
     mediaId,
     nativePlatform,
   ]);
@@ -923,6 +931,8 @@ function WatchVideoCardComponent({
   video,
   listIndex,
   isActive,
+  isAudioOwner = isActive,
+  committedActiveIndex,
   shouldLoadPlayer: loadPlayer,
   shouldPreparePlayer: preparePlayer = loadPlayer,
   isNextItem = false,
@@ -1056,15 +1066,15 @@ function WatchVideoCardComponent({
 
   const loop = shouldLoopCurrentVideo({ autoNext, isLastItem });
   const audio = resolveEffectiveAudio({
-    isActive,
-    muted: muted || editAudioScale <= 0.001,
+    isActive: isActive && isAudioOwner,
+    muted: muted || editAudioScale <= 0.001 || !isAudioOwner,
     volume: volume * editAudioScale,
   });
   const addedSoundScale = watchAddedSoundScale(edit);
   const selectedSoundAudio = resolveSelectedSoundWatchAudio({
-    isActive,
-    shouldPlay,
-    watchMuted: muted,
+    isActive: isActive && isAudioOwner,
+    shouldPlay: shouldPlay && isAudioOwner,
+    watchMuted: muted || !isAudioOwner,
     watchVolume: volume,
     addedSoundVolume: addedSoundScale,
   });
@@ -1360,6 +1370,7 @@ function WatchVideoCardComponent({
           postId={video.postId ?? null}
           playerEpoch={boundEpoch}
           listIndex={listIndex ?? -1}
+          committedActiveIndex={committedActiveIndex}
           isActive={isActive}
           shouldPlay={shouldPlay}
           userPauseLatchRef={userPauseLatchRef}

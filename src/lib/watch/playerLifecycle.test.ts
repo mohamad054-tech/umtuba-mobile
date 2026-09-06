@@ -376,10 +376,10 @@ describe("unmount silences then detaches", () => {
     expect(session.calls).toContain("pause");
   });
 
-  it("does not pause an unready Android player (dd86a3e)", () => {
+  it("pauses an unready Android non-owner so leftover AudioTracks cannot stay started", () => {
     expect(
       resolveInactiveTeardownMode({ platform: "android", itemReady: false })
-    ).toBe("mute-only");
+    ).toBe("mute-and-pause");
     const session = createPlayerSession();
     applyWatchInactiveTeardown(session.player, {
       platform: "android",
@@ -387,7 +387,7 @@ describe("unmount silences then detaches", () => {
     });
     expect(session.player.muted).toBe(true);
     expect(session.player.volume).toBe(0);
-    expect(session.calls).not.toContain("pause");
+    expect(session.calls).toContain("pause");
   });
 });
 

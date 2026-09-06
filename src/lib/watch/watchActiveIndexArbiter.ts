@@ -63,7 +63,15 @@ export function shouldRetainWatchSurface(input: {
   itemIndex: number;
   activeIndex: number;
   lastSettledNativePage: number | null;
+  previousIndex?: number | null;
 }): boolean {
+  if (
+    input.previousIndex != null &&
+    input.itemIndex === input.previousIndex &&
+    input.itemIndex !== input.activeIndex
+  ) {
+    return true;
+  }
   const native = input.lastSettledNativePage;
   if (native == null) return false;
   if (native === input.activeIndex) return false;
@@ -78,6 +86,7 @@ export function shouldLoadOwnedWatchPlayer(input: {
   platform?: string | null;
   lastSettledNativePage?: number | null;
   warmedTargetIndex?: number | null;
+  previousIndex?: number | null;
 }): boolean {
   if (shouldLoadPlayer(input.index, input.activeIndex, input.platform)) {
     return true;
@@ -86,6 +95,7 @@ export function shouldLoadOwnedWatchPlayer(input: {
     itemIndex: input.index,
     activeIndex: input.activeIndex,
     lastSettledNativePage: input.lastSettledNativePage ?? null,
+    previousIndex: input.previousIndex ?? null,
   })) {
     return true;
   }

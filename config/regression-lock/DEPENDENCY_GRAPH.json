@@ -4,6 +4,7 @@
     "watch": {
       "globs": [
         "app/(tabs)/watch.tsx",
+        "components/WatchVideoCard.tsx",
         "src/lib/watch/**",
         "src/lib/nav/WatchEntryTracker.tsx"
       ],
