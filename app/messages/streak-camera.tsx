@@ -1,5 +1,6 @@
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -25,11 +26,13 @@ import { getSupabase } from "@/src/lib/supabase/client";
 import { sendVisualMessage } from "@/src/lib/umStreak/api";
 import {
   captureVisualFromCamera,
+  finalizeCapturedVisualFromUri,
   pickVisualFromLibrary,
   type CapturedVisualAsset,
   type VisualCameraFacing,
   type VisualCaptureMode,
 } from "@/src/lib/umStreak/capture";
+import { toCameraViewFacing } from "@/src/lib/umStreak/retention";
 import { umStreakText } from "@/src/lib/umStreak/copy";
 import {
   detectUmStreakLocale,
@@ -38,6 +41,7 @@ import {
   umStreakWritingStyle,
 } from "@/src/lib/umStreak/locale";
 import { UM_STREAK_CAPTION_MAX } from "@/src/lib/umStreak/media";
+import type { VisualExpirationPolicy } from "@/src/lib/umStreak/types";
 import { uploadPrivateVisualMedia } from "@/src/lib/umStreak/upload";
 import { colors } from "@/src/theme/colors";
 
@@ -51,16 +55,23 @@ export default function UmStreakCameraScreen() {
   const locale = detectUmStreakLocale();
   const align = umStreakTextAlign(locale);
   const row = umStreakFlexDirection(locale);
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
   const [mode, setMode] = useState<VisualCaptureMode>("photo");
   const [facing, setFacing] = useState<VisualCameraFacing>("environment");
   const [asset, setAsset] = useState<CapturedVisualAsset | null>(null);
   const [caption, setCaption] = useState("");
+  const [retention, setRetention] =
+    useState<VisualExpirationPolicy>("view_once");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     lockedConversationId ? [lockedConversationId] : []
   );
   const [pending, setPending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,6 +90,11 @@ export default function UmStreakCameraScreen() {
     return () => sub.remove();
   }, [router]);
 
+  useEffect(() => {
+    if (!permission || permission.granted || !permission.canAskAgain) return;
+    void requestPermission();
+  }, [permission, requestPermission]);
+
   const recipients = useMemo(() => {
     if (lockedConversationId) {
       return conversations.filter((item) => item.id === lockedConversationId);
@@ -88,13 +104,59 @@ export default function UmStreakCameraScreen() {
 
   const onCapture = useCallback(async () => {
     setError(null);
+    const camera = cameraRef.current;
+    if (camera && cameraReady && permission?.granted && !previewFailed) {
+      try {
+        if (mode === "photo") {
+          const photo = await camera.takePictureAsync({ quality: 0.92 });
+          if (photo?.uri) {
+            const live = await finalizeCapturedVisualFromUri({
+              uri: photo.uri,
+              mimeType: "image/jpeg",
+              mediaType: "image",
+              width: photo.width,
+              height: photo.height,
+            });
+            if (live.ok) {
+              setAsset(live.asset);
+              return;
+            }
+            if (!live.cancelled) setError(live.message);
+            return;
+          }
+        } else if (recording) {
+          camera.stopRecording();
+          return;
+        } else {
+          setRecording(true);
+          const video = await camera.recordAsync({ maxDuration: 15 });
+          setRecording(false);
+          if (video?.uri) {
+            const live = await finalizeCapturedVisualFromUri({
+              uri: video.uri,
+              mimeType: "video/mp4",
+              mediaType: "video",
+            });
+            if (live.ok) {
+              setAsset(live.asset);
+              return;
+            }
+            if (!live.cancelled) setError(live.message);
+            return;
+          }
+        }
+      } catch {
+        setRecording(false);
+      }
+    }
+
     const result = await captureVisualFromCamera({ mode, facing });
     if (!result.ok) {
       if (!result.cancelled) setError(result.message);
       return;
     }
     setAsset(result.asset);
-  }, [facing, mode]);
+  }, [cameraReady, facing, mode, permission?.granted, previewFailed, recording]);
 
   const onLibrary = useCallback(async () => {
     setError(null);
@@ -153,6 +215,7 @@ export default function UmStreakCameraScreen() {
           height: asset.height,
           durationMs: asset.durationMs,
           peerId: peer?.peerId ?? null,
+          expirationPolicy: retention,
         });
         if (!sent.ok) {
           setError(sent.message);
@@ -183,6 +246,7 @@ export default function UmStreakCameraScreen() {
     locale,
     lockedConversationId,
     pending,
+    retention,
     router,
     selectedIds,
     user,
@@ -197,6 +261,14 @@ export default function UmStreakCameraScreen() {
       </View>
     );
   }
+
+  const previewHint = !permission
+    ? null
+    : permission.granted
+      ? previewFailed
+        ? umStreakText("previewFailed", locale)
+        : umStreakText("livePreview", locale)
+      : umStreakText("cameraDenied", locale);
 
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
@@ -230,10 +302,41 @@ export default function UmStreakCameraScreen() {
             }
             accessibilityIgnoresInvertColors
           />
+        ) : permission?.granted && !previewFailed ? (
+          <CameraView
+            ref={cameraRef}
+            style={styles.previewMedia}
+            facing={toCameraViewFacing(facing)}
+            mode={mode === "video" ? "video" : "picture"}
+            mute={false}
+            onCameraReady={() => setCameraReady(true)}
+            onMountError={() => {
+              setPreviewFailed(true);
+              setCameraReady(false);
+            }}
+          />
         ) : (
-          <Text style={[styles.previewHint, umStreakWritingStyle(locale)]} >
-            {umStreakText("livePreview", locale)}
-          </Text>
+          <View style={styles.previewFallback}>
+            {!permission ? (
+              <ActivityIndicator color={colors.accentAmber} />
+            ) : (
+              <Text style={[styles.previewHint, umStreakWritingStyle(locale)]} >
+                {previewHint}
+              </Text>
+            )}
+            {permission && !permission.granted ? (
+              <Pressable
+                style={styles.grantBtn}
+                onPress={() => void requestPermission()}
+                accessibilityRole="button"
+                accessibilityLabel={umStreakText("camera", locale)}
+              >
+                <Text style={[styles.grantText, umStreakWritingStyle(locale)]} >
+                  {umStreakText("camera", locale)}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         )}
       </View>
 
@@ -300,16 +403,55 @@ export default function UmStreakCameraScreen() {
 
       {!asset ? (
         <Pressable
-          style={styles.shutter}
+          style={[styles.shutter, recording && styles.shutterRecording]}
           onPress={() => void onCapture()}
           accessibilityRole="button"
-          accessibilityLabel={umStreakText("capture", locale)}
+          accessibilityLabel={
+            recording
+              ? umStreakText("stopRecording", locale)
+              : umStreakText("capture", locale)
+          }
         />
       ) : (
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.sendBlock}
         >
+          <Text style={[styles.legend, { textAlign: align }]} >
+            {umStreakText("retentionChoice", locale)}
+          </Text>
+          <View style={[styles.modes, { flexDirection: row, paddingHorizontal: 0 }]}>
+            <Pressable
+              style={[
+                styles.modeBtn,
+                retention === "view_once" && styles.modeOn,
+              ]}
+              onPress={() => setRetention("view_once")}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: retention === "view_once" }}
+              accessibilityLabel={umStreakText("viewOnce", locale)}
+            >
+              <Text style={[styles.modeText, umStreakWritingStyle(locale)]} >
+                {umStreakText("viewOnce", locale)}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.modeBtn,
+                retention === "keep_in_conversation" && styles.modeOn,
+              ]}
+              onPress={() => setRetention("keep_in_conversation")}
+              accessibilityRole="radio"
+              accessibilityState={{
+                selected: retention === "keep_in_conversation",
+              }}
+              accessibilityLabel={umStreakText("keepInChat", locale)}
+            >
+              <Text style={[styles.modeText, umStreakWritingStyle(locale)]} >
+                {umStreakText("keepInChat", locale)}
+              </Text>
+            </Pressable>
+          </View>
           <TextInput
             value={caption}
             onChangeText={(value) => setCaption(value.slice(0, UM_STREAK_CAPTION_MAX))}
@@ -396,9 +538,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   previewMedia: { width: "100%", height: "100%" },
-  previewHint: { color: colors.textSubtle, paddingHorizontal: 24 },
+  previewFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  previewHint: { color: colors.textSubtle, textAlign: "center" },
+  grantBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.accentAmber,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  grantText: { color: colors.accentAmber, fontWeight: "700" },
   error: {
     color: colors.danger,
     textAlign: "center",
@@ -440,6 +599,10 @@ const styles = StyleSheet.create({
     borderColor: colors.accentAmber,
     alignSelf: "center",
     marginBottom: 16,
+  },
+  shutterRecording: {
+    backgroundColor: "#ef4444",
+    borderColor: "#fecaca",
   },
   sendBlock: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
   caption: {

@@ -1,6 +1,6 @@
 {
-  "task_id": "DESKTOP_UM_STREAK_LIVE_CAMERA_RETENTION_FOLD6_VALIDATION_V1",
-  "owner_goal": "Commit the UM Streak live camera + retention source and run one Android preview EAS for Fold6 QA. Watch frozen. No push. No second EAS.",
+  "task_id": "DESKTOP_UM_STREAK_LIVE_CAMERA_RETENTION_CHOICE_V1",
+  "owner_goal": "Replace the UM Streak black camera placeholder with a real live preview and add an explicit View Once vs Keep-in-chat choice before send. Watch frozen. Stop before EAS.",
   "base_sha": "a88640d956bf2b354ebc67b4fb7bfc48358e70a7",
   "product_area": "um_streak",
   "allowed_files": [
@@ -34,21 +34,20 @@
   ],
   "required_tests": [
     "src/lib/umStreak/**/*.test.ts",
-    "src/lib/messenger/**/*.test.ts",
-    "src/lib/regressionLock/**/*.test.ts"
+    "src/lib/messenger/**/*.test.ts"
   ],
   "required_device_gates": [],
   "eas_allowed": false,
   "play_allowed": false,
   "production_allowed": false,
   "push_allowed": false,
-  "max_eas_builds": 1,
+  "max_eas_builds": 0,
   "authorized_sha": null,
   "owner_status_claim": "NONE",
   "device_evidence": {
     "device": "RFCX718LVHK SM-F956B",
     "date": "2026-09-06",
-    "notes": "Owner authorized one Android preview EAS for Fold6 UM Streak camera/retention QA. Not OWNER_PASS. Watch remains DEVICE_FAIL."
+    "notes": "Owner already device-proved capture/send/library/video play on 1c56aca. Source-only until owner pre-EAS review. Not OWNER_PASS."
   },
-  "notes": "Watch is FROZEN at 1c56aca / a88640d. One Android preview EAS only. No push. No Play. No production. No migration. No second EAS."
+  "notes": "Watch is FROZEN at 1c56aca / a88640d. Do not touch Watch files. No EAS. No migration. No push. Task branch starts at a88640d (1c56aca + regression-lock only)."
 }

@@ -3,6 +3,7 @@ import {
   type Message,
   type MessageStatus,
 } from "@/src/lib/messenger/types";
+import { resolveVisualExpirationPolicy } from "@/src/lib/umStreak/retention";
 
 export type MessengerMessageRow = {
   id: string;
@@ -71,10 +72,9 @@ export function mapMessengerMessageRow(
           caption: isDeleted ? null : row.body?.trim() || null,
           viewed: Boolean(row.visual_opened_at),
           openedAt: row.visual_opened_at ?? null,
-          expirationPolicy:
-            row.visual_expiration_policy === "disappear_after_view"
-              ? "disappear_after_view"
-              : "view_once",
+          expirationPolicy: resolveVisualExpirationPolicy(
+            row.visual_expiration_policy
+          ),
           previewUrl: null,
         }
       : null,

@@ -70,10 +70,16 @@ import {
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   getConversationUmStreak,
+  hydrateKeepVisualPreviews,
   openVisualMessage,
 } from "@/src/lib/umStreak/api";
 import { umStreakText } from "@/src/lib/umStreak/copy";
 import { detectUmStreakLocale } from "@/src/lib/umStreak/locale";
+import {
+  isKeepInConversationPolicy,
+  preserveKeepVisualPreviews,
+  shouldClearSiblingVisualPreview,
+} from "@/src/lib/umStreak/retention";
 import type { UmStreakViewerStatus } from "@/src/lib/umStreak/types";
 import { colors } from "@/src/theme/colors";
 
@@ -161,7 +167,9 @@ export default function ConversationThreadScreen() {
         return;
       }
 
-      setMessages(page.messages);
+      setMessages(
+        await hydrateKeepVisualPreviews(getSupabase(), page.messages)
+      );
       setHasMore(page.hasMore);
       setCursor(page.nextCursor);
       setLoading(false);
@@ -256,6 +264,18 @@ export default function ConversationThreadScreen() {
             peerLastReadAt: live.peerLastReadAt,
           });
           setMessages((prev) => mergeMessages(prev, [mapped]));
+          if (isKeepInConversationPolicy(mapped.visual?.expirationPolicy)) {
+            void hydrateKeepVisualPreviews(getSupabase(), [mapped]).then(
+              (hydrated) => {
+                setMessages((prev) =>
+                  preserveKeepVisualPreviews(
+                    prev,
+                    mergeMessages(prev, hydrated)
+                  )
+                );
+              }
+            );
+          }
           if (row.sender_id !== live.userId) {
             void markConversationRead(getSupabase(), conversationId, row.id);
           }
@@ -274,7 +294,9 @@ export default function ConversationThreadScreen() {
           const mapped = mapMessengerMessageRow(row, live.userId, {
             peerLastReadAt: live.peerLastReadAt,
           });
-          setMessages((prev) => mergeMessages(prev, [mapped]));
+          setMessages((prev) =>
+            preserveKeepVisualPreviews(prev, mergeMessages(prev, [mapped]))
+          );
         },
         onResync: () => {
           void realtimeHandlersRef.current.loadThread({ soft: true });
@@ -330,7 +352,13 @@ export default function ConversationThreadScreen() {
         peerLastReadAt
       );
       if (!page.ok) return;
-      setMessages((prev) => mergeMessages(page.messages, prev));
+      const hydrated = await hydrateKeepVisualPreviews(
+        getSupabase(),
+        page.messages
+      );
+      setMessages((prev) =>
+        preserveKeepVisualPreviews(prev, mergeMessages(hydrated, prev))
+      );
       setHasMore(page.hasMore);
       setCursor(page.nextCursor);
     } finally {
@@ -422,7 +450,10 @@ export default function ConversationThreadScreen() {
         setMessages((prev) =>
           prev.map((item) => {
             if (item.id !== message.id) {
-              if (item.visual?.previewUrl) {
+              if (
+                item.visual?.previewUrl &&
+                shouldClearSiblingVisualPreview(item.visual.expirationPolicy)
+              ) {
                 return {
                   ...item,
                   visual: { ...item.visual, previewUrl: null },
@@ -430,12 +461,14 @@ export default function ConversationThreadScreen() {
               }
               return item;
             }
+            const previewUrl =
+              result.signedUrl ?? result.message.visual?.previewUrl ?? null;
             return {
               ...result.message,
               visual: result.message.visual
                 ? {
                     ...result.message.visual,
-                    previewUrl: result.signedUrl,
+                    previewUrl,
                   }
                 : result.message.visual,
             };

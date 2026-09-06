@@ -26,6 +26,21 @@ describe("view-once signed URL contract", () => {
     expect(
       visualReplayBlocked({ viewed: true, isMine: false })
     ).toBe(true);
+    expect(
+      shouldMintVisualSignedUrl({
+        visualOpenedAt: "2026-09-02T10:05:00.000Z",
+        senderId: USER_A,
+        currentUserId: USER_B,
+        expirationPolicy: "keep_in_conversation",
+      })
+    ).toBe(true);
+    expect(
+      visualReplayBlocked({
+        viewed: true,
+        isMine: false,
+        expirationPolicy: "keep_in_conversation",
+      })
+    ).toBe(false);
   });
 
   it("allows the first recipient open and sender preview", () => {

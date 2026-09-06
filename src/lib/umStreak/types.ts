@@ -28,6 +28,7 @@ export type UmStreakBadgeDay = (typeof UM_STREAK_BADGE_DAYS)[number];
 
 export const VISUAL_EXPIRATION_POLICIES = [
   "view_once",
+  "keep_in_conversation",
   "disappear_after_view",
 ] as const;
 export type VisualExpirationPolicy = (typeof VISUAL_EXPIRATION_POLICIES)[number];

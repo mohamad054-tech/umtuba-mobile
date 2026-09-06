@@ -12,7 +12,17 @@ import { utcDayKey } from "./calendar";
 import { umStreakText } from "./copy";
 import { viewerStatus } from "./engine";
 import { canSendPrivateVisual } from "./privacy";
-import type { UmStreakRecord, UmStreakViewerStatus } from "./types";
+import {
+  isKeepInConversationPolicy,
+  isPlayableVisualPreviewUrl,
+  resolveVisualExpirationPolicy,
+  visualSignedUrlTtlSeconds,
+} from "./retention";
+import type {
+  UmStreakRecord,
+  UmStreakViewerStatus,
+  VisualExpirationPolicy,
+} from "./types";
 import { shouldMintVisualSignedUrl } from "./visualMessage";
 
 export async function isPeerBlockedForUmStreak(peerId: string): Promise<boolean> {
@@ -36,6 +46,7 @@ export async function sendVisualMessage(
     height?: number | null;
     durationMs?: number | null;
     peerId?: string | null;
+    expirationPolicy?: VisualExpirationPolicy;
   }
 ): Promise<ActionResult<{ message: Message }>> {
   if (input.peerId) {
@@ -56,7 +67,8 @@ export async function sendVisualMessage(
     p_width: input.width ?? null,
     p_height: input.height ?? null,
     p_duration_ms: input.durationMs ?? null,
-    p_expiration_policy: "view_once",
+    p_expiration_policy:
+      input.expirationPolicy ?? "view_once",
   });
 
   if (error) {
@@ -94,12 +106,17 @@ export async function openVisualMessage(
 
   const existingRow = existing as MessengerMessageRow | null;
 
+  const expirationPolicy = resolveVisualExpirationPolicy(
+    existingRow?.visual_expiration_policy
+  );
+
   if (
     existingRow &&
     !shouldMintVisualSignedUrl({
       visualOpenedAt: existingRow.visual_opened_at,
       senderId: existingRow.sender_id ?? "",
       currentUserId,
+      expirationPolicy,
     })
   ) {
     return {
@@ -109,18 +126,30 @@ export async function openVisualMessage(
     };
   }
 
-  let signedUrl: string | null = null;
-  const { data: attachment } = await supabase
-    .from("message_attachments")
-    .select("storage_bucket, storage_path")
-    .eq("message_id", messageId)
-    .maybeSingle();
+  const signedUrl = await mintVisualSignedUrl(
+    supabase,
+    messageId,
+    expirationPolicy
+  );
 
-  if (attachment?.storage_bucket && attachment.storage_path) {
-    const signed = await supabase.storage
-      .from(attachment.storage_bucket)
-      .createSignedUrl(attachment.storage_path, 90);
-    signedUrl = signed.data?.signedUrl ?? null;
+  if (isKeepInConversationPolicy(expirationPolicy)) {
+    const mapped = existingRow
+      ? mapMessengerMessageRow(existingRow, currentUserId)
+      : null;
+    if (!mapped) {
+      return { ok: false, message: umStreakText("openFailed") };
+    }
+    if (mapped.visual && isPlayableVisualPreviewUrl(signedUrl)) {
+      mapped.visual = {
+        ...mapped.visual,
+        previewUrl: signedUrl,
+      };
+    }
+    return {
+      ok: true,
+      message: mapped,
+      signedUrl: isPlayableVisualPreviewUrl(signedUrl) ? signedUrl : null,
+    };
   }
 
   const { data, error } = await supabase.rpc("open_um_visual_message", {
@@ -155,18 +184,96 @@ export async function openVisualMessage(
     mapped.senderId !== currentUserId;
   const senderPreview = mapped.senderId === currentUserId;
 
+  const playableUrl = isPlayableVisualPreviewUrl(signedUrl) ? signedUrl : null;
+
   if ((firstOpen || senderPreview) && mapped.visual) {
     mapped.visual = {
       ...mapped.visual,
-      previewUrl: signedUrl,
+      previewUrl: playableUrl,
     };
   }
 
   return {
     ok: true,
     message: mapped,
-    signedUrl: firstOpen || senderPreview ? signedUrl : null,
+    signedUrl: firstOpen || senderPreview ? playableUrl : null,
   };
+}
+
+async function mintVisualSignedUrl(
+  supabase: SupabaseClient,
+  messageId: string,
+  policy: VisualExpirationPolicy
+): Promise<string | null> {
+  const { data: attachment } = await supabase
+    .from("message_attachments")
+    .select("storage_bucket, storage_path")
+    .eq("message_id", messageId)
+    .maybeSingle();
+
+  if (!attachment?.storage_bucket || !attachment.storage_path) {
+    return null;
+  }
+
+  const signed = await supabase.storage
+    .from(attachment.storage_bucket)
+    .createSignedUrl(
+      attachment.storage_path,
+      visualSignedUrlTtlSeconds(policy)
+    );
+  const url = signed.data?.signedUrl ?? null;
+  return isPlayableVisualPreviewUrl(url) ? url : null;
+}
+
+export async function hydrateKeepVisualPreviews(
+  supabase: SupabaseClient,
+  messages: Message[]
+): Promise<Message[]> {
+  const keepIds = messages
+    .filter(
+      (item) =>
+        Boolean(item.visual) &&
+        !item.isDeleted &&
+        isKeepInConversationPolicy(item.visual?.expirationPolicy) &&
+        !isPlayableVisualPreviewUrl(item.visual?.previewUrl)
+    )
+    .map((item) => item.id);
+
+  if (keepIds.length === 0) return messages;
+
+  const { data: attachments } = await supabase
+    .from("message_attachments")
+    .select("message_id, storage_bucket, storage_path")
+    .in("message_id", keepIds);
+
+  const urlById = new Map<string, string>();
+  for (const attachment of attachments ?? []) {
+    if (!attachment?.storage_bucket || !attachment.storage_path) continue;
+    const signed = await supabase.storage
+      .from(attachment.storage_bucket)
+      .createSignedUrl(
+        attachment.storage_path,
+        visualSignedUrlTtlSeconds("keep_in_conversation")
+      );
+    const url = signed.data?.signedUrl ?? null;
+    if (url && isPlayableVisualPreviewUrl(url) && attachment.message_id) {
+      urlById.set(attachment.message_id, url);
+    }
+  }
+
+  if (urlById.size === 0) return messages;
+
+  return messages.map((item) => {
+    const url = urlById.get(item.id);
+    if (!url || !item.visual) return item;
+    return {
+      ...item,
+      visual: {
+        ...item.visual,
+        previewUrl: url,
+      },
+    };
+  });
 }
 
 export async function getConversationUmStreak(

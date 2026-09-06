@@ -82,11 +82,17 @@ function fileNameFromUri(uri: string, mimeType: string): string {
   return `visual.${ext}`;
 }
 
-async function finalizeAsset(
-  asset: ImagePicker.ImagePickerAsset,
-  fallbackType: "image" | "video"
-): Promise<CaptureVisualResult> {
-  const uri = asset.uri?.trim();
+export async function finalizeCapturedVisualFromUri(input: {
+  uri: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+  mediaType: "image" | "video";
+  reportedSize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  durationMs?: number | null;
+}): Promise<CaptureVisualResult> {
+  const uri = input.uri.trim();
   if (!uri) {
     return {
       ok: false,
@@ -95,17 +101,15 @@ async function finalizeAsset(
     };
   }
 
-  const mediaType: "image" | "video" =
-    asset.type === "video" || fallbackType === "video" ? "video" : "image";
   const mimeType = inferMessageMediaMime({
-    mimeType: asset.mimeType,
-    fileName: asset.fileName,
+    mimeType: input.mimeType,
+    fileName: input.fileName,
     uri,
-    mediaType,
+    mediaType: input.mediaType,
   });
   const byteSize = await resolveByteSize({
     uri,
-    reportedSize: asset.fileSize,
+    reportedSize: input.reportedSize,
   });
   if (byteSize == null) {
     return {
@@ -120,11 +124,6 @@ async function finalizeAsset(
     return { ok: false, cancelled: false, message: check.message };
   }
 
-  const durationMs =
-    typeof asset.duration === "number" && Number.isFinite(asset.duration)
-      ? Math.round(asset.duration * 1000)
-      : null;
-
   return {
     ok: true,
     asset: {
@@ -132,18 +131,43 @@ async function finalizeAsset(
       mimeType,
       mediaType: check.mediaType,
       byteSize,
-      fileName: fileNameFromUri(asset.fileName || uri, mimeType),
+      fileName: fileNameFromUri(input.fileName || uri, mimeType),
       width:
-        typeof asset.width === "number" && asset.width > 0
-          ? Math.round(asset.width)
+        typeof input.width === "number" && input.width > 0
+          ? Math.round(input.width)
           : null,
       height:
-        typeof asset.height === "number" && asset.height > 0
-          ? Math.round(asset.height)
+        typeof input.height === "number" && input.height > 0
+          ? Math.round(input.height)
           : null,
-      durationMs,
+      durationMs:
+        typeof input.durationMs === "number" && Number.isFinite(input.durationMs)
+          ? Math.round(input.durationMs)
+          : null,
     },
   };
+}
+
+async function finalizeAsset(
+  asset: ImagePicker.ImagePickerAsset,
+  fallbackType: "image" | "video"
+): Promise<CaptureVisualResult> {
+  const mediaType: "image" | "video" =
+    asset.type === "video" || fallbackType === "video" ? "video" : "image";
+  const durationMs =
+    typeof asset.duration === "number" && Number.isFinite(asset.duration)
+      ? Math.round(asset.duration * 1000)
+      : null;
+  return finalizeCapturedVisualFromUri({
+    uri: asset.uri ?? "",
+    mimeType: asset.mimeType,
+    fileName: asset.fileName,
+    mediaType,
+    reportedSize: asset.fileSize,
+    width: asset.width,
+    height: asset.height,
+    durationMs,
+  });
 }
 
 /** Real device camera via the existing expo-image-picker stack. */

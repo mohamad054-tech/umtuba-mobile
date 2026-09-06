@@ -47,6 +47,11 @@ export const UM_STREAK_COPY = {
     uploadFailed: "Unable to upload visual message.",
     pickRecipient: "Choose at least one conversation.",
     signIn: "Please sign in to send a visual message.",
+    keepInChat: "Keep in chat",
+    retentionChoice: "How should this visual stay?",
+    cameraDenied: "Camera permission is required for live preview. Use Library or allow camera access.",
+    previewFailed: "Live camera preview is unavailable on this device. You can still capture or use Library.",
+    mediaLoadFailed: "This visual could not be displayed. Tap to try again.",
   },
   ar: {
     title: "UM Streak",
@@ -93,6 +98,11 @@ export const UM_STREAK_COPY = {
     uploadFailed: "تعذّر رفع الرسالة البصرية.",
     pickRecipient: "اختر محادثة واحدة على الأقل.",
     signIn: "يرجى تسجيل الدخول لإرسال رسالة بصرية.",
+    keepInChat: "الاحتفاظ في المحادثة",
+    retentionChoice: "كيف يبقى هذا المحتوى؟",
+    cameraDenied: "معاينة الكاميرا تحتاج إذناً. استخدم المكتبة أو اسمح للكاميرا.",
+    previewFailed: "معاينة الكاميرا المباشرة غير متاحة على هذا الجهاز. يمكنك الالتقاط أو استخدام المكتبة.",
+    mediaLoadFailed: "تعذّر عرض هذا المحتوى. اضغط للمحاولة مرة أخرى.",
   },
 } as const;
 

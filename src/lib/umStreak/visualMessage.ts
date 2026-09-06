@@ -1,3 +1,4 @@
+import { isKeepInConversationPolicy } from "./retention";
 import { canOpenPrivateVisual } from "./privacy";
 import type { VisualExpirationPolicy, VisualMessageRecord } from "./types";
 
@@ -59,6 +60,21 @@ export function markVisualOpened(
     };
   }
 
+  if (isKeepInConversationPolicy(record.expirationPolicy)) {
+    return {
+      record: record.viewed
+        ? record
+        : {
+            ...record,
+            viewed: true,
+            openedAt: nowIso,
+          },
+      opened: !record.viewed,
+      mediaRevoked: false,
+      reason: record.viewed ? "already_viewed" : "opened",
+    };
+  }
+
   if (record.viewed || record.openedAt) {
     return {
       record,
@@ -85,7 +101,10 @@ export function visualMediaAccessible(
   record: VisualMessageRecord,
   nowIso: string
 ): boolean {
-  if (record.viewed || record.openedAt) {
+  if (
+    !isKeepInConversationPolicy(record.expirationPolicy) &&
+    (record.viewed || record.openedAt)
+  ) {
     return false;
   }
   if (record.expiresAt) {
@@ -106,7 +125,11 @@ export function shouldMintVisualSignedUrl(input: {
   visualOpenedAt: string | null | undefined;
   senderId: string;
   currentUserId: string;
+  expirationPolicy?: string | null;
 }): boolean {
+  if (isKeepInConversationPolicy(input.expirationPolicy)) {
+    return true;
+  }
   if (input.visualOpenedAt && input.senderId !== input.currentUserId) {
     return false;
   }
@@ -116,6 +139,10 @@ export function shouldMintVisualSignedUrl(input: {
 export function visualReplayBlocked(input: {
   viewed: boolean;
   isMine: boolean;
+  expirationPolicy?: string | null;
 }): boolean {
+  if (isKeepInConversationPolicy(input.expirationPolicy)) {
+    return false;
+  }
   return input.viewed && !input.isMine;
 }

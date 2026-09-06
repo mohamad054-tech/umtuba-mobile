@@ -4,6 +4,7 @@ export * from "./engine";
 export * from "./badges";
 export * from "./privacy";
 export * from "./visualMessage";
+export * from "./retention";
 export * from "./media";
 export * from "./locale";
 export * from "./copy";

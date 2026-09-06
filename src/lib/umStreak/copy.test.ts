@@ -13,6 +13,8 @@ describe("UM Streak bilingual copy", () => {
     expect(umStreakDirection("ar")).toBe("rtl");
     expect(umStreakFlexDirection("ar")).toBe("row-reverse");
     expect(umStreakText("viewOnce", "ar")).toBe("عرض مرة واحدة");
+    expect(umStreakText("keepInChat", "ar")).toBe("الاحتفاظ في المحادثة");
+    expect(umStreakText("retentionChoice", "ar")).toBe("كيف يبقى هذا المحتوى؟");
     expect(umStreakText("notPublic", "ar")).toContain("UM Life");
     expect(umStreakStateLabel("you_need_to_reply", "ar")).toBe("دورك اليوم");
     expect(umStreakBadgeLabel(30, "ar")).toBe("30 يوماً");
@@ -24,5 +26,7 @@ describe("UM Streak bilingual copy", () => {
     expect(umStreakText("badge365", "en")).toBe("365 days");
     expect(umStreakText("send", "en")).not.toMatch(/point|coin|money|wallet/i);
     expect(umStreakText("notPublic", "en")).toMatch(/Not a UM Life post/);
+    expect(umStreakText("keepInChat", "en")).toBe("Keep in chat");
+    expect(umStreakText("viewOnce", "en")).toBe("View once");
   });
 });

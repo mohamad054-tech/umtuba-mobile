@@ -119,6 +119,17 @@ const config: ExpoConfig = {
       },
     ],
     [
+      "expo-camera",
+      {
+        cameraPermission:
+          "UMTUBA needs camera access so you can send a private UM Streak photo or video in Messages.",
+        microphonePermission:
+          "UMTUBA needs microphone access so you can record a private UM Streak video in Messages.",
+        recordAudioAndroid: true,
+        barcodeScannerEnabled: false,
+      },
+    ],
+    [
       "expo-image-picker",
       {
         photosPermission:

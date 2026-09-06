@@ -161,4 +161,29 @@ describe("message preview / time formatting", () => {
     });
     expect(mapped.text).toBe("hello");
   });
+
+  it("maps keep-in-conversation visuals without forcing view-once", () => {
+    const mapped = mapMessengerMessageRow(
+      {
+        id: "m3",
+        conversation_id: "c1",
+        sender_id: "u2",
+        body: "keep",
+        message_type: "video",
+        created_at: "2026-07-26T10:00:00.000Z",
+        deleted_at: null,
+        client_id: null,
+        visual_opened_at: "2026-07-26T10:01:00.000Z",
+        visual_expiration_policy: "keep_in_conversation",
+      },
+      "u1"
+    );
+    expect(mapped.visual).toMatchObject({
+      mediaType: "video",
+      caption: "keep",
+      viewed: true,
+      previewUrl: null,
+      expirationPolicy: "keep_in_conversation",
+    });
+  });
 });

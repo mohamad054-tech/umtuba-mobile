@@ -1,4 +1,5 @@
 import { useVideoPlayer, VideoView } from "expo-video";
+import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { umStreakText } from "@/src/lib/umStreak/copy";
@@ -6,6 +7,10 @@ import {
   detectUmStreakLocale,
   umStreakDirection,
 } from "@/src/lib/umStreak/locale";
+import {
+  isKeepInConversationPolicy,
+  isPlayableVisualPreviewUrl,
+} from "@/src/lib/umStreak/retention";
 import { visualReplayBlocked } from "@/src/lib/umStreak/visualMessage";
 import type { Message } from "@/src/lib/messenger/types";
 import { colors } from "@/src/theme/colors";
@@ -46,13 +51,21 @@ export function VisualMessageBubble({
 }: VisualMessageBubbleProps) {
   const locale = detectUmStreakLocale();
   const visual = message.visual;
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setLoadFailed(false);
+  }, [visual?.previewUrl]);
+
   if (!visual || message.isDeleted) {
     return null;
   }
 
+  const keep = isKeepInConversationPolicy(visual.expirationPolicy);
   const replayBlocked = visualReplayBlocked({
     viewed: visual.viewed,
     isMine: message.isMine,
+    expirationPolicy: visual.expirationPolicy,
   });
   const caption = visual.caption?.trim() || "";
   const mediaLabel =
@@ -60,10 +73,16 @@ export function VisualMessageBubble({
     (visual.mediaType === "video"
       ? umStreakText("capturedVideo", locale)
       : umStreakText("capturedPhoto", locale));
+  const playable = isPlayableVisualPreviewUrl(visual.previewUrl);
+  const chipLabel = replayBlocked
+    ? umStreakText("opened", locale)
+    : keep
+      ? umStreakText("keepInChat", locale)
+      : umStreakText("viewOnce", locale);
 
   return (
     <View style={styles.wrap}>
-      {visual.previewUrl ? (
+      {playable && visual.previewUrl && !loadFailed ? (
         visual.mediaType === "video" ? (
           <OpenVisualVideo
             uri={visual.previewUrl}
@@ -73,30 +92,32 @@ export function VisualMessageBubble({
           <Image
             source={{ uri: visual.previewUrl }}
             style={styles.media}
-            resizeMode="cover"
+            resizeMode="contain"
             accessibilityLabel={mediaLabel}
             accessibilityIgnoresInvertColors
+            onError={() => setLoadFailed(true)}
           />
         )
       ) : (
         <Pressable
           style={[styles.chip, replayBlocked && styles.openedChip]}
-          onPress={() => onOpen(message)}
+          onPress={() => {
+            setLoadFailed(false);
+            onOpen(message);
+          }}
           disabled={busy || replayBlocked}
           accessibilityRole="button"
           accessibilityState={{ disabled: busy || replayBlocked, busy }}
           accessibilityLabel={
-            replayBlocked
-              ? umStreakText("opened", locale)
-              : umStreakText("viewOnce", locale)
+            loadFailed ? umStreakText("mediaLoadFailed", locale) : chipLabel
           }
         >
           <Text
             style={[styles.chipText, { writingDirection: umStreakDirection(locale) }]}
           >
-            {replayBlocked
-              ? umStreakText("opened", locale)
-              : umStreakText("viewOnce", locale)}
+            {loadFailed
+              ? umStreakText("mediaLoadFailed", locale)
+              : chipLabel}
           </Text>
         </Pressable>
       )}
@@ -117,7 +138,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 220,
     borderRadius: 16,
-    backgroundColor: "#000",
+    backgroundColor: "#111118",
   },
   chip: {
     minHeight: 72,

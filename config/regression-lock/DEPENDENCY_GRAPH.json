@@ -4,6 +4,7 @@
     "watch": {
       "globs": [
         "app/(tabs)/watch.tsx",
+        "components/WatchVideoCard.tsx",
         "src/lib/watch/**",
         "src/lib/nav/WatchEntryTracker.tsx"
       ],
@@ -39,7 +40,11 @@
       "expands_contracts": []
     },
     "um_streak": {
-      "globs": ["src/lib/umStreak/**", "app/messages/streak-camera.tsx"],
+      "globs": [
+        "src/lib/umStreak/**",
+        "app/messages/streak-camera.tsx",
+        "components/messenger/VisualMessageBubble.tsx"
+      ],
       "depends_on": ["messages", "auth", "supabase_client"],
       "expands_tests": ["src/lib/umStreak/**/*.test.ts"],
       "expands_contracts": []
