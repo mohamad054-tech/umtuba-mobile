@@ -11,10 +11,7 @@ import {
 import { AuthScreen } from "@/components/AuthScreen";
 import { normalizeReferralCode } from "@/src/contracts/referral";
 import { useAuth } from "@/src/lib/auth/AuthContext";
-import {
-  getReferralAttribution,
-  saveReferralAttribution,
-} from "@/src/lib/auth/referralAttribution";
+import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
 import { colors } from "@/src/theme/colors";
 
 export default function SignupScreen() {
@@ -25,7 +22,6 @@ export default function SignupScreen() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +30,8 @@ export default function SignupScreen() {
       typeof params.ref === "string" ? params.ref : null
     );
     if (fromParam) {
-      setReferralCode(fromParam);
       void saveReferralAttribution(fromParam);
-      return;
     }
-    void getReferralAttribution().then(({ code }) => {
-      if (code) setReferralCode(code);
-    });
   }, [params.ref]);
 
   if (!loading && session && passwordRecoveryPending) {
@@ -55,15 +46,11 @@ export default function SignupScreen() {
     setBusy(true);
     setError(null);
     try {
-      if (referralCode) {
-        await saveReferralAttribution(referralCode);
-      }
       await signUp({
         email,
         password,
         fullName,
         username,
-        referralCode: referralCode || null,
       });
       router.replace("/(tabs)/watch");
     } catch (err) {
@@ -136,15 +123,6 @@ export default function SignupScreen() {
         autoComplete="new-password"
         textContentType="newPassword"
         accessibilityLabel="Password"
-      />
-      <TextInput
-        style={styles.input}
-        autoCapitalize="characters"
-        placeholder="Referral code (optional)"
-        placeholderTextColor={colors.textSubtle}
-        value={referralCode}
-        onChangeText={setReferralCode}
-        accessibilityLabel="Referral code, optional"
       />
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
