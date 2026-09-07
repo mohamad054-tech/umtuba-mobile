@@ -19,6 +19,8 @@ export type PlayerLike = {
   replaceAsync?: (src: string) => Promise<unknown>;
   /** expo-video VideoPlayer.status; optional on the test double. */
   status?: string;
+  /** expo-video VideoPlayer.playing; JS pause() may lag native Media3. */
+  playing?: boolean;
   /** Present on our test double; native SharedObject throws instead. */
   isReleased?: boolean;
   playbackRate?: number;
@@ -122,6 +124,7 @@ export function createPlayerSession() {
   let volume = 1;
   let loop = false;
   let currentTime = 0;
+  let playing = false;
   const calls: string[] = [];
 
   const assertAlive = (op: string) => {
@@ -164,9 +167,18 @@ export function createPlayerSession() {
       assertAlive("seek");
       currentTime = value;
     },
+    get playing() {
+      assertAlive("playing");
+      return playing;
+    },
+    set playing(value) {
+      assertAlive("playing");
+      playing = value;
+    },
     play: () => {
       assertAlive("play");
       calls.push("play");
+      playing = true;
     },
     pause: () => {
       assertAlive("pause");

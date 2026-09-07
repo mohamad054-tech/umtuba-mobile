@@ -116,7 +116,7 @@ describe("3 first frame unmutes", () => {
     expect(afterFrame?.shouldPlay).toBe(true);
   });
 
-  it("holds incoming mute until outgoing audio is silenced", () => {
+  it("holds incoming mute until outgoing native audio ownership is released", () => {
     expect(
       shouldUnmuteWatchAfterFirstFrame({
         firstFrameConfirmed: true,

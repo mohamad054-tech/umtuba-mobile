@@ -11,7 +11,8 @@
     "date": "2026-09-07"
   },
   "open_owner_failures": [
-    "other Watch contracts remain uncertified except Phase 1 ~20% short swipe"
+    "other Watch contracts remain uncertified except Phase 1 ~20% short swipe",
+    "PHASE2_RAPID_STARVATION_OPEN=YES rapid navigation can consume rolling-five 7->2 then plan misses; do not fix in rapid handoff source task"
   ],
   "contracts": [
     {
@@ -111,7 +112,7 @@
     {
       "id": "WATCH_5_VIDEO_ROLLING_CACHE",
       "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "Phase 2 source: five upcoming ready, one replacement per advance, existing N-1 kept. ANDROID_WATCH_FORWARD_READY_TARGET=5. Not owner-certified. Phase 3 previous-five is not included.",
+      "last_known_accepted_evidence": "Phase 2 source: five upcoming ready, one replacement per advance, existing N-1 kept. ANDROID_WATCH_FORWARD_READY_TARGET=5. Not owner-certified. Phase 3 previous-five is not included. PHASE2_RAPID_STARVATION_OPEN=YES: rapid navigation can consume 7->2 then plan misses. Do not fix in the rapid handoff source task.",
       "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
       "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
       "regression_tests": [

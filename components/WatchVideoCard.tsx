@@ -103,8 +103,14 @@ import {
   WATCH_VIDEO_AUDIO_MIXING_MODE,
   canIncomingWatchAudioUnmute,
   getWatchPlayerSlot,
+  noteWatchPlayerNativePlaying,
   registerWatchPlayerSlot,
+  subscribeWatchAudioHandoff,
 } from "@/src/lib/watch/watchAudioHandoff";
+import {
+  shouldAttachPreparedNeighborSurface,
+  shouldExposeWatchTargetSurface,
+} from "@/src/lib/watch/watchVisualHandoff";
 import {
   WATCH_HEADER_RAIL_RESERVED,
   WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
@@ -427,6 +433,8 @@ function WatchPlayerPane({
     "loading"
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [firstFrameDrawable, setFirstFrameDrawable] = useState(false);
+  const [audioHandoffGen, setAudioHandoffGen] = useState(0);
   const lastSeekToken = useRef<number | null>(null);
   const nativePlatform = resolveWatchNativePlatform(Platform.OS);
   const statusRef = useRef(status);
@@ -492,6 +500,12 @@ function WatchPlayerPane({
       }
     };
   }, [listIndex, player]);
+
+  useEffect(() => {
+    return subscribeWatchAudioHandoff(() => {
+      setAudioHandoffGen((prev) => prev + 1);
+    });
+  }, []);
 
   const canTouchBoundPlayer = () =>
     playerAliveRef.current &&
@@ -606,6 +620,7 @@ function WatchPlayerPane({
   });
 
   useEventListener(player, "playingChange", ({ isPlaying }) => {
+    noteWatchPlayerNativePlaying(listIndex, isPlaying);
     if (!canTouchBoundPlayer()) return;
     if (
       !shouldApplyWatchTransport({
@@ -689,15 +704,29 @@ function WatchPlayerPane({
     };
   }, [player]);
 
-  const attachSurface = shouldAttachWatchSurface({
-    loadPlayer,
-    preparePlayer,
-    itemReady: status === "ready" || nativeStatusRef.current === "readyToPlay",
-    warmNextSurface,
-    isNextItem,
-    platform: nativePlatform,
-  });
+  const itemReadyForSurface =
+    status === "ready" || nativeStatusRef.current === "readyToPlay";
+  const attachSurface =
+    shouldAttachWatchSurface({
+      loadPlayer,
+      preparePlayer,
+      itemReady: itemReadyForSurface,
+      warmNextSurface,
+      isNextItem,
+      platform: nativePlatform,
+    }) ||
+    shouldAttachPreparedNeighborSurface({
+      platform: nativePlatform,
+      preparePlayer,
+      itemReady: itemReadyForSurface,
+      isNeighbor: isNextItem || (!isActive && warmNextSurface),
+    });
   attachSurfaceRef.current = attachSurface;
+  const exposeSurface = shouldExposeWatchTargetSurface({
+    isActive,
+    attached: attachSurface,
+    firstFrameDrawable,
+  });
 
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;
@@ -709,6 +738,13 @@ function WatchPlayerPane({
         itemReady,
       });
       playGenerationRef.current = null;
+      try {
+        if (player.playing === true) {
+          noteWatchPlayerNativePlaying(listIndex, true);
+        }
+      } catch {
+        noteWatchPlayerNativePlaying(listIndex, false);
+      }
       if (!isActive) {
         onTimeline({ currentTime: 0, duration: 0, ratio: 0 });
       }
@@ -795,6 +831,7 @@ function WatchPlayerPane({
     mediaId,
     playerEpoch,
     postId,
+    audioHandoffGen,
   ]);
 
   useEffect(() => {
@@ -879,10 +916,12 @@ function WatchPlayerPane({
 
   useEffect(() => {
     firstFrameRef.current = false;
+    setFirstFrameDrawable(false);
   }, [player, mediaId, playerEpoch]);
 
   const onRenderedFirstFrame = useCallback(() => {
     firstFrameRef.current = true;
+    setFirstFrameDrawable(true);
     markWatchTransition(nativePlatform, "first_frame");
     if (
       canTouchBoundPlayer() &&
@@ -913,7 +952,7 @@ function WatchPlayerPane({
     >
       {attachSurface ? (
         <VideoView
-          style={styles.video}
+          style={exposeSurface ? styles.video : styles.hiddenWatchSurface}
           player={player}
           contentFit={WATCH_VIDEO_CONTENT_FIT}
           nativeControls={false}
@@ -925,7 +964,7 @@ function WatchPlayerPane({
         />
       ) : null}
 
-      {attachSurface && status === "loading" && (
+      {isActive && attachSurface && status === "loading" && (
         <View style={styles.centerOverlay} pointerEvents="none">
           <ActivityIndicator
             color={colors.accentCyan}
@@ -1895,6 +1934,10 @@ const styles = StyleSheet.create({
   },
   video: {
     ...StyleSheet.absoluteFill,
+  },
+  hiddenWatchSurface: {
+    ...StyleSheet.absoluteFill,
+    opacity: 0,
   },
   placeholder: {
     ...StyleSheet.absoluteFill,

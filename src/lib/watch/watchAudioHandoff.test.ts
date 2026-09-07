@@ -6,8 +6,12 @@ import {
   AUDIBLE_WATCH_PLAYERS_MAX,
   WATCH_VIDEO_AUDIO_MIXING_MODE,
   canIncomingWatchAudioUnmute,
+  canNewWatchAudioBecomeAudible,
+  confirmWatchOutgoingNativeSilence,
   countAudibleWatchPlayerInvariant,
   holdIncomingWatchAudioSilent,
+  isWatchOutgoingNativeAudioSilenced,
+  noteWatchPlayerNativePlaying,
   planWatchAudioHandoffSteps,
   registerWatchPlayerSlot,
   resetWatchAudioHandoffForTests,
@@ -30,7 +34,7 @@ function audibleSnapshot(input: {
       shouldPlay: false,
       muted: input.outgoing.player.muted,
       volume: input.outgoing.player.volume,
-      playing: false,
+      playing: input.outgoing.player.playing,
     },
     {
       isActive: input.incomingActive,
@@ -51,6 +55,7 @@ describe("Watch audio clean handoff", () => {
       "mute_outgoing",
       "pause_outgoing",
       "hold_incoming_silent",
+      "confirm_outgoing_native_silence",
       "allow_incoming_unmute",
     ]);
   });
@@ -91,7 +96,7 @@ describe("Watch audio clean handoff", () => {
     expect(incoming.calls).not.toContain("pause");
   });
 
-  it("blocks incoming unmute until outgoing is silenced, then allows exactly one audible player", () => {
+  it("blocks incoming unmute while outgoing native playing is still true", () => {
     const outgoing = createPlayerSession();
     const incoming = createPlayerSession();
     applyPlaybackIntent(outgoing.player, {
@@ -103,21 +108,16 @@ describe("Watch audio clean handoff", () => {
     registerWatchPlayerSlot(0, outgoing.player);
     registerWatchPlayerSlot(1, incoming.player);
 
-    expect(canIncomingWatchAudioUnmute()).toBe(true);
     const handoff = runWatchOutgoingAudioHandoff({ fromIndex: 0, toIndex: 1 });
     expect(handoff.outgoingSilenced).toBe(true);
-    expect(handoff.incomingHeldSilent).toBe(true);
-    expect(handoff.incomingMayUnmute).toBe(true);
+    expect(handoff.outgoingNativeSilenced).toBe(false);
+    expect(handoff.incomingMayUnmute).toBe(false);
+    expect(canIncomingWatchAudioUnmute()).toBe(false);
+    expect(canNewWatchAudioBecomeAudible()).toBe(false);
     expect(outgoing.player.muted).toBe(true);
     expect(outgoing.player.volume).toBe(0);
-    expect(outgoing.calls).toContain("pause");
-    expect(incoming.player.muted).toBe(true);
-    expect(incoming.player.volume).toBe(0);
-    expect(incoming.calls).not.toContain("pause");
-    expect(
-      audibleSnapshot({ outgoing, incoming, incomingActive: false })
-    ).toBe(0);
-
+    expect(outgoing.player.playing).toBe(true);
+    expect(isWatchOutgoingNativeAudioSilenced(outgoing.player, 0)).toBe(false);
     expect(
       shouldUnmuteWatchAfterFirstFrame({
         firstFrameConfirmed: true,
@@ -125,9 +125,17 @@ describe("Watch audio clean handoff", () => {
         shouldPlay: true,
         userMuted: false,
         surfaceAttached: true,
-        outgoingSilenced: false,
+        outgoingSilenced: canIncomingWatchAudioUnmute(),
       })
     ).toBe(false);
+    expect(
+      audibleSnapshot({ outgoing, incoming, incomingActive: true })
+    ).toBe(0);
+
+    noteWatchPlayerNativePlaying(0, false);
+    expect(canIncomingWatchAudioUnmute()).toBe(true);
+    expect(canNewWatchAudioBecomeAudible()).toBe(true);
+    expect(isWatchOutgoingNativeAudioSilenced(outgoing.player, 0)).toBe(true);
     expect(
       shouldUnmuteWatchAfterFirstFrame({
         firstFrameConfirmed: true,
@@ -150,12 +158,60 @@ describe("Watch audio clean handoff", () => {
     ).toBe(AUDIBLE_WATCH_PLAYERS_MAX);
   });
 
+  it("does not let incoming become audible while outgoing native ownership is active", () => {
+    const outgoing = createPlayerSession();
+    const incoming = createPlayerSession();
+    applyPlaybackIntent(outgoing.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: false,
+    });
+    registerWatchPlayerSlot(0, outgoing.player);
+    registerWatchPlayerSlot(1, incoming.player);
+    runWatchOutgoingAudioHandoff({ fromIndex: 0, toIndex: 1 });
+
+    applyPlaybackIntent(incoming.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: false,
+    });
+    expect(canNewWatchAudioBecomeAudible()).toBe(false);
+    expect(
+      countAudibleWatchPlayerInvariant([
+        {
+          isActive: false,
+          shouldPlay: false,
+          muted: outgoing.player.muted,
+          volume: outgoing.player.volume,
+          playing: outgoing.player.playing === true,
+        },
+        {
+          isActive: true,
+          shouldPlay: true,
+          muted: incoming.player.muted,
+          volume: incoming.player.volume,
+          playing: true,
+        },
+      ])
+    ).toBe(1);
+
+    incoming.player.muted = true;
+    incoming.player.volume = 0;
+    expect(canNewWatchAudioBecomeAudible()).toBe(false);
+    confirmWatchOutgoingNativeSilence(0);
+    expect(canNewWatchAudioBecomeAudible()).toBe(true);
+  });
+
   it("treats a missing outgoing slot as already silenced so the first video can unmute", () => {
     const incoming = createPlayerSession();
     registerWatchPlayerSlot(0, incoming.player);
     const handoff = runWatchOutgoingAudioHandoff({ fromIndex: 0, toIndex: 0 });
     expect(handoff.outgoingSilenced).toBe(true);
+    expect(handoff.outgoingNativeSilenced).toBe(true);
     expect(canIncomingWatchAudioUnmute()).toBe(true);
+    expect(canNewWatchAudioBecomeAudible()).toBe(true);
   });
 
   it("closes the incoming unmute gate before outgoing silence during A→B", () => {
@@ -178,6 +234,8 @@ describe("Watch audio clean handoff", () => {
     };
     runWatchOutgoingAudioHandoff({ fromIndex: 0, toIndex: 1 });
     expect(seen).toEqual([false]);
+    expect(canIncomingWatchAudioUnmute()).toBe(false);
+    noteWatchPlayerNativePlaying(0, false);
     expect(canIncomingWatchAudioUnmute()).toBe(true);
   });
 });
