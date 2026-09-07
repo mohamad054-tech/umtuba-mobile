@@ -115,6 +115,30 @@ describe("3 first frame unmutes", () => {
     expect(afterFrame?.volume).toBe(1);
     expect(afterFrame?.shouldPlay).toBe(true);
   });
+
+  it("holds incoming mute until outgoing audio is silenced", () => {
+    expect(
+      shouldUnmuteWatchAfterFirstFrame({
+        firstFrameConfirmed: true,
+        isActive: true,
+        shouldPlay: true,
+        userMuted: false,
+        surfaceAttached: true,
+        playerMediaId: "post-2",
+        visibleMediaId: "post-2",
+        outgoingSilenced: false,
+      })
+    ).toBe(false);
+    const held = resolveGatedWatchPlaybackIntent({
+      ...GATE_BASE,
+      surfaceAttached: true,
+      firstFrameConfirmed: true,
+      outgoingSilenced: false,
+    });
+    expect(held?.shouldPlay).toBe(true);
+    expect(held?.muted).toBe(true);
+    expect(held?.volume).toBe(0);
+  });
 });
 
 describe("4 stale player/post event is ignored", () => {

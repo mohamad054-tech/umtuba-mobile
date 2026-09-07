@@ -100,6 +100,12 @@ import {
   runAlivePlayerOp,
 } from "@/src/lib/watch/playerSession";
 import {
+  WATCH_VIDEO_AUDIO_MIXING_MODE,
+  canIncomingWatchAudioUnmute,
+  getWatchPlayerSlot,
+  registerWatchPlayerSlot,
+} from "@/src/lib/watch/watchAudioHandoff";
+import {
   WATCH_HEADER_RAIL_RESERVED,
   WATCH_RAIL_ACTION_LABEL_MAX_WIDTH,
   WATCH_RAIL_ACTION_MIN_HEIGHT,
@@ -466,7 +472,7 @@ function WatchPlayerPane({
     p.loop = false;
     p.muted = true;
     p.volume = 0;
-    p.audioMixingMode = "mixWithOthers";
+    p.audioMixingMode = WATCH_VIDEO_AUDIO_MIXING_MODE;
     p.staysActiveInBackground = false;
     p.showNowPlayingNotification = false;
     p.keepScreenOnWhilePlaying = true;
@@ -477,6 +483,15 @@ function WatchPlayerPane({
     }
   });
   const boundPlayerRef = useRef<typeof player | null>(null);
+
+  useLayoutEffect(() => {
+    registerWatchPlayerSlot(listIndex, player);
+    return () => {
+      if (getWatchPlayerSlot(listIndex) === player) {
+        registerWatchPlayerSlot(listIndex, null);
+      }
+    };
+  }, [listIndex, player]);
 
   const canTouchBoundPlayer = () =>
     playerAliveRef.current &&
@@ -531,6 +546,7 @@ function WatchPlayerPane({
         muted,
         volume,
         loop,
+        outgoingSilenced: canIncomingWatchAudioUnmute(),
       });
       if (intent) {
         playGenerationRef.current = ownershipGenerationRef.current;
@@ -733,6 +749,7 @@ function WatchPlayerPane({
       muted,
       volume,
       loop,
+      outgoingSilenced: canIncomingWatchAudioUnmute(),
     });
     if (
       intent &&
@@ -877,6 +894,7 @@ function WatchPlayerPane({
         surfaceAttached: attachSurfaceRef.current,
         playerMediaId: mediaIdRef.current,
         visibleMediaId: mediaId,
+        outgoingSilenced: canIncomingWatchAudioUnmute(),
       })
     ) {
       runAlivePlayerOp(player, (alive) => {

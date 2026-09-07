@@ -162,12 +162,14 @@ export function resolveGatedWatchPlaybackIntent(
     muted: boolean;
     volume: number;
     loop: boolean;
+    outgoingSilenced?: boolean;
   }
 ): PlaybackIntent | null {
   if (!shouldStartPlaybackAfterAsset(input)) return null;
   const holdMuteForFrame =
     input.platform === "android" && !input.firstFrameConfirmed;
-  const muted = input.muted || holdMuteForFrame;
+  const holdMuteForOutgoing = input.outgoingSilenced === false;
+  const muted = input.muted || holdMuteForFrame || holdMuteForOutgoing;
   return {
     shouldPlay: true,
     muted,
@@ -185,11 +187,13 @@ export function shouldUnmuteWatchAfterFirstFrame(input: {
   surfaceAttached: boolean;
   playerMediaId?: string | null;
   visibleMediaId?: string | null;
+  outgoingSilenced?: boolean;
 }): boolean {
   if (!input.firstFrameConfirmed) return false;
   if (!input.isActive || !input.shouldPlay) return false;
   if (!input.surfaceAttached) return false;
   if (input.userMuted) return false;
+  if (input.outgoingSilenced === false) return false;
   if (
     input.playerMediaId != null &&
     input.visibleMediaId != null &&

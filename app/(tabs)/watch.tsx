@@ -186,6 +186,7 @@ import {
   shouldInterceptWatchRootBack,
 } from "@/src/lib/nav/watchRootExit";
 import { bumpWatchOwnerGeneration } from "@/src/lib/watch/activePlayerOwnership";
+import { runWatchOutgoingAudioHandoff } from "@/src/lib/watch/watchAudioHandoff";
 import { bumpWatchLeaveGeneration } from "@/src/lib/watch/playerLifecycle";
 import { shouldEnableWatchPullToRefresh } from "@/src/lib/watch/watchGestures";
 import { watchLightHaptic } from "@/src/lib/watch/watchHaptics";
@@ -330,6 +331,10 @@ export default function WatchScreen() {
     (decision: WatchActiveIndexDecision) => {
       if (!decision.accept || decision.next.activeIndex == null) return;
       const nextIndex = decision.next.activeIndex;
+      runWatchOutgoingAudioHandoff({
+        fromIndex: activeIndexRef.current,
+        toIndex: nextIndex,
+      });
       arbiterRef.current = decision.next;
       setLastSettledNativePage(decision.next.lastSettledNativePage);
       const nextGeneration = bumpWatchOwnerGeneration(
