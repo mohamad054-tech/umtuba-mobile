@@ -26,24 +26,22 @@ This is a product contract. Previous accepted behavior is part of the product.
 12. No product edit without a valid task manifest (`docs/ai/tasks/CURRENT_TASK_MANIFEST.json`).
 13. Default `MAX_EAS_BUILDS = 1`. A second build needs a new explicit owner GO.
 14. Never force-push, `reset --hard` preserved work, or `git clean` preserved worktrees.
-15. Do not mark current Fold6 Watch healthy. It is `DEVICE_FAIL`.
+15. Watch Phase 1 ~20% short swipe is Fold6 `OWNER_PASS` locked at `f1e85475` / EAS `40b685de`. Do not modify, weaken, or silently refactor that gesture. Other Watch contracts remain uncertified unless separately locked.
 
 ## Required sequence
 
 `OWNER_PASS` → baseline lock → regression contract → change-scope check → test gates → device gate when required → only then next work.
 
-## Current Fold6 Watch (do not paper over)
+## Current Fold6 Watch
 
 ```
-CURRENT_FOLD6_WATCH_STATUS = DEVICE_FAIL
-OPEN:
-- random black video surface
-- missing 80% handoff
-- old audio bleeding into next video
-7536c11 additionally: video 2 black, 2→3 snapback to video 1
-Installed device SHA: 11c0719f70fb014e0c0219a679c5a92a1b1815af
-Watch source identity remains 1c56aca. Do not mark Watch healthy.
-UM Streak live camera + retention is OWNER_PASS at 11c0719 / e6ece863.
+WATCH_PHASE1_20_PERCENT = OWNER_PASS LOCKED
+AUTHORITATIVE_SOURCE = f1e85475b5ab19b09884f70bc370ff77afe43905
+AUTHORITATIVE_EAS = 40b685de-2efc-4fd5-b8e1-31cacd8e8397
+DEVICE = RFCX718LVHK / SM-F956B
+INSTALLED = f1e85475 / 40b685de
+WITHDRAWN: 80% commit, finger-down 80%, 5a30e5b0, f7d36b6d, ab9d34d
+UM Streak live camera + retention remains OWNER_PASS at 11c0719 / e6ece863.
 ```
 
-Do not fix those failures inside a governance-only task.
+Phase 2/3 and any future Watch work must preserve the accepted ~20% swipe exactly. Conflicting changes require explicit OWNER GO.

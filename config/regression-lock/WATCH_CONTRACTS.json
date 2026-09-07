@@ -1,11 +1,17 @@
 {
   "schema_version": 1,
   "product_area": "watch",
-  "current_fold6_watch_status": "DEVICE_FAIL",
+  "current_fold6_watch_status": "PHASE1_20_PERCENT_OWNER_PASS_LOCKED",
+  "watch_phase1_20_percent_owner_pass": {
+    "status": "OWNER_PASS",
+    "locked": true,
+    "source_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
+    "eas_build_id": "40b685de-2efc-4fd5-b8e1-31cacd8e8397",
+    "device": "RFCX718LVHK / SM-F956B",
+    "date": "2026-09-07"
+  },
   "open_owner_failures": [
-    "random black video surface",
-    "missing 80% handoff",
-    "old audio bleeding into next video"
+    "other Watch contracts remain uncertified except Phase 1 ~20% short swipe"
   ],
   "contracts": [
     {
@@ -65,8 +71,8 @@
     },
     {
       "id": "WATCH_80_PERCENT_HANDOFF",
-      "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Reference 4547d6bb: itemVisiblePercentThreshold 80, first isViewable claims activeIndex. Installed 1c56aca discards callback. 7536c11 source restore DEVICE_FAIL.",
+      "owner_status": "SUPERSEDED",
+      "last_known_accepted_evidence": "Withdrawn. Owner rejected 80% commit, finger-down 80%, 5a30e5b0, and f7d36b6d. Superseded by WATCH_20_PERCENT_SHORT_SWIPE OWNER_PASS at f1e85475 / 40b685de.",
       "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
       "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
       "regression_tests": [
@@ -81,6 +87,26 @@
         "src/lib/watch/watchManualHandoff.ts"
       ],
       "dependent_files": ["src/lib/watch/watchViewport.ts"]
+    },
+    {
+      "id": "WATCH_20_PERCENT_SHORT_SWIPE",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-07. Source f1e85475. EAS 40b685de. 1→2, 2→3, 3→2 short ~20% release. Tiny movement stays. Short flick OK. No black, snapback, wrong audio, or one-cell-late. Do not modify without OWNER GO.",
+      "reference_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
+      "reference_branch": "origin/desktop/watch-phase1-20-percent-owner-pass-freeze-v1",
+      "regression_tests": [
+        "src/lib/watch/watchManualHandoff.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "20_PERCENT_SHORT_SWIPE_MISSING",
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "dependent_files": [
+        "src/lib/watch/watchActiveIndexArbiter.ts",
+        "src/lib/watch/watchViewport.ts"
+      ]
     },
     {
       "id": "WATCH_5_VIDEO_ROLLING_CACHE",

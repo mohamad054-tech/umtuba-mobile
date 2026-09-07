@@ -9,7 +9,7 @@ Read and follow `docs/ai/UMTUBA_AGENT_REGRESSION_POLICY.md`.
 
 - No product edit without `docs/ai/tasks/CURRENT_TASK_MANIFEST.json`.
 - Run `npm run regression:task-check`, `regression:scope-check`, and `regression:contracts` before claiming work complete.
-- Unit PASS is never OWNER_PASS. Current Fold6 Watch is DEVICE_FAIL.
+- Unit PASS is never OWNER_PASS. Watch Phase 1 ~20% short swipe is Fold6 OWNER_PASS locked at f1e85475 / 40b685de.
 - No EAS before `npm run regression:pre-eas`. Default one EAS build per task.
 - Do not change Watch while implementing an unrelated feature.
 - Latest commit is not automatically the baseline. Compare against accepted baseline SHA.

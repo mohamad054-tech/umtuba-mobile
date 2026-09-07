@@ -130,6 +130,20 @@
       "device_required": true
     },
     {
+      "id": "20_PERCENT_SHORT_SWIPE_MISSING",
+      "symptom": "Watch requires a long/80% drag or held finger instead of committing after a short ~20% vertical release.",
+      "likely_modules": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "reference_builds": [
+        "f1e85475 / 40b685de OWNER_PASS"
+      ],
+      "resolved": true,
+      "prevention_test": "src/lib/watch/watchManualHandoff.test.ts",
+      "device_required": true
+    },
+    {
       "id": "80_PERCENT_HANDOFF_MISSING",
       "symptom": "Old video stays active until effectively 100% snap/settle. 80% handoff absent on device.",
       "likely_modules": [

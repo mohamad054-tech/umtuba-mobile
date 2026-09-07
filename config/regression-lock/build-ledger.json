@@ -1,4 +1,13 @@
 {
+  "DESKTOP_WATCH_PHASE1_20_PERCENT_DEVICE_GATE_V1": {
+    "task_id": "DESKTOP_WATCH_PHASE1_20_PERCENT_DEVICE_GATE_V1",
+    "authorized_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
+    "max_eas_builds": 1,
+    "build_count": 1,
+    "eas_build_ids": [
+      "40b685de-2efc-4fd5-b8e1-31cacd8e8397"
+    ]
+  },
   "DESKTOP_UM_STREAK_LIVE_CAMERA_RETENTION_FOLD6_VALIDATION_V1": {
     "task_id": "DESKTOP_UM_STREAK_LIVE_CAMERA_RETENTION_FOLD6_VALIDATION_V1",
     "authorized_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",

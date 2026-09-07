@@ -6,10 +6,10 @@
     "serial": "RFCX718LVHK",
     "name": "Galaxy Z Fold6"
   },
-  "current_installed_device_sha": "11c0719f70fb014e0c0219a679c5a92a1b1815af",
-  "current_installed_eas_build_id": "e6ece863-3e88-46b5-a26d-80f69a6f1eb2",
-  "current_fold6_watch_status": "DEVICE_FAIL",
-  "notes": "OWNER_PASS is never inferred from unit tests. Fold6 now has 11c0719 / e6ece863. Watch blobs remain 1c56aca-identical and DEVICE_FAIL. UM Streak live camera + retention is OWNER_PASS. Do not treat newest unrelated commit as baseline.",
+  "current_installed_device_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
+  "current_installed_eas_build_id": "40b685de-2efc-4fd5-b8e1-31cacd8e8397",
+  "current_fold6_watch_status": "PHASE1_20_PERCENT_OWNER_PASS_LOCKED",
+  "notes": "OWNER_PASS is never inferred from unit tests. Watch Phase 1 ~20% short swipe is Fold6 OWNER_PASS at f1e85475 / 40b685de. UM Streak live camera + retention remains OWNER_PASS at 11c0719 / e6ece863. Do not treat newest unrelated commit as baseline.",
   "baselines": [
     {
       "feature_id": "WATCH_DEVICE_ROLLBACK_1C56ACA",
@@ -49,7 +49,7 @@
     {
       "feature_id": "WATCH_80_PERCENT_HANDOFF",
       "product_area": "watch",
-      "owner_status": "DEVICE_FAIL",
+      "owner_status": "SUPERSEDED",
       "accepted_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
       "accepted_eas_build_id": null,
       "accepted_device": "RFCX718LVHK / SM-F956B",
@@ -73,8 +73,36 @@
       "dependencies": ["watch", "media_video"],
       "known_failure_signatures": ["80_PERCENT_HANDOFF_MISSING"],
       "supersedes": [],
+      "superseded_by": "WATCH_20_PERCENT_SHORT_SWIPE",
+      "notes": "Withdrawn. Owner rejected 80% commit / finger-down / 5a30e5b0 / f7d36b6d. Superseded by WATCH_20_PERCENT_SHORT_SWIPE OWNER_PASS at f1e85475 / 40b685de."
+    },
+    {
+      "feature_id": "WATCH_20_PERCENT_SHORT_SWIPE",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
+      "accepted_eas_build_id": "40b685de-2efc-4fd5-b8e1-31cacd8e8397",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-07",
+      "required_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "protected_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/watchManualHandoff.ts"
+      ],
+      "regression_tests": [
+        "src/lib/watch/watchManualHandoff.test.ts"
+      ],
+      "device_tests": [
+        "WATCH_20_PERCENT_SHORT_SWIPE"
+      ],
+      "dependencies": ["watch", "media_video"],
+      "known_failure_signatures": ["20_PERCENT_SHORT_SWIPE_MISSING"],
+      "supersedes": ["WATCH_80_PERCENT_HANDOFF"],
       "superseded_by": null,
-      "notes": "Reference logic at 4547d6bb: itemVisiblePercentThreshold 80, first isViewable claims activeIndex. 1c56aca discards viewability. 7536c11 restored source logic but DEVICE_FAIL (black + snapback). Not OWNER_PASS."
+      "notes": "Owner Fold6 PASS. Short ~20% vertical release commits next/previous. Tiny movement stays. Fast same-direction flick may commit. Phase 2/3 must not change this gesture without OWNER GO."
     },
     {
       "feature_id": "WATCH_7536C11_SOURCE_RESTORE_REJECTED",
@@ -213,7 +241,7 @@
       "known_failure_signatures": [],
       "supersedes": ["UM_STREAK_MOBILE"],
       "superseded_by": null,
-      "notes": "Owner physical PASS on Fold6 RFCX718LVHK / SM-F956B. APK SHA 11c0719. EAS e6ece863. Watch remains DEVICE_FAIL and frozen."
+      "notes": "Owner physical PASS on Fold6 RFCX718LVHK / SM-F956B. APK SHA 11c0719. EAS e6ece863. Watch Phase 1 ~20% swipe is separately OWNER_PASS locked at f1e85475 / 40b685de. Do not edit UM Streak."
     },
     {
       "feature_id": "UM_STREAK_LIVE_CAMERA_PREVIEW",
