@@ -24,7 +24,10 @@ import {
   resolveManualHandoffCompletionTransaction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualScrollProgress,
   resolveNoFirstFrameManualHandoff,
+  shouldArmManual80Commit,
+  shouldTreatWatchEndDragAsSettle,
   resolvePendingManualHandoffAction,
   shouldAcceptPendingManualHandoff,
   shouldCancelPendingManualHandoff,
@@ -200,6 +203,67 @@ describe("manual handoff parity with auto-advance", () => {
         activeIndex: 0,
       })
     ).toBe(true);
+  });
+
+  it("arms 80% commit from scroll progress without requiring finger-down", () => {
+    expect(
+      resolveManualScrollProgress({
+        fromIndex: 0,
+        currentOffset: 632,
+        itemHeight: 800,
+        itemCount: 5,
+      })
+    ).toEqual({ targetIndex: 1, pageFraction: 0.79 });
+    expect(
+      shouldArmManual80Commit({
+        pageFraction: 0.79,
+        targetIndex: 1,
+        fromIndex: 0,
+      })
+    ).toBe(false);
+    expect(
+      resolveManualScrollProgress({
+        fromIndex: 0,
+        currentOffset: 640,
+        itemHeight: 800,
+        itemCount: 5,
+      })
+    ).toEqual({ targetIndex: 1, pageFraction: 0.8 });
+    expect(
+      shouldArmManual80Commit({
+        pageFraction: 0.8,
+        targetIndex: 1,
+        fromIndex: 0,
+      })
+    ).toBe(true);
+    expect(
+      shouldArmManual80Commit({
+        pageFraction: 0.8,
+        targetIndex: 2,
+        fromIndex: 1,
+      })
+    ).toBe(true);
+    expect(
+      shouldArmManual80Commit({
+        pageFraction: 0.8,
+        targetIndex: 1,
+        fromIndex: 2,
+      })
+    ).toBe(true);
+    expect(manualViewabilityMayWriteActiveIndex()).toBe(false);
+    expect(shouldTreatWatchEndDragAsSettle({ velocityY: 0 })).toBe(true);
+    expect(shouldTreatWatchEndDragAsSettle({ velocityY: undefined })).toBe(
+      true
+    );
+    expect(shouldTreatWatchEndDragAsSettle({ velocityY: 18 })).toBe(false);
+    expect(
+      shouldCompleteManualHandoff({
+        nativeSettledPage: 1,
+        targetIndex: 1,
+        targetSurfaceAttached: true,
+        targetFirstFrame: false,
+      })
+    ).toBe(false);
   });
 
   it("manual settle 0→1 and 1→2 then back 2→1", () => {

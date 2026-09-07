@@ -41,6 +41,54 @@ export function resolveManualHandoffTarget(input: {
   return null;
 }
 
+/** Commit once the swipe has crossed ~80% of a page. Finger-down is not required. */
+export const WATCH_MANUAL_COMMIT_PAGE_FRACTION = 0.8;
+
+export function resolveManualScrollProgress(input: {
+  fromIndex: number;
+  currentOffset: number;
+  itemHeight: number;
+  itemCount: number;
+}): { targetIndex: number | null; pageFraction: number } {
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return { targetIndex: null, pageFraction: 0 };
+  }
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  if (from == null) return { targetIndex: null, pageFraction: 0 };
+  const delta = input.currentOffset - from * input.itemHeight;
+  const pageFraction = Math.min(
+    1,
+    Math.max(0, Math.abs(delta) / input.itemHeight)
+  );
+  return {
+    targetIndex: resolveManualHandoffTarget(input),
+    pageFraction,
+  };
+}
+
+export function shouldArmManual80Commit(input: {
+  pageFraction: number;
+  targetIndex: number | null;
+  fromIndex: number;
+}): boolean {
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
+  if (from == null || target == null || target === from) return false;
+  return (
+    Number.isFinite(input.pageFraction) &&
+    input.pageFraction >= WATCH_MANUAL_COMMIT_PAGE_FRACTION
+  );
+}
+
+/** Finger-up with leftover velocity is not a settle. Wait for momentum end. */
+export function shouldTreatWatchEndDragAsSettle(input: {
+  velocityY?: number | null;
+}): boolean {
+  const velocity = input.velocityY;
+  if (velocity == null || !Number.isFinite(velocity)) return true;
+  return Math.abs(velocity) === 0;
+}
+
 export function shouldWarmManualTarget(input: {
   fromIndex: number;
   targetIndex: number | null;

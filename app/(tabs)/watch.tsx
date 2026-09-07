@@ -165,9 +165,12 @@ import {
   resolveAndroidManualSettleAction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualScrollProgress,
   shouldAcceptPendingManualHandoff,
+  shouldArmManual80Commit,
   shouldClaimWatchIndexFromNativeSettle,
   shouldIgnoreStaleManualSettle,
+  shouldTreatWatchEndDragAsSettle,
   shouldWarmManualTarget,
   type ManualHandoffPending,
 } from "@/src/lib/watch/watchManualHandoff";
@@ -811,6 +814,50 @@ export default function WatchScreen() {
     });
   }, []);
 
+  const armManual80Commit = useCallback(
+    (fromIndex: number, offset: number) => {
+      const progress = resolveManualScrollProgress({
+        fromIndex,
+        currentOffset: offset,
+        itemHeight: itemHeightRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (
+        !shouldArmManual80Commit({
+          pageFraction: progress.pageFraction,
+          targetIndex: progress.targetIndex,
+          fromIndex,
+        })
+      ) {
+        return;
+      }
+      const target = progress.targetIndex;
+      if (target == null) return;
+      applyWarmedTargetIndex(target);
+      const targetVideo = visibleVideosRef.current[target];
+      const created = createManualHandoffPending({
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        targetIndex: target,
+        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
+      });
+      if (!created) return;
+      const existing = pendingManualRef.current;
+      if (existing?.targetIndex === target) {
+        pendingManualRef.current = { ...existing, nativePage: target };
+      } else {
+        const generation = manualHandoffGenRef.current + 1;
+        manualHandoffGenRef.current = generation;
+        pendingManualRef.current = {
+          ...created,
+          generation,
+          nativePage: target,
+        };
+      }
+      tryCompletePendingManualHandoff();
+    },
+    [applyWarmedTargetIndex, tryCompletePendingManualHandoff]
+  );
+
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
     dragStartIndexRef.current = activeIndexRef.current;
@@ -820,7 +867,10 @@ export default function WatchScreen() {
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       watchScrollInFlightRef.current = true;
       scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
-      if (!manualDragActiveRef.current) return;
+      if (!manualDragActiveRef.current) {
+        armManual80Commit(dragStartIndexRef.current, scrollOffsetRef.current);
+        return;
+      }
       const directional = resolveManualHandoffTarget({
         fromIndex: dragStartIndexRef.current,
         currentOffset: scrollOffsetRef.current,
@@ -855,11 +905,13 @@ export default function WatchScreen() {
           targetIndex: target,
         })
       ) {
+        armManual80Commit(dragStartIndexRef.current, scrollOffsetRef.current);
         return;
       }
       applyWarmedTargetIndex(target);
+      armManual80Commit(dragStartIndexRef.current, scrollOffsetRef.current);
     },
-    [applyWarmedTargetIndex]
+    [applyWarmedTargetIndex, armManual80Commit]
   );
 
   const onWatchScrollSettle = useCallback(
@@ -941,9 +993,10 @@ export default function WatchScreen() {
         generation,
         nativePage,
       };
+      armManual80Commit(dragStartIndexRef.current, offset);
       tryCompletePendingManualHandoff();
     },
-    [applyWarmedTargetIndex, cancelPendingManualHandoff, tryCompletePendingManualHandoff]
+    [applyWarmedTargetIndex, armManual80Commit, cancelPendingManualHandoff, tryCompletePendingManualHandoff]
   );
 
   useEffect(() => {
@@ -1894,7 +1947,20 @@ export default function WatchScreen() {
         onScrollBeginDrag={onWatchScrollBeginDrag}
         scrollEventThrottle={16}
         onMomentumScrollEnd={onWatchScrollSettle}
-        onScrollEndDrag={onWatchScrollSettle}
+        onScrollEndDrag={(event) => {
+          if (
+            !shouldTreatWatchEndDragAsSettle({
+              velocityY: event.nativeEvent.velocity?.y,
+            })
+          ) {
+            armManual80Commit(
+              dragStartIndexRef.current,
+              event.nativeEvent.contentOffset.y
+            );
+            return;
+          }
+          onWatchScrollSettle(event);
+        }}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
