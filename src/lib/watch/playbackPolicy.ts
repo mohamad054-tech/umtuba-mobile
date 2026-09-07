@@ -93,12 +93,27 @@ export function shouldPrepareWatchPlayer(
 export const ANDROID_NEXT_SURFACE_WARM_REMAINING_MS = 1800;
 export const ANDROID_HANDOFF_WAIT_MS = 700;
 
+export function resolveAndroidNextWarmIndex(
+  activeIndex: number,
+  itemCount: number
+): number | null {
+  if (!Number.isFinite(activeIndex) || !Number.isFinite(itemCount)) {
+    return null;
+  }
+  const current = Math.trunc(activeIndex);
+  const next = current + 1;
+  if (current < 0 || next >= Math.trunc(itemCount)) return null;
+  return next;
+}
+
 export function shouldWarmAndroidNextSurface(input: {
   platform?: string | null;
   remainingMs: number | null | undefined;
   ended?: boolean;
+  nextPrepared?: boolean;
 }): boolean {
   if (input.platform !== "android") return false;
+  if (input.nextPrepared === true) return true;
   if (input.ended === true) return true;
   if (input.remainingMs == null || !Number.isFinite(input.remainingMs)) {
     return false;

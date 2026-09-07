@@ -239,6 +239,8 @@ describe("watch root restore contracts", () => {
       "post-6",
     ]);
     expect(plan.upcomingCount).toBe(5);
+    expect(plan.previousCount).toBe(0);
+    expect(plan.previousTarget).toBe(5);
     expect(
       shouldRequestWatchFeedForwardPage({
         activeIndex: 0,
@@ -254,6 +256,33 @@ describe("watch root restore contracts", () => {
         target: 5,
       })
     ).toBe(true);
+  });
+
+  it("retains five previous videos independently of five upcoming", () => {
+    const videos = Array.from({ length: 13 }, (_, n) => ({
+      id: `v${n + 1}`,
+      postId: n + 1,
+      src: `https://cdn.example/${n + 1}.mp4`,
+    }));
+    const plan = planAndroidWatchCacheWindow({
+      videos,
+      activeIndex: 6,
+    });
+    expect(plan.previousCount).toBe(5);
+    expect(plan.upcomingCount).toBe(5);
+    expect(plan.keepIds).toEqual([
+      "post-2",
+      "post-3",
+      "post-4",
+      "post-5",
+      "post-6",
+      "post-7",
+      "post-8",
+      "post-9",
+      "post-10",
+      "post-11",
+      "post-12",
+    ]);
   });
 
   it("cache isolation cannot write activeIndex or claim the player", () => {

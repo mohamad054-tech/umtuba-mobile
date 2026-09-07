@@ -9,8 +9,49 @@
  * after release (see playerLifecycle.detachWatchPlayerBinding).
  */
 
-import type { PlaybackIntent } from "./playerSession";
+import {
+  applyInactiveAudioTeardown,
+  applyPlaybackIntent,
+  type PlaybackIntent,
+  type PlayerLike,
+} from "./playerSession";
 import { clampWatchVolume } from "./playbackPolicy";
+
+let exclusiveAudiblePlayer: PlayerLike | null = null;
+
+export function __resetExclusiveWatchAudioOwnerForTests(): void {
+  exclusiveAudiblePlayer = null;
+}
+
+export function releaseExclusiveWatchAudioOwner(
+  player: PlayerLike | null | undefined
+): void {
+  if (player != null && exclusiveAudiblePlayer === player) {
+    exclusiveAudiblePlayer = null;
+  }
+}
+
+/**
+ * One audible owner at a time. Mute the previous player in the same JS turn
+ * before the incoming owner can unmute. Do not wait for native silence and
+ * do not hide surfaces.
+ */
+export function applyExclusiveWatchPlaybackIntent(
+  player: PlayerLike,
+  intent: PlaybackIntent
+): boolean {
+  const incomingAudible =
+    intent.shouldPlay === true && intent.muted !== true && intent.volume > 0;
+  if (incomingAudible) {
+    if (exclusiveAudiblePlayer && exclusiveAudiblePlayer !== player) {
+      applyInactiveAudioTeardown(exclusiveAudiblePlayer);
+    }
+    exclusiveAudiblePlayer = player;
+  } else if (exclusiveAudiblePlayer === player) {
+    exclusiveAudiblePlayer = null;
+  }
+  return applyPlaybackIntent(player, intent);
+}
 
 export const INACTIVE_WATCH_AUDIO = {
   muted: true,

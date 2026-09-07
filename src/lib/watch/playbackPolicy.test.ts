@@ -43,6 +43,7 @@ import {
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
   shouldPrepareWatchPlayer,
+  resolveAndroidNextWarmIndex,
   shouldWarmAndroidNextSurface,
   resolveWatchHandoffReadiness,
   shouldPlayVideo,
@@ -178,6 +179,16 @@ describe("Android next-surface warm and gated handoff", () => {
         remainingMs: 200,
       })
     ).toBe(false);
+    expect(
+      shouldWarmAndroidNextSurface({
+        platform: "android",
+        remainingMs: 4000,
+        nextPrepared: true,
+      })
+    ).toBe(true);
+    expect(resolveAndroidNextWarmIndex(0, 8)).toBe(1);
+    expect(resolveAndroidNextWarmIndex(7, 8)).toBeNull();
+    expect(resolveAndroidNextWarmIndex(0, 1)).toBeNull();
     expect(
       shouldAttachWatchSurface({
         loadPlayer: false,

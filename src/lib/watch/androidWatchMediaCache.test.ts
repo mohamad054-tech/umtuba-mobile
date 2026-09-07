@@ -9,6 +9,8 @@ import {
   ANDROID_WATCH_CACHE_MANIFEST_NAME,
   ANDROID_WATCH_CACHE_TARGET,
   ANDROID_WATCH_FORWARD_READY_TARGET,
+  ANDROID_WATCH_PREVIOUS_READY_TARGET,
+  countWatchCachePreviousReady,
   ANDROID_WATCH_MAX_BUFFER_BYTES,
   ANDROID_WATCH_VIDEO_CACHE_BYTES,
   __resetAndroidWatchCacheSyncForTests,
@@ -131,6 +133,7 @@ describe("Android Watch rolling cache target 5", () => {
       },
     });
     expect(warmed.keepIds).toEqual([
+      "post-1",
       "post-2",
       "post-3",
       "post-4",
@@ -140,6 +143,7 @@ describe("Android Watch rolling cache target 5", () => {
       "post-8",
     ]);
     expect(warmed.hits).toEqual([
+      "post-1",
       "post-2",
       "post-3",
       "post-4",
@@ -148,7 +152,8 @@ describe("Android Watch rolling cache target 5", () => {
       "post-7",
     ]);
     expect(warmed.downloadIds).toEqual(["post-8"]);
-    expect(warmed.evictIds).toEqual(["post-1"]);
+    expect(warmed.evictIds).toEqual([]);
+    expect(warmed.previousCount).toBe(2);
   });
 
   it("starts from a cached first item and does not redownload a valid hit", async () => {
@@ -242,32 +247,55 @@ describe("Android Watch rolling cache target 5", () => {
     expect(port.downloads.at(-1)).toBe("https://cdn.example/7.mp4");
   });
 
-  it("evicts the oldest retained item and caches the next on advance", async () => {
+  it("keeps previous five independently and evicts only outside that window", async () => {
     const port = createMemoryWatchMediaCachePort();
     const applied: string[] = [];
+    const videos = Array.from({ length: 13 }, (_, i) => video(i + 1));
     await syncAndroidWatchRollingCache({
       platform: "android",
-      videos: [1, 2, 3, 4, 5, 6].map((i) => video(i)),
+      videos,
       activeIndex: 0,
       port,
       onResolved: (videoId, uri) => applied.push(`${videoId}:${uri}`),
     });
-    const rolled = await syncAndroidWatchRollingCache({
+    const mid = await syncAndroidWatchRollingCache({
       platform: "android",
-      videos: [1, 2, 3, 4, 5, 6].map((i) => video(i)),
+      videos,
       activeIndex: 2,
       port,
     });
-    expect(rolled.evicted).toEqual(["post-1"]);
-    expect(rolled.cachedIds).toEqual([
+    expect(mid.evicted).toEqual([]);
+    expect(mid.cachedIds).toContain("post-1");
+    const far = await syncAndroidWatchRollingCache({
+      platform: "android",
+      videos,
+      activeIndex: 6,
+      port,
+    });
+    expect(far.cachedIds).toEqual([
       "post-2",
       "post-3",
       "post-4",
       "post-5",
       "post-6",
+      "post-7",
+      "post-8",
+      "post-9",
+      "post-10",
+      "post-11",
+      "post-12",
     ]);
-    expect(rolled.cachedIds).not.toContain("post-1");
+    expect(far.cachedIds).not.toContain("post-1");
+    expect(far.evicted).toContain("post-1");
     expect(applied.some((row) => row.startsWith("clip-1:file://"))).toBe(true);
+    expect(ANDROID_WATCH_PREVIOUS_READY_TARGET).toBe(5);
+    expect(
+      countWatchCachePreviousReady({
+        videos,
+        activeIndex: 6,
+        cachedIds: far.cachedIds,
+      })
+    ).toBe(5);
   });
 
   it("keeps retained local URIs playable after a network-less sync", async () => {
@@ -402,6 +430,10 @@ describe("Phase2 rolling-five completion", () => {
     const results = await Promise.all(rapid);
     const latest = results.at(-1);
     expect(latest?.cachedIds).toEqual([
+      "post-2",
+      "post-3",
+      "post-4",
+      "post-5",
       "post-6",
       "post-7",
       "post-8",

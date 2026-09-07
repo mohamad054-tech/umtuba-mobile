@@ -120,6 +120,7 @@ import {
   resolveWatchHandoffReadiness,
   shouldHandoffWatchAdvance,
   shouldPrepareWatchPlayer,
+  resolveAndroidNextWarmIndex,
   shouldWarmAndroidNextSurface,
   toWatchListPixels,
   watchInteractionSignature,
@@ -370,8 +371,6 @@ export default function WatchScreen() {
     handoffGenRef.current += 1;
     manualHandoffGenRef.current += 1;
     pendingManualRef.current = null;
-    applyWarmedTargetIndex(null);
-    setWarmNextSurface(false);
     nextHandoffRef.current = {
       index: -1,
       ready: false,
@@ -379,7 +378,7 @@ export default function WatchScreen() {
       surfaceAttached: false,
       mediaId: null,
     };
-  }, [activeIndex, applyWarmedTargetIndex]);
+  }, [activeIndex]);
 
   useEffect(() => {
     const generation = registerMountedWatchInstance();
@@ -517,6 +516,21 @@ export default function WatchScreen() {
   useEffect(() => {
     videosLengthRef.current = visibleVideos.length;
   }, [visibleVideos.length]);
+
+  useEffect(() => {
+    const nextWarm = resolveAndroidNextWarmIndex(
+      activeIndex,
+      visibleVideos.length
+    );
+    applyWarmedTargetIndex(nextWarm);
+    setWarmNextSurface(
+      shouldWarmAndroidNextSurface({
+        platform: Platform.OS,
+        remainingMs: null,
+        nextPrepared: nextWarm != null,
+      })
+    );
+  }, [activeIndex, applyWarmedTargetIndex, visibleVideos.length]);
 
   const activeVideoId = visibleVideos[activeIndex]?.id ?? null;
   useEffect(() => {

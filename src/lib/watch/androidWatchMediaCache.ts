@@ -23,12 +23,14 @@ export const ANDROID_WATCH_MAX_BUFFER_BYTES = 12 * 1024 * 1024;
 
 /**
  * Rolling on-device Watch window. Identity is post/media id, not list index.
- * Phase 2 keeps five upcoming real videos ready. Existing N-1 stays in the
- * window so ordinary back-one is not deleted. Phase 3 previous-five is not
- * implemented here. Cache must never write activeIndex, scroll FlatList,
- * claim player ownership, or attach/detach VideoView.
+ * Phase 2 keeps five upcoming real videos ready. Phase 3 independently
+ * retains the five most recently watched previous videos. Forward and
+ * previous windows do not share eviction. Cache must never write
+ * activeIndex, scroll FlatList, claim player ownership, or attach/detach
+ * VideoView.
  */
 export const ANDROID_WATCH_FORWARD_READY_TARGET = 5;
+export const ANDROID_WATCH_PREVIOUS_READY_TARGET = 5;
 export const ANDROID_WATCH_CACHE_TARGET = ANDROID_WATCH_FORWARD_READY_TARGET;
 export const ANDROID_WATCH_CACHE_DIR_NAME = "umtuba-watch-media/";
 export const ANDROID_WATCH_CACHE_MANIFEST_NAME = "umtuba-watch-rolling-v1.json";
@@ -127,11 +129,13 @@ export type WatchCachePlanItem = {
 
 export type WatchCacheWindowPlan = {
   target: number;
+  previousTarget: number;
   keepIds: string[];
   downloadIds: string[];
   evictIds: string[];
   hits: string[];
   upcomingCount: number;
+  previousCount: number;
 };
 
 export function emptyWatchCacheManifest(
@@ -217,6 +221,34 @@ export function shouldReuseWatchCacheOnRemount(input: {
   return input.fileExists && input.bytes > 0 && input.mediaIdInFeed;
 }
 
+export function countWatchCachePreviousReady(input: {
+  videos: Array<{
+    id: string;
+    postId?: number | null;
+    src?: string | null;
+  }>;
+  activeIndex: number;
+  cachedIds: readonly string[];
+  previousTarget?: number;
+}): number {
+  const previousTarget =
+    input.previousTarget ?? ANDROID_WATCH_PREVIOUS_READY_TARGET;
+  const activeIndex = Number.isFinite(input.activeIndex)
+    ? Math.max(0, Math.trunc(input.activeIndex))
+    : 0;
+  const cached = new Set(input.cachedIds);
+  let previous = 0;
+  let ready = 0;
+  const start = Math.max(0, activeIndex - previousTarget);
+  for (let i = start; i < activeIndex; i += 1) {
+    const mediaId = watchMediaIdentity(input.videos[i]);
+    if (!mediaId) continue;
+    previous += 1;
+    if (cached.has(mediaId)) ready += 1;
+  }
+  return ready;
+}
+
 export function countWatchCacheUpcomingReady(input: {
   videos: Array<{
     id: string;
@@ -256,8 +288,11 @@ export function planAndroidWatchCacheWindow(input: {
   activeIndex: number;
   manifest?: WatchCacheManifest;
   target?: number;
+  previousTarget?: number;
 }): WatchCacheWindowPlan {
   const target = input.target ?? ANDROID_WATCH_FORWARD_READY_TARGET;
+  const previousTarget =
+    input.previousTarget ?? ANDROID_WATCH_PREVIOUS_READY_TARGET;
   const activeIndex = Number.isFinite(input.activeIndex)
     ? Math.max(0, Math.trunc(input.activeIndex))
     : 0;
@@ -276,7 +311,11 @@ export function planAndroidWatchCacheWindow(input: {
     });
     return true;
   };
-  if (activeIndex > 0) pushIndex(activeIndex - 1);
+  const previousStart = Math.max(0, activeIndex - previousTarget);
+  let previous = 0;
+  for (let i = previousStart; i < activeIndex; i += 1) {
+    if (pushIndex(i)) previous += 1;
+  }
   pushIndex(activeIndex);
   let upcoming = 0;
   for (let i = activeIndex + 1; i < input.videos.length && upcoming < target; i += 1) {
@@ -301,7 +340,16 @@ export function planAndroidWatchCacheWindow(input: {
     .sort((a, b) => a.cachedAt - b.cachedAt)
     .map((entry) => entry.mediaId);
 
-  return { target, keepIds, downloadIds, evictIds, hits, upcomingCount: upcoming };
+  return {
+    target,
+    previousTarget,
+    keepIds,
+    downloadIds,
+    evictIds,
+    hits,
+    upcomingCount: upcoming,
+    previousCount: previous,
+  };
 }
 
 export function parseWatchCacheManifest(
@@ -723,11 +771,15 @@ async function runAndroidWatchRollingCacheSync(
   if (input.accountId) {
     const now = input.now ?? Date.now();
     const activeVideo = input.videos[input.activeIndex];
-    const neighborVideo =
-      input.activeIndex > 0 ? input.videos[input.activeIndex - 1] : null;
-    const rememberVideos = [neighborVideo, activeVideo].filter(
-      (row): row is WatchVideo => row != null
+    const previousStart = Math.max(
+      0,
+      input.activeIndex - ANDROID_WATCH_PREVIOUS_READY_TARGET
     );
+    const rememberVideos: WatchVideo[] = [];
+    for (let i = previousStart; i <= input.activeIndex; i += 1) {
+      const video = input.videos[i];
+      if (video) rememberVideos.push(video);
+    }
     const activeMediaId = activeVideo ? watchMediaIdentity(activeVideo) : null;
     for (const video of rememberVideos) {
       const mediaId = watchMediaIdentity(video);

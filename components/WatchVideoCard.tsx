@@ -75,6 +75,8 @@ import {
 } from "@/src/lib/watch/watchTransitionTrace";
 import { resolveAndroidWatchBufferOptions } from "@/src/lib/watch/androidWatchMediaCache";
 import {
+  applyExclusiveWatchPlaybackIntent,
+  releaseExclusiveWatchAudioOwner,
   shouldApplyWatchPlayerOp,
   shouldHonorLatePlayerEvent,
   shouldTeardownUnexpectedPlay,
@@ -94,7 +96,6 @@ import {
 } from "@/src/lib/watch/playerLifecycle";
 import {
   applyInactiveAudioTeardown,
-  applyPlaybackIntent,
   applySeekTime,
   isPlayerAlive,
   runAlivePlayerOp,
@@ -534,7 +535,7 @@ function WatchPlayerPane({
       });
       if (intent) {
         playGenerationRef.current = ownershipGenerationRef.current;
-        applyPlaybackIntent(player, intent);
+        applyExclusiveWatchPlaybackIntent(player, intent);
         runAlivePlayerOp(player, (alive) => {
           alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActiveRef.current)
             ? playbackRate
@@ -688,6 +689,7 @@ function WatchPlayerPane({
     const itemReady = status === "ready";
     const nativeReady = nativeStatusRef.current === "readyToPlay";
     if (!isActive || !shouldPlay) {
+      releaseExclusiveWatchAudioOwner(player);
       applyWatchInactiveTeardown(player, {
         platform: nativePlatform,
         itemReady,
@@ -746,7 +748,7 @@ function WatchPlayerPane({
       })
     ) {
       playGenerationRef.current = ownershipGeneration;
-      applyPlaybackIntent(player, intent);
+      applyExclusiveWatchPlaybackIntent(player, intent);
       runAlivePlayerOp(player, (alive) => {
         alive.playbackRate = shouldApplyWatchPlaybackSpeed(isActive)
           ? playbackRate
@@ -758,6 +760,7 @@ function WatchPlayerPane({
       return;
     }
     playGenerationRef.current = null;
+    releaseExclusiveWatchAudioOwner(player);
     applyWatchInactiveTeardown(player, {
       platform: nativePlatform,
       itemReady,

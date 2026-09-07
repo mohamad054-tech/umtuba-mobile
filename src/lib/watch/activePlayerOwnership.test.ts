@@ -8,6 +8,8 @@ import {
   isPlayerAlive,
 } from "./playerSession";
 import {
+  __resetExclusiveWatchAudioOwnerForTests,
+  applyExclusiveWatchPlaybackIntent,
   bumpWatchOwnerGeneration,
   canProduceWatchAudio,
   countAudibleWatchPlayers,
@@ -354,5 +356,30 @@ describe("ONLY_ACTIVE_WATCH_POST_CAN_PLAY_AUDIO", () => {
         },
       ])
     ).toBe(1);
+  });
+
+  it("mutes the previous audible owner before the next owner unmutes", () => {
+    __resetExclusiveWatchAudioOwnerForTests();
+    const outgoing = createPlayerSession();
+    const incoming = createPlayerSession();
+    applyExclusiveWatchPlaybackIntent(outgoing.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: true,
+    });
+    applyExclusiveWatchPlaybackIntent(incoming.player, {
+      shouldPlay: true,
+      muted: false,
+      volume: 1,
+      loop: false,
+    });
+    expect(outgoing.player.muted).toBe(true);
+    expect(outgoing.player.volume).toBe(0);
+    expect(outgoing.calls).toContain("pause");
+    expect(incoming.player.muted).toBe(false);
+    expect(incoming.player.volume).toBe(1);
+    expect(incoming.calls).toContain("play");
+    __resetExclusiveWatchAudioOwnerForTests();
   });
 });
