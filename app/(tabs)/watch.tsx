@@ -871,6 +871,25 @@ export default function WatchScreen() {
         nextFirstFrame: nextHandoffRef.current.firstFrame,
       }),
     });
+    if (targetOffset != null) {
+      const confirmOffset = targetOffset;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (
+            !shouldPinWatchScrollAfterNativeSettle({
+              currentOffset: scrollOffsetRef.current,
+              targetOffset: confirmOffset,
+            })
+          ) {
+            return;
+          }
+          listRef.current?.scrollToOffset({
+            offset: confirmOffset,
+            animated: false,
+          });
+        });
+      });
+    }
   }, []);
 
   const armShortSwipeCommit = useCallback(
@@ -920,6 +939,7 @@ export default function WatchScreen() {
         shouldProgrammaticCommitWatchShortSwipe({
           targetIndex: target,
           nativeRoundedPage: nativeRounded,
+          fromIndex,
         })
       ) {
         listRef.current?.scrollToOffset({

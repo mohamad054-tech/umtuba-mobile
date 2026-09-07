@@ -320,8 +320,16 @@ describe("manual handoff parity with auto-advance", () => {
       shouldProgrammaticCommitWatchShortSwipe({
         targetIndex: 1,
         nativeRoundedPage: 1,
+        fromIndex: 1,
       })
     ).toBe(false);
+    expect(
+      shouldProgrammaticCommitWatchShortSwipe({
+        targetIndex: 1,
+        nativeRoundedPage: 1,
+        fromIndex: 0,
+      })
+    ).toBe(true);
     expect(
       shouldPinWatchScrollAfterNativeSettle({
         currentOffset: 800,

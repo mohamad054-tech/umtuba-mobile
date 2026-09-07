@@ -225,11 +225,15 @@ export function shouldPinWatchScrollAfterNativeSettle(input: {
 export function shouldProgrammaticCommitWatchShortSwipe(input: {
   targetIndex: number | null;
   nativeRoundedPage: number | null;
+  fromIndex?: number | null;
 }): boolean {
   const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
   const native = sanitizeWatchListIndex(input.nativeRoundedPage ?? Number.NaN);
   if (target == null || native == null) return false;
-  return target !== native;
+  if (target !== native) return true;
+  const from = sanitizeWatchListIndex(input.fromIndex ?? Number.NaN);
+  // Index 0 RefreshControl unmounts on claim and can undo a native land.
+  return from === 0 && target === 1;
 }
 
 export function resolveWatchEndDragNativePage(input: {
