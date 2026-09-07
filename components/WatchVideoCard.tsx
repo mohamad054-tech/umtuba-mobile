@@ -57,6 +57,7 @@ import {
   scrubFillWidthPercent,
   scrubThumbLeftPercent,
   shouldAttachWatchSurface,
+  shouldPreserveWatchFirstFrameAcrossSurface,
   WATCH_SCRUB_LAYOUT_DIRECTION,
   shouldLoopCurrentVideo,
   shouldPlayVideo,
@@ -433,6 +434,7 @@ function WatchPlayerPane({
   const playerAliveRef = useRef(true);
   const nativeStatusRef = useRef<string | null>(null);
   const attachSurfaceRef = useRef(false);
+  const prevAttachSurfaceRef = useRef(false);
   const mediaIdRef = useRef(mediaId);
   const postIdRef = useRef(postId);
   const playerEpochRef = useRef(playerEpoch);
@@ -683,6 +685,15 @@ function WatchPlayerPane({
     platform: nativePlatform,
   });
   attachSurfaceRef.current = attachSurface;
+  if (
+    !shouldPreserveWatchFirstFrameAcrossSurface({
+      wasAttached: prevAttachSurfaceRef.current,
+      isAttached: attachSurface,
+    })
+  ) {
+    firstFrameRef.current = false;
+  }
+  prevAttachSurfaceRef.current = attachSurface;
 
   useLayoutEffect(() => {
     if (!canTouchBoundPlayer()) return;

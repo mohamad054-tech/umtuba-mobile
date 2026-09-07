@@ -120,7 +120,8 @@ import {
   resolveWatchHandoffReadiness,
   shouldHandoffWatchAdvance,
   shouldPrepareWatchPlayer,
-  resolveAndroidNextWarmIndex,
+  resolveAndroidDirectionalWarmIndex,
+  resolveWatchWarmDirection,
   shouldWarmAndroidNextSurface,
   toWatchListPixels,
   watchInteractionSignature,
@@ -272,6 +273,7 @@ export default function WatchScreen() {
   const moreInFlight = useRef(false);
   const urlGenerationRef = useRef(0);
   const activeIndexRef = useRef(0);
+  const previousActiveIndexRef = useRef(0);
   const playbackGenerationRef = useRef(0);
   const videosLengthRef = useRef(0);
   const itemHeightRef = useRef(WINDOW_HEIGHT);
@@ -518,9 +520,15 @@ export default function WatchScreen() {
   }, [visibleVideos.length]);
 
   useEffect(() => {
-    const nextWarm = resolveAndroidNextWarmIndex(
+    const direction = resolveWatchWarmDirection({
+      previousActiveIndex: previousActiveIndexRef.current,
+      nextActiveIndex: activeIndex,
+    });
+    previousActiveIndexRef.current = activeIndex;
+    const nextWarm = resolveAndroidDirectionalWarmIndex(
       activeIndex,
-      visibleVideos.length
+      visibleVideos.length,
+      direction
     );
     applyWarmedTargetIndex(nextWarm);
     setWarmNextSurface(

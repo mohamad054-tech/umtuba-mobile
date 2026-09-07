@@ -12,9 +12,11 @@ import {
   shouldRequestWatchFeedForwardPage,
 } from "./androidWatchMediaCache";
 import {
+  resolveAndroidDirectionalWarmIndex,
   resolveMostVisibleWatchIndex,
   resolveWatchActiveIndexFromViewableItems,
   resolveWatchOwnedIndex,
+  resolveWatchWarmDirection,
   shouldPlayWithUserPause,
 } from "./playbackPolicy";
 import {
@@ -311,6 +313,17 @@ describe("watch root restore contracts", () => {
   it("Share/Cancel preserves the current video", () => {
     expect(watchShareSheetRemountsWatch()).toBe(false);
     expect(watchShareDismissPreservesActiveItem()).toBe(true);
+  });
+
+  it("backward settle warms the previous neighbor, not the next", () => {
+    expect(
+      resolveWatchWarmDirection({
+        previousActiveIndex: 7,
+        nextActiveIndex: 6,
+      })
+    ).toBe("backward");
+    expect(resolveAndroidDirectionalWarmIndex(6, 13, "backward")).toBe(5);
+    expect(resolveAndroidDirectionalWarmIndex(6, 13, "forward")).toBe(7);
   });
 
   it("back swipe keeps the previous item in the prepare window", () => {

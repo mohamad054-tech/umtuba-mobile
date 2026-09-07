@@ -106,6 +106,50 @@ export function resolveAndroidNextWarmIndex(
   return next;
 }
 
+export function resolveAndroidPreviousWarmIndex(
+  activeIndex: number
+): number | null {
+  if (!Number.isFinite(activeIndex)) return null;
+  const previous = Math.trunc(activeIndex) - 1;
+  return previous >= 0 ? previous : null;
+}
+
+export type WatchWarmDirection = "forward" | "backward";
+
+export function resolveWatchWarmDirection(input: {
+  previousActiveIndex: number;
+  nextActiveIndex: number;
+}): WatchWarmDirection {
+  if (
+    Number.isFinite(input.previousActiveIndex) &&
+    Number.isFinite(input.nextActiveIndex) &&
+    input.nextActiveIndex < input.previousActiveIndex
+  ) {
+    return "backward";
+  }
+  return "forward";
+}
+
+/** One off-screen neighbor: next after a forward settle, previous after a back settle. */
+export function resolveAndroidDirectionalWarmIndex(
+  activeIndex: number,
+  itemCount: number,
+  direction: WatchWarmDirection
+): number | null {
+  if (direction === "backward") {
+    return resolveAndroidPreviousWarmIndex(activeIndex);
+  }
+  return resolveAndroidNextWarmIndex(activeIndex, itemCount);
+}
+
+/** First-frame from a detached or newly reattached surface must not unlock audio. */
+export function shouldPreserveWatchFirstFrameAcrossSurface(input: {
+  wasAttached: boolean;
+  isAttached: boolean;
+}): boolean {
+  return input.wasAttached === true && input.isAttached === true;
+}
+
 export function shouldWarmAndroidNextSurface(input: {
   platform?: string | null;
   remainingMs: number | null | undefined;

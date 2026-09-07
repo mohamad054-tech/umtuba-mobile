@@ -43,7 +43,10 @@ import {
   shouldLoadPlayer,
   shouldLoopCurrentVideo,
   shouldPrepareWatchPlayer,
+  resolveAndroidDirectionalWarmIndex,
   resolveAndroidNextWarmIndex,
+  resolveWatchWarmDirection,
+  shouldPreserveWatchFirstFrameAcrossSurface,
   shouldWarmAndroidNextSurface,
   resolveWatchHandoffReadiness,
   shouldPlayVideo,
@@ -189,6 +192,33 @@ describe("Android next-surface warm and gated handoff", () => {
     expect(resolveAndroidNextWarmIndex(0, 8)).toBe(1);
     expect(resolveAndroidNextWarmIndex(7, 8)).toBeNull();
     expect(resolveAndroidNextWarmIndex(0, 1)).toBeNull();
+    expect(resolveWatchWarmDirection({ previousActiveIndex: 7, nextActiveIndex: 6 })).toBe(
+      "backward"
+    );
+    expect(resolveWatchWarmDirection({ previousActiveIndex: 6, nextActiveIndex: 7 })).toBe(
+      "forward"
+    );
+    expect(resolveAndroidDirectionalWarmIndex(7, 13, "forward")).toBe(8);
+    expect(resolveAndroidDirectionalWarmIndex(7, 13, "backward")).toBe(6);
+    expect(resolveAndroidDirectionalWarmIndex(0, 13, "backward")).toBeNull();
+    expect(
+      shouldPreserveWatchFirstFrameAcrossSurface({
+        wasAttached: true,
+        isAttached: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldPreserveWatchFirstFrameAcrossSurface({
+        wasAttached: true,
+        isAttached: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldPreserveWatchFirstFrameAcrossSurface({
+        wasAttached: false,
+        isAttached: true,
+      })
+    ).toBe(false);
     expect(
       shouldAttachWatchSurface({
         loadPlayer: false,
