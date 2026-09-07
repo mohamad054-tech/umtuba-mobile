@@ -163,6 +163,7 @@ import {
 import {
   createManualHandoffPending,
   resolveAndroidManualSettleAction,
+  resolveManualHandoffCompletionTransaction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   shouldAcceptPendingManualHandoff,
@@ -806,9 +807,24 @@ export default function WatchScreen() {
       return;
     }
     pendingManualRef.current = null;
-    scrollToWatchIndexRef.current(pending.targetIndex, 0, {
-      animated: false,
-    });
+    const transaction = resolveManualHandoffCompletionTransaction("user-swipe");
+    if (transaction.pinNativeOffset) {
+      scrollToWatchIndexRef.current(pending.targetIndex, 0, {
+        animated: false,
+      });
+      return;
+    }
+    programmaticAdvanceUntilRef.current =
+      Date.now() + PROGRAMMATIC_ADVANCE_LOCK_MS;
+    applyWatchIndexDecisionRef.current(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: transaction.claimReason,
+        requestedIndex: pending.targetIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: pending.targetIndex,
+      })
+    );
   }, []);
 
   const onWatchScrollBeginDrag = useCallback(() => {

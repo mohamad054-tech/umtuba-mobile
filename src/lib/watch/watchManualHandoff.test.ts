@@ -166,7 +166,7 @@ describe("manual handoff parity with auto-advance", () => {
     ).toBe(true);
   });
 
-  it("manual settle runs claim + lock + native offset pin only after first_frame", () => {
+  it("manual settle claims after first_frame and does not pin a user swipe", () => {
     expect(
       shouldClaimWatchIndexFromNativeSettle({
         platform: "android",
@@ -188,7 +188,17 @@ describe("manual handoff parity with auto-advance", () => {
         targetFirstFrame: false,
       })
     ).toBe(false);
+    expect(resolveManualHandoffCompletionTransaction("user-swipe")).toEqual({
+      claimReason: "programmatic",
+      applyViewabilityLock: true,
+      pinNativeOffset: false,
+    });
     expect(resolveManualHandoffCompletionTransaction()).toEqual({
+      claimReason: "programmatic",
+      applyViewabilityLock: true,
+      pinNativeOffset: false,
+    });
+    expect(resolveManualHandoffCompletionTransaction("auto-next")).toEqual({
       claimReason: "programmatic",
       applyViewabilityLock: true,
       pinNativeOffset: true,

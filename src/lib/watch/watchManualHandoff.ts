@@ -99,18 +99,25 @@ export function shouldKeepPreviousSurfaceDuringManualHandoff(input: {
   return input.handoffCompleted !== true;
 }
 
+export type ManualHandoffCompletionReason = "user-swipe" | "auto-next";
+
 export type ManualHandoffCompletionTransaction = {
   claimReason: "programmatic";
   applyViewabilityLock: true;
-  pinNativeOffset: true;
+  pinNativeOffset: boolean;
 };
 
-/** Same claim + lock + scrollToWatchIndex pin as auto-advance. */
-export function resolveManualHandoffCompletionTransaction(): ManualHandoffCompletionTransaction {
+/**
+ * User swipe already moved the native page. Pinning it again fights Fold6
+ * settle and remounts the visible surface. Auto-next still needs one pin.
+ */
+export function resolveManualHandoffCompletionTransaction(
+  reason: ManualHandoffCompletionReason = "user-swipe"
+): ManualHandoffCompletionTransaction {
   return {
     claimReason: "programmatic",
     applyViewabilityLock: true,
-    pinNativeOffset: true,
+    pinNativeOffset: reason === "auto-next",
   };
 }
 
