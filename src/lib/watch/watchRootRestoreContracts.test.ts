@@ -217,7 +217,7 @@ describe("watch root restore contracts", () => {
     expect(resolved.invalidated).toBe(false);
   });
 
-  it("five retained videos stay in the rolling window", () => {
+  it("five upcoming videos stay in the rolling window", () => {
     const videos = [1, 2, 3, 4, 5, 6].map((n) => ({
       id: `v${n}`,
       postId: n,
@@ -229,7 +229,14 @@ describe("watch root restore contracts", () => {
       target: ANDROID_WATCH_CACHE_TARGET,
     });
     expect(plan.target).toBe(5);
-    expect(plan.keepIds).toHaveLength(5);
+    expect(plan.keepIds).toEqual([
+      "post-1",
+      "post-2",
+      "post-3",
+      "post-4",
+      "post-5",
+      "post-6",
+    ]);
     expect(
       shouldEvictWatchDurableOldest({
         retainedCountBefore: 5,

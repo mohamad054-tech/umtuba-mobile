@@ -111,7 +111,7 @@
     {
       "id": "WATCH_5_VIDEO_ROLLING_CACHE",
       "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "Source-equivalent to 4547d6bb / a1ceb9d. ANDROID_WATCH_CACHE_TARGET=5. Not owner-certified.",
+      "last_known_accepted_evidence": "Phase 2 source: five upcoming ready, one replacement per advance, existing N-1 kept. ANDROID_WATCH_FORWARD_READY_TARGET=5. Not owner-certified. Phase 3 previous-five is not included.",
       "reference_sha": "4547d6bb21166d36d93eaff33a1862ebfbf5398a",
       "reference_branch": "origin/central/watch-root-restore-from-b5cba17-v1",
       "regression_tests": [

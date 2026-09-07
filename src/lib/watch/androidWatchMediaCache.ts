@@ -23,11 +23,13 @@ export const ANDROID_WATCH_MAX_BUFFER_BYTES = 12 * 1024 * 1024;
 
 /**
  * Rolling on-device Watch window. Identity is post/media id, not list index.
- * Cache may read activeIndex to choose which 5 files to retain. It must
- * never write activeIndex, scroll FlatList, claim player ownership, or
- * attach/detach VideoView.
+ * Phase 2 keeps five upcoming real videos ready. Existing N-1 stays in the
+ * window so ordinary back-one is not deleted. Phase 3 previous-five is not
+ * implemented here. Cache must never write activeIndex, scroll FlatList,
+ * claim player ownership, or attach/detach VideoView.
  */
-export const ANDROID_WATCH_CACHE_TARGET = 5;
+export const ANDROID_WATCH_FORWARD_READY_TARGET = 5;
+export const ANDROID_WATCH_CACHE_TARGET = ANDROID_WATCH_FORWARD_READY_TARGET;
 export const ANDROID_WATCH_CACHE_DIR_NAME = "umtuba-watch-media/";
 export const ANDROID_WATCH_CACHE_MANIFEST_NAME = "umtuba-watch-rolling-v1.json";
 
@@ -169,24 +171,30 @@ export function planAndroidWatchCacheWindow(input: {
   manifest?: WatchCacheManifest;
   target?: number;
 }): WatchCacheWindowPlan {
-  const target = input.target ?? ANDROID_WATCH_CACHE_TARGET;
+  const target = input.target ?? ANDROID_WATCH_FORWARD_READY_TARGET;
   const activeIndex = Number.isFinite(input.activeIndex)
     ? Math.max(0, Math.trunc(input.activeIndex))
     : 0;
-  const start = activeIndex > 0 ? Math.max(0, activeIndex - 1) : 0;
   const keep: WatchCachePlanItem[] = [];
   const seen = new Set<string>();
-  for (let i = start; i < input.videos.length && keep.length < target; i += 1) {
-    const video = input.videos[i];
-    if (!video) continue;
+  const pushIndex = (index: number): boolean => {
+    const video = input.videos[index];
+    if (!video) return false;
     const mediaId = watchMediaIdentity(video);
-    if (seen.has(mediaId)) continue;
+    if (!mediaId || seen.has(mediaId)) return false;
     seen.add(mediaId);
     keep.push({
       mediaId,
       videoId: video.id,
       src: (video.src ?? "").trim(),
     });
+    return true;
+  };
+  if (activeIndex > 0) pushIndex(activeIndex - 1);
+  pushIndex(activeIndex);
+  let upcoming = 0;
+  for (let i = activeIndex + 1; i < input.videos.length && upcoming < target; i += 1) {
+    if (pushIndex(i)) upcoming += 1;
   }
 
   const keepIds = keep.map((item) => item.mediaId);
@@ -477,16 +485,21 @@ export async function syncAndroidWatchRollingCache(input: {
   }
 
   const nextManifest: WatchCacheManifest = {
-    target: ANDROID_WATCH_CACHE_TARGET,
-    entries: nextEntries.slice(0, ANDROID_WATCH_CACHE_TARGET),
+    target: ANDROID_WATCH_FORWARD_READY_TARGET,
+    entries: nextEntries.filter((entry) => plan.keepIds.includes(entry.mediaId)),
   };
   await writeManifest(port, manifestUri, nextManifest);
 
   if (input.accountId) {
     const now = input.now ?? Date.now();
     const activeVideo = input.videos[input.activeIndex];
+    const neighborVideo =
+      input.activeIndex > 0 ? input.videos[input.activeIndex - 1] : null;
+    const rememberVideos = [neighborVideo, activeVideo].filter(
+      (row): row is WatchVideo => row != null
+    );
     const activeMediaId = activeVideo ? watchMediaIdentity(activeVideo) : null;
-    for (const video of input.videos) {
+    for (const video of rememberVideos) {
       const mediaId = watchMediaIdentity(video);
       const cached = nextManifest.entries.find((row) => row.mediaId === mediaId);
       if (!cached) continue;
