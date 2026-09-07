@@ -142,6 +142,14 @@ export function resolveAndroidDirectionalWarmIndex(
   return resolveAndroidNextWarmIndex(activeIndex, itemCount);
 }
 
+/** Backward settle must not also latch the unused forward TextureView. */
+export function shouldLatchAndroidForwardWarmSurface(input: {
+  direction: WatchWarmDirection;
+  warmIndex: number | null;
+}): boolean {
+  return input.direction === "forward" && input.warmIndex != null;
+}
+
 /** First-frame from a detached or newly reattached surface must not unlock audio. */
 export function shouldPreserveWatchFirstFrameAcrossSurface(input: {
   wasAttached: boolean;

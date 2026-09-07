@@ -46,6 +46,7 @@ import {
   resolveAndroidDirectionalWarmIndex,
   resolveAndroidNextWarmIndex,
   resolveWatchWarmDirection,
+  shouldLatchAndroidForwardWarmSurface,
   shouldPreserveWatchFirstFrameAcrossSurface,
   shouldWarmAndroidNextSurface,
   resolveWatchHandoffReadiness,
@@ -201,6 +202,18 @@ describe("Android next-surface warm and gated handoff", () => {
     expect(resolveAndroidDirectionalWarmIndex(7, 13, "forward")).toBe(8);
     expect(resolveAndroidDirectionalWarmIndex(7, 13, "backward")).toBe(6);
     expect(resolveAndroidDirectionalWarmIndex(0, 13, "backward")).toBeNull();
+    expect(
+      shouldLatchAndroidForwardWarmSurface({
+        direction: "forward",
+        warmIndex: 8,
+      })
+    ).toBe(true);
+    expect(
+      shouldLatchAndroidForwardWarmSurface({
+        direction: "backward",
+        warmIndex: 6,
+      })
+    ).toBe(false);
     expect(
       shouldPreserveWatchFirstFrameAcrossSurface({
         wasAttached: true,

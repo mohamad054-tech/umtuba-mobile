@@ -17,6 +17,7 @@ import {
   resolveWatchActiveIndexFromViewableItems,
   resolveWatchOwnedIndex,
   resolveWatchWarmDirection,
+  shouldLatchAndroidForwardWarmSurface,
   shouldPlayWithUserPause,
 } from "./playbackPolicy";
 import {
@@ -324,6 +325,18 @@ describe("watch root restore contracts", () => {
     ).toBe("backward");
     expect(resolveAndroidDirectionalWarmIndex(6, 13, "backward")).toBe(5);
     expect(resolveAndroidDirectionalWarmIndex(6, 13, "forward")).toBe(7);
+    expect(
+      shouldLatchAndroidForwardWarmSurface({
+        direction: "backward",
+        warmIndex: 5,
+      })
+    ).toBe(false);
+    expect(
+      shouldLatchAndroidForwardWarmSurface({
+        direction: "forward",
+        warmIndex: 7,
+      })
+    ).toBe(true);
   });
 
   it("back swipe keeps the previous item in the prepare window", () => {

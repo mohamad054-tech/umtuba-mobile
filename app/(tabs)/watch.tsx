@@ -122,6 +122,7 @@ import {
   shouldPrepareWatchPlayer,
   resolveAndroidDirectionalWarmIndex,
   resolveWatchWarmDirection,
+  shouldLatchAndroidForwardWarmSurface,
   shouldWarmAndroidNextSurface,
   toWatchListPixels,
   watchInteractionSignature,
@@ -532,11 +533,15 @@ export default function WatchScreen() {
     );
     applyWarmedTargetIndex(nextWarm);
     setWarmNextSurface(
-      shouldWarmAndroidNextSurface({
-        platform: Platform.OS,
-        remainingMs: null,
-        nextPrepared: nextWarm != null,
-      })
+      shouldLatchAndroidForwardWarmSurface({
+        direction,
+        warmIndex: nextWarm,
+      }) &&
+        shouldWarmAndroidNextSurface({
+          platform: Platform.OS,
+          remainingMs: null,
+          nextPrepared: nextWarm != null,
+        })
     );
   }, [activeIndex, applyWarmedTargetIndex, visibleVideos.length]);
 
