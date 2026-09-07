@@ -35,6 +35,12 @@ import {
   shouldTreatWatchPointerAsSwipe,
 } from "./watchGestures";
 import {
+  resolveManualScrollProgress,
+  shouldApplyWatchPage0Pin,
+  shouldRejectCollapsedForwardSnapToZero,
+  WATCH_SHORT_SWIPE_PAGE_FRACTION,
+} from "./watchManualHandoff";
+import {
   inspectLocalWatchPlaybackFile,
   isolatePrefetchFailureFromActiveCell,
   resolveRetainedWatchPlaybackSrc,
@@ -314,6 +320,31 @@ describe("watch root restore contracts", () => {
   it("Share/Cancel preserves the current video", () => {
     expect(watchShareSheetRemountsWatch()).toBe(false);
     expect(watchShareDismissPreservesActiveItem()).toBe(true);
+  });
+
+  it("page-1 forward intent never pins back to page 0", () => {
+    expect(WATCH_SHORT_SWIPE_PAGE_FRACTION).toBe(0.2);
+    expect(shouldApplyWatchPage0Pin({ fromIndex: 0, targetIndex: 1 })).toBe(
+      true
+    );
+    expect(shouldApplyWatchPage0Pin({ fromIndex: 1, targetIndex: 2 })).toBe(
+      false
+    );
+    const collapsed = resolveManualScrollProgress({
+      fromIndex: 1,
+      currentOffset: 480,
+      itemHeight: 800,
+      itemCount: 8,
+      dragStartOffset: 0,
+    });
+    expect(collapsed.targetIndex).toBe(2);
+    expect(
+      shouldRejectCollapsedForwardSnapToZero({
+        fromIndex: 1,
+        targetIndex: 0,
+        deltaPx: 480,
+      })
+    ).toBe(true);
   });
 
   it("backward settle warms the previous neighbor, not the next", () => {

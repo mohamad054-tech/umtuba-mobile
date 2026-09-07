@@ -170,6 +170,7 @@ import {
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveManualScrollProgress,
+  resolveWatchDragTarget,
   resolveWatchEndDragNativePage,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
@@ -315,6 +316,7 @@ export default function WatchScreen() {
   >(null);
   const manualHandoffGenRef = useRef(0);
   const dragStartIndexRef = useRef(0);
+  const dragStartOffsetRef = useRef(0);
   const manualDragActiveRef = useRef(false);
   const scrollToWatchIndexRef = useRef<
     (
@@ -899,6 +901,7 @@ export default function WatchScreen() {
         currentOffset: offset,
         itemHeight: itemHeightRef.current,
         itemCount: videosLengthRef.current,
+        dragStartOffset: dragStartOffsetRef.current,
       });
       if (
         !shouldCommitShortManualSwipe({
@@ -907,6 +910,7 @@ export default function WatchScreen() {
           pageFraction: progress.pageFraction,
           velocityY,
           itemHeight: itemHeightRef.current,
+          deltaPx: progress.deltaPx,
         })
       ) {
         return false;
@@ -955,6 +959,7 @@ export default function WatchScreen() {
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
     dragStartIndexRef.current = activeIndexRef.current;
+    dragStartOffsetRef.current = scrollOffsetRef.current;
   }, []);
 
   const onWatchScroll = useCallback(
@@ -967,16 +972,19 @@ export default function WatchScreen() {
         currentOffset: scrollOffsetRef.current,
         itemHeight: itemHeightRef.current,
         itemCount: videosLengthRef.current,
+        dragStartOffset: dragStartOffsetRef.current,
       });
       const nativeHint = resolveWatchNativePage(
         scrollOffsetRef.current,
         itemHeightRef.current,
         videosLengthRef.current
       );
-      const target =
-        nativeHint != null && nativeHint !== dragStartIndexRef.current
-          ? nativeHint
-          : directional;
+      const target = resolveWatchDragTarget({
+        fromIndex: dragStartIndexRef.current,
+        directionalTarget: directional,
+        nativeHint,
+        dragDeltaPx: scrollOffsetRef.current - dragStartOffsetRef.current,
+      });
       const retarget = resolveManualHandoffRetarget({
         previousTarget: warmedTargetIndexRef.current,
         nextTarget: target,

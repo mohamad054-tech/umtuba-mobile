@@ -25,7 +25,9 @@ import {
   isAccidentalManualSwipe,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualProgressOrigin,
   resolveManualScrollProgress,
+  resolveWatchDragTarget,
   resolveNoFirstFrameManualHandoff,
   shouldCommitShortManualSwipe,
   resolvePendingManualHandoffAction,
@@ -35,13 +37,17 @@ import {
   shouldCompleteManualHandoff,
   shouldIgnoreStaleManualSettle,
   shouldKeepPreviousSurfaceDuringManualHandoff,
+  shouldApplyWatchPage0Pin,
   shouldPinWatchScrollAfterNativeSettle,
   shouldProgrammaticCommitWatchShortSwipe,
+  shouldRejectCollapsedForwardSnapToZero,
   resolveWatchEndDragNativePage,
   shouldMountOffscreenManualTargetVideoView,
   shouldReleasePreviousWatchSurface,
   shouldStartManualHandoffAudio,
   shouldWarmManualTarget,
+  WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC,
+  WATCH_SHORT_SWIPE_PAGE_FRACTION,
 } from "./watchManualHandoff";
 
 describe("manual handoff parity with auto-advance", () => {
@@ -342,6 +348,148 @@ describe("manual handoff parity with auto-advance", () => {
         targetOffset: 800,
       })
     ).toBe(true);
+  });
+
+  it("page-1 normal forward never collapses to 0 after a stale page-0 offset", () => {
+    const height = 800;
+    expect(WATCH_SHORT_SWIPE_PAGE_FRACTION).toBe(0.2);
+    expect(WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC).toBe(1);
+    expect(shouldApplyWatchPage0Pin({ fromIndex: 0, targetIndex: 1 })).toBe(
+      true
+    );
+    expect(shouldApplyWatchPage0Pin({ fromIndex: 1, targetIndex: 2 })).toBe(
+      false
+    );
+    expect(shouldApplyWatchPage0Pin({ fromIndex: 1, targetIndex: 0 })).toBe(
+      false
+    );
+
+    const collapsedForward = resolveManualScrollProgress({
+      fromIndex: 1,
+      currentOffset: 480,
+      itemHeight: height,
+      itemCount: 8,
+      dragStartOffset: 0,
+    });
+    expect(collapsedForward.targetIndex).toBe(2);
+    expect(collapsedForward.deltaPx).toBe(480);
+    expect(collapsedForward.pageFraction).toBe(0.6);
+    expect(
+      shouldRejectCollapsedForwardSnapToZero({
+        fromIndex: 1,
+        targetIndex: 0,
+        deltaPx: 480,
+      })
+    ).toBe(true);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 1,
+        targetIndex: collapsedForward.targetIndex,
+        pageFraction: collapsedForward.pageFraction,
+        velocityY: 0,
+        itemHeight: height,
+        deltaPx: collapsedForward.deltaPx,
+      })
+    ).toBe(true);
+    expect(
+      resolveWatchDragTarget({
+        fromIndex: 1,
+        directionalTarget: 2,
+        nativeHint: 0,
+        dragDeltaPx: 480,
+      })
+    ).toBe(2);
+
+    const aligned12 = resolveManualScrollProgress({
+      fromIndex: 1,
+      currentOffset: 1280,
+      itemHeight: height,
+      itemCount: 8,
+      dragStartOffset: 800,
+    });
+    expect(aligned12.targetIndex).toBe(2);
+    expect(aligned12.pageFraction).toBe(0.6);
+    expect(
+      shouldProgrammaticCommitWatchShortSwipe({
+        targetIndex: 2,
+        nativeRoundedPage: 2,
+        fromIndex: 1,
+      })
+    ).toBe(false);
+
+    const short12 = resolveManualScrollProgress({
+      fromIndex: 1,
+      currentOffset: 960,
+      itemHeight: height,
+      itemCount: 8,
+      dragStartOffset: 800,
+    });
+    expect(short12.targetIndex).toBe(2);
+    expect(short12.pageFraction).toBe(0.2);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 1,
+        targetIndex: 2,
+        pageFraction: 0.2,
+        velocityY: 0,
+        itemHeight: height,
+        deltaPx: 160,
+      })
+    ).toBe(true);
+
+    const flick12 = shouldCommitShortManualSwipe({
+      fromIndex: 1,
+      targetIndex: 2,
+      pageFraction: 0.12,
+      velocityY: height,
+      itemHeight: height,
+      deltaPx: 96,
+    });
+    expect(flick12).toBe(true);
+
+    const realBack = resolveManualScrollProgress({
+      fromIndex: 1,
+      currentOffset: 320,
+      itemHeight: height,
+      itemCount: 8,
+      dragStartOffset: 800,
+    });
+    expect(realBack.targetIndex).toBe(0);
+    expect(realBack.deltaPx).toBe(-480);
+    expect(
+      shouldRejectCollapsedForwardSnapToZero({
+        fromIndex: 1,
+        targetIndex: 0,
+        deltaPx: -480,
+      })
+    ).toBe(false);
+
+    const page23 = resolveManualScrollProgress({
+      fromIndex: 2,
+      currentOffset: 2080,
+      itemHeight: height,
+      itemCount: 8,
+      dragStartOffset: 1600,
+    });
+    expect(page23.targetIndex).toBe(3);
+    expect(
+      shouldApplyWatchPage0Pin({ fromIndex: 2, targetIndex: 3 })
+    ).toBe(false);
+    expect(
+      resolveManualProgressOrigin({
+        fromIndex: 1,
+        itemHeight: height,
+        dragStartOffset: 0,
+      })
+    ).toBe(0);
+    expect(
+      resolveManualHandoffTarget({
+        fromIndex: 0,
+        currentOffset: 160,
+        itemHeight: height,
+        itemCount: 8,
+      })
+    ).toBe(1);
   });
 
   it("manual settle 0→1 and 1→2 then back 2→1", () => {

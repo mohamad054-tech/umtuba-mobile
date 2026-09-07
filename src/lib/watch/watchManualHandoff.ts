@@ -12,11 +12,38 @@ import {
 /** Direction is known once the drag crosses a fraction of one page. */
 const MANUAL_DIRECTION_PAGE_FRACTION = 0.12;
 
+/**
+ * Finger travel is measured from the offset at drag start.
+ * After page 0 RefreshControl unmounts, contentOffset can collapse toward 0
+ * while activeIndex stays 1. Using fromIndex*height then treats a forward
+ * finger as a back-to-0 commit and pins to zero.
+ */
+export function resolveManualProgressOrigin(input: {
+  fromIndex: number;
+  itemHeight: number;
+  dragStartOffset?: number | null;
+}): number | null {
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return null;
+  }
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  if (from == null) return null;
+  if (
+    input.dragStartOffset != null &&
+    Number.isFinite(input.dragStartOffset) &&
+    input.dragStartOffset >= 0
+  ) {
+    return input.dragStartOffset;
+  }
+  return from * input.itemHeight;
+}
+
 export function resolveManualHandoffTarget(input: {
   fromIndex: number;
   currentOffset: number;
   itemHeight: number;
   itemCount: number;
+  dragStartOffset?: number | null;
 }): number | null {
   if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
     return null;
@@ -29,7 +56,9 @@ export function resolveManualHandoffTarget(input: {
   }
   const from = sanitizeWatchListIndex(input.fromIndex);
   if (from == null) return null;
-  const delta = input.currentOffset - from * input.itemHeight;
+  const origin = resolveManualProgressOrigin(input);
+  if (origin == null) return null;
+  const delta = input.currentOffset - origin;
   const threshold = input.itemHeight * MANUAL_DIRECTION_PAGE_FRACTION;
   if (delta >= threshold) {
     const next = from + 1;
@@ -57,13 +86,17 @@ export function resolveManualScrollProgress(input: {
   currentOffset: number;
   itemHeight: number;
   itemCount: number;
+  dragStartOffset?: number | null;
 }): { targetIndex: number | null; pageFraction: number; deltaPx: number } {
   if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
     return { targetIndex: null, pageFraction: 0, deltaPx: 0 };
   }
   const from = sanitizeWatchListIndex(input.fromIndex);
-  if (from == null) return { targetIndex: null, pageFraction: 0, deltaPx: 0 };
-  const deltaPx = input.currentOffset - from * input.itemHeight;
+  const origin = resolveManualProgressOrigin(input);
+  if (from == null || origin == null) {
+    return { targetIndex: null, pageFraction: 0, deltaPx: 0 };
+  }
+  const deltaPx = input.currentOffset - origin;
   const pageFraction = Math.min(
     1,
     Math.max(0, Math.abs(deltaPx) / input.itemHeight)
@@ -73,6 +106,47 @@ export function resolveManualScrollProgress(input: {
     pageFraction,
     deltaPx,
   };
+}
+
+/** A forward finger from page >= 1 must never be committed as a snap to 0. */
+export function shouldRejectCollapsedForwardSnapToZero(input: {
+  fromIndex: number;
+  targetIndex: number | null;
+  deltaPx: number;
+}): boolean {
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
+  if (from == null || from < 1) return false;
+  if (target !== 0) return false;
+  return Number.isFinite(input.deltaPx) && input.deltaPx >= 0;
+}
+
+/**
+ * Native page from a collapsed offset can be 0 while activeIndex is 1.
+ * A forward drag must keep the directional target, not jump to 0.
+ */
+export function resolveWatchDragTarget(input: {
+  fromIndex: number;
+  directionalTarget: number | null;
+  nativeHint: number | null;
+  dragDeltaPx: number;
+}): number | null {
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const native = sanitizeWatchListIndex(input.nativeHint ?? Number.NaN);
+  const directional = sanitizeWatchListIndex(
+    input.directionalTarget ?? Number.NaN
+  );
+  if (
+    from != null &&
+    native != null &&
+    native < from &&
+    Number.isFinite(input.dragDeltaPx) &&
+    input.dragDeltaPx >= 0
+  ) {
+    return directional;
+  }
+  if (native != null && from != null && native !== from) return native;
+  return directional;
 }
 
 export function resolveManualSwipePagesPerSec(input: {
@@ -90,10 +164,21 @@ export function shouldCommitShortManualSwipe(input: {
   pageFraction: number;
   velocityY?: number | null;
   itemHeight: number;
+  deltaPx?: number;
 }): boolean {
   const from = sanitizeWatchListIndex(input.fromIndex);
   const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
   if (from == null || target == null || target === from) return false;
+  if (
+    input.deltaPx != null &&
+    shouldRejectCollapsedForwardSnapToZero({
+      fromIndex: from,
+      targetIndex: target,
+      deltaPx: input.deltaPx,
+    })
+  ) {
+    return false;
+  }
   if (!Number.isFinite(input.pageFraction) || input.pageFraction < 0) {
     return false;
   }
@@ -231,8 +316,19 @@ export function shouldProgrammaticCommitWatchShortSwipe(input: {
   const native = sanitizeWatchListIndex(input.nativeRoundedPage ?? Number.NaN);
   if (target == null || native == null) return false;
   if (target !== native) return true;
+  return shouldApplyWatchPage0Pin({
+    fromIndex: input.fromIndex,
+    targetIndex: target,
+  });
+}
+
+/** RefreshControl teardown pin. Exact 0→1 only. Never armed from page 1. */
+export function shouldApplyWatchPage0Pin(input: {
+  fromIndex?: number | null;
+  targetIndex: number | null;
+}): boolean {
   const from = sanitizeWatchListIndex(input.fromIndex ?? Number.NaN);
-  // Index 0 RefreshControl unmounts on claim and can undo a native land.
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
   return from === 0 && target === 1;
 }
 
