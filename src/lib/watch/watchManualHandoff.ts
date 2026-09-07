@@ -97,18 +97,18 @@ export function shouldCommitShortManualSwipe(input: {
     return false;
   }
 
+  // Distance is authoritative. Android release velocity is often inverted
+  // or noisy, and must not veto a clear ~20% swipe.
+  if (input.pageFraction >= WATCH_SHORT_SWIPE_PAGE_FRACTION) return true;
+
   const pagesPerSec = resolveManualSwipePagesPerSec({
     velocityY: input.velocityY,
     itemHeight: input.itemHeight,
   });
   const goingNext = target > from;
   const velocityAgrees =
-    pagesPerSec === 0 ||
-    (goingNext && pagesPerSec > 0) ||
-    (!goingNext && pagesPerSec < 0);
+    (goingNext && pagesPerSec > 0) || (!goingNext && pagesPerSec < 0);
   if (!velocityAgrees) return false;
-
-  if (input.pageFraction >= WATCH_SHORT_SWIPE_PAGE_FRACTION) return true;
   return Math.abs(pagesPerSec) >= WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC;
 }
 

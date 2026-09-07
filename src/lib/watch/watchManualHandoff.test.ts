@@ -274,6 +274,15 @@ describe("manual handoff parity with auto-advance", () => {
         velocityY: -height,
         itemHeight: height,
       })
+    ).toBe(true);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 0,
+        targetIndex: 1,
+        pageFraction: 0.12,
+        velocityY: -height,
+        itemHeight: height,
+      })
     ).toBe(false);
     expect(manualViewabilityMayWriteActiveIndex()).toBe(false);
     expect(
