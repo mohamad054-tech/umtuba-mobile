@@ -9,6 +9,7 @@ import {
   ANDROID_WATCH_CACHE_TARGET,
   createMemoryWatchMediaCachePort,
   planAndroidWatchCacheWindow,
+  shouldRequestWatchFeedForwardPage,
 } from "./androidWatchMediaCache";
 import {
   resolveMostVisibleWatchIndex,
@@ -237,6 +238,14 @@ describe("watch root restore contracts", () => {
       "post-5",
       "post-6",
     ]);
+    expect(plan.upcomingCount).toBe(5);
+    expect(
+      shouldRequestWatchFeedForwardPage({
+        activeIndex: 0,
+        itemCount: videos.length,
+        hasMore: true,
+      })
+    ).toBe(true);
     expect(
       shouldEvictWatchDurableOldest({
         retainedCountBefore: 5,

@@ -131,6 +131,7 @@ export type WatchCacheWindowPlan = {
   downloadIds: string[];
   evictIds: string[];
   hits: string[];
+  upcomingCount: number;
 };
 
 export function emptyWatchCacheManifest(
@@ -159,6 +160,91 @@ export function shouldRedownloadWatchCache(input: {
 }): boolean {
   if (!input.fileExists) return true;
   return !isValidWatchCacheEntry(input.entry);
+}
+
+export function countWatchFeedUpcoming(
+  itemCount: number,
+  activeIndex: number
+): number {
+  if (!Number.isFinite(itemCount) || itemCount <= 0) return 0;
+  const index = Number.isFinite(activeIndex)
+    ? Math.max(0, Math.trunc(activeIndex))
+    : 0;
+  return Math.max(0, Math.trunc(itemCount) - index - 1);
+}
+
+/**
+ * Request the next real feed page before the loaded list can no longer
+ * supply five upcoming identities. Does not change paging / swipe.
+ */
+export function shouldRequestWatchFeedForwardPage(input: {
+  activeIndex: number;
+  itemCount: number;
+  hasMore: boolean;
+  target?: number;
+}): boolean {
+  if (!input.hasMore) return false;
+  if (input.itemCount <= 0) return false;
+  const target = input.target ?? ANDROID_WATCH_FORWARD_READY_TARGET;
+  return countWatchFeedUpcoming(input.itemCount, input.activeIndex) <= target;
+}
+
+/**
+ * Evict leftovers that left the keep window only when the loaded feed is
+ * complete enough to know they are not needed. Incomplete cold snapshots
+ * must not delete valid forward files that the next page will keep.
+ */
+export function shouldEvictWatchRollingCacheEntry(input: {
+  mediaId: string;
+  keepIds: readonly string[];
+  feedMediaIds: readonly string[];
+  upcomingCount: number;
+  target?: number;
+}): boolean {
+  if (input.keepIds.includes(input.mediaId)) return false;
+  const target = input.target ?? ANDROID_WATCH_FORWARD_READY_TARGET;
+  const inFeed = input.feedMediaIds.includes(input.mediaId);
+  if (!inFeed && input.upcomingCount < target) return false;
+  return true;
+}
+
+/** Cold remount: a valid on-disk file for a feed identity is a hit. */
+export function shouldReuseWatchCacheOnRemount(input: {
+  fileExists: boolean;
+  bytes: number;
+  mediaIdInFeed: boolean;
+}): boolean {
+  return input.fileExists && input.bytes > 0 && input.mediaIdInFeed;
+}
+
+export function countWatchCacheUpcomingReady(input: {
+  videos: Array<{
+    id: string;
+    postId?: number | null;
+    src?: string | null;
+  }>;
+  activeIndex: number;
+  cachedIds: readonly string[];
+  target?: number;
+}): number {
+  const target = input.target ?? ANDROID_WATCH_FORWARD_READY_TARGET;
+  const activeIndex = Number.isFinite(input.activeIndex)
+    ? Math.max(0, Math.trunc(input.activeIndex))
+    : 0;
+  const cached = new Set(input.cachedIds);
+  let upcoming = 0;
+  let ready = 0;
+  for (let i = activeIndex + 1; i < input.videos.length && upcoming < target; i += 1) {
+    const mediaId = watchMediaIdentity(input.videos[i]);
+    if (!mediaId) continue;
+    upcoming += 1;
+    if (cached.has(mediaId)) ready += 1;
+  }
+  return ready;
+}
+
+export function watchCacheDestUri(dir: string, mediaId: string): string {
+  return `${dir}${ANDROID_WATCH_CACHE_DIR_NAME}${watchCacheFileName(mediaId)}`;
 }
 
 export function planAndroidWatchCacheWindow(input: {
@@ -215,7 +301,7 @@ export function planAndroidWatchCacheWindow(input: {
     .sort((a, b) => a.cachedAt - b.cachedAt)
     .map((entry) => entry.mediaId);
 
-  return { target, keepIds, downloadIds, evictIds, hits };
+  return { target, keepIds, downloadIds, evictIds, hits, upcomingCount: upcoming };
 }
 
 export function parseWatchCacheManifest(
@@ -298,29 +384,31 @@ export async function peekAndroidWatchCacheHits(input: {
 }): Promise<WatchCacheHit[]> {
   const port = resolvePort(input.port);
   if (!port) return [];
-  const { manifest } = await readManifest(port);
+  const { dir, manifest } = await readManifest(port);
   const hits: WatchCacheHit[] = [];
   const staleMediaIds: string[] = [];
   for (const video of input.videos) {
     const mediaId = watchMediaIdentity(video);
+    if (!mediaId) continue;
     const entry = manifest.entries.find((row) => row.mediaId === mediaId);
-    if (!entry) continue;
-    const check = await inspectLocalWatchPlaybackFile(port, entry.uri);
+    const destUri = entry?.uri ?? (dir ? watchCacheDestUri(dir, mediaId) : "");
+    if (!destUri) continue;
+    const check = await inspectLocalWatchPlaybackFile(port, destUri);
     if (!check.usable) {
-      staleMediaIds.push(mediaId);
+      if (entry) staleMediaIds.push(mediaId);
       continue;
     }
     if (
       !shouldApplyLocalWatchUriToVideo({
         video,
-        candidateMediaId: entry.mediaId,
-        candidateUri: entry.uri,
+        candidateMediaId: mediaId,
+        candidateUri: destUri,
         fileUsable: true,
       })
     ) {
       continue;
     }
-    hits.push({ videoId: video.id, mediaId, uri: entry.uri });
+    hits.push({ videoId: video.id, mediaId, uri: destUri });
   }
   if (staleMediaIds.length > 0) {
     await invalidateStaleAndroidWatchCacheEntries({
@@ -351,7 +439,7 @@ export async function invalidateStaleAndroidWatchCacheEntries(input: {
   return next;
 }
 
-export async function syncAndroidWatchRollingCache(input: {
+type WatchCacheSyncInput = {
   platform?: string | null;
   videos: WatchVideo[];
   activeIndex: number;
@@ -359,7 +447,73 @@ export async function syncAndroidWatchRollingCache(input: {
   now?: number;
   port?: WatchMediaCachePort;
   onResolved?: (videoId: string, localUri: string) => void;
-}): Promise<WatchCacheSyncResult> {
+};
+
+type WatchCacheSyncWaiter = {
+  resolve: (result: WatchCacheSyncResult) => void;
+  reject: (error: unknown) => void;
+};
+
+let syncRunning = false;
+let latestSyncInput: WatchCacheSyncInput | null = null;
+let syncWaiters: WatchCacheSyncWaiter[] = [];
+
+export function __resetAndroidWatchCacheSyncForTests(): void {
+  inflightDownloads.clear();
+  syncRunning = false;
+  latestSyncInput = null;
+  syncWaiters = [];
+}
+
+export async function syncAndroidWatchRollingCache(
+  input: WatchCacheSyncInput
+): Promise<WatchCacheSyncResult> {
+  return new Promise((resolve, reject) => {
+    latestSyncInput = input;
+    syncWaiters.push({ resolve, reject });
+    void pumpAndroidWatchCacheSync();
+  });
+}
+
+async function pumpAndroidWatchCacheSync(): Promise<void> {
+  if (syncRunning) return;
+  syncRunning = true;
+  try {
+    while (syncWaiters.length > 0) {
+      const input = latestSyncInput;
+      const waiters = syncWaiters;
+      latestSyncInput = null;
+      syncWaiters = [];
+      if (!input) {
+        for (const waiter of waiters) {
+          waiter.resolve({
+            target: ANDROID_WATCH_CACHE_TARGET,
+            cachedIds: [],
+            hits: [],
+            misses: [],
+            evicted: [],
+          });
+        }
+        continue;
+      }
+      try {
+        const result = await runAndroidWatchRollingCacheSync(input);
+        for (const waiter of waiters) waiter.resolve(result);
+      } catch (error) {
+        for (const waiter of waiters) waiter.reject(error);
+      }
+    }
+  } finally {
+    syncRunning = false;
+    if (syncWaiters.length > 0) {
+      void pumpAndroidWatchCacheSync();
+    }
+  }
+}
+
+async function runAndroidWatchRollingCacheSync(
+  input: WatchCacheSyncInput
+): Promise<WatchCacheSyncResult> {
   const empty: WatchCacheSyncResult = {
     target: ANDROID_WATCH_CACHE_TARGET,
     cachedIds: [],
@@ -380,6 +534,13 @@ export async function syncAndroidWatchRollingCache(input: {
     activeIndex: input.activeIndex,
     manifest,
   });
+  const feedMediaIds = input.videos
+    .map((video) => watchMediaIdentity(video))
+    .filter((mediaId): mediaId is string => Boolean(mediaId));
+  const upcomingCount = countWatchFeedUpcoming(
+    input.videos.length,
+    input.activeIndex
+  );
 
   const mediaDir = `${dir}${ANDROID_WATCH_CACHE_DIR_NAME}`;
   await port.ensureDir(mediaDir);
@@ -399,30 +560,26 @@ export async function syncAndroidWatchRollingCache(input: {
   const nextEntries: WatchCacheEntry[] = [];
   const hits: string[] = [];
   const misses: string[] = [];
-  const evicted: string[] = [];
 
   for (const entry of manifest.entries) {
-    if (plan.evictIds.includes(entry.mediaId)) {
-      evicted.push(entry.mediaId);
-      if (!retainedMediaIds.has(entry.mediaId)) {
-        try {
-          await port.delete(entry.uri);
-        } catch {
-          // Best-effort eviction.
-        }
-      }
-      continue;
-    }
     if (await entryStillOnDisk(port, entry)) {
       nextEntries.push(entry);
     }
   }
 
   const keepSet = new Set(plan.keepIds);
+  const downloadJobs: Array<{
+    video: WatchVideo;
+    mediaId: string;
+    src: string;
+    destUri: string;
+  }> = [];
+
   for (const video of input.videos) {
     const mediaId = watchMediaIdentity(video);
     if (!keepSet.has(mediaId)) continue;
     const existing = nextEntries.find((row) => row.mediaId === mediaId);
+    const destUri = existing?.uri ?? watchCacheDestUri(dir, mediaId);
     if (existing) {
       hits.push(mediaId);
       const usable = await inspectLocalWatchPlaybackFile(port, existing.uri);
@@ -440,53 +597,126 @@ export async function syncAndroidWatchRollingCache(input: {
       }
       continue;
     }
+    const destBytes = (await port.exists(destUri)) ? await port.size(destUri) : 0;
+    if (
+      shouldReuseWatchCacheOnRemount({
+        fileExists: destBytes > 0,
+        bytes: destBytes,
+        mediaIdInFeed: true,
+      })
+    ) {
+      const reused: WatchCacheEntry = {
+        mediaId,
+        videoId: video.id,
+        uri: destUri,
+        bytes: destBytes,
+        cachedAt: Date.now(),
+      };
+      if (isValidWatchCacheEntry(reused)) {
+        nextEntries.push(reused);
+        hits.push(mediaId);
+        if (
+          shouldApplyLocalWatchUriToVideo({
+            video,
+            candidateMediaId: mediaId,
+            candidateUri: destUri,
+            fileUsable: true,
+          }) &&
+          !isLocalWatchPlaybackUri(video.src)
+        ) {
+          input.onResolved?.(video.id, destUri);
+        }
+        continue;
+      }
+    }
     const src = (video.src ?? "").trim();
     if (!src || isLocalWatchPlaybackUri(src)) {
       misses.push(mediaId);
       continue;
     }
-    const destUri = `${mediaDir}${watchCacheFileName(mediaId)}`;
-    const downloaded = await downloadWatchCacheFile(port, mediaId, src, destUri);
-    if (!downloaded) {
-      misses.push(mediaId);
+    downloadJobs.push({ video, mediaId, src, destUri });
+  }
+
+  const downloaded = await Promise.all(
+    downloadJobs.map(async (job) => ({
+      job,
+      uri: await downloadWatchCacheFile(port, job.mediaId, job.src, job.destUri),
+    }))
+  );
+  for (const row of downloaded) {
+    if (!row.uri) {
+      misses.push(row.job.mediaId);
       continue;
     }
-    const bytes = await port.size(downloaded);
+    const bytes = await port.size(row.uri);
     const entry: WatchCacheEntry = {
-      mediaId,
-      videoId: video.id,
-      uri: downloaded,
+      mediaId: row.job.mediaId,
+      videoId: row.job.video.id,
+      uri: row.uri,
       bytes,
       cachedAt: Date.now(),
     };
     if (!isValidWatchCacheEntry(entry)) {
       try {
-        await port.delete(downloaded);
+        await port.delete(row.uri);
       } catch {
         // Drop incomplete cache files so they cannot be served later.
       }
-      misses.push(mediaId);
+      misses.push(row.job.mediaId);
       continue;
     }
     if (
       !shouldApplyLocalWatchUriToVideo({
-        video,
+        video: row.job.video,
         candidateMediaId: entry.mediaId,
         candidateUri: entry.uri,
         fileUsable: true,
       })
     ) {
-      misses.push(mediaId);
+      misses.push(row.job.mediaId);
       continue;
     }
     nextEntries.push(entry);
-    hits.push(mediaId);
-    input.onResolved?.(video.id, downloaded);
+    hits.push(row.job.mediaId);
+    input.onResolved?.(row.job.video.id, row.uri);
   }
 
+  const evicted: string[] = [];
+  const retained: WatchCacheEntry[] = [];
+  for (const entry of nextEntries) {
+    const evict = shouldEvictWatchRollingCacheEntry({
+      mediaId: entry.mediaId,
+      keepIds: plan.keepIds,
+      feedMediaIds,
+      upcomingCount,
+      target: plan.target,
+    });
+    if (!evict) {
+      retained.push(entry);
+      continue;
+    }
+    evicted.push(entry.mediaId);
+    if (!retainedMediaIds.has(entry.mediaId)) {
+      try {
+        await port.delete(entry.uri);
+      } catch {
+        // Best-effort eviction.
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  const keepOrdered: WatchCacheEntry[] = [];
+  for (const mediaId of plan.keepIds) {
+    const entry = retained.find((row) => row.mediaId === mediaId);
+    if (!entry || seen.has(mediaId)) continue;
+    seen.add(mediaId);
+    keepOrdered.push(entry);
+  }
+  const held = retained.filter((entry) => !seen.has(entry.mediaId));
   const nextManifest: WatchCacheManifest = {
     target: ANDROID_WATCH_FORWARD_READY_TARGET,
-    entries: nextEntries.filter((entry) => plan.keepIds.includes(entry.mediaId)),
+    entries: [...keepOrdered, ...held],
   };
   await writeManifest(port, manifestUri, nextManifest);
 
@@ -501,7 +731,7 @@ export async function syncAndroidWatchRollingCache(input: {
     const activeMediaId = activeVideo ? watchMediaIdentity(activeVideo) : null;
     for (const video of rememberVideos) {
       const mediaId = watchMediaIdentity(video);
-      const cached = nextManifest.entries.find((row) => row.mediaId === mediaId);
+      const cached = keepOrdered.find((row) => row.mediaId === mediaId);
       if (!cached) continue;
       const remoteUri = isLocalWatchPlaybackUri(video.src) ? undefined : video.src;
       await rememberWatchedOfflineVideo({
@@ -518,7 +748,7 @@ export async function syncAndroidWatchRollingCache(input: {
 
   const result: WatchCacheSyncResult = {
     target: ANDROID_WATCH_CACHE_TARGET,
-    cachedIds: nextManifest.entries.map((entry) => entry.mediaId),
+    cachedIds: keepOrdered.map((entry) => entry.mediaId),
     hits,
     misses,
     evicted,
@@ -655,7 +885,8 @@ export function __setWatchMediaCachePortForTests(
 
 export function createMemoryWatchMediaCachePort(
   cacheRoot = "file:///cache/",
-  documentRoot = "file:///documents/"
+  documentRoot = "file:///documents/",
+  options?: { beforeDownload?: (sourceUrl: string) => Promise<void> }
 ): WatchMediaCachePort & { files: Map<string, string>; downloads: string[] } {
   const files = new Map<string, string>();
   const downloads: string[] = [];
@@ -667,6 +898,9 @@ export function createMemoryWatchMediaCachePort(
     exists: async (uri) => files.has(uri),
     size: async (uri) => files.get(uri)?.length ?? 0,
     download: async (sourceUrl, destUri) => {
+      if (options?.beforeDownload) {
+        await options.beforeDownload(sourceUrl);
+      }
       downloads.push(sourceUrl);
       files.set(destUri, sourceUrl);
       return { uri: destUri, status: 200 };

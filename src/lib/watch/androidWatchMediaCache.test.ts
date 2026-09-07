@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-video", () => ({
   setVideoCacheSizeAsync: async () => undefined,
@@ -6,18 +6,25 @@ vi.mock("expo-video", () => ({
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
+  ANDROID_WATCH_CACHE_MANIFEST_NAME,
   ANDROID_WATCH_CACHE_TARGET,
   ANDROID_WATCH_FORWARD_READY_TARGET,
   ANDROID_WATCH_MAX_BUFFER_BYTES,
   ANDROID_WATCH_VIDEO_CACHE_BYTES,
+  __resetAndroidWatchCacheSyncForTests,
+  countWatchCacheUpcomingReady,
   createMemoryWatchMediaCachePort,
   emptyWatchCacheManifest,
   isValidWatchCacheEntry,
   peekAndroidWatchCacheHits,
   planAndroidWatchCacheWindow,
   resolveAndroidWatchBufferOptions,
+  shouldEvictWatchRollingCacheEntry,
   shouldRedownloadWatchCache,
+  shouldRequestWatchFeedForwardPage,
+  shouldReuseWatchCacheOnRemount,
   syncAndroidWatchRollingCache,
+  watchCacheDestUri,
   watchCacheFileName,
 } from "./androidWatchMediaCache";
 
@@ -287,5 +294,209 @@ describe("Android Watch rolling cache target 5", () => {
     });
     expect(offline.cachedIds).toHaveLength(5);
     expect(offline.misses).toEqual([]);
+  });
+});
+
+function cachedMediaFiles(
+  port: ReturnType<typeof createMemoryWatchMediaCachePort>
+): string[] {
+  return [...port.files.keys()].filter(
+    (uri) => uri.includes("umtuba-watch-media/") && uri.endsWith(".mp4")
+  );
+}
+
+describe("Phase2 rolling-five completion", () => {
+  beforeEach(() => {
+    __resetAndroidWatchCacheSyncForTests();
+  });
+
+  it("requests more real feed items before the five-forward window runs out", () => {
+    expect(
+      shouldRequestWatchFeedForwardPage({
+        activeIndex: 0,
+        itemCount: 12,
+        hasMore: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldRequestWatchFeedForwardPage({
+        activeIndex: 6,
+        itemCount: 12,
+        hasMore: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldRequestWatchFeedForwardPage({
+        activeIndex: 8,
+        itemCount: 12,
+        hasMore: true,
+      })
+    ).toBe(true);
+    expect(
+      shouldRequestWatchFeedForwardPage({
+        activeIndex: 10,
+        itemCount: 12,
+        hasMore: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldEvictWatchRollingCacheEntry({
+        mediaId: "post-700",
+        keepIds: ["post-1", "post-2", "post-3", "post-4", "post-5", "post-6"],
+        feedMediaIds: ["post-1", "post-2"],
+        upcomingCount: 1,
+      })
+    ).toBe(false);
+    expect(
+      shouldEvictWatchRollingCacheEntry({
+        mediaId: "post-1",
+        keepIds: ["post-2", "post-3", "post-4", "post-5", "post-6"],
+        feedMediaIds: ["post-1", "post-2", "post-3", "post-4", "post-5", "post-6"],
+        upcomingCount: 3,
+      })
+    ).toBe(true);
+  });
+
+  it("replenishes toward five upcoming during rapid overlapping advances", async () => {
+    const videos = Array.from({ length: 20 }, (_, i) => video(i + 1));
+    let gated = false;
+    let unlock!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+    const port = createMemoryWatchMediaCachePort(
+      "file:///cache/",
+      "file:///documents/",
+      {
+        beforeDownload: async () => {
+          if (gated) await gate;
+        },
+      }
+    );
+    const seeded = await syncAndroidWatchRollingCache({
+      platform: "android",
+      videos,
+      activeIndex: 0,
+      port,
+    });
+    expect(seeded.cachedIds).toEqual([
+      "post-1",
+      "post-2",
+      "post-3",
+      "post-4",
+      "post-5",
+      "post-6",
+    ]);
+    gated = true;
+    const rapid = [1, 2, 3, 4, 5, 6].map((activeIndex) =>
+      syncAndroidWatchRollingCache({
+        platform: "android",
+        videos,
+        activeIndex,
+        port,
+      })
+    );
+    await Promise.resolve();
+    expect(cachedMediaFiles(port).length).toBeGreaterThanOrEqual(6);
+    unlock();
+    const results = await Promise.all(rapid);
+    const latest = results.at(-1);
+    expect(latest?.cachedIds).toEqual([
+      "post-6",
+      "post-7",
+      "post-8",
+      "post-9",
+      "post-10",
+      "post-11",
+      "post-12",
+    ]);
+    expect(
+      countWatchCacheUpcomingReady({
+        videos,
+        activeIndex: 6,
+        cachedIds: latest?.cachedIds ?? [],
+      })
+    ).toBe(5);
+    expect(latest?.cachedIds.length).toBeGreaterThan(2);
+  });
+
+  it("reuses valid forward files on cold remount instead of re-downloading", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    const videos = [1, 2, 3, 4, 5, 6].map((i) => video(i));
+    const seeded = await syncAndroidWatchRollingCache({
+      platform: "android",
+      videos,
+      activeIndex: 0,
+      port,
+    });
+    const downloadsAfterSeed = port.downloads.length;
+    expect(seeded.cachedIds).toHaveLength(6);
+
+    const coldPartial = await syncAndroidWatchRollingCache({
+      platform: "android",
+      videos: [video(1)],
+      activeIndex: 0,
+      port,
+    });
+    expect(coldPartial.evicted).toEqual([]);
+    expect(cachedMediaFiles(port).length).toBe(6);
+    expect(
+      shouldReuseWatchCacheOnRemount({
+        fileExists: true,
+        bytes: 12,
+        mediaIdInFeed: true,
+      })
+    ).toBe(true);
+
+    port.files.delete(`file:///cache/${ANDROID_WATCH_CACHE_MANIFEST_NAME}`);
+    const remounted = await syncAndroidWatchRollingCache({
+      platform: "android",
+      videos,
+      activeIndex: 0,
+      port,
+    });
+    expect(remounted.cachedIds).toEqual([
+      "post-1",
+      "post-2",
+      "post-3",
+      "post-4",
+      "post-5",
+      "post-6",
+    ]);
+    expect(port.downloads.length).toBe(downloadsAfterSeed);
+    const peeked = await peekAndroidWatchCacheHits({ videos, port });
+    expect(peeked.map((hit) => hit.mediaId)).toEqual(remounted.cachedIds);
+  });
+
+  it("does not start a second download for a valid in-flight or on-disk hit", async () => {
+    const port = createMemoryWatchMediaCachePort();
+    const videos = [1, 2, 3, 4, 5, 6].map((i) => video(i));
+    const [first, second] = await Promise.all([
+      syncAndroidWatchRollingCache({
+        platform: "android",
+        videos,
+        activeIndex: 0,
+        port,
+      }),
+      syncAndroidWatchRollingCache({
+        platform: "android",
+        videos,
+        activeIndex: 0,
+        port,
+      }),
+    ]);
+    expect(first.cachedIds).toHaveLength(6);
+    expect(second.cachedIds).toHaveLength(6);
+    expect(port.downloads).toEqual([
+      "https://cdn.example/1.mp4",
+      "https://cdn.example/2.mp4",
+      "https://cdn.example/3.mp4",
+      "https://cdn.example/4.mp4",
+      "https://cdn.example/5.mp4",
+      "https://cdn.example/6.mp4",
+    ]);
+    expect(watchCacheDestUri("file:///cache/", "post-2")).toBe(
+      "file:///cache/umtuba-watch-media/post-2.mp4"
+    );
   });
 });

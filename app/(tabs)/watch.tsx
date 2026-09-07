@@ -136,6 +136,7 @@ import {
   ensureAndroidWatchVideoCache,
   peekAndroidWatchCacheHits,
   resolveWatchMediaCachePort,
+  shouldRequestWatchFeedForwardPage,
   syncAndroidWatchRollingCache,
 } from "@/src/lib/watch/androidWatchMediaCache";
 import {
@@ -1147,6 +1148,19 @@ export default function WatchScreen() {
       });
     });
   }, [activeIndex, patchVideo, playbackIdentity, user?.id]);
+
+  useEffect(() => {
+    if (
+      !shouldRequestWatchFeedForwardPage({
+        activeIndex,
+        itemCount: visibleVideos.length,
+        hasMore: Boolean(cursor) && !endReached,
+      })
+    ) {
+      return;
+    }
+    void loadMore();
+  }, [activeIndex, cursor, endReached, loadMore, visibleVideos.length]);
 
   const onToggleLike = useCallback(
     async (video: WatchVideo) => {
