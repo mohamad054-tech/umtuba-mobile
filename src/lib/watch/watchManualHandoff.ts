@@ -41,6 +41,93 @@ export function resolveManualHandoffTarget(input: {
   return null;
 }
 
+/**
+ * Commit on release after a short deliberate swipe (~20% of one page).
+ * Direction is already known at 12%. Native paging still rounds at 50%,
+ * so a 20% release would otherwise snap back.
+ */
+export const WATCH_SHORT_SWIPE_PAGE_FRACTION = 0.2;
+
+/** Viewport-relative flick: one page per second in the swipe direction. */
+export const WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC = 1;
+
+export function resolveManualScrollProgress(input: {
+  fromIndex: number;
+  currentOffset: number;
+  itemHeight: number;
+  itemCount: number;
+}): { targetIndex: number | null; pageFraction: number; deltaPx: number } {
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) {
+    return { targetIndex: null, pageFraction: 0, deltaPx: 0 };
+  }
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  if (from == null) return { targetIndex: null, pageFraction: 0, deltaPx: 0 };
+  const deltaPx = input.currentOffset - from * input.itemHeight;
+  const pageFraction = Math.min(
+    1,
+    Math.max(0, Math.abs(deltaPx) / input.itemHeight)
+  );
+  return {
+    targetIndex: resolveManualHandoffTarget(input),
+    pageFraction,
+    deltaPx,
+  };
+}
+
+export function resolveManualSwipePagesPerSec(input: {
+  velocityY?: number | null;
+  itemHeight: number;
+}): number {
+  if (!Number.isFinite(input.itemHeight) || input.itemHeight <= 0) return 0;
+  if (input.velocityY == null || !Number.isFinite(input.velocityY)) return 0;
+  return input.velocityY / input.itemHeight;
+}
+
+export function shouldCommitShortManualSwipe(input: {
+  fromIndex: number;
+  targetIndex: number | null;
+  pageFraction: number;
+  velocityY?: number | null;
+  itemHeight: number;
+}): boolean {
+  const from = sanitizeWatchListIndex(input.fromIndex);
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
+  if (from == null || target == null || target === from) return false;
+  if (!Number.isFinite(input.pageFraction) || input.pageFraction < 0) {
+    return false;
+  }
+
+  const pagesPerSec = resolveManualSwipePagesPerSec({
+    velocityY: input.velocityY,
+    itemHeight: input.itemHeight,
+  });
+  const goingNext = target > from;
+  const velocityAgrees =
+    pagesPerSec === 0 ||
+    (goingNext && pagesPerSec > 0) ||
+    (!goingNext && pagesPerSec < 0);
+  if (!velocityAgrees) return false;
+
+  if (input.pageFraction >= WATCH_SHORT_SWIPE_PAGE_FRACTION) return true;
+  return Math.abs(pagesPerSec) >= WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC;
+}
+
+export function isAccidentalManualSwipe(input: {
+  pageFraction: number;
+  velocityY?: number | null;
+  itemHeight: number;
+}): boolean {
+  if (input.pageFraction >= WATCH_SHORT_SWIPE_PAGE_FRACTION) return false;
+  return (
+    Math.abs(
+      resolveManualSwipePagesPerSec({
+        velocityY: input.velocityY,
+        itemHeight: input.itemHeight,
+      })
+    ) < WATCH_SHORT_SWIPE_FLICK_PAGES_PER_SEC
+  );
+}
+
 export function shouldWarmManualTarget(input: {
   fromIndex: number;
   targetIndex: number | null;

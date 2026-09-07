@@ -22,9 +22,12 @@ import {
   manualViewabilityMayWriteActiveIndex,
   resolveAndroidManualSettleAction,
   resolveManualHandoffCompletionTransaction,
+  isAccidentalManualSwipe,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualScrollProgress,
   resolveNoFirstFrameManualHandoff,
+  shouldCommitShortManualSwipe,
   resolvePendingManualHandoffAction,
   shouldAcceptPendingManualHandoff,
   shouldCancelPendingManualHandoff,
@@ -200,6 +203,87 @@ describe("manual handoff parity with auto-advance", () => {
         activeIndex: 0,
       })
     ).toBe(true);
+  });
+
+  it("commits a short 20% swipe on release and ignores tiny movement", () => {
+    const height = 800;
+    expect(
+      resolveManualScrollProgress({
+        fromIndex: 0,
+        currentOffset: 152,
+        itemHeight: height,
+        itemCount: 5,
+      })
+    ).toEqual({ targetIndex: 1, pageFraction: 0.19, deltaPx: 152 });
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 0,
+        targetIndex: 1,
+        pageFraction: 0.19,
+        velocityY: 0,
+        itemHeight: height,
+      })
+    ).toBe(false);
+    expect(
+      isAccidentalManualSwipe({
+        pageFraction: 0.19,
+        velocityY: 0,
+        itemHeight: height,
+      })
+    ).toBe(true);
+    expect(
+      resolveManualScrollProgress({
+        fromIndex: 0,
+        currentOffset: 160,
+        itemHeight: height,
+        itemCount: 5,
+      })
+    ).toEqual({ targetIndex: 1, pageFraction: 0.2, deltaPx: 160 });
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 0,
+        targetIndex: 1,
+        pageFraction: 0.2,
+        velocityY: 0,
+        itemHeight: height,
+      })
+    ).toBe(true);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 2,
+        targetIndex: 1,
+        pageFraction: 0.2,
+        velocityY: 0,
+        itemHeight: height,
+      })
+    ).toBe(true);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 0,
+        targetIndex: 1,
+        pageFraction: 0.12,
+        velocityY: height,
+        itemHeight: height,
+      })
+    ).toBe(true);
+    expect(
+      shouldCommitShortManualSwipe({
+        fromIndex: 0,
+        targetIndex: 1,
+        pageFraction: 0.2,
+        velocityY: -height,
+        itemHeight: height,
+      })
+    ).toBe(false);
+    expect(manualViewabilityMayWriteActiveIndex()).toBe(false);
+    expect(
+      shouldCompleteManualHandoff({
+        nativeSettledPage: 1,
+        targetIndex: 1,
+        targetSurfaceAttached: true,
+        targetFirstFrame: false,
+      })
+    ).toBe(false);
   });
 
   it("manual settle 0→1 and 1→2 then back 2→1", () => {

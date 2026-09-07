@@ -165,8 +165,10 @@ import {
   resolveAndroidManualSettleAction,
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
+  resolveManualScrollProgress,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
+  shouldCommitShortManualSwipe,
   shouldIgnoreStaleManualSettle,
   shouldWarmManualTarget,
   type ManualHandoffPending,
@@ -810,6 +812,58 @@ export default function WatchScreen() {
       animated: false,
     });
   }, []);
+
+  const armShortSwipeCommit = useCallback(
+    (fromIndex: number, offset: number, velocityY?: number | null) => {
+      const progress = resolveManualScrollProgress({
+        fromIndex,
+        currentOffset: offset,
+        itemHeight: itemHeightRef.current,
+        itemCount: videosLengthRef.current,
+      });
+      if (
+        !shouldCommitShortManualSwipe({
+          fromIndex,
+          targetIndex: progress.targetIndex,
+          pageFraction: progress.pageFraction,
+          velocityY,
+          itemHeight: itemHeightRef.current,
+        })
+      ) {
+        return false;
+      }
+      const target = progress.targetIndex;
+      if (target == null) return false;
+      applyWarmedTargetIndex(target);
+      const targetVideo = visibleVideosRef.current[target];
+      const created = createManualHandoffPending({
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        targetIndex: target,
+        targetMediaId: targetVideo ? watchMediaIdentity(targetVideo) : null,
+      });
+      if (!created) return false;
+      const generation = manualHandoffGenRef.current + 1;
+      manualHandoffGenRef.current = generation;
+      pendingManualRef.current = {
+        ...created,
+        generation,
+        nativePage: target,
+      };
+      tryCompletePendingManualHandoff();
+      if (pendingManualRef.current?.targetIndex !== target) {
+        return true;
+      }
+      const pinOffset = resolveWatchScrollOffset(target, itemHeightRef.current);
+      if (pinOffset != null) {
+        listRef.current?.scrollToOffset({
+          offset: pinOffset,
+          animated: true,
+        });
+      }
+      return true;
+    },
+    [applyWarmedTargetIndex, tryCompletePendingManualHandoff]
+  );
 
   const onWatchScrollBeginDrag = useCallback(() => {
     manualDragActiveRef.current = true;
@@ -1894,7 +1948,15 @@ export default function WatchScreen() {
         onScrollBeginDrag={onWatchScrollBeginDrag}
         scrollEventThrottle={16}
         onMomentumScrollEnd={onWatchScrollSettle}
-        onScrollEndDrag={onWatchScrollSettle}
+        onScrollEndDrag={(event) => {
+          const committed = armShortSwipeCommit(
+            dragStartIndexRef.current,
+            event.nativeEvent.contentOffset.y,
+            event.nativeEvent.velocity?.y
+          );
+          if (committed) return;
+          onWatchScrollSettle(event);
+        }}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}
         extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
