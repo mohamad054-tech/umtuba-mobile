@@ -1,5 +1,6 @@
 import { shouldMountWatchPlayer } from "@/src/lib/feed/videoStoragePath";
 import {
+  resolveWatchIndexFromScrollOffset,
   sanitizeWatchListIndex,
   shouldAttachWatchSurface,
 } from "./playbackPolicy";
@@ -199,6 +200,48 @@ export function resolveManualHandoffCompletionTransaction(): ManualHandoffComple
     applyViewabilityLock: true,
     pinNativeOffset: true,
   };
+}
+
+/** Already-on-page slop. Not a settle delay. */
+export const WATCH_SETTLED_OFFSET_EPSILON_PX = 4;
+
+export function shouldPinWatchScrollAfterNativeSettle(input: {
+  currentOffset: number;
+  targetOffset: number;
+}): boolean {
+  if (!Number.isFinite(input.currentOffset) || !Number.isFinite(input.targetOffset)) {
+    return false;
+  }
+  return (
+    Math.abs(input.currentOffset - input.targetOffset) > WATCH_SETTLED_OFFSET_EPSILON_PX
+  );
+}
+
+/**
+ * Native paging rounds at half a page. A 20% commit still needs one JS pin
+ * because native would snap back. A normal/flick swipe that already rounds
+ * to the target must not get a second scrollToOffset.
+ */
+export function shouldProgrammaticCommitWatchShortSwipe(input: {
+  targetIndex: number | null;
+  nativeRoundedPage: number | null;
+}): boolean {
+  const target = sanitizeWatchListIndex(input.targetIndex ?? Number.NaN);
+  const native = sanitizeWatchListIndex(input.nativeRoundedPage ?? Number.NaN);
+  if (target == null || native == null) return false;
+  return target !== native;
+}
+
+export function resolveWatchEndDragNativePage(input: {
+  currentOffset: number;
+  itemHeight: number;
+  itemCount: number;
+}): number | null {
+  return resolveWatchIndexFromScrollOffset(
+    input.currentOffset,
+    input.itemHeight,
+    input.itemCount
+  );
 }
 
 /**

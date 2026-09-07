@@ -35,6 +35,9 @@ import {
   shouldCompleteManualHandoff,
   shouldIgnoreStaleManualSettle,
   shouldKeepPreviousSurfaceDuringManualHandoff,
+  shouldPinWatchScrollAfterNativeSettle,
+  shouldProgrammaticCommitWatchShortSwipe,
+  resolveWatchEndDragNativePage,
   shouldMountOffscreenManualTargetVideoView,
   shouldReleasePreviousWatchSurface,
   shouldStartManualHandoffAudio,
@@ -293,6 +296,44 @@ describe("manual handoff parity with auto-advance", () => {
         targetFirstFrame: false,
       })
     ).toBe(false);
+    expect(
+      resolveWatchEndDragNativePage({
+        currentOffset: 160,
+        itemHeight: height,
+        itemCount: 5,
+      })
+    ).toBe(0);
+    expect(
+      shouldProgrammaticCommitWatchShortSwipe({
+        targetIndex: 1,
+        nativeRoundedPage: 0,
+      })
+    ).toBe(true);
+    expect(
+      resolveWatchEndDragNativePage({
+        currentOffset: 480,
+        itemHeight: height,
+        itemCount: 5,
+      })
+    ).toBe(1);
+    expect(
+      shouldProgrammaticCommitWatchShortSwipe({
+        targetIndex: 1,
+        nativeRoundedPage: 1,
+      })
+    ).toBe(false);
+    expect(
+      shouldPinWatchScrollAfterNativeSettle({
+        currentOffset: 800,
+        targetOffset: 800,
+      })
+    ).toBe(false);
+    expect(
+      shouldPinWatchScrollAfterNativeSettle({
+        currentOffset: 160,
+        targetOffset: 800,
+      })
+    ).toBe(true);
   });
 
   it("manual settle 0→1 and 1→2 then back 2→1", () => {

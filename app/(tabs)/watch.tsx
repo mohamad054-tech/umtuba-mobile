@@ -170,10 +170,13 @@ import {
   resolveManualHandoffRetarget,
   resolveManualHandoffTarget,
   resolveManualScrollProgress,
+  resolveWatchEndDragNativePage,
   shouldAcceptPendingManualHandoff,
   shouldClaimWatchIndexFromNativeSettle,
   shouldCommitShortManualSwipe,
   shouldIgnoreStaleManualSettle,
+  shouldPinWatchScrollAfterNativeSettle,
+  shouldProgrammaticCommitWatchShortSwipe,
   shouldWarmManualTarget,
   type ManualHandoffPending,
 } from "@/src/lib/watch/watchManualHandoff";
@@ -836,8 +839,37 @@ export default function WatchScreen() {
       return;
     }
     pendingManualRef.current = null;
-    scrollToWatchIndexRef.current(pending.targetIndex, 0, {
-      animated: false,
+    const targetOffset = resolveWatchScrollOffset(
+      pending.targetIndex,
+      itemHeightRef.current
+    );
+    if (
+      targetOffset != null &&
+      shouldPinWatchScrollAfterNativeSettle({
+        currentOffset: scrollOffsetRef.current,
+        targetOffset,
+      })
+    ) {
+      scrollToWatchIndexRef.current(pending.targetIndex, 0, {
+        animated: false,
+      });
+      return;
+    }
+    applyWatchIndexDecisionRef.current(
+      decideWatchActiveIndexClaim({
+        arbiter: arbiterRef.current,
+        reason: "programmatic",
+        requestedIndex: pending.targetIndex,
+        navigationGeneration: arbiterRef.current.navigationGeneration,
+        nativeSettledPage: pending.targetIndex,
+      })
+    );
+    markWatchTransition(Platform.OS, "next_source_activation", {
+      index: pending.targetIndex,
+      readiness: resolveWatchHandoffReadiness({
+        nextReady: nextHandoffRef.current.ready,
+        nextFirstFrame: nextHandoffRef.current.firstFrame,
+      }),
     });
   }, []);
 
@@ -877,12 +909,19 @@ export default function WatchScreen() {
         generation,
         nativePage: target,
       };
-      tryCompletePendingManualHandoff();
-      if (pendingManualRef.current?.targetIndex !== target) {
-        return true;
-      }
+      const nativeRounded = resolveWatchEndDragNativePage({
+        currentOffset: offset,
+        itemHeight: itemHeightRef.current,
+        itemCount: videosLengthRef.current,
+      });
       const pinOffset = resolveWatchScrollOffset(target, itemHeightRef.current);
-      if (pinOffset != null) {
+      if (
+        pinOffset != null &&
+        shouldProgrammaticCommitWatchShortSwipe({
+          targetIndex: target,
+          nativeRoundedPage: nativeRounded,
+        })
+      ) {
         listRef.current?.scrollToOffset({
           offset: pinOffset,
           animated: true,
@@ -1607,6 +1646,14 @@ export default function WatchScreen() {
 
     if (attempt < 2) {
       setTimeout(() => {
+        if (
+          !shouldPinWatchScrollAfterNativeSettle({
+            currentOffset: scrollOffsetRef.current,
+            targetOffset: offset,
+          })
+        ) {
+          return;
+        }
         try {
           listRef.current?.scrollToOffset({ offset, animated: false });
         } catch (err) {
