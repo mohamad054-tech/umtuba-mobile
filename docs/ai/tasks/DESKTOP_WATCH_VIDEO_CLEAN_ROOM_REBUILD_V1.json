@@ -1,6 +1,6 @@
 {
-  "task_id": "DESKTOP_WATCH_VIDEO_CLEAN_ROOM_REBUILD_V2",
-  "owner_goal": "Resume the isolated Watch video engine from the existing clean-room worktree. Do not restart or patch experimental video SHAs. Deterministic A-I tests must pass before Watch UI integration. Preserve UM Streak.",
+  "task_id": "DESKTOP_WATCH_VIDEO_CLEAN_ROOM_REBUILD_V1",
+  "owner_goal": "Rebuild the Watch video playback engine in isolation from the last safe Watch base. Do not patch experimental video SHAs. Preserve UM Streak and Watch product UI. New engine owns index, source, players, audio, cache, and ~20% paging without the old state machine.",
   "base_sha": "68733e73ce250d795aee6922d84cddf73796133c",
   "product_area": "watch",
   "allowed_files": [
@@ -47,7 +47,7 @@
   "device_evidence": {
     "device": "RFCX718LVHK / SM-F956B",
     "date": "2026-09-08",
-    "notes": "Resume existing uncommitted engine under DESKTOP-WATCH-VIDEO-CLEAN-ROOM-REBUILD-V1. No Vitest 5 fetch. No page-1 EAS."
+    "notes": "Clean-room from 68733e7 (f1e85475 product + OWNER_PASS freeze). Experimental video SHAs are read-only reference only. Do not touch UM Streak. Do not delete old Watch source."
   },
-  "notes": "OLD_ENGINE_PRESERVED_READ_ONLY. Resume V1 engine files. Do not copy watchManualHandoff or playerSession. One EAS only after local A-I proof + off-repo pre-eas authorize."
+  "notes": "OLD_ENGINE_PRESERVED_READ_ONLY. New modules live under src/lib/watch/engine/. Do not copy watchManualHandoff, activePlayerOwnership, playerSession, or eviction assumptions. One EAS only after local proof + off-repo pre-eas authorize."
 }

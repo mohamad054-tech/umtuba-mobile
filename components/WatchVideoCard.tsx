@@ -201,6 +201,8 @@ export type WatchVideoCardProps = {
   cellHeight?: number;
   topInset?: number;
   bottomInset?: number;
+  /** Engine owns the VideoView. Card chrome stays; video pane is a hole. */
+  externalPlayback?: boolean;
 };
 
 type TimelineState = {
@@ -963,6 +965,7 @@ function WatchVideoCardComponent({
   cellHeight,
   topInset = 0,
   bottomInset = 0,
+  externalPlayback = false,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
   const captionAlign = localeTextAlign(locale);
@@ -1352,7 +1355,7 @@ function WatchVideoCardComponent({
         );
       }}
     >
-      {mountPlayer ? (
+      {mountPlayer && !externalPlayback ? (
         <WatchPlayerPane
           key={`watch-player-${mediaId}-${boundEpoch}`}
           src={boundSrc}
@@ -1387,7 +1390,13 @@ function WatchVideoCardComponent({
           onPlayerStatus={onPlayerStatus}
         />
       ) : (
-        <View style={styles.placeholder} accessibilityElementsHidden>
+        <View
+          style={[
+            styles.placeholder,
+            externalPlayback ? styles.engineHole : null,
+          ]}
+          accessibilityElementsHidden
+        >
           {loadPlayer ? (
             <View style={styles.centerOverlay} pointerEvents="none">
               <ActivityIndicator
@@ -1881,6 +1890,9 @@ const styles = StyleSheet.create({
   placeholder: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.surface,
+  },
+  engineHole: {
+    backgroundColor: "transparent",
   },
   centerOverlay: {
     ...StyleSheet.absoluteFill,

@@ -32,6 +32,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CommentsSheet } from "@/components/CommentsSheet";
 import { WatchShareSheet } from "@/components/WatchShareSheet";
 import { IdentityHeader } from "@/components/IdentityHeader";
+import {
+  WatchEngineHost,
+  type WatchEngineHostHandle,
+} from "@/components/WatchEngineHost";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
@@ -143,6 +147,7 @@ import {
   resolveWatchStartupFeed,
 } from "@/src/lib/watch/watchOfflineManifest";
 import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
+import { resolveWatchEngineSource } from "@/src/lib/watch/engine";
 import {
   inspectLocalWatchPlaybackFile,
   isolatePrefetchFailureFromActiveCell,
@@ -220,6 +225,7 @@ export default function WatchScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
+  const engineHostRef = useRef<WatchEngineHostHandle>(null);
   const params = useLocalSearchParams<{ post?: string }>();
   const focusPostId =
     typeof params.post === "string" && /^\d+$/.test(params.post)
@@ -1057,12 +1063,35 @@ export default function WatchScreen() {
             }
           }
           if (urlGenerationRef.current !== generation) return;
+          const resolved = resolveWatchEngineSource({
+            mediaId: video ? watchMediaIdentity(video) : id,
+            retained:
+              currentLocalUsable === true && current
+                ? {
+                    uri: current,
+                    exists: true,
+                    bytes: 1,
+                    complete: true,
+                  }
+                : currentLocalUsable === false && current
+                  ? {
+                      uri: current,
+                      exists: false,
+                      bytes: 0,
+                      complete: false,
+                    }
+                  : null,
+            remoteUrl: src,
+          });
+          if (!resolved.uri) return;
           if (
-            !shouldApplyResolvedWatchSrc(current, src, { currentLocalUsable })
+            !shouldApplyResolvedWatchSrc(current, resolved.uri, {
+              currentLocalUsable,
+            })
           ) {
             return;
           }
-          patchVideo(id, { src });
+          patchVideo(id, { src: resolved.uri });
         })();
       },
     });
@@ -1543,37 +1572,7 @@ export default function WatchScreen() {
       }),
     });
 
-    const animated = options?.animated ?? attempt === 0;
-    const run = () => {
-      listRef.current?.scrollToOffset({
-        offset,
-        animated,
-      });
-    };
-
-    try {
-      run();
-    } catch (err) {
-      console.warn("Watch auto-next scroll failed:", err);
-      if (attempt < 3) {
-        setTimeout(
-          () => scrollToWatchIndex(nextIndex, attempt + 1, options),
-          80 * (attempt + 1)
-        );
-      }
-      return;
-    }
-
-    if (attempt < 2) {
-      setTimeout(() => {
-        try {
-          listRef.current?.scrollToOffset({ offset, animated: false });
-        } catch (err) {
-          console.warn("Watch auto-next scroll retry failed:", err);
-          scrollToWatchIndex(nextIndex, attempt + 1, options);
-        }
-      }, 120);
-    }
+    engineHostRef.current?.snapToIndex(nextIndex);
   }, [applyWatchIndexDecision]);
   scrollToWatchIndexRef.current = scrollToWatchIndex;
 
@@ -1587,33 +1586,7 @@ export default function WatchScreen() {
       return;
     }
     markWatchTransition(Platform.OS, "current_end", { index: nextIndex });
-    if (Platform.OS !== "android") {
-      scrollToWatchIndex(nextIndex);
-      return;
-    }
-    currentEndedRef.current = true;
-    setWarmNextSurface(true);
-    const started = Date.now();
-    const gen = handoffGenRef.current + 1;
-    handoffGenRef.current = gen;
-    const tryHandoff = () => {
-      if (handoffGenRef.current !== gen) return;
-      const waitedMs = Date.now() - started;
-      const nextState = nextHandoffRef.current;
-      const firstFrame =
-        nextState.index === nextIndex && nextState.firstFrame;
-      if (
-        shouldHandoffWatchAdvance({
-          nextFirstFrame: firstFrame,
-          waitedMs,
-        })
-      ) {
-        scrollToWatchIndex(nextIndex, 0, { animated: !firstFrame });
-        return;
-      }
-      setTimeout(tryHandoff, 32);
-    };
-    tryHandoff();
+    scrollToWatchIndex(nextIndex, 0, { animated: true });
   }, [autoNext, scrollToWatchIndex]);
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
@@ -1641,24 +1614,10 @@ export default function WatchScreen() {
         video={item}
         listIndex={index}
         isActive={index === activeIndex}
-        shouldLoadPlayer={shouldLoadOwnedWatchPlayer({
-          index,
-          activeIndex,
-          platform: Platform.OS,
-          lastSettledNativePage,
-          warmedTargetIndex,
-        })}
-        shouldPreparePlayer={shouldPrepareWatchPlayer(
-          index,
-          activeIndex,
-          Platform.OS
-        )}
+        externalPlayback
+        shouldLoadPlayer={false}
+        shouldPreparePlayer={false}
         isNextItem={index === activeIndex + 1}
-        warmNextSurface={
-          Platform.OS === "android" &&
-          (index === warmedTargetIndex ||
-            (index === activeIndex + 1 && warmNextSurface))
-        }
         onHandoffState={
           Platform.OS === "android" &&
           (index === activeIndex + 1 || index === warmedTargetIndex)
@@ -1930,67 +1889,38 @@ export default function WatchScreen() {
           </Pressable>
         </View>
       ) : null}
-      <FlatList
-        ref={listRef}
-        data={visibleVideos}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        pagingEnabled
-        scrollEnabled={listScrollEnabled}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={itemHeight}
-        snapToAlignment="start"
-        disableIntervalMomentum
-        decelerationRate="fast"
-        getItemLayout={getItemLayout}
-        onLayout={onWatchListLayout}
-        onScroll={onWatchScroll}
-        onScrollBeginDrag={onWatchScrollBeginDrag}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={onWatchScrollSettle}
-        onScrollEndDrag={(event) => {
-          const committed = armShortSwipeCommit(
-            dragStartIndexRef.current,
-            event.nativeEvent.contentOffset.y,
-            event.nativeEvent.velocity?.y
-          );
-          if (committed) return;
-          onWatchScrollSettle(event);
-        }}
-        onEndReached={() => void loadMore()}
-        onEndReachedThreshold={0.6}
-        extraData={`${activeIndex}:${lastSettledNativePage}:${warmedTargetIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        windowSize={5}
-        maxToRenderPerBatch={3}
-        initialNumToRender={2}
-        removeClippedSubviews={false}
-        refreshControl={
-          shouldEnableWatchPullToRefresh(activeIndex) ? (
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => void loadInitial({ soft: true })}
-              tintColor={colors.accentCyan}
-              colors={[colors.accentCyan]}
-            />
-          ) : undefined
-        }
-        ListFooterComponent={listFooter}
-        onScrollToIndexFailed={(info) => {
-          const offset = resolveWatchScrollOffset(
-            info.index,
-            itemHeightRef.current
-          );
-          if (offset == null) return;
-          setTimeout(() => {
-            listRef.current?.scrollToOffset({
-              offset,
-              animated: false,
-            });
-          }, 100);
-        }}
-      />
+      <View style={{ flex: 1 }} onLayout={onWatchListLayout}>
+        <WatchEngineHost
+          ref={engineHostRef}
+          videos={visibleVideos}
+          itemHeight={itemHeight}
+          settledIndex={activeIndex}
+          onSettledIndex={(index) => {
+            applyWatchIndexDecision(
+              decideWatchActiveIndexClaim({
+                arbiter: arbiterRef.current,
+                reason: "native-settle",
+                requestedIndex: index,
+                navigationGeneration: arbiterRef.current.navigationGeneration,
+                nativeSettledPage: index,
+              })
+            );
+          }}
+          onRequestMore={() => void loadMore()}
+          hasMore={Boolean(cursor) && !endReached}
+          loadingMore={loadingMore}
+          refreshing={refreshing}
+          onRefresh={() => void loadInitial({ soft: true })}
+          muted={muted}
+          volume={volume}
+          screenFocused={screenFocused}
+          listScrollEnabled={listScrollEnabled}
+          onActiveEnded={onActiveEnded}
+          listFooter={listFooter}
+          extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
+          renderChrome={({ item, index }) => renderItem({ item, index })}
+        />
+      </View>
       <View
         style={[
           styles.header,
