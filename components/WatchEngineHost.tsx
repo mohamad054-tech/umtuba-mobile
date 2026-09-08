@@ -22,6 +22,7 @@ import {
   planWatchEnginePlayerSlots,
   resolveWatchEngineItemSource,
   resolveWatchEngineReadiness,
+  resolveWatchEngineWantsPlay,
   shouldMountWatchEnginePlayer,
   shouldRecreateWatchEnginePlayer,
   shouldRequestWatchEngineFeedTail,
@@ -65,6 +66,7 @@ export type WatchEngineHostProps = {
     index: number;
     isActive: boolean;
     timeline: WatchEngineTimeline | null;
+    onUserPausedChange?: (paused: boolean) => void;
   }) => ReactNode;
 };
 
@@ -114,6 +116,11 @@ export const WatchEngineHost = forwardRef<
   const playerIdentityRef = useRef<{ mediaId: string; src: string } | null>(
     null
   );
+  const [userPaused, setUserPaused] = useState(false);
+
+  useEffect(() => {
+    setUserPaused(false);
+  }, [settledIndex]);
 
   itemHeightRef.current = itemHeight;
   settledRef.current = settledIndex;
@@ -277,7 +284,12 @@ export const WatchEngineHost = forwardRef<
       if (isCurrent && playable && resolvedSrc && (recreate || !previousIdentity)) {
         playerIdentityRef.current = { mediaId, src: resolvedSrc };
       }
-      const audible = audioOwner === mediaId && isCurrent;
+      const wantsPlay = resolveWatchEngineWantsPlay({
+        isCurrent,
+        screenFocused,
+        userPaused: userPaused && isCurrent,
+      });
+      const audible = audioOwner === mediaId && isCurrent && wantsPlay;
       return (
         <View style={{ height: itemHeight, backgroundColor: "#000" }}>
           {mount && playable && resolvedSrc ? (
@@ -285,7 +297,7 @@ export const WatchEngineHost = forwardRef<
               key={mediaId}
               src={resolvedSrc}
               mediaId={mediaId}
-              shouldPlay={isCurrent && screenFocused}
+              shouldPlay={wantsPlay}
               audible={audible}
               muted={muted}
               volume={volume}
@@ -337,6 +349,7 @@ export const WatchEngineHost = forwardRef<
             index,
             isActive: isCurrent,
             timeline: timelineById[mediaId] ?? null,
+            onUserPausedChange: isCurrent ? setUserPaused : undefined,
           })}
         </View>
       );
@@ -353,6 +366,7 @@ export const WatchEngineHost = forwardRef<
       screenFocused,
       slots,
       timelineById,
+      userPaused,
       volume,
     ]
   );
@@ -380,7 +394,7 @@ export const WatchEngineHost = forwardRef<
       scrollEventThrottle={16}
       onEndReached={onRequestMore}
       onEndReachedThreshold={0.6}
-      extraData={`${extraData ?? ""}:${watchEngineSrcSignature(videos)}:${Object.keys(firstFrameById).length}`}
+      extraData={`${extraData ?? ""}:${watchEngineSrcSignature(videos)}:${Object.keys(firstFrameById).length}:${userPaused ? "1" : "0"}`}
       windowSize={5}
       maxToRenderPerBatch={3}
       initialNumToRender={2}

@@ -21,6 +21,8 @@ import {
 } from "./startup";
 import {
   resolveWatchEngineReadiness,
+  resolveWatchEngineWantsPlay,
+  shouldRecreateWatchEnginePlayer,
   shouldStartWatchEnginePlayback,
 } from "./readiness";
 import { resolveWatchEngineVisualLayer } from "./visual";
@@ -276,6 +278,37 @@ describe("watch engine local gate", () => {
         firstFrameReady: true,
       })
     ).toBe("ready-to-render");
+  });
+
+  it("keeps a user pause after first-frame readiness and does not recreate", () => {
+    const wantsPlay = resolveWatchEngineWantsPlay({
+      isCurrent: true,
+      screenFocused: true,
+      userPaused: true,
+    });
+    expect(wantsPlay).toBe(false);
+    expect(
+      shouldStartWatchEnginePlayback({
+        wantsPlay,
+        sourcePlayable: true,
+        surfaceAttached: true,
+      })
+    ).toBe(false);
+    expect(
+      resolveWatchEngineReadiness({
+        sourcePlayable: true,
+        surfaceAttached: true,
+        firstFrameReady: true,
+      })
+    ).toBe("ready-to-render");
+    expect(
+      shouldRecreateWatchEnginePlayer({
+        previousMediaId: "post-1",
+        nextMediaId: "post-1",
+        previousSrc: "https://cdn.example/a.mp4",
+        nextSrc: "https://cdn.example/a.mp4",
+      })
+    ).toBe(false);
   });
 
   it("never mounts more than three players", () => {

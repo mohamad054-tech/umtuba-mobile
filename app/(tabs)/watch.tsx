@@ -1616,10 +1616,12 @@ export default function WatchScreen() {
       item,
       index,
       externalTimeline,
+      onUserPausedChange,
     }: {
       item: WatchVideo;
       index: number;
       externalTimeline?: { currentTime: number; duration: number; ratio: number } | null;
+      onUserPausedChange?: (paused: boolean) => void;
     }) => (
       <WatchVideoCard
         video={item}
@@ -1627,6 +1629,7 @@ export default function WatchScreen() {
         isActive={index === activeIndex}
         externalPlayback
         externalTimeline={externalTimeline ?? null}
+        onUserPausedChange={onUserPausedChange}
         shouldLoadPlayer={false}
         shouldPreparePlayer={false}
         isNextItem={index === activeIndex + 1}
@@ -1940,8 +1943,13 @@ export default function WatchScreen() {
           }}
           listFooter={listFooter}
           extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
-          renderChrome={({ item, index, timeline }) =>
-            renderItem({ item, index, externalTimeline: timeline })
+          renderChrome={({ item, index, timeline, onUserPausedChange }) =>
+            renderItem({
+              item,
+              index,
+              externalTimeline: timeline,
+              onUserPausedChange,
+            })
           }
         />
       </View>

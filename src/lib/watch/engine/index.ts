@@ -37,6 +37,7 @@ export type { WatchEnginePlayerSource } from "./playerSource";
 export {
   resolveWatchEngineItemSource,
   resolveWatchEngineReadiness,
+  resolveWatchEngineWantsPlay,
   shouldRecreateWatchEnginePlayer,
   shouldStartWatchEnginePlayback,
   watchEngineItemSourceUri,

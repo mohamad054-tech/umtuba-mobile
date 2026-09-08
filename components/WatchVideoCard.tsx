@@ -211,6 +211,8 @@ export type WatchVideoCardProps = {
   externalPlayback?: boolean;
   /** Engine timeline. Card clock must not stay 0:00 when the player is live. */
   externalTimeline?: TimelineState | null;
+  /** Engine play/pause. Card chrome cannot pause the active player by itself. */
+  onUserPausedChange?: (paused: boolean) => void;
 };
 
 type PlayerPaneProps = {
@@ -969,6 +971,7 @@ function WatchVideoCardComponent({
   bottomInset = 0,
   externalPlayback = false,
   externalTimeline = null,
+  onUserPausedChange,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
   const captionAlign = localeTextAlign(locale);
@@ -1234,8 +1237,9 @@ function WatchVideoCardComponent({
     if (!decision.invokeHandler) return;
     userPauseLatchRef.current = decision.nextUserPaused;
     setUserPaused(decision.nextUserPaused);
+    onUserPausedChange?.(decision.nextUserPaused);
     showFeedback(decision.pauseCommand ? "pause" : "play");
-  }, [feedShouldPlay, isActive, paneStatus, showFeedback]);
+  }, [feedShouldPlay, isActive, onUserPausedChange, paneStatus, showFeedback]);
 
   const showLikeAck = useCallback(() => {
     if (watchPrefersReducedMotion()) return;

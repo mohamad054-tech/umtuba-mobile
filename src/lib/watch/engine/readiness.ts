@@ -37,6 +37,19 @@ export function shouldStartWatchEnginePlayback(input: {
   );
 }
 
+/** Feed autoplay must not resume a latched user pause after readiness. */
+export function resolveWatchEngineWantsPlay(input: {
+  isCurrent: boolean;
+  screenFocused: boolean;
+  userPaused: boolean;
+}): boolean {
+  return (
+    input.isCurrent === true &&
+    input.screenFocused === true &&
+    input.userPaused !== true
+  );
+}
+
 export function shouldRecreateWatchEnginePlayer(input: {
   previousMediaId: string | null | undefined;
   nextMediaId: string;

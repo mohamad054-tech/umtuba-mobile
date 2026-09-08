@@ -4,6 +4,7 @@ import { watchEnginePlayerSource, watchEnginePlayerSourceEquals } from "./player
 import {
   resolveWatchEngineItemSource,
   resolveWatchEngineReadiness,
+  resolveWatchEngineWantsPlay,
   shouldRecreateWatchEnginePlayer,
   shouldStartWatchEnginePlayback,
   watchEngineItemSourceUri,
@@ -42,6 +43,34 @@ describe("resolveWatchEngineReadiness", () => {
         firstFrameReady: true,
       })
     ).toBe("ready-to-render");
+  });
+});
+
+describe("resolveWatchEngineWantsPlay", () => {
+  it("keeps a user pause even after readiness would allow play", () => {
+    const wantsPlay = resolveWatchEngineWantsPlay({
+      isCurrent: true,
+      screenFocused: true,
+      userPaused: true,
+    });
+    expect(wantsPlay).toBe(false);
+    expect(
+      shouldStartWatchEnginePlayback({
+        wantsPlay,
+        sourcePlayable: true,
+        surfaceAttached: true,
+      })
+    ).toBe(false);
+  });
+
+  it("resumes only after a second tap clears the latch", () => {
+    expect(
+      resolveWatchEngineWantsPlay({
+        isCurrent: true,
+        screenFocused: true,
+        userPaused: false,
+      })
+    ).toBe(true);
   });
 });
 
