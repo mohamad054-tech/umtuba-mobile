@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { resolveProgressRatio } from "@/src/lib/watch/playbackPolicy";
+import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 
 import {
   watchEnginePlayerSource,
@@ -128,7 +129,7 @@ export function WatchEnginePlayer({
       <VideoView
         player={player}
         style={styles.fill}
-        contentFit="cover"
+        contentFit={WATCH_VIDEO_CONTENT_FIT}
         nativeControls={false}
         allowsPictureInPicture={false}
         surfaceType="textureView"
