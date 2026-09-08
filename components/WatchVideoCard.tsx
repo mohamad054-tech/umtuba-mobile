@@ -1420,14 +1420,8 @@ function WatchVideoCardComponent({
           }}
           onPlayerStatus={onPlayerStatus}
         />
-      ) : (
-        <View
-          style={[
-            styles.placeholder,
-            externalPlayback ? styles.engineHole : null,
-          ]}
-          accessibilityElementsHidden
-        >
+      ) : externalPlayback ? null : (
+        <View style={styles.placeholder} accessibilityElementsHidden>
           {loadPlayer ? (
             <View style={styles.centerOverlay} pointerEvents="none">
               <ActivityIndicator

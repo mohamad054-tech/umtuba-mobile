@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   watchEnginePlayerSource,
+  watchEnginePlayerSourceEquals,
   watchEngineSrcSignature,
 } from "./playerSource";
 
@@ -22,6 +23,13 @@ describe("watchEnginePlayerSource", () => {
       uri: "https://cdn.example/watch/post-1.mp4",
       useCaching: true,
     });
+  });
+
+  it("considers two equal source objects interchangeable", () => {
+    const left = watchEnginePlayerSource("https://cdn.example/a.mp4");
+    const right = watchEnginePlayerSource("https://cdn.example/a.mp4");
+    expect(left).not.toBe(right);
+    expect(watchEnginePlayerSourceEquals(left, right)).toBe(true);
   });
 });
 

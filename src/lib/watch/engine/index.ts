@@ -30,9 +30,18 @@ export {
 } from "./identity";
 export {
   watchEnginePlayerSource,
+  watchEnginePlayerSourceEquals,
   watchEngineSrcSignature,
 } from "./playerSource";
 export type { WatchEnginePlayerSource } from "./playerSource";
+export {
+  resolveWatchEngineItemSource,
+  resolveWatchEngineReadiness,
+  shouldRecreateWatchEnginePlayer,
+  shouldStartWatchEnginePlayback,
+  watchEngineItemSourceUri,
+} from "./readiness";
+export type { WatchEngineReadiness } from "./readiness";
 export {
   planWatchEnginePlayerSlots,
   shouldMountWatchEnginePlayer,

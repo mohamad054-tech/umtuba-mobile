@@ -121,7 +121,6 @@ import {
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
-  resolveWatchHandoffReadiness,
   shouldHandoffWatchAdvance,
   shouldPrepareWatchPlayer,
   shouldWarmAndroidNextSurface,
@@ -147,7 +146,10 @@ import {
   resolveWatchStartupFeed,
 } from "@/src/lib/watch/watchOfflineManifest";
 import { watchMediaIdentity } from "@/src/lib/watch/watchCellBinding";
-import { resolveWatchEngineSource } from "@/src/lib/watch/engine";
+import {
+  resolveWatchEngineSource,
+  type WatchEngineReadiness,
+} from "@/src/lib/watch/engine";
 import {
   inspectLocalWatchPlaybackFile,
   isolatePrefetchFailureFromActiveCell,
@@ -302,6 +304,10 @@ export default function WatchScreen() {
     surfaceAttached: false,
     mediaId: null as string | null,
   });
+  const engineReadinessRef = useRef<{
+    mediaId: string | null;
+    readiness: WatchEngineReadiness;
+  }>({ mediaId: null, readiness: "blocked" });
   const handoffGenRef = useRef(0);
   const [warmNextSurface, setWarmNextSurface] = useState(false);
   const [warmedTargetIndex, setWarmedTargetIndex] = useState<number | null>(
@@ -1566,10 +1572,7 @@ export default function WatchScreen() {
     );
     markWatchTransition(Platform.OS, "next_source_activation", {
       index: nextIndex,
-      readiness: resolveWatchHandoffReadiness({
-        nextReady: nextHandoffRef.current.ready,
-        nextFirstFrame: nextHandoffRef.current.firstFrame,
-      }),
+      readiness: engineReadinessRef.current.readiness,
     });
 
     engineHostRef.current?.snapToIndex(nextIndex);
@@ -1925,6 +1928,16 @@ export default function WatchScreen() {
           screenFocused={screenFocused}
           listScrollEnabled={listScrollEnabled}
           onActiveEnded={onActiveEnded}
+          onReadiness={({ mediaId, readiness }) => {
+            engineReadinessRef.current = { mediaId, readiness };
+            if (readiness === "ready-buffered") {
+              markWatchTransition(Platform.OS, "surface_attached", {
+                readiness,
+              });
+            } else if (readiness === "ready-to-render") {
+              markWatchTransition(Platform.OS, "first_frame", { readiness });
+            }
+          }}
           listFooter={listFooter}
           extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
           renderChrome={({ item, index, timeline }) =>

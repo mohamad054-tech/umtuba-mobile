@@ -16,6 +16,15 @@ export function watchEnginePlayerSource(
   };
 }
 
+export function watchEnginePlayerSourceEquals(
+  left: WatchEnginePlayerSource | null | undefined,
+  right: WatchEnginePlayerSource | null | undefined
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.uri === right.uri && left.useCaching === right.useCaching;
+}
+
 export function watchEngineSrcSignature(
   videos: readonly { id: string; src?: string | null }[]
 ): string {

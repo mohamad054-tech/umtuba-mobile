@@ -103,4 +103,30 @@ describe("WatchPlaybackController", () => {
     expect(plan.backwardCache).not.toContain("post-1");
     expect(settled.state.settledIndex).toBe(14);
   });
+
+  it("binds a playable source then surface before first frame", () => {
+    const controller = createWatchPlaybackController(IDS);
+    const unresolved = controller.resolveCurrentSource({
+      remoteUrl: "",
+    });
+    expect(unresolved.kind).toBe("unresolved");
+    controller.applyResolvedSource(unresolved);
+    expect(controller.getState().playbackSource).toBeNull();
+
+    const resolved = controller.resolveCurrentSource({
+      remoteUrl: "https://cdn.example/post-1.mp4",
+    });
+    expect(resolved.kind).toBe("remote");
+    controller.applyResolvedSource(resolved);
+    expect(controller.getState().playbackSource?.uri).toBe(
+      "https://cdn.example/post-1.mp4"
+    );
+    expect(controller.getState().surfaceReady).toBe(false);
+    expect(controller.getState().firstFrameReady).toBe(false);
+
+    controller.markSurfaceReady("post-1");
+    expect(controller.getState().surfaceReady).toBe(true);
+    controller.markFirstFrame("post-1");
+    expect(controller.getState().firstFrameReady).toBe(true);
+  });
 });

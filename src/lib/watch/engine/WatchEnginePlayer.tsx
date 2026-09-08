@@ -1,11 +1,15 @@
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { resolveProgressRatio } from "@/src/lib/watch/playbackPolicy";
 
-import { watchEnginePlayerSource } from "./playerSource";
+import {
+  watchEnginePlayerSource,
+  watchEnginePlayerSourceEquals,
+} from "./playerSource";
+import { shouldStartWatchEnginePlayback } from "./readiness";
 
 const TIME_UPDATE_INTERVAL_SEC = 0.25;
 
@@ -22,6 +26,7 @@ export type WatchEnginePlayerProps = {
   audible: boolean;
   muted: boolean;
   volume: number;
+  onSurfaceReady?: (mediaId: string) => void;
   onFirstFrame?: (mediaId: string) => void;
   onEnded?: (mediaId: string) => void;
   onError?: (mediaId: string, message: string) => void;
@@ -35,12 +40,22 @@ export function WatchEnginePlayer({
   audible,
   muted,
   volume,
+  onSurfaceReady,
   onFirstFrame,
   onEnded,
   onError,
   onTimeline,
 }: WatchEnginePlayerProps) {
-  const playerSource = useMemo(() => watchEnginePlayerSource(src), [src]);
+  const [surfaceAttached, setSurfaceAttached] = useState(false);
+  const sourceRef = useRef(watchEnginePlayerSource(src));
+  const playerSource = useMemo(() => {
+    const next = watchEnginePlayerSource(src);
+    if (watchEnginePlayerSourceEquals(sourceRef.current, next)) {
+      return sourceRef.current;
+    }
+    sourceRef.current = next;
+    return next;
+  }, [src]);
   const player = useVideoPlayer(playerSource, (instance) => {
     instance.loop = false;
     instance.muted = true;
@@ -52,18 +67,24 @@ export function WatchEnginePlayer({
     instance.timeUpdateEventInterval = TIME_UPDATE_INTERVAL_SEC;
   });
 
+  const sourcePlayable = playerSource.uri.length > 0;
+  const canPlay = shouldStartWatchEnginePlayback({
+    wantsPlay: shouldPlay,
+    sourcePlayable,
+    surfaceAttached,
+  });
+
   useEffect(() => {
     player.muted = !audible || muted;
     player.volume = audible && !muted ? volume : 0;
-    if (shouldPlay) {
+    if (canPlay) {
       player.play();
     } else {
       player.pause();
     }
-  }, [audible, muted, player, shouldPlay, volume]);
+  }, [audible, canPlay, muted, player, volume]);
 
   useEventListener(player, "statusChange", ({ status, error }) => {
-    if (status === "readyToPlay") onFirstFrame?.(mediaId);
     if (status === "error") {
       onError?.(
         mediaId,
@@ -95,6 +116,13 @@ export function WatchEnginePlayer({
     onEnded?.(mediaId);
   });
 
+  const bindVisibleSurface = (readyMediaId: string) => {
+    if (!surfaceAttached) {
+      setSurfaceAttached(true);
+    }
+    onSurfaceReady?.(readyMediaId);
+  };
+
   return (
     <View style={styles.fill} pointerEvents="none" collapsable={false}>
       <VideoView
@@ -102,6 +130,18 @@ export function WatchEnginePlayer({
         style={styles.fill}
         contentFit="cover"
         nativeControls={false}
+        allowsPictureInPicture={false}
+        surfaceType="textureView"
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          if (width > 0 && height > 0) {
+            bindVisibleSurface(mediaId);
+          }
+        }}
+        onFirstFrameRender={() => {
+          bindVisibleSurface(mediaId);
+          onFirstFrame?.(mediaId);
+        }}
       />
     </View>
   );

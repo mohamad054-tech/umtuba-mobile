@@ -19,6 +19,10 @@ import {
   createWatchEngineStartupMarks,
   markWatchEngineStartup,
 } from "./startup";
+import {
+  resolveWatchEngineReadiness,
+  shouldStartWatchEnginePlayback,
+} from "./readiness";
 import { resolveWatchEngineVisualLayer } from "./visual";
 
 const HEIGHT = 2000;
@@ -241,6 +245,37 @@ describe("watch engine local gate", () => {
       5
     );
     expect(marks.usableMs).toBe(5);
+  });
+
+  it("does not play and stays blocked until the active surface is bound", () => {
+    expect(
+      shouldStartWatchEnginePlayback({
+        wantsPlay: true,
+        sourcePlayable: true,
+        surfaceAttached: false,
+      })
+    ).toBe(false);
+    expect(
+      resolveWatchEngineReadiness({
+        sourcePlayable: true,
+        surfaceAttached: false,
+        firstFrameReady: false,
+      })
+    ).toBe("blocked");
+    expect(
+      resolveWatchEngineReadiness({
+        sourcePlayable: true,
+        surfaceAttached: true,
+        firstFrameReady: false,
+      })
+    ).toBe("ready-buffered");
+    expect(
+      resolveWatchEngineReadiness({
+        sourcePlayable: true,
+        surfaceAttached: true,
+        firstFrameReady: true,
+      })
+    ).toBe("ready-to-render");
   });
 
   it("never mounts more than three players", () => {

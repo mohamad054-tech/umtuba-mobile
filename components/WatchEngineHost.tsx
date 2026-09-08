@@ -17,16 +17,20 @@ import {
 } from "react-native";
 
 import type { WatchVideo } from "@/src/contracts/watch";
-import { isPlayableWatchSrc } from "@/src/lib/feed/videoStoragePath";
 import {
   createWatchPlaybackController,
   planWatchEnginePlayerSlots,
+  resolveWatchEngineItemSource,
+  resolveWatchEngineReadiness,
   shouldMountWatchEnginePlayer,
+  shouldRecreateWatchEnginePlayer,
   shouldRequestWatchEngineFeedTail,
+  watchEngineItemSourceUri,
   watchEngineMediaId,
   watchEngineOffsetForIndex,
   watchEngineSrcSignature,
   WatchEnginePlayer,
+  type WatchEngineReadiness,
   type WatchEngineTimeline,
 } from "@/src/lib/watch/engine";
 import { colors } from "@/src/theme/colors";
@@ -50,6 +54,10 @@ export type WatchEngineHostProps = {
   screenFocused: boolean;
   listScrollEnabled: boolean;
   onActiveEnded: () => void;
+  onReadiness?: (input: {
+    mediaId: string;
+    readiness: WatchEngineReadiness;
+  }) => void;
   listFooter?: ReactNode;
   extraData?: string;
   renderChrome: (input: {
@@ -79,6 +87,7 @@ export const WatchEngineHost = forwardRef<
     screenFocused,
     listScrollEnabled,
     onActiveEnded,
+    onReadiness,
     listFooter,
     extraData,
     renderChrome,
@@ -96,9 +105,15 @@ export const WatchEngineHost = forwardRef<
   const [firstFrameById, setFirstFrameById] = useState<Record<string, boolean>>(
     {}
   );
+  const [surfaceReadyById, setSurfaceReadyById] = useState<
+    Record<string, boolean>
+  >({});
   const [timelineById, setTimelineById] = useState<
     Record<string, WatchEngineTimeline>
   >({});
+  const playerIdentityRef = useRef<{ mediaId: string; src: string } | null>(
+    null
+  );
 
   itemHeightRef.current = itemHeight;
   settledRef.current = settledIndex;
@@ -110,7 +125,16 @@ export const WatchEngineHost = forwardRef<
 
   useEffect(() => {
     engineRef.current.setMediaIds(mediaIds);
-  }, [mediaIds]);
+    const current = videos[settledIndex];
+    if (!current) return;
+    const mediaId = watchEngineMediaId(current);
+    engineRef.current.applyResolvedSource(
+      resolveWatchEngineItemSource({
+        mediaId,
+        src: current.src,
+      })
+    );
+  }, [mediaIds, settledIndex, videos]);
 
   const snapOnce = useCallback((index: number) => {
     const offset = watchEngineOffsetForIndex(index, itemHeightRef.current);
@@ -177,11 +201,45 @@ export const WatchEngineHost = forwardRef<
     [applyEngineState]
   );
 
-  const slots = planWatchEnginePlayerSlots({
-    settledIndex,
-    itemCount: videos.length,
-    direction: engineRef.current.getState().direction,
-  });
+  const slots = useMemo(
+    () =>
+      planWatchEnginePlayerSlots({
+        settledIndex,
+        itemCount: videos.length,
+        direction: engineRef.current.getState().direction,
+      }),
+    [settledIndex, videos.length]
+  );
+
+  const emitReadiness = useCallback(
+    (
+      mediaId: string,
+      flags: {
+        sourcePlayable: boolean;
+        surfaceAttached: boolean;
+        firstFrameReady: boolean;
+      }
+    ) => {
+      onReadiness?.({
+        mediaId,
+        readiness: resolveWatchEngineReadiness(flags),
+      });
+    },
+    [onReadiness]
+  );
+
+  useEffect(() => {
+    const current = videos[settledIndex];
+    if (!current) return;
+    const mediaId = watchEngineMediaId(current);
+    const playable =
+      watchEngineItemSourceUri({ mediaId, src: current.src }) != null;
+    emitReadiness(mediaId, {
+      sourcePlayable: playable,
+      surfaceAttached: Boolean(surfaceReadyById[mediaId]),
+      firstFrameReady: Boolean(firstFrameById[mediaId]),
+    });
+  }, [emitReadiness, firstFrameById, settledIndex, surfaceReadyById, videos]);
 
   useEffect(() => {
     if (
@@ -201,24 +259,58 @@ export const WatchEngineHost = forwardRef<
       const mediaId = watchEngineMediaId(item);
       const mount = shouldMountWatchEnginePlayer({ index, slots });
       const isCurrent = index === slots.current;
-      const playable = isPlayableWatchSrc(item.src);
+      const resolvedSrc = watchEngineItemSourceUri({
+        mediaId,
+        src: item.src,
+      });
+      const playable = resolvedSrc != null;
+      const previousIdentity = playerIdentityRef.current;
+      const recreate =
+        isCurrent &&
+        playable &&
+        shouldRecreateWatchEnginePlayer({
+          previousMediaId: previousIdentity?.mediaId,
+          nextMediaId: mediaId,
+          previousSrc: previousIdentity?.src,
+          nextSrc: resolvedSrc ?? "",
+        });
+      if (isCurrent && playable && resolvedSrc && (recreate || !previousIdentity)) {
+        playerIdentityRef.current = { mediaId, src: resolvedSrc };
+      }
       const audible = audioOwner === mediaId && isCurrent;
       return (
         <View style={{ height: itemHeight, backgroundColor: "#000" }}>
-          {mount && playable ? (
+          {mount && playable && resolvedSrc ? (
             <WatchEnginePlayer
-              key={`${mediaId}:${item.src}`}
-              src={item.src}
+              key={mediaId}
+              src={resolvedSrc}
               mediaId={mediaId}
               shouldPlay={isCurrent && screenFocused}
               audible={audible}
               muted={muted}
               volume={volume}
+              onSurfaceReady={(id) => {
+                engineRef.current.markSurfaceReady(id);
+                setSurfaceReadyById((prev) =>
+                  prev[id] ? prev : { ...prev, [id]: true }
+                );
+                emitReadiness(id, {
+                  sourcePlayable: true,
+                  surfaceAttached: true,
+                  firstFrameReady: Boolean(firstFrameById[id]),
+                });
+                applyEngineState();
+              }}
               onFirstFrame={(id) => {
                 engineRef.current.markFirstFrame(id);
                 setFirstFrameById((prev) =>
                   prev[id] ? prev : { ...prev, [id]: true }
                 );
+                emitReadiness(id, {
+                  sourcePlayable: true,
+                  surfaceAttached: true,
+                  firstFrameReady: true,
+                });
                 applyEngineState();
               }}
               onTimeline={(id, next) => {
@@ -256,6 +348,8 @@ export const WatchEngineHost = forwardRef<
       muted,
       onActiveEnded,
       renderChrome,
+      emitReadiness,
+      firstFrameById,
       screenFocused,
       slots,
       timelineById,

@@ -47,7 +47,7 @@
   "device_evidence": {
     "device": "RFCX718LVHK / SM-F956B",
     "date": "2026-09-08",
-    "notes": "EAS cb9667fc on 17a9cd3 installed. Fold6 smoke FAIL: black surface + 0:00/0:00. Opaque WatchVideoCard cell covered engine VideoView; WatchEnginePlayer rebuilt ExoPlayer every render."
+    "notes": "EAS cb9667fc on 17a9cd3 installed. Fold6 smoke FAIL: black surface + 0:00/0:00. 0216595 fixed opaque chrome and source-object churn. Local follow-up binds TextureView, gates play until the surface is attached, and reports engine readiness instead of stale handoff blocked. Not Fold6 PASS."
   },
-  "notes": "First EAS used. Second EAS justified only after this integration fix. Do not resurrect old handoff machines. Do not touch UM Streak."
+  "notes": "First EAS used. Do not start second EAS until Fold6 proves surface bind + readiness. Do not resurrect old handoff machines. Do not touch UM Streak."
 }
