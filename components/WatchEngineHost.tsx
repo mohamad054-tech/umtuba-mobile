@@ -25,7 +25,9 @@ import {
   shouldRequestWatchEngineFeedTail,
   watchEngineMediaId,
   watchEngineOffsetForIndex,
+  watchEngineSrcSignature,
   WatchEnginePlayer,
+  type WatchEngineTimeline,
 } from "@/src/lib/watch/engine";
 import { colors } from "@/src/theme/colors";
 
@@ -54,6 +56,7 @@ export type WatchEngineHostProps = {
     item: WatchVideo;
     index: number;
     isActive: boolean;
+    timeline: WatchEngineTimeline | null;
   }) => ReactNode;
 };
 
@@ -93,6 +96,9 @@ export const WatchEngineHost = forwardRef<
   const [firstFrameById, setFirstFrameById] = useState<Record<string, boolean>>(
     {}
   );
+  const [timelineById, setTimelineById] = useState<
+    Record<string, WatchEngineTimeline>
+  >({});
 
   itemHeightRef.current = itemHeight;
   settledRef.current = settledIndex;
@@ -196,12 +202,12 @@ export const WatchEngineHost = forwardRef<
       const mount = shouldMountWatchEnginePlayer({ index, slots });
       const isCurrent = index === slots.current;
       const playable = isPlayableWatchSrc(item.src);
-      const firstFrame = firstFrameById[mediaId] === true;
       const audible = audioOwner === mediaId && isCurrent;
       return (
         <View style={{ height: itemHeight, backgroundColor: "#000" }}>
           {mount && playable ? (
             <WatchEnginePlayer
+              key={`${mediaId}:${item.src}`}
               src={item.src}
               mediaId={mediaId}
               shouldPlay={isCurrent && screenFocused}
@@ -215,34 +221,44 @@ export const WatchEngineHost = forwardRef<
                 );
                 applyEngineState();
               }}
+              onTimeline={(id, next) => {
+                if (!isCurrent) return;
+                setTimelineById((prev) => {
+                  const current = prev[id];
+                  if (
+                    current &&
+                    current.duration === next.duration &&
+                    Math.abs(current.currentTime - next.currentTime) < 0.2
+                  ) {
+                    return prev;
+                  }
+                  return { ...prev, [id]: next };
+                });
+              }}
               onEnded={() => {
                 if (isCurrent) onActiveEnded();
               }}
             />
           ) : null}
-          {isCurrent && !firstFrame ? (
-            <View
-              pointerEvents="none"
-              style={{
-                ...{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
-                backgroundColor: "#000",
-              }}
-            />
-          ) : null}
-          {renderChrome({ item, index, isActive: isCurrent })}
+          {renderChrome({
+            item,
+            index,
+            isActive: isCurrent,
+            timeline: timelineById[mediaId] ?? null,
+          })}
         </View>
       );
     },
     [
       applyEngineState,
       audioOwner,
-      firstFrameById,
       itemHeight,
       muted,
       onActiveEnded,
       renderChrome,
       screenFocused,
       slots,
+      timelineById,
       volume,
     ]
   );
@@ -270,7 +286,7 @@ export const WatchEngineHost = forwardRef<
       scrollEventThrottle={16}
       onEndReached={onRequestMore}
       onEndReachedThreshold={0.6}
-      extraData={extraData}
+      extraData={`${extraData ?? ""}:${watchEngineSrcSignature(videos)}:${Object.keys(firstFrameById).length}`}
       windowSize={5}
       maxToRenderPerBatch={3}
       initialNumToRender={2}

@@ -29,6 +29,11 @@ export {
   watchEngineMediaId,
 } from "./identity";
 export {
+  watchEnginePlayerSource,
+  watchEngineSrcSignature,
+} from "./playerSource";
+export type { WatchEnginePlayerSource } from "./playerSource";
+export {
   planWatchEnginePlayerSlots,
   shouldMountWatchEnginePlayer,
   WATCH_ENGINE_MAX_PLAYERS,
@@ -47,7 +52,10 @@ export {
   watchEngineStartupDurations,
 } from "./startup";
 export { WatchEnginePlayer } from "./WatchEnginePlayer";
-export type { WatchEnginePlayerProps } from "./WatchEnginePlayer";
+export type {
+  WatchEnginePlayerProps,
+  WatchEngineTimeline,
+} from "./WatchEnginePlayer";
 export type {
   WatchEngineCachePlan,
   WatchEngineDirection,

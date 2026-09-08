@@ -1609,12 +1609,21 @@ export default function WatchScreen() {
   const keyExtractor = useCallback((item: WatchVideo) => watchItemKey(item), []);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: WatchVideo; index: number }) => (
+    ({
+      item,
+      index,
+      externalTimeline,
+    }: {
+      item: WatchVideo;
+      index: number;
+      externalTimeline?: { currentTime: number; duration: number; ratio: number } | null;
+    }) => (
       <WatchVideoCard
         video={item}
         listIndex={index}
         isActive={index === activeIndex}
         externalPlayback
+        externalTimeline={externalTimeline ?? null}
         shouldLoadPlayer={false}
         shouldPreparePlayer={false}
         isNextItem={index === activeIndex + 1}
@@ -1918,7 +1927,9 @@ export default function WatchScreen() {
           onActiveEnded={onActiveEnded}
           listFooter={listFooter}
           extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
-          renderChrome={({ item, index }) => renderItem({ item, index })}
+          renderChrome={({ item, index, timeline }) =>
+            renderItem({ item, index, externalTimeline: timeline })
+          }
         />
       </View>
       <View

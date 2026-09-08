@@ -139,6 +139,12 @@ const PLAY_PAUSE_FEEDBACK_MS = 700;
 const TIME_UPDATE_INTERVAL_SEC = 0.25;
 const SCRUB_CATCHUP_EPSILON = 0.02;
 
+type TimelineState = {
+  currentTime: number;
+  duration: number;
+  ratio: number;
+};
+
 export type WatchVideoCardProps = {
   video: WatchVideo;
   listIndex?: number;
@@ -203,12 +209,8 @@ export type WatchVideoCardProps = {
   bottomInset?: number;
   /** Engine owns the VideoView. Card chrome stays; video pane is a hole. */
   externalPlayback?: boolean;
-};
-
-type TimelineState = {
-  currentTime: number;
-  duration: number;
-  ratio: number;
+  /** Engine timeline. Card clock must not stay 0:00 when the player is live. */
+  externalTimeline?: TimelineState | null;
 };
 
 type PlayerPaneProps = {
@@ -966,6 +968,7 @@ function WatchVideoCardComponent({
   topInset = 0,
   bottomInset = 0,
   externalPlayback = false,
+  externalTimeline = null,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
   const captionAlign = localeTextAlign(locale);
@@ -1006,6 +1009,25 @@ function WatchVideoCardComponent({
     duration: 0,
     ratio: 0,
   });
+  const chromeTimeline = useMemo(() => {
+    if (!externalPlayback) return timeline;
+    if (externalTimeline && externalTimeline.duration > 0) {
+      return externalTimeline;
+    }
+    const publishedSec =
+      typeof video.durationMs === "number" && video.durationMs > 0
+        ? video.durationMs / 1000
+        : 0;
+    const currentTime = externalTimeline?.currentTime ?? 0;
+    if (publishedSec > 0) {
+      return {
+        currentTime,
+        duration: publishedSec,
+        ratio: resolveProgressRatio(currentTime, publishedSec),
+      };
+    }
+    return externalTimeline ?? timeline;
+  }, [externalPlayback, externalTimeline, timeline, video.durationMs]);
   const [seekRequest, setSeekRequest] = useState<{
     token: number;
     ratio: number;
@@ -1138,6 +1160,14 @@ function WatchVideoCardComponent({
   onHandoffStateRef.current = onHandoffState;
   const onRemainingMsRef = useRef(onRemainingMs);
   onRemainingMsRef.current = onRemainingMs;
+
+  useEffect(() => {
+    if (!externalPlayback || !isActive) return;
+    if (!(chromeTimeline.duration > 0)) return;
+    onRemainingMsRef.current?.(
+      Math.max(0, (chromeTimeline.duration - chromeTimeline.currentTime) * 1000)
+    );
+  }, [chromeTimeline, externalPlayback, isActive]);
 
   useEffect(() => {
     firstFrameRef.current = false;
@@ -1343,7 +1373,8 @@ function WatchVideoCardComponent({
 
   return (
     <View
-      style={[styles.cell, style]}
+      style={[styles.cell, externalPlayback ? styles.engineChrome : null, style]}
+      pointerEvents={externalPlayback ? "box-none" : "auto"}
       accessibilityLabel={a11ySummary}
       accessibilityRole="text"
       onLayout={(event) => {
@@ -1435,7 +1466,7 @@ function WatchVideoCardComponent({
       ) : null}
 
       <View
-        style={styles.overlay}
+        style={[styles.overlay, externalPlayback ? styles.engineOverlay : null]}
         pointerEvents={paneStatus === "error" ? "none" : "box-none"}
       >
         {shouldMountWatchVideoTapLayer({ paneStatus }) ? (
@@ -1757,15 +1788,15 @@ function WatchVideoCardComponent({
             ]}
           >
             <Text style={styles.timeText}>
-              {formatPlaybackClock(timeline.currentTime)}
+              {formatPlaybackClock(chromeTimeline.currentTime)}
             </Text>
             <Text style={styles.timeText}>
-              {formatPlaybackClock(timeline.duration)}
+              {formatPlaybackClock(chromeTimeline.duration)}
             </Text>
           </View>
-          {shouldExposeWatchScrub(timeline.duration) ? (
+          {shouldExposeWatchScrub(chromeTimeline.duration) && !externalPlayback ? (
             <ScrubBar
-              ratio={isActive ? timeline.ratio : 0}
+              ratio={isActive ? chromeTimeline.ratio : 0}
               accessibilityLabel={t("watch.seek")}
               onSeekRatio={onSeekRatio}
               onGestureActiveChange={onScrubActive}
@@ -1880,6 +1911,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     flexGrow: 0,
     flexShrink: 0,
+  },
+  engineChrome: {
+    backgroundColor: "transparent",
+  },
+  engineOverlay: {
+    elevation: 0,
   },
   playerWrap: {
     ...StyleSheet.absoluteFill,
