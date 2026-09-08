@@ -11,6 +11,10 @@ import {
   watchEnginePlayerSourceEquals,
 } from "./playerSource";
 import { shouldStartWatchEnginePlayback } from "./readiness";
+import {
+  resolveWatchEngineSeekSeconds,
+  type WatchEngineSeekCommand,
+} from "./seek";
 
 const TIME_UPDATE_INTERVAL_SEC = 0.25;
 
@@ -32,6 +36,7 @@ export type WatchEnginePlayerProps = {
   onEnded?: (mediaId: string) => void;
   onError?: (mediaId: string, message: string) => void;
   onTimeline?: (mediaId: string, timeline: WatchEngineTimeline) => void;
+  seekRequest?: WatchEngineSeekCommand | null;
 };
 
 export function WatchEnginePlayer({
@@ -46,8 +51,10 @@ export function WatchEnginePlayer({
   onEnded,
   onError,
   onTimeline,
+  seekRequest = null,
 }: WatchEnginePlayerProps) {
   const [surfaceAttached, setSurfaceAttached] = useState(false);
+  const lastSeekTokenRef = useRef<number | null>(null);
   const sourceRef = useRef(watchEnginePlayerSource(src));
   const playerSource = useMemo(() => {
     const next = watchEnginePlayerSource(src);
@@ -84,6 +91,27 @@ export function WatchEnginePlayer({
       player.pause();
     }
   }, [audible, canPlay, muted, player, volume]);
+
+  useEffect(() => {
+    if (!seekRequest) return;
+    if (lastSeekTokenRef.current === seekRequest.token) return;
+    const duration =
+      typeof player.duration === "number" && Number.isFinite(player.duration)
+        ? player.duration
+        : 0;
+    const seconds = resolveWatchEngineSeekSeconds({
+      ratio: seekRequest.ratio,
+      duration,
+    });
+    if (seconds == null) return;
+    lastSeekTokenRef.current = seekRequest.token;
+    player.currentTime = seconds;
+    if (canPlay) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [canPlay, player, seekRequest]);
 
   useEventListener(player, "statusChange", ({ status, error }) => {
     if (status === "error") {

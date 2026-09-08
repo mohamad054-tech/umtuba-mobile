@@ -89,6 +89,50 @@ export function shouldTreatWatchPointerAsSwipe(input: {
   return Number.isFinite(input.movedPx) && Math.abs(input.movedPx) >= threshold;
 }
 
+/** Full-screen tap layer must not steal a vertical page drag. */
+export function shouldWatchTapLayerYieldVertical(input: {
+  dx: number;
+  dy: number;
+  thresholdPx?: number;
+}): boolean {
+  const threshold =
+    typeof input.thresholdPx === "number" && input.thresholdPx > 0
+      ? input.thresholdPx
+      : WATCH_SWIPE_MOVE_THRESHOLD_PX;
+  if (!Number.isFinite(input.dx) || !Number.isFinite(input.dy)) return false;
+  return (
+    Math.abs(input.dy) >= threshold &&
+    Math.abs(input.dy) >= Math.abs(input.dx)
+  );
+}
+
+export function shouldDispatchWatchTapAfterTouch(input: {
+  dx: number;
+  dy: number;
+  yieldedVertical?: boolean;
+}): boolean {
+  if (input.yieldedVertical === true) return false;
+  const moved = Math.hypot(input.dx, input.dy);
+  return !shouldTreatWatchPointerAsSwipe({ movedPx: moved });
+}
+
+/** Scrub claims horizontal travel; vertical paging stays with the list. */
+export function shouldWatchScrubClaimGesture(input: {
+  dx: number;
+  dy: number;
+  thresholdPx?: number;
+}): boolean {
+  const threshold =
+    typeof input.thresholdPx === "number" && input.thresholdPx > 0
+      ? input.thresholdPx
+      : WATCH_SWIPE_MOVE_THRESHOLD_PX;
+  if (!Number.isFinite(input.dx) || !Number.isFinite(input.dy)) return false;
+  return (
+    Math.abs(input.dx) >= threshold &&
+    Math.abs(input.dx) > Math.abs(input.dy)
+  );
+}
+
 export function shouldMountWatchVideoTapLayer(input: {
   paneStatus: "idle" | "loading" | "ready" | "error";
 }): boolean {

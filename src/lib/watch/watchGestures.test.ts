@@ -5,10 +5,13 @@ import {
   WATCH_DOUBLE_TAP_WINDOW_MS,
   createWatchTapClassifier,
   resolveWatchTapAction,
+  shouldDispatchWatchTapAfterTouch,
   shouldDispatchWatchVideoTap,
   shouldEnableWatchPullToRefresh,
   shouldMountWatchVideoTapLayer,
   shouldTreatWatchPointerAsSwipe,
+  shouldWatchScrubClaimGesture,
+  shouldWatchTapLayerYieldVertical,
   type WatchGestureSurface,
 } from "./watchGestures";
 
@@ -125,6 +128,28 @@ describe("tap vs swipe", () => {
     expect(shouldTreatWatchPointerAsSwipe({ movedPx: 3 })).toBe(false);
     expect(shouldTreatWatchPointerAsSwipe({ movedPx: 8 })).toBe(true);
     expect(shouldTreatWatchPointerAsSwipe({ movedPx: -12 })).toBe(true);
+  });
+
+  it("yields the tap layer as soon as the move is vertical", () => {
+    expect(shouldWatchTapLayerYieldVertical({ dx: 0, dy: 0 })).toBe(false);
+    expect(shouldWatchTapLayerYieldVertical({ dx: 4, dy: 4 })).toBe(false);
+    expect(shouldWatchTapLayerYieldVertical({ dx: 2, dy: 12 })).toBe(true);
+    expect(shouldWatchTapLayerYieldVertical({ dx: 20, dy: 4 })).toBe(false);
+  });
+
+  it("does not fire tap after a yielded vertical drag", () => {
+    expect(
+      shouldDispatchWatchTapAfterTouch({ dx: 0, dy: 2, yieldedVertical: false })
+    ).toBe(true);
+    expect(
+      shouldDispatchWatchTapAfterTouch({ dx: 0, dy: 16, yieldedVertical: true })
+    ).toBe(false);
+  });
+
+  it("lets the scrub bar claim horizontal travel only", () => {
+    expect(shouldWatchScrubClaimGesture({ dx: 12, dy: 2 })).toBe(true);
+    expect(shouldWatchScrubClaimGesture({ dx: 2, dy: 16 })).toBe(false);
+    expect(shouldWatchScrubClaimGesture({ dx: 3, dy: 1 })).toBe(false);
   });
 });
 

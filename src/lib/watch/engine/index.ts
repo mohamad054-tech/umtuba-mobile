@@ -42,6 +42,18 @@ export {
   shouldStartWatchEnginePlayback,
   watchEngineItemSourceUri,
 } from "./readiness";
+export {
+  resolveWatchEnginePlayAfterSeek,
+  resolveWatchEngineSeekSeconds,
+  shouldRecreateWatchEnginePlayerOnSeek,
+  watchEngineSeekKeepsIdentity,
+} from "./seek";
+export type { WatchEngineSeekCommand } from "./seek";
+export {
+  createWatchEngineTimelineStore,
+  shouldRebuildWatchEngineRenderItemOnTimelineTick,
+} from "./timelineStore";
+export type { WatchEngineTimelineStore } from "./timelineStore";
 export type { WatchEngineReadiness } from "./readiness";
 export {
   planWatchEnginePlayerSlots,

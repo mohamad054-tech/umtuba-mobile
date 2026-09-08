@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -31,8 +32,11 @@ import {
   watchEngineOffsetForIndex,
   watchEngineSrcSignature,
   WatchEnginePlayer,
+  createWatchEngineTimelineStore,
   type WatchEngineReadiness,
+  type WatchEngineSeekCommand,
   type WatchEngineTimeline,
+  type WatchEngineTimelineStore,
 } from "@/src/lib/watch/engine";
 import { colors } from "@/src/theme/colors";
 
@@ -67,8 +71,46 @@ export type WatchEngineHostProps = {
     isActive: boolean;
     timeline: WatchEngineTimeline | null;
     onUserPausedChange?: (paused: boolean) => void;
+    onSeekRatio?: (ratio: number) => void;
   }) => ReactNode;
 };
+
+function WatchEngineChromeBridge({
+  mediaId,
+  store,
+  item,
+  index,
+  isActive,
+  onUserPausedChange,
+  onSeekRatio,
+  renderChrome,
+}: {
+  mediaId: string;
+  store: WatchEngineTimelineStore;
+  item: WatchVideo;
+  index: number;
+  isActive: boolean;
+  onUserPausedChange?: (paused: boolean) => void;
+  onSeekRatio?: (ratio: number) => void;
+  renderChrome: WatchEngineHostProps["renderChrome"];
+}) {
+  const timeline = useSyncExternalStore(
+    (onStoreChange) => store.subscribe(mediaId, onStoreChange),
+    () => store.get(mediaId)
+  );
+  return (
+    <>
+      {renderChrome({
+        item,
+        index,
+        isActive,
+        timeline,
+        onUserPausedChange,
+        onSeekRatio,
+      })}
+    </>
+  );
+}
 
 export const WatchEngineHost = forwardRef<
   WatchEngineHostHandle,
@@ -110,9 +152,11 @@ export const WatchEngineHost = forwardRef<
   const [surfaceReadyById, setSurfaceReadyById] = useState<
     Record<string, boolean>
   >({});
-  const [timelineById, setTimelineById] = useState<
-    Record<string, WatchEngineTimeline>
-  >({});
+  const timelineStoreRef = useRef(createWatchEngineTimelineStore());
+  const seekTokenRef = useRef(0);
+  const [seekRequest, setSeekRequest] = useState<
+    (WatchEngineSeekCommand & { mediaId: string }) | null
+  >(null);
   const playerIdentityRef = useRef<{ mediaId: string; src: string } | null>(
     null
   );
@@ -120,7 +164,19 @@ export const WatchEngineHost = forwardRef<
 
   useEffect(() => {
     setUserPaused(false);
+    setSeekRequest(null);
   }, [settledIndex]);
+
+  const onSeekRatio = useCallback((ratio: number) => {
+    const current = videos[settledRef.current];
+    if (!current) return;
+    seekTokenRef.current += 1;
+    setSeekRequest({
+      mediaId: watchEngineMediaId(current),
+      token: seekTokenRef.current,
+      ratio,
+    });
+  }, [videos]);
 
   itemHeightRef.current = itemHeight;
   settledRef.current = settledIndex;
@@ -301,6 +357,11 @@ export const WatchEngineHost = forwardRef<
               audible={audible}
               muted={muted}
               volume={volume}
+              seekRequest={
+                isCurrent && seekRequest?.mediaId === mediaId
+                  ? seekRequest
+                  : null
+              }
               onSurfaceReady={(id) => {
                 engineRef.current.markSurfaceReady(id);
                 setSurfaceReadyById((prev) =>
@@ -327,30 +388,23 @@ export const WatchEngineHost = forwardRef<
               }}
               onTimeline={(id, next) => {
                 if (!isCurrent) return;
-                setTimelineById((prev) => {
-                  const current = prev[id];
-                  if (
-                    current &&
-                    current.duration === next.duration &&
-                    Math.abs(current.currentTime - next.currentTime) < 0.2
-                  ) {
-                    return prev;
-                  }
-                  return { ...prev, [id]: next };
-                });
+                timelineStoreRef.current.set(id, next);
               }}
               onEnded={() => {
                 if (isCurrent) onActiveEnded();
               }}
             />
           ) : null}
-          {renderChrome({
-            item,
-            index,
-            isActive: isCurrent,
-            timeline: timelineById[mediaId] ?? null,
-            onUserPausedChange: isCurrent ? setUserPaused : undefined,
-          })}
+          <WatchEngineChromeBridge
+            mediaId={mediaId}
+            store={timelineStoreRef.current}
+            item={item}
+            index={index}
+            isActive={isCurrent}
+            onUserPausedChange={isCurrent ? setUserPaused : undefined}
+            onSeekRatio={isCurrent ? onSeekRatio : undefined}
+            renderChrome={renderChrome}
+          />
         </View>
       );
     },
@@ -363,9 +417,10 @@ export const WatchEngineHost = forwardRef<
       renderChrome,
       emitReadiness,
       firstFrameById,
+      onSeekRatio,
       screenFocused,
+      seekRequest,
       slots,
-      timelineById,
       userPaused,
       volume,
     ]

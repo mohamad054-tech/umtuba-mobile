@@ -116,9 +116,12 @@ import {
   WATCH_LONG_PRESS_MS,
   createWatchTapClassifier,
   shouldCancelWatchTapsOnLongPress,
+  shouldDispatchWatchTapAfterTouch,
   shouldDispatchWatchVideoTap,
   shouldMountWatchVideoTapLayer,
   shouldOpenWatchQuickActions,
+  shouldWatchScrubClaimGesture,
+  shouldWatchTapLayerYieldVertical,
 } from "@/src/lib/watch/watchGestures";
 import {
   DEFAULT_WATCH_PLAYBACK_SPEED,
@@ -213,6 +216,7 @@ export type WatchVideoCardProps = {
   externalTimeline?: TimelineState | null;
   /** Engine play/pause. Card chrome cannot pause the active player by itself. */
   onUserPausedChange?: (paused: boolean) => void;
+  onEngineSeekRatio?: (ratio: number) => void;
 };
 
 type PlayerPaneProps = {
@@ -259,8 +263,8 @@ function ScrubBar({
   accessibilityLabel,
   onSeekRatio,
   onGestureActiveChange,
-  trackColor = "rgba(255,255,255,0.28)",
-  fillColor = colors.accentCyan,
+  trackColor = "rgba(0,0,0,0.45)",
+  fillColor = "#FFFFFF",
   tall = false,
 }: ScrubBarProps) {
   const trackRef = useRef<View>(null);
@@ -305,8 +309,16 @@ function ScrubBar({
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onStartShouldSetPanResponderCapture: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          shouldWatchScrubClaimGesture({
+            dx: gesture.dx,
+            dy: gesture.dy,
+          }),
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          shouldWatchScrubClaimGesture({
+            dx: gesture.dx,
+            dy: gesture.dy,
+          }),
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: (event) => {
@@ -396,6 +408,82 @@ function ScrubBar({
         />
       </View>
     </View>
+  );
+}
+
+function WatchProgressTrack({ ratio }: { ratio: number }) {
+  return (
+    <View
+      style={styles.progressTrack}
+      pointerEvents="none"
+      accessibilityElementsHidden
+    >
+      <View
+        style={[
+          styles.progressFill,
+          { width: scrubFillWidthPercent(ratio) },
+        ]}
+      />
+    </View>
+  );
+}
+
+function WatchVideoTapLayer({
+  style,
+  onTap,
+  onLongPress,
+}: {
+  style: StyleProp<ViewStyle>;
+  onTap: () => void;
+  onLongPress: () => void;
+}) {
+  const startRef = useRef({ x: 0, y: 0 });
+  const yieldedRef = useRef(false);
+  const longTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearLongPress = useCallback(() => {
+    if (longTimer.current) {
+      clearTimeout(longTimer.current);
+      longTimer.current = null;
+    }
+  }, []);
+
+  return (
+    <View
+      style={style}
+      onStartShouldSetResponder={() => false}
+      onMoveShouldSetResponder={() => false}
+      onTouchStart={(event) => {
+        const { pageX, pageY } = event.nativeEvent;
+        startRef.current = { x: pageX, y: pageY };
+        yieldedRef.current = false;
+        clearLongPress();
+        longTimer.current = setTimeout(() => {
+          longTimer.current = null;
+          if (!yieldedRef.current) onLongPress();
+        }, WATCH_LONG_PRESS_MS);
+      }}
+      onTouchMove={(event) => {
+        const dx = event.nativeEvent.pageX - startRef.current.x;
+        const dy = event.nativeEvent.pageY - startRef.current.y;
+        if (shouldWatchTapLayerYieldVertical({ dx, dy })) {
+          yieldedRef.current = true;
+          clearLongPress();
+        }
+      }}
+      onTouchEnd={(event) => {
+        const dx = event.nativeEvent.pageX - startRef.current.x;
+        const dy = event.nativeEvent.pageY - startRef.current.y;
+        const fireTap = shouldDispatchWatchTapAfterTouch({
+          dx,
+          dy,
+          yieldedVertical: yieldedRef.current,
+        });
+        clearLongPress();
+        if (fireTap) onTap();
+      }}
+      onTouchCancel={clearLongPress}
+    />
   );
 }
 
@@ -972,6 +1060,7 @@ function WatchVideoCardComponent({
   externalPlayback = false,
   externalTimeline = null,
   onUserPausedChange,
+  onEngineSeekRatio,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
   const captionAlign = localeTextAlign(locale);
@@ -1336,20 +1425,23 @@ function WatchVideoCardComponent({
 
   const onSeekRatio = useCallback(
     (ratio: number) => {
-      if (!canSeekWithDuration(timeline.duration)) {
+      if (!canSeekWithDuration(chromeTimeline.duration)) {
         return;
       }
       scrubTargetRatioRef.current = ratio;
       seekTokenRef.current += 1;
       setSeekRequest({ token: seekTokenRef.current, ratio });
+      onEngineSeekRatio?.(ratio);
       setTimeline((prev) => ({
         ...prev,
+        duration: chromeTimeline.duration || prev.duration,
         ratio,
         currentTime:
-          resolveSeekTimeOrNull(ratio, prev.duration) ?? prev.currentTime,
+          resolveSeekTimeOrNull(ratio, chromeTimeline.duration) ??
+          prev.currentTime,
       }));
     },
-    [timeline.duration]
+    [chromeTimeline.duration, onEngineSeekRatio]
   );
 
   const onScrubActive = useCallback(
@@ -1468,13 +1560,10 @@ function WatchVideoCardComponent({
         pointerEvents={paneStatus === "error" ? "none" : "box-none"}
       >
         {shouldMountWatchVideoTapLayer({ paneStatus }) ? (
-          <Pressable
+          <WatchVideoTapLayer
             style={[styles.tapLayer, { right: WATCH_VOLUME_RIGHT_CLEARANCE }]}
-            onPress={onVideoAreaTap}
+            onTap={onVideoAreaTap}
             onLongPress={onVideoAreaLongPress}
-            delayLongPress={WATCH_LONG_PRESS_MS}
-            accessible={false}
-            importantForAccessibility="no"
           />
         ) : null}
 
@@ -1792,7 +1881,7 @@ function WatchVideoCardComponent({
               {formatPlaybackClock(chromeTimeline.duration)}
             </Text>
           </View>
-          {shouldExposeWatchScrub(chromeTimeline.duration) && !externalPlayback ? (
+          {shouldExposeWatchScrub(chromeTimeline.duration) ? (
             <ScrubBar
               ratio={isActive ? chromeTimeline.ratio : 0}
               accessibilityLabel={t("watch.seek")}
@@ -1801,11 +1890,7 @@ function WatchVideoCardComponent({
               tall
             />
           ) : (
-            <View
-              style={styles.shortProgress}
-              pointerEvents="none"
-              accessibilityElementsHidden
-            />
+            <WatchProgressTrack ratio={isActive ? chromeTimeline.ratio : 0} />
           )}
         </View>
       </View>
@@ -2101,10 +2186,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
-  shortProgress: {
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: "rgba(255,255,255,0.18)",
+  progressTrack: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.72)",
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
   },
   username: {
     color: colors.text,
@@ -2211,6 +2305,8 @@ const styles = StyleSheet.create({
     overflow: "visible",
     justifyContent: "center",
     direction: WATCH_SCRUB_LAYOUT_DIRECTION,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.72)",
   },
   scrubFill: {
     position: "absolute",
