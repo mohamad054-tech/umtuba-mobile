@@ -37,7 +37,7 @@ describe("watch engine snap speed", () => {
 
   it("uses a short fixed snap instead of the native 250ms ease-out", () => {
     expect(WATCH_ENGINE_NATIVE_SMOOTH_SCROLL_MS).toBe(250);
-    expect(resolveWatchEngineSnapDurationMs()).toBe(150);
+    expect(resolveWatchEngineSnapDurationMs()).toBe(120);
     expect(WATCH_ENGINE_SNAP_DURATION_MS).toBeLessThan(
       WATCH_ENGINE_NATIVE_SMOOTH_SCROLL_MS
     );

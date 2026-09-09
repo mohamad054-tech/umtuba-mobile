@@ -1,7 +1,7 @@
 {
   "task_id": "DESKTOP_WATCH_SNAP_SPEED_V1",
   "owner_goal": "After a 10% commit, snap the remaining page quickly (TikTok-like). Do not change the 10% decision, flick velocity, TextureView, contain, pause, scrub, or readiness. No EAS until local gates pass.",
-  "base_sha": "1ad7ea446dae49a9bb6dfb40c76bd7f04b25d14f",
+  "base_sha": "56df7914ff582dca78f99b14f2c1e3fba2f78f68",
   "product_area": "watch",
   "allowed_files": [
     "src/lib/watch/engine/**",
@@ -40,5 +40,5 @@
     "date": "2026-09-09",
     "notes": "1ad7ea4 Fold6 threshold PASS. Owner rejected post-release snap as too slow vs TikTok. Not Fold6 PASS until snap retest."
   },
-  "notes": "Change only the post-release snap animation. Keep WATCH_ENGINE_COMMIT_FRACTION=0.1 and WATCH_ENGINE_FLICK_PAGES_PER_SEC=1. Native scrollToOffset(animated:true) is ~250ms OverScroller and is the slow-snap cause. Replacement is UI-thread withTiming (~150ms)."
+  "notes": "Retune only WATCH_ENGINE_SNAP_DURATION_MS from 150 to 120. Keep easing, 10% threshold, gesture, drag 1:1, TextureView, contain, pause, and scrub unchanged."
 }

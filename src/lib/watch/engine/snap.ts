@@ -10,7 +10,7 @@ import {
 export const WATCH_ENGINE_NATIVE_SMOOTH_SCROLL_MS = 250;
 
 /** Short UI-thread snap. Owner feel on Fold6 can retune this; not a locked contract. */
-export const WATCH_ENGINE_SNAP_DURATION_MS = 150;
+export const WATCH_ENGINE_SNAP_DURATION_MS = 120;
 
 export function remainingWatchEngineSnapDistance(input: {
   currentOffset: number;
