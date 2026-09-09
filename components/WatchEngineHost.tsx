@@ -10,12 +10,21 @@ import {
   type ReactNode,
 } from "react";
 import {
-  FlatList,
   RefreshControl,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import Animated, {
+  Easing,
+  cancelAnimation,
+  runOnJS,
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import type { WatchVideo } from "@/src/contracts/watch";
 import {
@@ -29,7 +38,8 @@ import {
   shouldRequestWatchEngineFeedTail,
   watchEngineItemSourceUri,
   watchEngineMediaId,
-  watchEngineOffsetForIndex,
+  resolveWatchEngineSnapDurationMs,
+  resolveWatchEngineSnapOffset,
   watchEngineSrcSignature,
   WatchEnginePlayer,
   createWatchEngineTimelineStore,
@@ -138,13 +148,17 @@ export const WatchEngineHost = forwardRef<
   },
   ref
 ) {
-  const listRef = useRef<FlatList<WatchVideo>>(null);
+  const listRef = useAnimatedRef<Animated.FlatList<WatchVideo>>();
   const engineRef = useRef(createWatchPlaybackController());
   const dragStartOffsetRef = useRef(0);
   const dragStartIndexRef = useRef(0);
+  const lastOffsetRef = useRef(Math.max(0, settledIndex * itemHeight));
   const itemHeightRef = useRef(itemHeight);
   const settledRef = useRef(settledIndex);
   const snapGenRef = useRef(0);
+  const snappingRef = useRef(false);
+  const snapOffset = useSharedValue(0);
+  const snapping = useSharedValue(false);
   const [audioOwner, setAudioOwner] = useState<string | null>(null);
   const [firstFrameById, setFirstFrameById] = useState<Record<string, boolean>>(
     {}
@@ -199,14 +213,6 @@ export const WatchEngineHost = forwardRef<
     );
   }, [mediaIds, settledIndex, videos]);
 
-  const snapOnce = useCallback((index: number) => {
-    const offset = watchEngineOffsetForIndex(index, itemHeightRef.current);
-    if (offset == null) return;
-    listRef.current?.scrollToOffset({ offset, animated: true });
-  }, []);
-
-  useImperativeHandle(ref, () => ({ snapToIndex: snapOnce }), [snapOnce]);
-
   const applyEngineState = useCallback(() => {
     const state = engineRef.current.getState();
     setAudioOwner(state.audioOwner);
@@ -215,18 +221,81 @@ export const WatchEngineHost = forwardRef<
     }
   }, [onSettledIndex]);
 
+  const finishSnap = useCallback(
+    (offset: number) => {
+      snappingRef.current = false;
+      snapping.value = false;
+      lastOffsetRef.current = offset;
+      const { effects } = engineRef.current.nativeSettled({
+        offset,
+        itemHeight: itemHeightRef.current,
+      });
+      if (effects.snap != null) return;
+      applyEngineState();
+    },
+    [applyEngineState, snapping]
+  );
+
+  useAnimatedReaction(
+    () => snapOffset.value,
+    (value) => {
+      if (!snapping.value) return;
+      scrollTo(listRef, 0, value, false);
+    }
+  );
+
+  const snapOnce = useCallback(
+    (index: number) => {
+      const target = resolveWatchEngineSnapOffset({
+        index,
+        itemHeight: itemHeightRef.current,
+      });
+      if (target == null) return;
+      const from = lastOffsetRef.current;
+      if (Math.abs(target - from) < 1) {
+        finishSnap(target);
+        return;
+      }
+      cancelAnimation(snapOffset);
+      snappingRef.current = true;
+      snapping.value = true;
+      snapOffset.value = from;
+      snapOffset.value = withTiming(
+        target,
+        {
+          duration: resolveWatchEngineSnapDurationMs(),
+          easing: Easing.out(Easing.cubic),
+        },
+        (finished) => {
+          if (finished) {
+            runOnJS(finishSnap)(target);
+          }
+        }
+      );
+    },
+    [finishSnap, snapOffset, snapping]
+  );
+
+  useImperativeHandle(ref, () => ({ snapToIndex: snapOnce }), [snapOnce]);
+
   const onScrollBeginDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      dragStartOffsetRef.current = event.nativeEvent.contentOffset.y;
+      cancelAnimation(snapOffset);
+      snappingRef.current = false;
+      snapping.value = false;
+      const offset = event.nativeEvent.contentOffset.y;
+      lastOffsetRef.current = offset;
+      dragStartOffsetRef.current = offset;
       dragStartIndexRef.current = settledRef.current;
       engineRef.current.beginGesture(settledRef.current);
     },
-    []
+    [snapOffset, snapping]
   );
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offset = event.nativeEvent.contentOffset.y;
+      lastOffsetRef.current = offset;
       if (!(itemHeightRef.current > 0)) return;
       const visible = Math.round(offset / itemHeightRef.current);
       engineRef.current.moveGesture(visible);
@@ -236,6 +305,7 @@ export const WatchEngineHost = forwardRef<
 
   const onScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      lastOffsetRef.current = event.nativeEvent.contentOffset.y;
       const { state, effects } = engineRef.current.releaseGesture({
         fromIndex: dragStartIndexRef.current,
         currentOffset: event.nativeEvent.contentOffset.y,
@@ -254,6 +324,8 @@ export const WatchEngineHost = forwardRef<
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (snappingRef.current) return;
+      lastOffsetRef.current = event.nativeEvent.contentOffset.y;
       const { effects } = engineRef.current.nativeSettled({
         offset: event.nativeEvent.contentOffset.y,
         itemHeight: itemHeightRef.current,
@@ -427,7 +499,7 @@ export const WatchEngineHost = forwardRef<
   );
 
   return (
-    <FlatList
+    <Animated.FlatList
       ref={listRef}
       data={videos}
       keyExtractor={(item) => watchEngineMediaId(item)}

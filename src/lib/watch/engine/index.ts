@@ -24,6 +24,16 @@ export {
   watchEnginePagesPerSecond,
 } from "./gesture";
 export {
+  remainingWatchEngineSnapDistance,
+  resolveWatchEngineSnapDurationMs,
+  resolveWatchEngineSnapOffset,
+  shouldUseNativeAnimatedScrollToOffset,
+  watchEngineRemainingAfterCommit,
+  watchEngineSnapKeepsCommitFraction,
+  WATCH_ENGINE_NATIVE_SMOOTH_SCROLL_MS,
+  WATCH_ENGINE_SNAP_DURATION_MS,
+} from "./snap";
+export {
   clampWatchEngineIndex,
   watchEngineIndexFromOffset,
   watchEngineMediaId,
