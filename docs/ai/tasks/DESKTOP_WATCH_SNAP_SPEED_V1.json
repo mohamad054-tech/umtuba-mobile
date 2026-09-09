@@ -33,12 +33,12 @@
   "production_allowed": false,
   "push_allowed": true,
   "max_eas_builds": 0,
-  "authorized_sha": "1ad7ea446dae49a9bb6dfb40c76bd7f04b25d14f",
-  "owner_status_claim": "NONE",
+  "authorized_sha": "dd972be9a069011e1b63d700e1d8e5a704ca3b0e",
+  "owner_status_claim": "OWNER_PASS",
   "device_evidence": {
     "device": "RFCX718LVHK / SM-F956B",
     "date": "2026-09-09",
-    "notes": "1ad7ea4 Fold6 threshold PASS. Owner rejected post-release snap as too slow vs TikTok. Not Fold6 PASS until snap retest."
+    "notes": "Owner Fold6 confirmation of 120ms post-release snap feel on dd972be / EAS 5a02229d. lastUpdateTime 2026-09-09 11:35:36. 10% threshold unchanged. Not a Phase 1 20% lock. No second EAS."
   },
-  "notes": "Retune only WATCH_ENGINE_SNAP_DURATION_MS from 150 to 120. Keep easing, 10% threshold, gesture, drag 1:1, TextureView, contain, pause, and scrub unchanged."
+  "notes": "Snap-speed feel OWNER_PASS only. WATCH_ENGINE_SNAP_DURATION_MS=120. Keep easing, 10% threshold, gesture, drag 1:1, TextureView, contain, pause, and scrub unchanged. No more snap-speed EAS."
 }
