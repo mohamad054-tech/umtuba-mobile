@@ -76,7 +76,7 @@ describe("WatchPlaybackController", () => {
     const released = controller.releaseGesture({
       fromIndex: 0,
       dragStartOffset: 0,
-      currentOffset: HEIGHT * 0.1,
+      currentOffset: HEIGHT * 0.09,
       itemHeight: HEIGHT,
     });
     expect(released.state.targetIndex).toBe(0);

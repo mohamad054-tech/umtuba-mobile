@@ -44,4 +44,4 @@ WITHDRAWN: 80% commit, finger-down 80%, 5a30e5b0, f7d36b6d, ab9d34d
 UM Streak live camera + retention remains OWNER_PASS at 11c0719 / e6ece863.
 ```
 
-Phase 2/3 and any future Watch work must preserve the accepted ~20% swipe exactly. Conflicting changes require explicit OWNER GO.
+Phase 2/3 and any future Watch work must preserve the accepted ~20% swipe exactly unless the owner issues an explicit GO. Owner GO 2026-09-09: the clean-room engine commit fraction is 10% (`WATCH_ENGINE_COMMIT_FRACTION = 0.1`) on task `DESKTOP_WATCH_SWIPE_THRESHOLD_10_PERCENT_V1`. The Phase 1 handoff lock at `f1e85475` / `40b685de` remains historical. Flick velocity, JS snap, and `pagingEnabled` stay unchanged.

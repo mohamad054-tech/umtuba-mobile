@@ -94,7 +94,7 @@ describe("watch engine local gate", () => {
     expect(controller.getState().settledIndex).toBe(39);
   });
 
-  it("commits a 20% swipe and a flick, and holds short travel", () => {
+  it("commits a 10% swipe and a flick, and holds short travel", () => {
     expect(
       resolveWatchEngineReleaseTarget({
         fromIndex: 3,

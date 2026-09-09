@@ -2,9 +2,9 @@ import { clampWatchEngineIndex } from "./identity";
 import type { WatchEngineDirection } from "./types";
 
 /** Owner-accepted short deliberate commit. New math, not the old handoff machine. */
-export const WATCH_ENGINE_COMMIT_FRACTION = 0.2;
+export const WATCH_ENGINE_COMMIT_FRACTION = 0.1;
 
-/** Velocity-sensitive flick. Distance still wins when the finger traveled 20%. */
+/** Velocity-sensitive flick. Distance still wins when the finger traveled 10%. */
 export const WATCH_ENGINE_FLICK_PAGES_PER_SEC = 1;
 
 export type WatchEngineReleaseDecision = {

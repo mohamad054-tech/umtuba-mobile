@@ -60,7 +60,7 @@ describe("watch engine seek", () => {
     expect(shouldRebuildWatchEngineRenderItemOnTimelineTick()).toBe(false);
   });
 
-  it("keeps the locked 20 percent page-change threshold", () => {
-    expect(WATCH_ENGINE_COMMIT_FRACTION).toBe(0.2);
+  it("keeps the owner-authorized 10 percent page-change threshold", () => {
+    expect(WATCH_ENGINE_COMMIT_FRACTION).toBe(0.1);
   });
 });
