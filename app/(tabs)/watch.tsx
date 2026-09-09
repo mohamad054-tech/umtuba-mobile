@@ -7,7 +7,14 @@ import {
   useSegments,
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,6 +47,17 @@ import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
 import { REPORT_REASON_KEYS, useTranslation } from "@/src/lib/i18n";
+import {
+  applyOptimisticWatchRecordsToList,
+  getOptimisticWatchPublishVersion,
+  getOptimisticWatchRecord,
+  isOptimisticWatchClientId,
+  listOptimisticWatchRecords,
+  markOptimisticLocalVisible,
+  optimisticPublishPhaseSignature,
+  shouldFocusNewOptimisticItem,
+  subscribeOptimisticWatchPublish,
+} from "@/src/lib/feed/optimisticWatchPublish";
 import { isLocalWatchPlaybackUri } from "@/src/lib/feed/videoStoragePath";
 import {
   prepareWatchPlaybackUrls,
@@ -107,6 +125,8 @@ import {
   type UgcReportReason,
 } from "@/src/lib/social/ugcModeration";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { createDefaultOptimisticPublishDeps } from "@/src/lib/video/optimisticPublishDeps";
+import { retryOptimisticPublish } from "@/src/lib/video/optimisticPublishPipeline";
 import {
   DEFAULT_WATCH_AUTO_NEXT,
   DEFAULT_WATCH_MUTED,
@@ -234,7 +254,13 @@ export default function WatchScreen() {
       ? Number(params.post)
       : null;
 
-  const [videos, setVideos] = useState<WatchVideo[]>([]);
+  const optimisticTick = useSyncExternalStore(
+    subscribeOptimisticWatchPublish,
+    getOptimisticWatchPublishVersion
+  );
+  const [videos, setVideos] = useState<WatchVideo[]>(() =>
+    applyOptimisticWatchRecordsToList([])
+  );
   const [cursor, setCursor] = useState<WatchFeedCursor | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [lastSettledNativePage, setLastSettledNativePage] = useState<
@@ -739,7 +765,11 @@ export default function WatchScreen() {
           setError(t("watch.loadFailed"));
           return;
         }
-        setVideos(mergeWatchVideos([], startup.videos));
+        setVideos(
+          applyOptimisticWatchRecordsToList(
+            mergeWatchVideos([], startup.videos)
+          )
+        );
         if (startup.page) {
           setCursor(startup.page.nextCursor);
           setEndReached(!startup.page.nextCursor);
@@ -770,6 +800,32 @@ export default function WatchScreen() {
     void loadInitial();
   }, [loadInitial]);
 
+  useEffect(() => {
+    const optimistic = listOptimisticWatchRecords();
+    setVideos((prev) => applyOptimisticWatchRecordsToList(prev, optimistic));
+    const first = optimistic[0];
+    if (first && first.timestamps.t1 == null) {
+      markOptimisticLocalVisible(first.clientId);
+    }
+    if (
+      first &&
+      shouldFocusNewOptimisticItem(
+        optimistic,
+        visibleVideosRef.current[0]?.id ?? null
+      )
+    ) {
+      applyWatchIndexDecision(
+        decideWatchActiveIndexClaim({
+          arbiter: arbiterRef.current,
+          reason: "bootstrap",
+          requestedIndex: 0,
+          navigationGeneration: arbiterRef.current.navigationGeneration,
+        })
+      );
+      engineHostRef.current?.snapToIndex(0);
+    }
+  }, [applyWatchIndexDecision, optimisticTick]);
+
   const loadMore = useCallback(async () => {
     if (!cursor || moreInFlight.current || loadingMore || endReached) return;
     moreInFlight.current = true;
@@ -777,7 +833,9 @@ export default function WatchScreen() {
     try {
       const supabase = getSupabase();
       const page = await fetchWatchFeedPage(supabase, { cursor });
-      setVideos((prev) => mergeWatchVideos(prev, page.videos));
+      setVideos((prev) =>
+        applyOptimisticWatchRecordsToList(mergeWatchVideos(prev, page.videos))
+      );
       setCursor(page.nextCursor);
       if (!page.nextCursor) {
         setEndReached(true);
@@ -1703,7 +1761,7 @@ export default function WatchScreen() {
             : undefined
         }
         onDeleteOwn={
-          viewerMaySeeDeleteControl(user?.id, item.author.id)
+          item.postId && viewerMaySeeDeleteControl(user?.id, item.author.id)
             ? () => onDeleteOwn(item)
             : undefined
         }
@@ -1842,7 +1900,7 @@ export default function WatchScreen() {
     </View>
   ) : null;
 
-  if (loading) {
+  if (loading && videos.length === 0) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
@@ -1945,16 +2003,71 @@ export default function WatchScreen() {
             }
           }}
           listFooter={listFooter}
-          extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}`}
-          renderChrome={({ item, index, timeline, onUserPausedChange, onSeekRatio }) =>
-            renderItem({
-              item,
-              index,
-              externalTimeline: timeline,
-              onUserPausedChange,
-              onSeekRatio,
-            })
-          }
+          extraData={`${activeIndex}:${playbackGeneration}:${watchInteractionSignature(visibleVideos)}:${optimisticPublishPhaseSignature()}`}
+          renderChrome={({ item, index, timeline, onUserPausedChange, onSeekRatio }) => {
+            const optimistic = isOptimisticWatchClientId(item.id)
+              ? getOptimisticWatchRecord(item.id)
+              : null;
+            return (
+              <>
+                {renderItem({
+                  item,
+                  index,
+                  externalTimeline: timeline,
+                  onUserPausedChange,
+                  onSeekRatio,
+                })}
+                {optimistic && optimistic.phase !== "ready" ? (
+                  <View
+                    style={[
+                      styles.optimisticBadge,
+                      { top: insets.top + 52 },
+                    ]}
+                    pointerEvents={
+                      optimistic.phase === "failed" ? "box-none" : "none"
+                    }
+                  >
+                    <Text style={styles.optimisticBadgeText}>
+                      {optimistic.phase === "uploading"
+                        ? t("create.uploading", {
+                            values: { percent: optimistic.uploadPercent },
+                          })
+                        : optimistic.phase === "publishing"
+                          ? t("create.publishing")
+                          : optimistic.error ?? t("create.publishFailed")}
+                    </Text>
+                    {optimistic.phase === "failed" ? (
+                      <Pressable
+                        onPress={() => {
+                          if (!user?.id) return;
+                          void retryOptimisticPublish(
+                            optimistic.clientId,
+                            createDefaultOptimisticPublishDeps({
+                              userId: user.id,
+                              profile: {
+                                full_name: optimistic.author.name,
+                                username: optimistic.author.username.replace(
+                                  /^@/,
+                                  ""
+                                ),
+                                avatar_initial: optimistic.author.avatar,
+                              },
+                            })
+                          );
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t("actions.retry")}
+                      >
+                        <Text style={styles.optimisticRetry}>
+                          {t("actions.retry")}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+              </>
+            );
+          }}
         />
       </View>
       <View
@@ -2126,5 +2239,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
+  },
+  optimisticBadge: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 4,
+    borderRadius: 12,
+    backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  optimisticBadgeText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  optimisticRetry: {
+    color: colors.accentCyan,
+    fontWeight: "700",
+    fontSize: 13,
   },
 });

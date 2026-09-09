@@ -52,5 +52,11 @@
   "authorized_sha": "dd972be9a069011e1b63d700e1d8e5a704ca3b0e",
   "owner_status_claim": "NONE",
   "device_evidence": null,
-  "notes": "Optimistic Watch insert on Publish. Do not change TextureView, contain, readiness, pause, scrub, 10% swipe, 120ms snap, or player lifecycle. Keep postId null on the session item so media identity does not change. No EAS this pass."
+  "status": "LOCAL_GATE_PASS",
+  "measurement": {
+    "device_run": false,
+    "invented_milliseconds": false,
+    "t0_to_t1_intended": "navigation + local file:// bind; do not await upload"
+  },
+  "notes": "Smallest optimistic layer. Session WatchVideo keeps postId=null and local src so Watch engine mediaId/src do not change. Server postId lives on the optimistic record for feed dedupe. Phase ready only after DB commit. No EAS."
 }

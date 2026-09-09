@@ -23,18 +23,16 @@ import {
   MAX_CAPTION_LENGTH,
   validateCaption,
 } from "@/src/contracts/video";
-import { getErrorMessage } from "@/src/contracts/validation";
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import {
+  createOptimisticWatchRecord,
+  insertOptimisticWatchRecord,
+} from "@/src/lib/feed/optimisticWatchPublish";
 import { localeTextAlign, useTranslation } from "@/src/lib/i18n";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
-  applyUploadProgress,
-  beginUpload,
   canStartUpload,
-  completePublish,
-  completeUpload,
   failPublish,
-  failUpload,
   initialCreateJourneyState,
   openWatchAfterPublishHref,
   retryFromError,
@@ -48,17 +46,11 @@ import {
   evaluateCreateAsset,
   isCreatePublishActionAllowed,
   isCreateUploadStartAllowed,
-  nextCreateAttemptId,
   resetCreateDraftAfterPublish,
-  shouldIgnoreStaleCreateCallback,
   shouldResetCreateOnBlur,
 } from "@/src/lib/video/createUploadState";
-import { isAbortError } from "@/src/lib/video/createProgress";
-import { deleteOwnedVideoObject } from "@/src/lib/video/deleteOwnedVideo";
-import {
-  clearPendingVideoUpload,
-  queuePendingVideoUpload,
-} from "@/src/lib/video/orphanUploads";
+import { createDefaultOptimisticPublishDeps } from "@/src/lib/video/optimisticPublishDeps";
+import { runOptimisticPublishPipeline } from "@/src/lib/video/optimisticPublishPipeline";
 import {
   expandLimitedVideoLibraryAccess,
   formatPickedDurationSecondsLabel,
@@ -67,8 +59,6 @@ import {
   type LibraryAccessState,
   type PickedVideoAsset,
 } from "@/src/lib/video/pickVideo";
-import { publishVideoPost } from "@/src/lib/video/publishVideoPost";
-import { uploadPostVideo } from "@/src/lib/video/uploadPostVideo";
 import { applySelectedSoundToEditState } from "@/src/lib/sounds/socialSoundPlayback";
 import {
   fetchSocialSoundById,
@@ -225,8 +215,8 @@ export default function CreateScreen() {
     abortRef.current?.abort();
   }, []);
 
-  const runPublishPipeline = useCallback(
-    async (picked: PickedVideoAsset, captionText: string) => {
+  const startOptimisticPublish = useCallback(
+    (picked: PickedVideoAsset, captionText: string) => {
       if (!user || !session) {
         setJourney((s) =>
           failPublish(s, new Error(t("create.signInToPublish")))
@@ -258,241 +248,54 @@ export default function CreateScreen() {
         return;
       }
 
-      const attemptId = nextCreateAttemptId(
-        picked.id,
-        ++attemptNonceRef.current
-      );
-      activeAttemptRef.current = attemptId;
-
-      const started = beginUpload(journeyRef.current, {
-        attemptId,
-        assetId: picked.id,
-      });
-      if (!started) return;
-      setJourney(started);
-
-      const uploadStartedAt = new Date().toISOString();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      let uploadedPath: string | null = null;
-
-      try {
-        const {
-          data: { session: liveSession },
-          error: sessionError,
-        } = await getSupabase().auth.getSession();
-
-        if (sessionError || !liveSession?.access_token) {
-          throw new Error(t("create.signInToUpload"));
-        }
-
-        const uploaded = await uploadPostVideo({
+      const record = createOptimisticWatchRecord({
+        localUri: picked.uri,
+        caption: captionText,
+        asset: {
           uri: picked.uri,
           fileName: picked.fileName,
           mimeType: picked.mimeType,
           byteSize: picked.byteSize,
+          durationMs: editedDurationMs(editState, picked.durationMs),
+          width: picked.width,
+          height: picked.height,
+        },
+        author: {
+          id: user.id,
+          name: profile?.full_name || profile?.display_name || "UMTUBA User",
+          username: profile?.username || `user_${user.id.slice(0, 8)}`,
+          avatar: profile?.avatar_initial || "U",
+        },
+        soundId: editState.soundId,
+        soundMix: editState.mix,
+        mediaPipeline: serializeEditIntoMediaPipeline(null, editState),
+      });
+      insertOptimisticWatchRecord(record);
+
+      const cleared = resetCreateDraftAfterPublish();
+      activeAttemptRef.current = cleared.activeAttemptId;
+      attemptNonceRef.current += 1;
+      setAsset(cleared.asset);
+      setCaption(cleared.caption);
+      setUgcAck(cleared.ugcAck);
+      setEditState(createInitialEditState(null));
+      setSelectedSound(null);
+      setJourney(initialCreateJourneyState());
+
+      router.replace("/(tabs)/watch" as never);
+      void runOptimisticPublishPipeline(
+        record.clientId,
+        createDefaultOptimisticPublishDeps({
           userId: user.id,
-          accessToken: liveSession.access_token,
-          signal: controller.signal,
-          onProgress: (progress) => {
-            setJourney((s) => {
-              if (
-                shouldIgnoreStaleCreateCallback(
-                  activeAttemptRef.current,
-                  s.attemptId,
-                  attemptId
-                )
-              ) {
-                return s;
-              }
-              return applyUploadProgress(s, progress.percent);
-            });
-          },
-        });
-
-        if (
-          shouldIgnoreStaleCreateCallback(
-            activeAttemptRef.current,
-            journeyRef.current.attemptId,
-            attemptId
-          )
-        ) {
-          if (uploaded.path) {
-            await deleteOwnedVideoObject(getSupabase(), user.id, uploaded.path);
-            await clearPendingVideoUpload(uploaded.path);
-          }
-          return;
-        }
-
-        uploadedPath = uploaded.path;
-        setJourney((s) =>
-          shouldIgnoreStaleCreateCallback(
-            activeAttemptRef.current,
-            s.attemptId,
-            attemptId
-          )
-            ? s
-            : completeUpload(s, uploaded.path)
-        );
-
-        const {
-          data: { user: liveUser },
-        } = await getSupabase().auth.getUser();
-        if (!liveUser || liveUser.id !== user.id) {
-          await queuePendingVideoUpload(uploaded.path);
-          throw Object.assign(new Error(t("create.signInToPublish")), {
-            code: "auth_required",
-          });
-        }
-
-        const result = await publishVideoPost(
-          getSupabase(),
-          user.id,
-          {
+          profile: {
             full_name: profile?.full_name || profile?.display_name || "UMTUBA User",
             username: profile?.username || `user_${user.id.slice(0, 8)}`,
             avatar_initial: profile?.avatar_initial || "U",
           },
-          {
-            caption: captionText,
-            videoPath: uploaded.path,
-            mimeType: uploaded.mimeType,
-            byteSize: uploaded.byteSize,
-            uploadStartedAt,
-            metadata: {
-              durationMs: editedDurationMs(editState, picked.durationMs),
-              width: picked.width,
-              height: picked.height,
-            },
-            soundId: editState.soundId,
-            soundMix: editState.mix,
-            mediaPipeline: serializeEditIntoMediaPipeline(null, editState),
-          }
-        );
-
-        if (
-          shouldIgnoreStaleCreateCallback(
-            activeAttemptRef.current,
-            journeyRef.current.attemptId,
-            attemptId
-          )
-        ) {
-          if (
-            !result.ok &&
-            result.videoPath &&
-            result.code !== "auth_required"
-          ) {
-            await deleteOwnedVideoObject(
-              getSupabase(),
-              user.id,
-              result.videoPath
-            );
-            await clearPendingVideoUpload(result.videoPath);
-          }
-          return;
-        }
-
-        if (!result.ok) {
-          if (result.code === "auth_required" && result.videoPath) {
-            await queuePendingVideoUpload(result.videoPath);
-          } else if (result.videoPath) {
-            await deleteOwnedVideoObject(
-              getSupabase(),
-              user.id,
-              result.videoPath
-            );
-            await clearPendingVideoUpload(result.videoPath);
-          }
-          setJourney((s) =>
-            shouldIgnoreStaleCreateCallback(
-              activeAttemptRef.current,
-              s.attemptId,
-              attemptId
-            )
-              ? s
-              : failPublish(s, new Error(result.message))
-          );
-          return;
-        }
-
-        await clearPendingVideoUpload(uploaded.path);
-        const cleared = resetCreateDraftAfterPublish();
-        activeAttemptRef.current = cleared.activeAttemptId;
-        attemptNonceRef.current += 1;
-        setAsset(cleared.asset);
-        setCaption(cleared.caption);
-        setUgcAck(cleared.ugcAck);
-        setJourney((s) =>
-          shouldIgnoreStaleCreateCallback(
-            attemptId,
-            s.attemptId,
-            attemptId
-          )
-            ? s
-            : completePublish(s, result.postId)
-        );
-      } catch (error) {
-        if (
-          shouldIgnoreStaleCreateCallback(
-            activeAttemptRef.current,
-            journeyRef.current.attemptId,
-            attemptId
-          )
-        ) {
-          return;
-        }
-
-        if (isAbortError(error)) {
-          if (uploadedPath) {
-            await deleteOwnedVideoObject(getSupabase(), user.id, uploadedPath);
-            await clearPendingVideoUpload(uploadedPath);
-          }
-          setJourney((s) =>
-            shouldIgnoreStaleCreateCallback(
-              activeAttemptRef.current,
-              s.attemptId,
-              attemptId
-            )
-              ? s
-              : failUpload(s, error)
-          );
-          return;
-        }
-
-        if (
-          uploadedPath &&
-          error instanceof Error &&
-          /sign in/i.test(error.message)
-        ) {
-          await queuePendingVideoUpload(uploadedPath);
-        } else if (uploadedPath) {
-          await deleteOwnedVideoObject(getSupabase(), user.id, uploadedPath);
-          await clearPendingVideoUpload(uploadedPath);
-        }
-
-        setJourney((s) =>
-          shouldIgnoreStaleCreateCallback(
-            activeAttemptRef.current,
-            s.attemptId,
-            attemptId
-          )
-            ? s
-            : failUpload(
-                s,
-                new Error(
-                  getErrorMessage(
-                    error,
-                    t("create.uploadFailed")
-                  )
-                )
-              )
-        );
-      } finally {
-        abortRef.current = null;
-      }
+        })
+      );
     },
-    [editState, profile, session, t, ugcAck, user]
+    [editState, profile, router, session, t, ugcAck, user]
   );
 
   const onPublish = useCallback(async () => {
@@ -524,8 +327,8 @@ export default function CreateScreen() {
       }));
       return;
     }
-    await runPublishPipeline(asset, caption);
-  }, [asset, caption, runPublishPipeline, t, ugcAck]);
+    startOptimisticPublish(asset, caption);
+  }, [asset, caption, startOptimisticPublish, t, ugcAck]);
 
   const onRetry = useCallback(() => {
     const bound = bindRetryToCurrentAsset({
@@ -537,8 +340,8 @@ export default function CreateScreen() {
       return;
     }
     setJourney((s) => retryFromError(s));
-    void runPublishPipeline(bound.asset, caption);
-  }, [asset, caption, runPublishPipeline]);
+    startOptimisticPublish(bound.asset, caption);
+  }, [asset, caption, startOptimisticPublish]);
 
   if (authLoading) {
     return (
