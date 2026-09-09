@@ -1,25 +1,42 @@
 {
   "schema_version": 1,
   "product_area": "watch",
-  "current_fold6_watch_status": "PHASE1_20_PERCENT_OWNER_PASS_LOCKED",
+  "current_fold6_watch_status": "CLEAN_ROOM_ENGINE_OWNER_PASS_LOCKED",
   "watch_phase1_20_percent_owner_pass": {
     "status": "OWNER_PASS",
     "locked": true,
+    "historical": true,
     "source_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
     "eas_build_id": "40b685de-2efc-4fd5-b8e1-31cacd8e8397",
     "device": "RFCX718LVHK / SM-F956B",
-    "date": "2026-09-07"
+    "date": "2026-09-07",
+    "notes": "HISTORICAL Phase 1 ~20% short swipe lock. Do not overwrite. Not the current clean-room engine baseline."
+  },
+  "watch_clean_room_engine_owner_pass": {
+    "status": "OWNER_PASS",
+    "locked": true,
+    "source_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+    "eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+    "device": "RFCX718LVHK / SM-F956B",
+    "date": "2026-09-09",
+    "last_update_time": "2026-09-09 13:07:46",
+    "measured_t0_to_t1_ms": 49,
+    "owner_confirmed": "كلشي تمام",
+    "freeze_branch": "desktop/watch-owner-pass-aa57b8ae",
+    "freeze_tag": "watch-fold6-owner-pass-aa57b8ae"
   },
   "open_owner_failures": [
-    "other Watch contracts remain uncertified except Phase 1 ~20% short swipe"
+    "WATCH_NO_AUDIO_BLEED / WATCH_AUDIO_BINDING remain DEVICE_FAIL (not in 2026-09-09 OWNER_PASS set)",
+    "WATCH_BACK_DOUBLE_PRESS, nav return, cache/retention, fold transition, and double-tap like remain uncertified",
+    "historical Phase 1 20% lock at f1e85475 / 40b685de is preserved and is not this baseline"
   ],
   "contracts": [
     {
       "id": "WATCH_PLAYER_BINDING",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "Unit tests for playerLifecycle / activePlayerOwnership. No current Fold6 OWNER_PASS.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": "desktop/restore-a1ceb9d-keep-um-streak-v1",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Correct binding, no snapback. lastUpdateTime 2026-09-09 13:07:46. Owner: كلشي تمام.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": [
         "src/lib/watch/playerLifecycle.test.ts",
         "src/lib/watch/activePlayerOwnership.test.ts"
@@ -35,10 +52,10 @@
     },
     {
       "id": "WATCH_VISIBLE_SURFACE_BINDING",
-      "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL: black surface on arbitrary feed videos. 7536c11 also failed video 2 black.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Black screen fixed. TextureView visible. Owner: كلشي تمام.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": [
         "src/lib/watch/watchCellBinding.test.ts",
         "src/lib/watch/playerLifecycle.test.ts"
@@ -174,10 +191,10 @@
     },
     {
       "id": "WATCH_PROGRESS_DIRECTION",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "WATCH_SCRUB_LAYOUT_DIRECTION=ltr unit tests.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Progress + scrub confirmed.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": ["src/lib/watch/playbackPolicy.test.ts"],
       "device_required": false,
       "failure_signature": "PROGRESS_RTL_REVERSED",
@@ -186,10 +203,10 @@
     },
     {
       "id": "WATCH_SEEK_DIRECTION",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "Scrub layout direction unit tests.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Progress + scrub confirmed.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": ["src/lib/watch/playbackPolicy.test.ts"],
       "device_required": false,
       "failure_signature": "PROGRESS_RTL_REVERSED",
@@ -198,10 +215,10 @@
     },
     {
       "id": "WATCH_FOLD6_CONTAIN_FOLDED",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "WATCH_VIDEO_CONTENT_FIT=contain. Folded cell 968x2376. Not current owner-certified.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. contentFit contain. No horizontal crop on Fold6 cover.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": ["src/lib/watch/watchVideoFit.ts"],
       "device_required": true,
       "failure_signature": "FOLD6_HORIZONTAL_CROP",
@@ -210,10 +227,10 @@
     },
     {
       "id": "WATCH_FOLD6_CONTAIN_UNFOLDED",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "Unfolded cell 1856x2160 contain/FIT. Not current owner-certified.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Same contentFit contain setting as folded cover. Owner: كلشي تمام.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": ["src/lib/watch/watchVideoFit.ts"],
       "device_required": true,
       "failure_signature": "FOLD6_VERTICAL_CROP",
@@ -294,10 +311,10 @@
     },
     {
       "id": "WATCH_PLAY_PAUSE",
-      "owner_status": "SOURCE_PASS_ONLY",
-      "last_known_accepted_evidence": "playbackPolicy / gate unit tests.",
-      "reference_sha": "a1ceb9d5590e154e56f53efb644fd4e86bea4a13",
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Play/Pause confirmed.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": ["src/lib/watch/watchPlaybackGate.test.ts"],
       "device_required": false,
       "failure_signature": null,
@@ -330,10 +347,10 @@
     },
     {
       "id": "WATCH_NO_BLACK_SURFACE",
-      "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "Owner Fold6 FAIL on 1c56aca: black video surface on arbitrary feed videos. 7536c11 also failed.",
-      "reference_sha": null,
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Black screen fixed. TextureView. Owner: كلشي تمام.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": [
         "src/lib/watch/watchCellBinding.test.ts",
         "src/lib/watch/playerLifecycle.test.ts"
@@ -363,10 +380,10 @@
     },
     {
       "id": "WATCH_NO_SNAPBACK",
-      "owner_status": "DEVICE_FAIL",
-      "last_known_accepted_evidence": "7536c11 owner FAIL: move from black video 2 to 3 snaps/returns to video 1.",
-      "reference_sha": null,
-      "reference_branch": null,
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Correct binding / no snapback.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
       "regression_tests": [
         "src/lib/watch/watchActiveIndexArbiter.test.ts",
         "src/lib/watch/watchViewport.test.ts"
@@ -379,6 +396,172 @@
         "src/lib/watch/watchViewport.ts"
       ],
       "dependent_files": ["src/lib/watch/watchManualHandoff.ts"]
+    },
+    {
+      "id": "WATCH_CLEAN_ROOM_ENGINE_OWNER_PASS",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. lastUpdateTime 2026-09-09 13:07:46. Measured T0→T1 = 49ms. Owner: كلشي تمام. Current Fold6 Watch known-good. Phase 1 20% lock at f1e85475 / 40b685de remains historical.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/**/*.test.ts",
+        "src/lib/feed/optimisticWatchPublish.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": [
+        "app/(tabs)/watch.tsx",
+        "app/(tabs)/create.tsx",
+        "components/WatchEngineHost.tsx",
+        "components/WatchVideoCard.tsx",
+        "src/lib/watch/engine/**",
+        "src/lib/feed/optimisticWatchPublish.ts"
+      ],
+      "dependent_files": [
+        "src/lib/video/optimisticPublishPipeline.ts",
+        "src/lib/video/optimisticPublishDeps.ts"
+      ]
+    },
+    {
+      "id": "WATCH_ENGINE_TEXTUREVIEW",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. TextureView surface. Black screen fixed.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/visual.test.ts",
+        "src/lib/watch/engine/readiness.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "owning_files": [
+        "src/lib/watch/engine/WatchEnginePlayer.tsx",
+        "src/lib/watch/engine/visual.ts"
+      ],
+      "dependent_files": [
+        "components/WatchEngineHost.tsx",
+        "app/(tabs)/watch.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_ENGINE_READY_TO_RENDER",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Readiness ready-to-render before play.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/readiness.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "BLACK_VIDEO_SURFACE",
+      "owning_files": [
+        "src/lib/watch/engine/readiness.ts",
+        "src/lib/watch/engine/WatchEnginePlayer.tsx"
+      ],
+      "dependent_files": [
+        "components/WatchEngineHost.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_NO_HORIZONTAL_CROP_ON_FOLD6_COVER",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. contentFit contain. No horizontal crop on Fold6 cover.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/contentFit.test.ts",
+        "src/lib/watch/watchVideoFit.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "FOLD6_HORIZONTAL_CROP",
+      "owning_files": [
+        "src/lib/watch/engine/WatchEnginePlayer.tsx",
+        "src/lib/watch/watchVideoFit.ts"
+      ],
+      "dependent_files": [
+        "components/WatchEngineHost.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_TAP_PAUSE_RESUME",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Play/Pause tap confirmed.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/tapPause.test.ts",
+        "src/lib/watch/watchGestures.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": null,
+      "owning_files": [
+        "src/lib/watch/engine/WatchEnginePlayer.tsx",
+        "src/lib/watch/watchGestures.ts",
+        "components/WatchEngineHost.tsx"
+      ],
+      "dependent_files": [
+        "app/(tabs)/watch.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_ENGINE_COMMIT_FRACTION_0_1",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Clean-room swipe threshold 10% (WATCH_ENGINE_COMMIT_FRACTION = 0.1). Phase 1 20% lock at f1e85475 remains historical.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/gesture.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "10_PERCENT_ENGINE_SWIPE_MISSING",
+      "owning_files": [
+        "src/lib/watch/engine/gesture.ts"
+      ],
+      "dependent_files": [
+        "src/lib/watch/engine/snap.ts",
+        "components/WatchEngineHost.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_ENGINE_SNAP_DURATION_MS_120",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Snap 120ms OWNER_PASS (WATCH_ENGINE_SNAP_DURATION_MS = 120).",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/watch/engine/snap.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "SNAP_DURATION_NOT_120",
+      "owning_files": [
+        "src/lib/watch/engine/snap.ts"
+      ],
+      "dependent_files": [
+        "components/WatchEngineHost.tsx"
+      ]
+    },
+    {
+      "id": "WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD",
+      "owner_status": "OWNER_PASS",
+      "last_known_accepted_evidence": "Owner Fold6 RFCX718LVHK / SM-F956B PASS 2026-09-09 on aa57b8ae / EAS 62bafb12. Optimistic Publish: local video visible almost immediately, measured T0→T1 = 49ms, background upload, same-item reconciliation, no duplicate, no black frame on handoff, position preserved. lastUpdateTime 2026-09-09 13:07:46.",
+      "reference_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "reference_branch": "origin/desktop/watch-owner-pass-aa57b8ae",
+      "regression_tests": [
+        "src/lib/feed/optimisticWatchPublish.test.ts",
+        "src/lib/video/optimisticPublishPipeline.test.ts"
+      ],
+      "device_required": true,
+      "failure_signature": "PUBLISH_LOCAL_NOT_VISIBLE_BEFORE_UPLOAD",
+      "owning_files": [
+        "src/lib/feed/optimisticWatchPublish.ts",
+        "src/lib/video/optimisticPublishPipeline.ts",
+        "app/(tabs)/create.tsx",
+        "app/(tabs)/watch.tsx"
+      ],
+      "dependent_files": [
+        "src/lib/video/optimisticPublishDeps.ts",
+        "components/WatchEngineHost.tsx"
+      ]
     }
   ]
 }

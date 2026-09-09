@@ -6,10 +6,10 @@
     "serial": "RFCX718LVHK",
     "name": "Galaxy Z Fold6"
   },
-  "current_installed_device_sha": "f1e85475b5ab19b09884f70bc370ff77afe43905",
-  "current_installed_eas_build_id": "40b685de-2efc-4fd5-b8e1-31cacd8e8397",
-  "current_fold6_watch_status": "PHASE1_20_PERCENT_OWNER_PASS_LOCKED",
-  "notes": "OWNER_PASS is never inferred from unit tests. Watch Phase 1 ~20% short swipe is Fold6 OWNER_PASS at f1e85475 / 40b685de. UM Streak live camera + retention remains OWNER_PASS at 11c0719 / e6ece863. Do not treat newest unrelated commit as baseline.",
+  "current_installed_device_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+  "current_installed_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+  "current_fold6_watch_status": "CLEAN_ROOM_ENGINE_OWNER_PASS_LOCKED",
+  "notes": "OWNER_PASS is never inferred from unit tests. Current Fold6 Watch known-good is the clean-room engine OWNER_PASS at aa57b8ae / 62bafb12 (lastUpdateTime 2026-09-09 13:07:46, T0→T1 49ms, owner كلشي تمام). Historical Phase 1 ~20% short swipe remains OWNER_PASS locked at f1e85475 / 40b685de — do not overwrite that lock. UM Streak live camera + retention remains OWNER_PASS at 11c0719 / e6ece863. Do not treat newest unrelated commit as baseline.",
   "baselines": [
     {
       "feature_id": "WATCH_DEVICE_ROLLBACK_1C56ACA",
@@ -102,7 +102,160 @@
       "known_failure_signatures": ["20_PERCENT_SHORT_SWIPE_MISSING"],
       "supersedes": ["WATCH_80_PERCENT_HANDOFF"],
       "superseded_by": null,
-      "notes": "Owner Fold6 PASS. Short ~20% vertical release commits next/previous. Tiny movement stays. Fast same-direction flick may commit. Phase 2/3 must not change this gesture without OWNER GO."
+      "notes": "HISTORICAL Phase 1 OWNER_PASS. Short ~20% vertical release commits next/previous. Tiny movement stays. Fast same-direction flick may commit. Do not overwrite. Current Fold6 Watch known-good is the clean-room engine at aa57b8ae / 62bafb12."
+    },
+    {
+      "feature_id": "WATCH_CLEAN_ROOM_ENGINE_OWNER_PASS",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "accepted_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-09",
+      "required_files": [
+        "app/(tabs)/watch.tsx",
+        "app/(tabs)/create.tsx",
+        "components/WatchEngineHost.tsx",
+        "components/WatchVideoCard.tsx",
+        "src/lib/watch/engine/**",
+        "src/lib/feed/optimisticWatchPublish.ts"
+      ],
+      "protected_files": [
+        "app/(tabs)/watch.tsx",
+        "app/(tabs)/create.tsx",
+        "components/WatchEngineHost.tsx",
+        "components/WatchVideoCard.tsx",
+        "src/lib/watch/engine/**",
+        "src/lib/feed/optimisticWatchPublish.ts"
+      ],
+      "regression_tests": [
+        "src/lib/watch/engine/**/*.test.ts",
+        "src/lib/feed/optimisticWatchPublish.test.ts"
+      ],
+      "device_tests": [
+        "WATCH_NO_BLACK_SURFACE",
+        "WATCH_ENGINE_TEXTUREVIEW",
+        "WATCH_ENGINE_READY_TO_RENDER",
+        "WATCH_FOLD6_CONTAIN_FOLDED",
+        "WATCH_NO_HORIZONTAL_CROP_ON_FOLD6_COVER",
+        "WATCH_PLAY_PAUSE",
+        "WATCH_TAP_PAUSE_RESUME",
+        "WATCH_PROGRESS_DIRECTION",
+        "WATCH_SEEK_DIRECTION",
+        "WATCH_ENGINE_COMMIT_FRACTION_0_1",
+        "WATCH_ENGINE_SNAP_DURATION_MS_120",
+        "WATCH_PLAYER_BINDING",
+        "WATCH_NO_SNAPBACK",
+        "WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD"
+      ],
+      "dependencies": ["watch", "media_video", "create_editor"],
+      "known_failure_signatures": [
+        "BLACK_VIDEO_SURFACE",
+        "NEXT_SWIPE_SNAPBACK_TO_FIRST",
+        "FOLD6_HORIZONTAL_CROP",
+        "10_PERCENT_ENGINE_SWIPE_MISSING",
+        "SNAP_DURATION_NOT_120",
+        "PUBLISH_LOCAL_NOT_VISIBLE_BEFORE_UPLOAD"
+      ],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Current Fold6 Watch known-good. Owner كلشي تمام. lastUpdateTime 2026-09-09 13:07:46. T0→T1 49ms. Black screen fixed, TextureView, contain, ready-to-render, play/pause, progress+scrub, 10% swipe, 120ms snap, no snapback, optimistic Publish, local visible, background upload, same-item reconcile, no duplicate, no black handoff, position preserved. Phase 1 20% lock at f1e85475 / 40b685de remains historical."
+    },
+    {
+      "feature_id": "WATCH_NO_BLACK_SURFACE",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "accepted_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-09",
+      "required_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/engine/WatchEnginePlayer.tsx",
+        "src/lib/watch/engine/visual.ts"
+      ],
+      "protected_files": [
+        "app/(tabs)/watch.tsx",
+        "src/lib/watch/engine/WatchEnginePlayer.tsx",
+        "src/lib/watch/engine/visual.ts"
+      ],
+      "regression_tests": [
+        "src/lib/watch/engine/visual.test.ts",
+        "src/lib/watch/engine/readiness.test.ts"
+      ],
+      "device_tests": ["WATCH_NO_BLACK_SURFACE"],
+      "dependencies": ["watch", "media_video"],
+      "known_failure_signatures": ["BLACK_VIDEO_SURFACE"],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Owner Fold6 PASS 2026-09-09. Black screen fixed. TextureView."
+    },
+    {
+      "feature_id": "WATCH_ENGINE_COMMIT_FRACTION_0_1",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "accepted_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-09",
+      "required_files": ["src/lib/watch/engine/gesture.ts"],
+      "protected_files": ["src/lib/watch/engine/gesture.ts"],
+      "regression_tests": ["src/lib/watch/engine/gesture.test.ts"],
+      "device_tests": ["WATCH_ENGINE_COMMIT_FRACTION_0_1"],
+      "dependencies": ["watch"],
+      "known_failure_signatures": ["10_PERCENT_ENGINE_SWIPE_MISSING"],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Clean-room 10% swipe OWNER_PASS. Does not overwrite historical Phase 1 20% lock at f1e85475 / 40b685de."
+    },
+    {
+      "feature_id": "WATCH_ENGINE_SNAP_DURATION_MS_120",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "accepted_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-09",
+      "required_files": ["src/lib/watch/engine/snap.ts"],
+      "protected_files": ["src/lib/watch/engine/snap.ts"],
+      "regression_tests": ["src/lib/watch/engine/snap.test.ts"],
+      "device_tests": ["WATCH_ENGINE_SNAP_DURATION_MS_120"],
+      "dependencies": ["watch"],
+      "known_failure_signatures": ["SNAP_DURATION_NOT_120"],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Snap 120ms OWNER_PASS on aa57b8ae / 62bafb12."
+    },
+    {
+      "feature_id": "WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD",
+      "product_area": "watch",
+      "owner_status": "OWNER_PASS",
+      "accepted_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+      "accepted_eas_build_id": "62bafb12-d89f-4e30-8842-28b391cb3c8d",
+      "accepted_device": "RFCX718LVHK / SM-F956B",
+      "accepted_date": "2026-09-09",
+      "required_files": [
+        "src/lib/feed/optimisticWatchPublish.ts",
+        "src/lib/video/optimisticPublishPipeline.ts",
+        "app/(tabs)/create.tsx",
+        "app/(tabs)/watch.tsx"
+      ],
+      "protected_files": [
+        "src/lib/feed/optimisticWatchPublish.ts",
+        "src/lib/video/optimisticPublishPipeline.ts",
+        "app/(tabs)/create.tsx",
+        "app/(tabs)/watch.tsx"
+      ],
+      "regression_tests": [
+        "src/lib/feed/optimisticWatchPublish.test.ts",
+        "src/lib/video/optimisticPublishPipeline.test.ts"
+      ],
+      "device_tests": ["WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD"],
+      "dependencies": ["watch", "create_editor", "media_video"],
+      "known_failure_signatures": ["PUBLISH_LOCAL_NOT_VISIBLE_BEFORE_UPLOAD"],
+      "supersedes": [],
+      "superseded_by": null,
+      "notes": "Optimistic Publish OWNER_PASS. Local video visible almost immediately. T0→T1 49ms. Background upload. Same-item reconcile. No duplicate. No black handoff. Position preserved."
     },
     {
       "feature_id": "WATCH_7536C11_SOURCE_RESTORE_REJECTED",

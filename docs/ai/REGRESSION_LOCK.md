@@ -27,3 +27,5 @@ Default EAS budget is 1. This tooling does not call EAS.
 `src/lib/regressionLock/**` is excluded from the app `tsc` project (Node CLI tooling). Guard coverage is `npm run test -- src/lib/regressionLock`.
 
 OWNER_PASS freeze updates `UMTUBA_BASELINES.json` only after owner device evidence is recorded. Locked contracts cannot be silently superseded.
+
+Current Fold6 Watch known-good is clean-room engine `aa57b8ae` / EAS `62bafb12` (`CLEAN_ROOM_ENGINE_OWNER_PASS_LOCKED`). Historical Phase 1 ~20% swipe remains locked at `f1e85475` / `40b685de`.

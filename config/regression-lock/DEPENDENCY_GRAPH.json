@@ -22,14 +22,22 @@
         "WATCH_NO_BLACK_SURFACE",
         "WATCH_NO_AUDIO_BLEED",
         "WATCH_NO_SNAPBACK",
-        "WATCH_5_VIDEO_ROLLING_CACHE"
+        "WATCH_5_VIDEO_ROLLING_CACHE",
+        "WATCH_CLEAN_ROOM_ENGINE_OWNER_PASS",
+        "WATCH_ENGINE_TEXTUREVIEW",
+        "WATCH_ENGINE_READY_TO_RENDER",
+        "WATCH_NO_HORIZONTAL_CROP_ON_FOLD6_COVER",
+        "WATCH_TAP_PAUSE_RESUME",
+        "WATCH_ENGINE_COMMIT_FRACTION_0_1",
+        "WATCH_ENGINE_SNAP_DURATION_MS_120",
+        "WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD"
       ]
     },
     "create_editor": {
       "globs": ["app/(tabs)/create.tsx", "src/lib/video/**"],
       "depends_on": ["media_video", "audio"],
       "expands_tests": ["src/lib/video/**/*.test.ts"],
-      "expands_contracts": []
+      "expands_contracts": ["WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD"]
     },
     "messages": {
       "globs": [

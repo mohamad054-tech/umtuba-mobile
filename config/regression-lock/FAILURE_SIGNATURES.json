@@ -12,10 +12,11 @@
       ],
       "reference_builds": [
         "1c56aca / 9c1b9429 (installed rollback)",
-        "7536c11 / bcb12f31 (rejected)"
+        "7536c11 / bcb12f31 (rejected)",
+        "aa57b8ae / 62bafb12 OWNER_PASS"
       ],
-      "resolved": false,
-      "prevention_test": "src/lib/watch/watchCellBinding.test.ts",
+      "resolved": true,
+      "prevention_test": "src/lib/watch/engine/visual.test.ts",
       "device_required": true
     },
     {
@@ -39,8 +40,8 @@
         "src/lib/watch/watchViewport.ts",
         "app/(tabs)/watch.tsx"
       ],
-      "reference_builds": ["1c56aca / 9c1b9429", "7536c11 / bcb12f31"],
-      "resolved": false,
+      "reference_builds": ["1c56aca / 9c1b9429", "7536c11 / bcb12f31", "aa57b8ae / 62bafb12 OWNER_PASS"],
+      "resolved": true,
       "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
       "device_required": true
     },
@@ -51,8 +52,8 @@
         "app/(tabs)/watch.tsx",
         "src/lib/watch/watchCellBinding.ts"
       ],
-      "reference_builds": ["7536c11 / bcb12f31"],
-      "resolved": false,
+      "reference_builds": ["7536c11 / bcb12f31", "aa57b8ae / 62bafb12 OWNER_PASS"],
+      "resolved": true,
       "prevention_test": "src/lib/watch/watchCellBinding.test.ts",
       "device_required": true
     },
@@ -64,8 +65,8 @@
         "src/lib/watch/watchViewport.ts",
         "app/(tabs)/watch.tsx"
       ],
-      "reference_builds": ["7536c11 / bcb12f31"],
-      "resolved": false,
+      "reference_builds": ["7536c11 / bcb12f31", "aa57b8ae / 62bafb12 OWNER_PASS"],
+      "resolved": true,
       "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
       "device_required": true
     },
@@ -98,16 +99,16 @@
       "symptom": "Folded Fold6 Watch frame is cropped left/right (cover/ZOOM).",
       "likely_modules": ["src/lib/watch/watchVideoFit.ts"],
       "reference_builds": [],
-      "resolved": false,
-      "prevention_test": "src/lib/watch/watchVideoFit.ts",
+      "resolved": true,
+      "prevention_test": "src/lib/watch/engine/contentFit.test.ts",
       "device_required": true
     },
     {
       "id": "FOLD6_VERTICAL_CROP",
       "symptom": "Unfolded Fold6 Watch frame is cropped top/bottom (cover/ZOOM).",
       "likely_modules": ["src/lib/watch/watchVideoFit.ts"],
-      "reference_builds": [],
-      "resolved": false,
+      "reference_builds": ["aa57b8ae / 62bafb12 OWNER_PASS"],
+      "resolved": true,
       "prevention_test": "src/lib/watch/watchVideoFit.ts",
       "device_required": true
     },
@@ -116,7 +117,7 @@
       "symptom": "Watch progress/seek runs the wrong horizontal direction.",
       "likely_modules": ["src/lib/watch/playbackPolicy.ts"],
       "reference_builds": [],
-      "resolved": false,
+      "resolved": true,
       "prevention_test": "src/lib/watch/playbackPolicy.test.ts",
       "device_required": false
     },
@@ -157,6 +158,50 @@
       ],
       "resolved": false,
       "prevention_test": "src/lib/watch/watchActiveIndexArbiter.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "10_PERCENT_ENGINE_SWIPE_MISSING",
+      "symptom": "Clean-room engine requires more than a 10% vertical swipe to commit the next/previous page.",
+      "likely_modules": [
+        "src/lib/watch/engine/gesture.ts",
+        "components/WatchEngineHost.tsx"
+      ],
+      "reference_builds": [
+        "aa57b8ae / 62bafb12 OWNER_PASS"
+      ],
+      "resolved": true,
+      "prevention_test": "src/lib/watch/engine/gesture.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "SNAP_DURATION_NOT_120",
+      "symptom": "Clean-room engine post-release snap is not 120ms.",
+      "likely_modules": [
+        "src/lib/watch/engine/snap.ts",
+        "components/WatchEngineHost.tsx"
+      ],
+      "reference_builds": [
+        "aa57b8ae / 62bafb12 OWNER_PASS"
+      ],
+      "resolved": true,
+      "prevention_test": "src/lib/watch/engine/snap.test.ts",
+      "device_required": true
+    },
+    {
+      "id": "PUBLISH_LOCAL_NOT_VISIBLE_BEFORE_UPLOAD",
+      "symptom": "Publish waits for upload/DB before the local file:// video is visible in Watch.",
+      "likely_modules": [
+        "src/lib/feed/optimisticWatchPublish.ts",
+        "src/lib/video/optimisticPublishPipeline.ts",
+        "app/(tabs)/create.tsx",
+        "app/(tabs)/watch.tsx"
+      ],
+      "reference_builds": [
+        "aa57b8ae / 62bafb12 OWNER_PASS T0-T1 49ms"
+      ],
+      "resolved": true,
+      "prevention_test": "src/lib/feed/optimisticWatchPublish.test.ts",
       "device_required": true
     }
   ]
