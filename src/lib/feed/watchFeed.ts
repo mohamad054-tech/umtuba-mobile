@@ -10,6 +10,8 @@ import {
   type WatchFeedPage,
   type WatchVideo,
 } from "@/src/contracts/watch";
+import { listUgcBlockIds, toBlockedIdSet } from "@/src/lib/safety/blocks";
+import { filterVideosByBlockedAuthors } from "@/src/lib/safety/ugcPolicy";
 import { loadViewerInteractionState } from "@/src/lib/social/interactions";
 
 export type VideoPostRow = {
@@ -196,15 +198,23 @@ export async function fetchWatchFeedPage(
     data: { user },
   } = await supabase.auth.getUser();
 
+  const blocked = user
+    ? await listUgcBlockIds(supabase)
+    : { ok: true as const, ids: [] as string[] };
+  const blockedIds = toBlockedIdSet(blocked.ok ? blocked.ids : []);
+  const visibleRows = pageRows.filter(
+    (row) => !row.user_id || !blockedIds.has(row.user_id)
+  );
+
   const viewerState = await loadViewerInteractionState(
     supabase,
     user?.id,
-    pageRows.map((row) => row.id)
+    visibleRows.map((row) => row.id)
   );
 
   const videos: WatchVideo[] = [];
 
-  for (const row of pageRows) {
+  for (const row of visibleRows) {
     const playbackUrl = await resolvePlaybackUrl(supabase, row);
     if (!playbackUrl) continue;
     const state = viewerState.get(row.id);
@@ -218,6 +228,8 @@ export async function fetchWatchFeedPage(
     );
   }
 
+  const filtered = filterVideosByBlockedAuthors(videos, blockedIds);
+
   const lastRow = pageRows[pageRows.length - 1];
   const nextCursor: WatchFeedCursor | null =
     hasMore && lastRow
@@ -225,7 +237,7 @@ export async function fetchWatchFeedPage(
       : null;
 
   return {
-    videos,
+    videos: filtered,
     nextCursor,
     usedDemoFallback: false,
   };

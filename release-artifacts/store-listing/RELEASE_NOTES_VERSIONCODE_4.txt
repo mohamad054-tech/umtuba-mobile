@@ -1,0 +1,9 @@
+What's new in 1.0.0 (versionCode 4)
+
+• Report a video or an account from Watch
+• Report or block someone from Messages
+• Blocked accounts are hidden from Watch, Discover, and Messages
+• You must accept UMTUBA Terms before publishing a video
+• Settings now includes Delete account and Blocked users
+
+Live is not available in this release.

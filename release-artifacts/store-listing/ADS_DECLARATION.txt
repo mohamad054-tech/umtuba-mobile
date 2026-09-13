@@ -1,0 +1,3 @@
+SCREEN/PATH = Play Console → Policy → App content → Ads
+EXACT OPTION = No, my app does not contain ads
+WHY = umtuba-mobile package.json has no AdMob / ads SDK. This binary does not serve ads.

@@ -1,0 +1,21 @@
+Play Console → Policy → App content → App access (already entered — do not reopen unless asked)
+
+Reviewer username:
+google-play-review@umtuba.com
+
+Password:
+Operator-local only. Read umtuba-mobile/.env.play-review.local
+Do not paste the password into chat, tickets, or this packet.
+
+How to review:
+1. Install the Internal testing / Closed testing build for com.umtuba.app
+2. Sign in with the reviewer account
+3. Watch — play a public video; tap Report (⚑) to report the video or account, or block
+4. Discover — browse cards (blocked creators are hidden)
+5. Create — pick a gallery video, tick the Terms checkbox, publish
+6. Messages — open a thread; use Report or block
+7. Settings → Delete account — opens https://umtuba.com/account-deletion
+8. Settings → Blocked users — list / unblock
+9. Live is intentionally unavailable
+
+Do not use this account for Store QA. Store QA is store-qa@umtuba.com (separate).

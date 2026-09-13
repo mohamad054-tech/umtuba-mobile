@@ -1,0 +1,9 @@
+SCREEN/PATH = Play Console → Grow → Store presence → Store settings
+App category = Social
+Tags (if shown) = Social; Video Players & Editors only if a second tag is required
+Website = https://umtuba.com
+Privacy policy = https://umtuba.com/privacy
+Email = the Play developer-account contact email you already use
+  Do not invent support@ or a new public mailbox.
+  Do not use google-play-review@umtuba.com (reviewer login, not store contact).
+Phone = leave blank unless Console requires it

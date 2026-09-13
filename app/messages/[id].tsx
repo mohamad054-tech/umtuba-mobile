@@ -16,9 +16,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { UgcSafetySheet, type UgcSafetyTarget } from "@/components/UgcSafetySheet";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   assertConversationMembership,
+  getConversationPeerId,
   getConversationPeerState,
   listMessagesForConversation,
   markConversationRead,
@@ -27,6 +29,8 @@ import {
   setConversationTyping,
   subscribeMessengerRealtime,
 } from "@/src/lib/messenger/api";
+import { blockUgcUser } from "@/src/lib/safety/blocks";
+import { reportUgcUser } from "@/src/lib/safety/reports";
 import { clearDraft, loadDraft, saveDraft } from "@/src/lib/messenger/drafts";
 import { mapMessengerMessageRow } from "@/src/lib/messenger/mapMessage";
 import {
@@ -77,6 +81,13 @@ export default function ConversationThreadScreen() {
   const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [appActive, setAppActive] = useState(true);
+  const [peerId, setPeerId] = useState<string | null>(null);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  const [safetyBusy, setSafetyBusy] = useState(false);
+  const [safetyError, setSafetyError] = useState<string | null>(null);
+  const [safetyConfirmation, setSafetyConfirmation] = useState<string | null>(
+    null
+  );
 
   const scrollToEnd = useCallback((animated = true) => {
     requestAnimationFrame(() => {
@@ -103,10 +114,11 @@ export default function ConversationThreadScreen() {
         return;
       }
 
-      const peer = await getConversationPeerState(
-        getSupabase(),
-        conversationId
-      );
+      const [peer, loadedPeerId] = await Promise.all([
+        getConversationPeerState(getSupabase(), conversationId),
+        getConversationPeerId(getSupabase(), conversationId),
+      ]);
+      if (loadedPeerId) setPeerId(loadedPeerId);
       const peerRead = peer.ok ? peer.peerLastReadAt : null;
       if (peer.ok) {
         setPeerTyping(peer.isTyping);
@@ -333,6 +345,10 @@ export default function ConversationThreadScreen() {
     [conversationId, draft, scrollToEnd, sending, user]
   );
 
+  const safetyTarget: UgcSafetyTarget | null = peerId
+    ? { userId: peerId, displayName: "This conversation" }
+    : null;
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -379,6 +395,20 @@ export default function ConversationThreadScreen() {
       keyboardVerticalOffset={Platform.OS === "android" ? 24 : 0}
     >
       <View style={styles.root}>
+        {peerId ? (
+          <Pressable
+            style={styles.safetyBar}
+            onPress={() => {
+              setSafetyError(null);
+              setSafetyConfirmation(null);
+              setSafetyOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Report or block this account"
+          >
+            <Text style={styles.safetyBarText}>Report or block</Text>
+          </Pressable>
+        ) : null}
         {peerTyping ? (
           <Text
             style={styles.typing}
@@ -518,6 +548,55 @@ export default function ConversationThreadScreen() {
           Text only — attachments, voice notes, stickers, groups, and calls are
           not available yet.
         </Text>
+        <UgcSafetySheet
+          visible={safetyOpen}
+          viewerId={user?.id}
+          target={safetyTarget}
+          busy={safetyBusy}
+          error={safetyError}
+          confirmation={safetyConfirmation}
+          onClose={() => setSafetyOpen(false)}
+          onReportContent={() => undefined}
+          onReportUser={(reason, detail) => {
+            if (!peerId) return;
+            void (async () => {
+              setSafetyBusy(true);
+              setSafetyError(null);
+              const result = await reportUgcUser(getSupabase(), {
+                userId: peerId,
+                reasonCode: reason,
+                detail,
+              });
+              setSafetyBusy(false);
+              if (!result.ok) {
+                setSafetyError(result.message);
+                return;
+              }
+              setSafetyConfirmation(
+                "Thanks. We received your report and will review this account."
+              );
+            })();
+          }}
+          onBlockUser={() => {
+            if (!peerId) return;
+            void (async () => {
+              setSafetyBusy(true);
+              setSafetyError(null);
+              const result = await blockUgcUser(getSupabase(), user?.id, peerId);
+              setSafetyBusy(false);
+              if (!result.ok) {
+                setSafetyError(result.message);
+                return;
+              }
+              setSafetyConfirmation(
+                "Account blocked. You will no longer see their messages."
+              );
+              setTimeout(() => {
+                router.replace("/(tabs)/messages");
+              }, 600);
+            })();
+          }}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -525,6 +604,17 @@ export default function ConversationThreadScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  safetyBar: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  safetyBarText: {
+    color: colors.accentCyan,
+    fontWeight: "700",
+  },
   center: {
     flex: 1,
     backgroundColor: colors.bg,

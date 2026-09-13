@@ -1,0 +1,15 @@
+PLAY_STORE_ASSETS_READY = PARTIAL
+STORE_GRAPHICS_OPERATOR_REQUIRED = YES (phone screenshots)
+
+Prepared from current product assets (not uploaded to Play):
+- Icon source: umtuba-mobile/assets/images/icon.png (1024×1024 geometric chevron, dark; not child-cartoon)
+- Feature graphic: umtuba-mobile/release-artifacts/store-listing/feature-graphic-1024x500.png
+  Generated from the existing icon on the product background #050510
+
+Missing — cannot invent without a device:
+- Phone screenshots (≥2 required). Capture from Internal Testing / Closed testing on a real device:
+  Watch (with Report visible), Discover, Create (Terms checkbox), Messages (Report or block)
+- 7-inch / 10-inch tablet screenshots if Console asks
+- Feature graphic is prepared locally; operator still must upload it
+
+Do not upload fake or mocked UI screenshots.

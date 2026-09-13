@@ -1,0 +1,47 @@
+﻿{
+  "id": "86c0d773-7072-4f0a-bf97-52349cde3f21",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "artifacts": {
+    "buildUrl": "https://expo.dev/artifacts/eas/gS81ENTpesTyRibnGSeph4csBNdir0vx6u3UwAd756s.aab",
+    "applicationArchiveUrl": "https://expo.dev/artifacts/eas/gS81ENTpesTyRibnGSeph4csBNdir0vx6u3UwAd756s.aab"
+  },
+  "fingerprint": {
+    "id": "019ff7e2-ce06-7819-9f29-be7a1aebec4d",
+    "hash": "e61c61269412e24643b0b9c8d15afa9c3a4758b9"
+  },
+  "initiatingActor": {
+    "id": "b272aed1-369f-4528-b362-e55c5a622af2",
+    "displayName": "mohamadabutair"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/d2593b45-8f18-4c57-9d71-0419193cfd77/86c0d773-7072-4f0a-bf97-52349cde3f21/2026-08-12T21%3A31%3A09Z-df09f63e-bd50-473b-b349-10854e478b62.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260812%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260812T215956Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=0f60f38ed093328acb25c187bc37d7eb3b7c71544738a1bec8540cae0b1650db907bad11c36b10abbd9a54b860d143e77c008d2c3b6f6e06fdf0ecaa9271b1c1a669704a24439d579b2430e6586b6905949345286749293efb25be007100656c4f09ea525af94b27ade96f5a7b81236e17bc34cf3b72d4a19c8f473e799297612cf1122d5397abf701cd502b571b69878e9c33d80d213a842ca59ae27583f9fef0c7ee0d9707ae654e4215cfde29c98e8ce461598886078a0951df9b03bfd8443fd97cb3acf9a7399aaa0f985fe54efc951ee1b2dbefd4c1e5c8a41bf8366095cc13fbcb5dde1e197076c506c00237687407600ef7660c596658c230233984d1"
+  ],
+  "project": {
+    "id": "d2593b45-8f18-4c57-9d71-0419193cfd77",
+    "name": "UMTUBA",
+    "slug": "umtuba-mobile",
+    "ownerAccount": {
+      "id": "313f9686-6fce-4a77-a7c2-9d3e3aca0410",
+      "name": "umtuba"
+    }
+  },
+  "distribution": "STORE",
+  "buildProfile": "production",
+  "sdkVersion": "57.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "2",
+  "gitCommitHash": "fe14a34e7d5d10f8fd6fe2f1845e3bd81ffe2f99",
+  "gitCommitMessage": "feat(mobile): harden world product surface v1",
+  "priority": "NORMAL",
+  "createdAt": "2026-08-12T21:31:04.019Z",
+  "updatedAt": "2026-08-12T21:45:22.520Z",
+  "completedAt": "2026-08-12T21:45:22.327Z",
+  "expirationDate": "2026-09-11T21:31:04.059Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 2245,
+    "buildQueueTime": 7876,
+    "buildDuration": 848187
+  }
+}

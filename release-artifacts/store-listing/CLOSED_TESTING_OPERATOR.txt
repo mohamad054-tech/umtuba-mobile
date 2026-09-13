@@ -1,0 +1,36 @@
+CLOSED_TESTING_OPTED_IN_COUNT = UNKNOWN
+Do not treat the email list (≥17) as opted-in testers.
+
+How to get the Closed testing opt-in URL
+1. Play Console → UMTUBA (com.umtuba.app) → Test and release → Testing → Closed testing
+2. Open Testers
+3. Copy the opt-in URL (join link). It looks like https://play.google.com/apps/testing/com.umtuba.app
+4. Send that URL to testers who are already on the email list
+
+What testers must do
+1. Open the opt-in URL while signed into the Google account that is on the tester list
+2. Tap Become a tester / Accept
+3. Install from the Play Store testing link on that same account
+4. Stay opted in. Leaving the program stops the 14-day clock for that seat
+
+How to verify opted-in count
+1. Same Testers page
+2. Read “Opted-in” (or equivalent), NOT the email-list membership count
+3. Record the number and the date
+
+When the 14-day clock starts
+Official rule for personal Play developer accounts created after 13 Nov 2023:
+https://support.google.com/googleplay/android-developer/answer/14151465
+The clock starts only after ≥12 testers are opted in continuously.
+Email-list membership does not start the clock.
+
+How to confirm Production access eligibility
+1. Publishing overview → look for Closed testing / production access
+2. If the account is an Organization, or a personal account created before 13 Nov 2023, confirm whether this gate applies
+3. Do not click Apply for production until:
+   - opted-in ≥12 for 14 continuous days (if the gate applies)
+   - versionCode 4 AAB is uploaded
+   - UGC / listing / IARC / Ads cards are saved
+   - you give an explicit GO
+
+Do not invent an opted-in count.

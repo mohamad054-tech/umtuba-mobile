@@ -1,0 +1,23 @@
+SCREEN/PATH = Play Console → Policy → App content → Content ratings → Start
+Category = Social Networking (or Social / Communication — not Game, not Utility)
+IARC email = the Play developer-account email you already use
+
+Designed first-party content:
+  Violence / blood / gore = NO
+  Sexual content / nudity as a featured product = NO
+  Strong language as featured product = NO
+  Drugs / alcohol / tobacco as featured product = NO
+  Gambling / simulated gambling / loot boxes = NO
+  Horror as featured product = NO
+
+Interactive elements:
+  Users can interact / communicate with each other = YES (public Watch + 1:1 Messages)
+  Users can share videos / text = YES (Create captions + Messages)
+  Users can share location = NO
+  Digital purchases / in-app purchases = NO (no Stripe / Play Billing / IAP)
+  Unrestricted internet / user-shared media others can see = YES (public Watch UGC)
+  Shares user’s personal info with other users = YES (username / public profile on Watch)
+  UGC present = YES
+  In-app moderation tools (report content, report users, block users) = YES in versionCode 4
+
+Do not retake the form to force Everyone. Social UGC + chat typically yields Teen / Parental Guidance.

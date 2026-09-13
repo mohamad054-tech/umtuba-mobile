@@ -1,0 +1,21 @@
+Ages already selected — do not change:
+  13–15 = YES
+  16–17 = YES
+  18 and over = YES
+  5 and under / 6–8 / 9–12 = NO
+
+App details:
+  Designed for children / primarily for children under 13 = NO
+  Appeals to children (if asked) = NO
+  Restrict Minor Access = DO NOT ENABLE
+
+If a free-text describe-the-app box appears:
+  UMTUBA is a social video app for people 13 and older. Users watch public videos, publish their own clips, and send 1:1 messages. It is not designed for children under 13.
+
+Ads (Families / neutral age screen):
+  App does not serve ads.
+
+Store presence:
+  Do NOT apply for Teacher Approved.
+
+Then Summary → Review and Save.

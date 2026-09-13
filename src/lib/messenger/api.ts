@@ -1,6 +1,11 @@
 import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 
 import { getErrorMessage } from "@/src/contracts/validation";
+import { listUgcBlockIds, toBlockedIdSet } from "@/src/lib/safety/blocks";
+import {
+  filterConversationsByBlockedPeers,
+  mapUgcRpcError,
+} from "@/src/lib/safety/ugcPolicy";
 import { isMessengerBackendMissing } from "@/src/lib/messenger/backend";
 import { parseConversation } from "@/src/lib/messenger/conversationParse";
 import {
@@ -258,7 +263,13 @@ export async function listConversationsForUser(
       return bTime - aTime;
     });
 
-  return { ok: true, conversations };
+  const blocked = await listUgcBlockIds(supabase);
+  const blockedIds = toBlockedIdSet(blocked.ok ? blocked.ids : []);
+
+  return {
+    ok: true,
+    conversations: filterConversationsByBlockedPeers(conversations, blockedIds),
+  };
 }
 
 export async function listMessagesForConversation(
@@ -322,6 +333,14 @@ export async function getOrCreateDirectConversation(
   supabase: SupabaseClient,
   otherUserId: string
 ): Promise<ActionResult<{ conversationId: string }>> {
+  const blocked = await listUgcBlockIds(supabase);
+  if (blocked.ok && blocked.ids.includes(otherUserId)) {
+    return {
+      ok: false,
+      message: "You cannot message this account because one of you blocked the other.",
+    };
+  }
+
   const { data, error } = await supabase.rpc(
     "get_or_create_direct_conversation",
     { p_other_user_id: otherUserId }
@@ -342,6 +361,9 @@ export async function getOrCreateDirectConversation(
     }
     if (message.includes("invalid conversation peer")) {
       return { ok: false, message: "You cannot message this account." };
+    }
+    if (message.includes("blocked")) {
+      return mapUgcRpcError(error.message, "You cannot message this account.");
     }
     return {
       ok: false,
@@ -425,6 +447,12 @@ export async function sendTextMessage(
     }
 
     console.error("sendTextMessage failed:", error);
+    if ((error.message || "").toLowerCase().includes("blocked")) {
+      return mapUgcRpcError(
+        error.message,
+        "You cannot message this account because one of you blocked the other."
+      );
+    }
     return {
       ok: false,
       message: getErrorMessage(
@@ -478,6 +506,19 @@ export async function setConversationTyping(
     };
   }
   return { ok: true, done: true };
+}
+
+export async function getConversationPeerId(
+  supabase: SupabaseClient,
+  conversationId: string
+): Promise<string | null> {
+  const { data, error } = await supabase.rpc("list_conversation_peers", {
+    p_conversation_ids: [conversationId],
+  });
+  if (error) return null;
+  const peers = (data ?? []) as Array<{ conversation_id: string; user_id?: string }>;
+  const peer = peers.find((row) => row.conversation_id === conversationId);
+  return peer?.user_id ?? null;
 }
 
 export async function getConversationPeerState(

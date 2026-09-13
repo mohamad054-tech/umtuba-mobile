@@ -1,0 +1,20 @@
+{
+  "buildId": "37dde25f-5cb8-4245-ab25-4e357217f6f7",
+  "platform": "android",
+  "status": "finished",
+  "profile": "production",
+  "distribution": "store",
+  "versionName": "1.0.0",
+  "versionCode": 4,
+  "package": "com.umtuba.app",
+  "sdkVersion": "57.0.0",
+  "gitCommitHash": "3b335610ced48aa2595fe49eef5b97511c7f4cb5",
+  "artifactUrl": "https://expo.dev/artifacts/eas/E30A6TXW29yo0u4eZ88budjsXkpSfzAlAcpf8XosOXM.aab",
+  "logsUrl": "https://expo.dev/accounts/umtuba/projects/umtuba-mobile/builds/37dde25f-5cb8-4245-ab25-4e357217f6f7",
+  "localPath": "release-artifacts/umtuba-android-production-37dde25f.aab",
+  "sha256": "C2CD78E0C14B46D02BECDA0C5CBC364F40B8A161832B85FF9FFCEE7E418283E6",
+  "bytes": 102255810,
+  "playUpload": false,
+  "keystore": "Build Credentials p6De1DDtE_ (default)",
+  "signingChanged": false
+}

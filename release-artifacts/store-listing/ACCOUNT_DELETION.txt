@@ -1,0 +1,15 @@
+SCREEN/PATH = Play Console → Policy → App content → Account deletion
+  (separate card from Data safety — do not reopen Data safety)
+
+App allows account creation = YES
+Users can request deletion = YES via web resource AND in-app link
+In-app path in versionCode 4 = Settings → Delete account
+  Opens https://umtuba.com/account-deletion (Linking.openURL)
+  Does NOT delete the account from the mobile client
+  Does NOT use Auth admin / service-role
+
+EXACT URL TO PASTE = https://umtuba.com/account-deletion
+  DO NOT PASTE https://umtuba.com/privacy
+  DO NOT PASTE https://umtuba.com
+
+Skip this card if Publishing overview already shows Account deletion complete.

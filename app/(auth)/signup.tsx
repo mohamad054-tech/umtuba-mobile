@@ -2,10 +2,12 @@ import { Link, Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  View,
 } from "react-native";
 
 import { AuthScreen } from "@/components/AuthScreen";
@@ -15,6 +17,11 @@ import {
   getReferralAttribution,
   saveReferralAttribution,
 } from "@/src/lib/auth/referralAttribution";
+import {
+  UGC_COMMUNITY_POLICY_URL,
+  UGC_SIGNUP_TERMS_LABEL,
+  canAcceptTerms,
+} from "@/src/lib/safety/ugcPolicy";
 import { colors } from "@/src/theme/colors";
 
 export default function SignupScreen() {
@@ -28,6 +35,7 @@ export default function SignupScreen() {
   const [referralCode, setReferralCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   useEffect(() => {
     const fromParam = normalizeReferralCode(
@@ -52,6 +60,10 @@ export default function SignupScreen() {
   }
 
   const onSubmit = async () => {
+    if (!canAcceptTerms(acceptTerms)) {
+      setError("Accept the UMTUBA Terms and community rules to create an account.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -146,17 +158,46 @@ export default function SignupScreen() {
         onChangeText={setReferralCode}
         accessibilityLabel="Referral code, optional"
       />
+      <Pressable
+        style={styles.ackRow}
+        onPress={() => setAcceptTerms((value) => !value)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: acceptTerms }}
+        accessibilityLabel={UGC_SIGNUP_TERMS_LABEL}
+      >
+        <View
+          style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}
+          accessible={false}
+        >
+          {acceptTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        </View>
+        <Text style={styles.ackText}>{UGC_SIGNUP_TERMS_LABEL}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => void Linking.openURL(UGC_COMMUNITY_POLICY_URL)}
+        accessibilityRole="link"
+        accessibilityLabel="Open UMTUBA Terms"
+      >
+        <Text style={styles.termsLink}>Read Terms</Text>
+      </Pressable>
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
         </Text>
       ) : null}
       <Pressable
-        style={[styles.button, busy && styles.buttonDisabled]}
+        style={[
+          styles.button,
+          (busy || !canAcceptTerms(acceptTerms)) && styles.buttonDisabled,
+        ]}
         onPress={() => void onSubmit()}
-        disabled={busy}
+        disabled={busy || !canAcceptTerms(acceptTerms)}
         accessibilityRole="button"
         accessibilityLabel="Create account"
+        accessibilityState={{
+          disabled: busy || !canAcceptTerms(acceptTerms),
+          busy,
+        }}
       >
         {busy ? (
           <ActivityIndicator color={colors.bg} />
@@ -206,5 +247,42 @@ const styles = StyleSheet.create({
   linkStrong: {
     color: colors.accentCyan,
     fontWeight: "700",
+  },
+  ackRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.accentCyan,
+    borderColor: colors.accentCyan,
+  },
+  checkboxMark: {
+    color: colors.bg,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  ackText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: colors.accentCyan,
+    fontWeight: "600",
   },
 });

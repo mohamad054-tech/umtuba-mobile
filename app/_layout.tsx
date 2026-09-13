@@ -208,6 +208,10 @@ export default function RootLayout() {
               <Stack.Screen name="world" options={{ title: "World" }} />
               <Stack.Screen name="settings" options={{ title: "Settings" }} />
               <Stack.Screen
+                name="blocked-users"
+                options={{ title: "Blocked users" }}
+              />
+              <Stack.Screen
                 name="change-password"
                 options={{ title: "Change password" }}
               />

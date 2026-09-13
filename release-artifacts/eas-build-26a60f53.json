@@ -1,0 +1,20 @@
+{
+  "id": "26a60f53-5658-4182-bca4-c0424928b015",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "buildProfile": "production",
+  "distribution": "STORE",
+  "package": "com.umtuba.app",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "3",
+  "sdkVersion": "57.0.0",
+  "artifactUrl": "https://expo.dev/artifacts/eas/FTD5AK_u0eFlbytU6X5Dp2k9_fJPFO7BNIBrDJbqFqY.aab",
+  "localPath": "release-artifacts/umtuba-android-production-26a60f53.aab",
+  "sha256": "61DAC1C62D9CCF85FBAD824B853F28DF24EFD7C2F4DDA3ADBCC0B470522ED70A",
+  "sizeBytes": 102242485,
+  "existingKeystoreUsed": true,
+  "easEnvLoaded": [
+    "EXPO_PUBLIC_SUPABASE_URL",
+    "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+  ]
+}

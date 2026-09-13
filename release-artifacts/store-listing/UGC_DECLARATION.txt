@@ -1,0 +1,20 @@
+SCREEN/PATH = Play Console → Policy → App content → User-generated content
+Answer AFTER versionCode 4 is uploaded (this binary implements the controls).
+
+App contains UGC = YES
+Publicly accessible UGC (social / Watch) = YES
+1:1 user interaction (Messages) = YES
+In-app report content = YES
+  Where: Watch video → Report (⚑) → Report video → choose reason → Submit
+In-app report users = YES
+  Where: Watch → Report account, or Messages thread → Report or block → Report account
+In-app block users = YES
+  Where: Watch / Messages safety sheet → Block account
+  Effects: hidden from Watch + Discover; conversations hidden; new messages rejected
+Users must accept Terms before create/upload = YES
+  Where: Create publish checkbox (required). Signup also requires Terms.
+Account deletion in-app path = YES
+  Settings → Delete account opens https://umtuba.com/account-deletion
+
+Do not claim these answers for versionCode 3. They are true for versionCode 4 only.
+Do not submit for review from this card.

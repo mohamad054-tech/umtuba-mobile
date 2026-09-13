@@ -1,0 +1,24 @@
+App name:
+UMTUBA
+
+Short description (66/80):
+Watch, create, and message on UMTUBA. Social video for talent 13+.
+
+Full description:
+UMTUBA is a social video app for people 13 and older. Watch short videos from creators, publish your own clips, discover new talent, and send 1:1 messages.
+
+What you can do in this Android release:
+• Watch — public creator videos
+• Discover — browse trending and latest videos
+• Create — upload a video from your gallery with a caption
+• Messages — 1:1 text conversations
+• Account — sign in with email and password
+• Safety — report a video or account, block an account, and accept Terms before publishing
+
+Live is not available in this Android release.
+
+UMTUBA is not directed at children under 13. If you are under the age of digital consent or majority where you live, use UMTUBA only with a parent or guardian’s permission.
+
+Privacy: https://umtuba.com/privacy
+Terms: https://umtuba.com/terms
+Delete your account: https://umtuba.com/account-deletion
