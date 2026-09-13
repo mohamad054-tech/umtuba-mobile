@@ -16,5 +16,23 @@
     "eas_build_ids": [
       "e6ece863-3e88-46b5-a26d-80f69a6f1eb2"
     ]
+  },
+  "DESKTOP_WATCH_OPTIMISTIC_UPLOAD_PREVIEW_V1": {
+    "task_id": "DESKTOP_WATCH_OPTIMISTIC_UPLOAD_PREVIEW_V1",
+    "authorized_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+    "max_eas_builds": 1,
+    "build_count": 1,
+    "eas_build_ids": [
+      "62bafb12-d89f-4e30-8842-28b391cb3c8d"
+    ]
+  },
+  "DESKTOP_ANDROID_OWNER_PASS_RELEASE_UPDATE_V1": {
+    "task_id": "DESKTOP_ANDROID_OWNER_PASS_RELEASE_UPDATE_V1",
+    "authorized_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+    "max_eas_builds": 1,
+    "build_count": 1,
+    "eas_build_ids": [
+      "efff03c3-e2f0-4790-9385-22373daccdd9"
+    ]
   }
 }

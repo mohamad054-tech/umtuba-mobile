@@ -1,0 +1,68 @@
+{
+  "task_id": "DESKTOP_ANDROID_OWNER_PASS_RELEASE_UPDATE_V1",
+  "owner_goal": "Publish the Fold6 Watch OWNER_PASS at aa57b8ae as one Android Closed Testing AAB update. No new features. No Watch behavior change. No functional source change. No Production publish. Do not change testers.",
+  "base_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+  "product_area": "regression_lock",
+  "allowed_files": [
+    "app.json",
+    "app.config.ts",
+    "app.config.js",
+    "eas.json",
+    "android/app/build.gradle",
+    "android/app/build.gradle.kts",
+    "docs/ai/**",
+    "config/regression-lock/**",
+    "src/lib/regressionLock/registry.test.ts"
+  ],
+  "allowed_modules": [
+    "regression_lock"
+  ],
+  "forbidden_modules": [
+    "watch",
+    "cache",
+    "create_editor",
+    "store",
+    "learning",
+    "um_streak",
+    "media_video",
+    "audio"
+  ],
+  "protected_contracts": [
+    "WATCH_20_PERCENT_SHORT_SWIPE",
+    "WATCH_CLEAN_ROOM_ENGINE_OWNER_PASS",
+    "WATCH_NO_BLACK_SURFACE",
+    "WATCH_ENGINE_TEXTUREVIEW",
+    "WATCH_ENGINE_READY_TO_RENDER",
+    "WATCH_FOLD6_CONTAIN_FOLDED",
+    "WATCH_NO_HORIZONTAL_CROP_ON_FOLD6_COVER",
+    "WATCH_PLAY_PAUSE",
+    "WATCH_TAP_PAUSE_RESUME",
+    "WATCH_PROGRESS_DIRECTION",
+    "WATCH_SEEK_DIRECTION",
+    "WATCH_ENGINE_COMMIT_FRACTION_0_1",
+    "WATCH_ENGINE_SNAP_DURATION_MS_120",
+    "WATCH_PLAYER_BINDING",
+    "WATCH_NO_SNAPBACK",
+    "WATCH_PUBLISH_LOCAL_VISIBLE_BEFORE_UPLOAD",
+    "WATCH_5_VIDEO_ROLLING_CACHE",
+    "WATCH_BACKWARD_RETENTION",
+    "UM_STREAK_LIVE_CAMERA_RETENTION_11C0719"
+  ],
+  "required_tests": [
+    "src/lib/regressionLock/**/*.test.ts"
+  ],
+  "required_device_gates": [],
+  "eas_allowed": true,
+  "play_allowed": true,
+  "production_allowed": false,
+  "push_allowed": true,
+  "max_eas_builds": 1,
+  "authorized_sha": "aa57b8aede67b753a95b3f359800cc0df88f147d",
+  "owner_status_claim": "OWNER_PASS",
+  "device_evidence": {
+    "device": "RFCX718LVHK / SM-F956B",
+    "date": "2026-09-09",
+    "notes": "Owner Fold6 confirmation on aa57b8ae / EAS 62bafb12-d89f-4e30-8842-28b391cb3c8d. lastUpdateTime 2026-09-09 13:07:46. Measured T0→T1 = 49ms. This task publishes that OWNER_PASS to current Closed Testing only. Do not overwrite Fold6 APK. Do not change testers. Do not promote to production."
+  },
+  "notes": "RELEASE from aa57b8ae only. FREEZE_RECORD_SHA b48e490 is docs-only and must not be the EAS gitCommitHash. eas.json appVersionSource=remote + production.autoIncrement=true: inspect Play/EAS remote versionCode before build; do not assume 21 is free. Local app.config.ts already has version 1.0.22 / versionCode 22; remote version may differ. One production AAB. Closed Testing upload only. production_allowed=false."
+}
