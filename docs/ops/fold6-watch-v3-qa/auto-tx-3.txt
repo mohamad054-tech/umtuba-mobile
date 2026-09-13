@@ -1,0 +1,6 @@
+﻿08-29 14:11:50.720 I/ReactNativeJS(17008): WATCH_TX {"t":1788001910720,"phase":"surface_attached"}
+08-29 14:11:50.819 I/ReactNativeJS(17008): WATCH_TX {"t":1788001910819,"phase":"first_frame"}
+08-29 14:11:52.347 I/ReactNativeJS(17008): WATCH_TX {"t":1788001912347,"phase":"current_end","index":30}
+08-29 14:11:52.347 I/ReactNativeJS(17008): WATCH_TX {"t":1788001912347,"phase":"next_source_activation","index":30,"readiness":"blocked"}
+08-29 14:11:52.425 I/ReactNativeJS(17008): WATCH_TX {"t":1788001912425,"phase":"audio_start"}
+08-29 14:11:53.584 I/ReactNativeJS(17008): WATCH_TX {"t":1788001913584,"phase":"next_ready"}

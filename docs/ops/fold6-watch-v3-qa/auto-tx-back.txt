@@ -1,0 +1,5 @@
+﻿08-29 14:11:57.945 I/ReactNativeJS(17008): WATCH_TX {"t":1788001917945,"phase":"audio_start"}
+08-29 14:11:57.946 I/ReactNativeJS(17008): WATCH_TX {"t":1788001917946,"phase":"surface_attached"}
+08-29 14:11:58.088 I/ReactNativeJS(17008): WATCH_TX {"t":1788001918088,"phase":"next_ready"}
+08-29 14:11:58.183 I/ReactNativeJS(17008): WATCH_TX {"t":1788001918183,"phase":"surface_attached"}
+08-29 14:11:58.227 I/ReactNativeJS(17008): WATCH_TX {"t":1788001918227,"phase":"first_frame"}

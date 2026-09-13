@@ -1,71 +1,44 @@
-# CURSOR_REPORT — DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
+# CURSOR_REPORT — DESKTOP_ANDROID_WATCH_AUTO_ADVANCE_QA_V1
 
 ```text
-TASK_ID = DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
-STATUS = COMPLETE_CODE_FIX_DEVICE_QA_NOT_RUN
-BASE_COMMIT = a79f5d11b0432e825b9262c4d6dd41f28bd952dd
-PLAYER_ARCHITECTURE_BEFORE = PER_CARD_EXOPLAYER_ANDROID_ACTIVE_ONLY_SURFACE
-CACHE_ARCHITECTURE_BEFORE = SIGNED_URL_MEMORY_CACHE_NO_MEDIA3_SIZE_CAP_SET
-THREE_VIDEO_WINDOW_IMPLEMENTED = YES
-PREVIOUS_RETAINED = YES
-NEXT_PRELOADED = YES
-NEXT_PLUS_2_PRELOADED = YES_ON_SLIDE
-SINGLE_PLAYER_REUSED = NO
-MEDIA3_PLAYLIST_USED = NO
-DISK_CACHE_USED = YES
-CACHE_POLICY = SIZE_LRU_MEDIA3
-CACHE_MAX_SIZE = 192MB
-SIGNED_URL_REFETCH_ON_BACK = NO
-MEDIA_BYTES_REFETCH_ON_BACK = NO
-FIX_COMMIT = 1a4b0f8b41ff388b99ffb136bbc39156d841e52f
-BUILD = FAIL
-DEVICE_QA = NOT_RUN
-TRANSITIONS_TESTED = 0
-FORWARD_GAP_BEFORE_MS = NOT_MEASURED
-FORWARD_GAP_AFTER_MS = NOT_MEASURED
-BACK_RETURN_BEFORE_MS = NOT_MEASURED
-BACK_RETURN_AFTER_MS = NOT_MEASURED
-CACHE_HIT_RATE_ADJACENT = NOT_MEASURED
-BLACK_FRAME = NOT_TESTED
-LOADING_SPINNER_ADJACENT = NOT_TESTED
-DUPLICATE_AUDIO = NOT_TESTED
-SIMULTANEOUS_PLAYBACK = NOT_TESTED
-MEMORY_REGRESSION = NOT_TESTED
-EXCESSIVE_NETWORK_REQUESTS = NOT_TESTED
-WEB_TOUCHED = NO
-IOS_TOUCHED = NO
-DEPLOYED = NO
-BLOCKERS = FOLD6_AUTHORIZED_BUT_INSTALLED_V20_NOT_V3; NO_NEW_APK; PLAY_UPLOAD_FORBIDDEN
-NOTES = Single ExoPlayer playlist not used — would redesign Watch. V2 first-frame handoff kept. Surface window still active-only.
+TASK_ID = DESKTOP_ANDROID_WATCH_AUTO_ADVANCE_QA_V1
+STATUS = AUTO_ADVANCE_PASS
+MANUAL_ADJACENT_CACHE_QA = PASS
+AUTO_ADVANCE_QA = PASS
+FINAL_ANDROID_GATE = READY_FOR_CENTRAL_REVIEW
+AUTO_TRANSITIONS_TESTED = 3
+AUTO_ADVANCE_GAP_MS = 68
+NEXT_READY_BEFORE_END = YES
+BLACK_FRAME = NO
+DUPLICATE_AUDIO = NO
+CRASH = NO
+METHOD = SEEK_NEAR_END+SHORT_REAL_VIDEO
+PLAY_UPLOAD = NO
+VERSIONCODE_PLAY_FIX_STILL_REQUIRED = YES
+BLOCKERS = NONE
 ```
 
 ## Summary
 
-Investigated expo-video/Media3: Watch is per-card `useVideoPlayer`. A single shared ExoPlayer + MediaItem playlist would lift playback out of cards (Watch redesign). Not done.
+Targeted auto-advance QA only on the already-installed Fold6 V3 binary (`da449c9` / EAS `6bc060ed`). No product code change. No Play upload.
 
-V3 keeps the card architecture and implements a sliding **previous / current / next** prepare window on Android:
+UI-seeked the existing SeekBar (`[42,1838]–[926,1964]`) to the last seconds of a 6:49 clip, then let it end naturally. That unlocked short clips. **3 conclusive auto end→next** transitions fired (`current_end` + `next_source_activation` + `audio_start`):
 
-- TextureView still current-only (Fold6 decoder lock).
-- Previous player is **not** released on advance; back remounts nothing inside the window.
-- Next stays prepared/buffered (`useCaching` + 8s / 12MB forward buffer).
-- When current becomes N+1, N+2 enters the window immediately; N-1 evicts.
-- Bounded Media3 disk cache 192MB LRU. Signed URLs stay in the existing memory cache (15min TTL); back does not re-sign if fresh.
+1. SEEK_NEAR_END: 6:49 orchestra → 0:18 Quran. `current_end`→`audio_start` **68ms**. `next_ready` logged before end. After-shot: new video at 0:02/0:18.
+2. SHORT_REAL_VIDEO: 18s Quran → 6s forest. `current_end`→`audio_start` **68ms**. `first_frame` 1525ms before end (warm next).
+3. SHORT_REAL_VIDEO: 6s forest → cat 1:01. `current_end`→`audio_start` **78ms**. `first_frame` 1528ms before end. After-shot: cat playing at 0:02.
 
-V2 auto-next first-frame gate is kept. iOS ±1 unchanged. Fold6 is on USB but still versionCode 20 — V3 not installed. No Play upload.
+Median auto gap **68ms**. Next was prepared before EOF (`first_frame` / `next_ready` before `current_end`). Last frame stayed visible at EOF (spinner overlay, not a black frame). No crash (pid 17008). Sequential `audio_start` only. Back after auto: `first_frame` 142ms after `surface_attached`.
+
+Android V3 is **READY_FOR_CENTRAL_REVIEW**. `versionCode` is still 20 (EAS remote) — Play fix still required, not a QA blocker. Edit-post-after-publish is not in this GO.
 
 ## Exact files changed
 
-- `app/(tabs)/watch.tsx`
-- `components/WatchVideoCard.tsx`
-- `src/lib/watch/playbackPolicy.ts`
-- `src/lib/watch/playbackPolicy.test.ts`
-- `src/lib/watch/playerLifecycle.ts`
-- `src/lib/watch/playerLifecycle.test.ts`
-- `src/lib/watch/playerLifecycleRegressionLock.test.ts`
-- `src/lib/watch/androidWatchMediaCache.ts`
-- `src/lib/watch/androidWatchMediaCache.test.ts`
-- `docs/ai/CURRENT_TASK.md`
 - `docs/ai/CURSOR_REPORT.md`
+- `docs/ai/CURRENT_TASK.md`
+- untracked ops shots/logs under `docs/ops/fold6-watch-v3-qa/` (`auto-*`)
+
+No product code.
 
 ## Migrations created
 
@@ -73,29 +46,29 @@ None.
 
 ## Security review
 
-No secrets. Cache size is local Media3 LRU, not a user-visible download. Transition logs have no URLs. Web/iOS/DB/payments untouched.
+ADB-only on owner Fold6. UI seek of existing SeekBar. No new debug hook. No Play / deploy. No Web/iOS. WATCH_TX extracts have no URLs.
 
 ## Tests
 
-Focused vitest **92 passed / 8 files**.
+Not re-run (no product code).
 
 ## TypeScript
 
-Changed Watch files only.
+Not re-run.
 
 ## Build
 
-FAIL — no APK/EAS. Installed Fold6 binary remains versionCode 20.
+Not rebuilt. Same installed preview `6bc060ed` / `da449c9` / lastUpdateTime 2026-08-29 13:20:19.
 
 ## git diff --check
 
-Clean.
+Docs only.
 
 ## git status --short
 
-After local commit. Parent web `380a366` preserved. Dirty mobile parent not reset. Not pushed.
+Isolated worktree: doc edits + `?? docs/ops/`. Not committed. Not pushed. Parent web `380a366` untouched.
 
 ## Open issues
 
-- Device QA blocked until a non-Play install of this SHA.
-- Single-player playlist still a Central redesign decision.
+- EAS remote `versionCode` still 20 — required before any Play upload (not this GO).
+- `next_source_activation` logged `readiness=blocked` even when `first_frame` had already fired ~1.5s earlier (handoff ref vs warm-surface race). Advance still instant; gap 68ms. Not a device FAIL.
