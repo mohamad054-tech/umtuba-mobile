@@ -63,6 +63,22 @@ describe("watch edit playback composite", () => {
     expect(watchAddedSoundScale(edit)).toBe(1);
   });
 
+  it("honors published web playback.inMs/outMs after refresh", () => {
+    const edit = watchEditFromPipeline(
+      {
+        playback: { version: 1, inMs: 1500, outMs: 4500 },
+        edit: { editedAt: "2026-08-29T00:00:00.000Z" },
+      },
+      8_000
+    );
+    expect(edit.trimStartMs).toBe(1500);
+    expect(edit.trimEndMs).toBe(4500);
+    expect(resolveWatchTrimBounds(edit, 8_000)).toEqual({
+      startSec: 1.5,
+      endSec: 4.5,
+    });
+  });
+
   it("reads pipeline-level sound_id when edit wrapper is missing", () => {
     const edit = watchEditFromPipeline(
       {

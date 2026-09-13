@@ -22,6 +22,7 @@ type ProfileTimelineProps = {
   postsFailed?: boolean;
   videosFailed?: boolean;
   onOpenVideo: (item: ProfileTimelineItem) => void;
+  onEditVideo?: (item: ProfileTimelineItem) => void;
 };
 
 export default function ProfileTimeline({
@@ -33,6 +34,7 @@ export default function ProfileTimeline({
   postsFailed,
   videosFailed,
   onOpenVideo,
+  onEditVideo,
 }: ProfileTimelineProps) {
   const textAlign = localeTextAlign(locale);
   const postMediaStyle = [styles.postMedia, { aspectRatio: mediaBox.aspectRatio }];
@@ -118,6 +120,16 @@ export default function ProfileTimeline({
             {published ? (
               <Text style={styles.postPublished}>{published}</Text>
             ) : null}
+            {canOpen && onEditVideo ? (
+              <Pressable
+                onPress={() => onEditVideo(item)}
+                accessibilityRole="button"
+                accessibilityLabel={t("actions.edit")}
+                style={styles.editRow}
+              >
+                <Text style={styles.editText}>{t("actions.edit")}</Text>
+              </Pressable>
+            ) : null}
           </Pressable>
         );
       })}
@@ -186,5 +198,15 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     marginBottom: 8,
+  },
+  editRow: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  editText: {
+    color: colors.accentCyan,
+    fontWeight: "700",
+    fontSize: 14,
   },
 });

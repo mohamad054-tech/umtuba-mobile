@@ -38,6 +38,7 @@ import {
 } from "@/src/lib/feed/watchPlaybackPrep";
 import {
   fetchWatchFeedPage,
+  fetchWatchVideoSnapshot,
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
 import { useAuth } from "@/src/lib/auth/AuthContext";
@@ -53,6 +54,8 @@ import {
   deletePostForOwner,
   viewerMaySeeDeleteControl,
 } from "@/src/lib/social/deleteOwnedPost";
+import { viewerMaySeeEditControl } from "@/src/lib/social/editOwnedPost";
+import { takeOwnedPostEdited } from "@/src/lib/social/ownedPostEditSignal";
 import {
   togglePostLike,
   togglePostSave,
@@ -254,6 +257,29 @@ export default function WatchScreen() {
           setHiddenPostIds(new Set(posts));
         }
       );
+      const editedId = takeOwnedPostEdited();
+      if (editedId) {
+        void fetchWatchVideoSnapshot(getSupabase(), editedId).then((fresh) => {
+          if (!fresh) return;
+          setVideos((prev) =>
+            prev.map((video) => {
+              if (video.postId !== editedId) return video;
+              const pathChanged =
+                Boolean(fresh.videoPath) && fresh.videoPath !== video.videoPath;
+              return {
+                ...video,
+                caption: fresh.caption,
+                title: fresh.title,
+                mediaPipeline: fresh.mediaPipeline,
+                durationMs: fresh.durationMs,
+                videoPath: fresh.videoPath ?? video.videoPath,
+                poster: fresh.poster ?? video.poster,
+                src: pathChanged && fresh.src ? fresh.src : video.src,
+              };
+            })
+          );
+        });
+      }
       return () => {
         screenFocusedRef.current = false;
         setScreenFocused(false);
@@ -669,6 +695,18 @@ export default function WatchScreen() {
     [patchVideo, t]
   );
 
+  const onEditOwn = useCallback(
+    (video: WatchVideo) => {
+      if (!video.postId || !user?.id) return;
+      if (!viewerMaySeeEditControl(user.id, video.author.id)) return;
+      router.push({
+        pathname: "/edit/post",
+        params: { postId: String(video.postId) },
+      } as never);
+    },
+    [router, user?.id]
+  );
+
   const onDeleteOwn = useCallback(
     (video: WatchVideo) => {
       if (!video.postId || !user?.id) return;
@@ -1020,6 +1058,11 @@ export default function WatchScreen() {
             ? () => void onShare(item)
             : undefined
         }
+        onEditOwn={
+          viewerMaySeeEditControl(user?.id, item.author.id)
+            ? () => onEditOwn(item)
+            : undefined
+        }
         onDeleteOwn={
           viewerMaySeeDeleteControl(user?.id, item.author.id)
             ? () => onDeleteOwn(item)
@@ -1070,6 +1113,7 @@ export default function WatchScreen() {
       onToggleAutoNext,
       onBlockUser,
       onDeleteOwn,
+      onEditOwn,
       onReport,
       onShare,
       onToggleLike,

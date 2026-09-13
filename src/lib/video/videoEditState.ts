@@ -121,13 +121,23 @@ export function serializeEditIntoMediaPipeline(
   existing: Record<string, unknown> | null | undefined,
   state: VideoEditState
 ): Record<string, unknown> {
+  const priorEdit =
+    existing?.edit && typeof existing.edit === "object"
+      ? (existing.edit as Record<string, unknown>)
+      : {};
   return {
     ...(existing ?? {}),
     hls: existing?.hls ?? null,
     dash: existing?.dash ?? null,
     abr: existing?.abr ?? null,
     overlays: serializeOverlays(state.overlays),
+    playback: {
+      version: VIDEO_EDIT_STATE_VERSION,
+      inMs: state.trimStartMs,
+      outMs: state.trimEndMs,
+    },
     edit: {
+      ...priorEdit,
       version: VIDEO_EDIT_STATE_VERSION,
       trimStartMs: state.trimStartMs,
       trimEndMs: state.trimEndMs,
@@ -151,11 +161,26 @@ export function parseEditFromMediaPipeline(
   const raw = mediaPipeline as Record<string, unknown>;
   const overlays = parseOverlays(raw.overlays);
   const edit = raw.edit && typeof raw.edit === "object" ? raw.edit : raw;
+  const playback =
+    raw.playback && typeof raw.playback === "object"
+      ? (raw.playback as Record<string, unknown>)
+      : null;
+  const playbackIn =
+    playback && typeof playback.inMs === "number" && Number.isFinite(playback.inMs)
+      ? playback.inMs
+      : undefined;
+  const playbackOut =
+    playback && typeof playback.outMs === "number" && Number.isFinite(playback.outMs)
+      ? playback.outMs
+      : undefined;
+  const editRec = edit as Record<string, unknown>;
   return sanitizeVideoEditState(
     {
       sound_id: raw.sound_id,
       sound_mix: raw.sound_mix,
-      ...(edit as object),
+      ...editRec,
+      trimStartMs: playbackIn ?? editRec.trimStartMs,
+      trimEndMs: playbackOut ?? editRec.trimEndMs,
       overlays,
     },
     durationMs

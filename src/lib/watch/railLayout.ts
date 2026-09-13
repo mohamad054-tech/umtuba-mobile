@@ -26,7 +26,7 @@ export function watchRailBottomOffset(bottomInset: number): number {
 }
 
 /**
- * Owner rail: Like, Save, comments, share, Delete (5).
+ * Owner rail: Like, Save, comments, share, Edit, Delete (6).
  * Other rail: Like, Save, comments, share, Report, Block (6).
  */
 export function watchRailFitsCell(input: {

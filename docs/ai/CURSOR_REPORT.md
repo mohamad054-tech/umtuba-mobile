@@ -1,71 +1,29 @@
-# CURSOR_REPORT — DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
-
-```text
-TASK_ID = DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
-STATUS = COMPLETE_CODE_FIX_DEVICE_QA_NOT_RUN
-BASE_COMMIT = a79f5d11b0432e825b9262c4d6dd41f28bd952dd
-PLAYER_ARCHITECTURE_BEFORE = PER_CARD_EXOPLAYER_ANDROID_ACTIVE_ONLY_SURFACE
-CACHE_ARCHITECTURE_BEFORE = SIGNED_URL_MEMORY_CACHE_NO_MEDIA3_SIZE_CAP_SET
-THREE_VIDEO_WINDOW_IMPLEMENTED = YES
-PREVIOUS_RETAINED = YES
-NEXT_PRELOADED = YES
-NEXT_PLUS_2_PRELOADED = YES_ON_SLIDE
-SINGLE_PLAYER_REUSED = NO
-MEDIA3_PLAYLIST_USED = NO
-DISK_CACHE_USED = YES
-CACHE_POLICY = SIZE_LRU_MEDIA3
-CACHE_MAX_SIZE = 192MB
-SIGNED_URL_REFETCH_ON_BACK = NO
-MEDIA_BYTES_REFETCH_ON_BACK = NO
-FIX_COMMIT = 1a4b0f8b41ff388b99ffb136bbc39156d841e52f
-BUILD = FAIL
-DEVICE_QA = NOT_RUN
-TRANSITIONS_TESTED = 0
-FORWARD_GAP_BEFORE_MS = NOT_MEASURED
-FORWARD_GAP_AFTER_MS = NOT_MEASURED
-BACK_RETURN_BEFORE_MS = NOT_MEASURED
-BACK_RETURN_AFTER_MS = NOT_MEASURED
-CACHE_HIT_RATE_ADJACENT = NOT_MEASURED
-BLACK_FRAME = NOT_TESTED
-LOADING_SPINNER_ADJACENT = NOT_TESTED
-DUPLICATE_AUDIO = NOT_TESTED
-SIMULTANEOUS_PLAYBACK = NOT_TESTED
-MEMORY_REGRESSION = NOT_TESTED
-EXCESSIVE_NETWORK_REQUESTS = NOT_TESTED
-WEB_TOUCHED = NO
-IOS_TOUCHED = NO
-DEPLOYED = NO
-BLOCKERS = FOLD6_AUTHORIZED_BUT_INSTALLED_V20_NOT_V3; NO_NEW_APK; PLAY_UPLOAD_FORBIDDEN
-NOTES = Single ExoPlayer playlist not used — would redesign Watch. V2 first-frame handoff kept. Surface window still active-only.
-```
+# CURSOR_REPORT — DESKTOP_ANDROID_POST_PUBLISH_EDITING_V1
 
 ## Summary
 
-Investigated expo-video/Media3: Watch is per-card `useVideoPlayer`. A single shared ExoPlayer + MediaItem playlist would lift playback out of cards (Watch redesign). Not done.
-
-V3 keeps the card architecture and implements a sliding **previous / current / next** prepare window on Android:
-
-- TextureView still current-only (Fold6 decoder lock).
-- Previous player is **not** released on advance; back remounts nothing inside the window.
-- Next stays prepared/buffered (`useCaching` + 8s / 12MB forward buffer).
-- When current becomes N+1, N+2 enters the window immediately; N-1 evicts.
-- Bounded Media3 disk cache 192MB LRU. Signed URLs stay in the existing memory cache (15min TTL); back does not re-sign if fresh.
-
-V2 auto-next first-frame gate is kept. iOS ±1 unchanged. Fold6 is on USB but still versionCode 20 — V3 not installed. No Play upload.
+Owner post + video edit is ported to an isolated Android worktree from the phone SHA `da449c9` (Watch V3 / `1a4b0f8` lineage). Owners get a visible Edit control on the Watch rail and on own Profile video cards. Save updates the same Post ID under RLS. Cancel or failed save does not switch live media. Watch playback now reads published web `media_pipeline.playback.inMs/outMs`, so a computer trim is visible after pull-to-refresh or reopen. Watch V3 cache/window code was not rewritten. Local tests for the new modules passed. Fold6 was attached (versionCode 20). A new versionCode 22 APK was prepared in source; install was not completed in this session because the EAS CLI hung and no JDK was on PATH.
 
 ## Exact files changed
 
-- `app/(tabs)/watch.tsx`
-- `components/WatchVideoCard.tsx`
-- `src/lib/watch/playbackPolicy.ts`
-- `src/lib/watch/playbackPolicy.test.ts`
-- `src/lib/watch/playerLifecycle.ts`
-- `src/lib/watch/playerLifecycle.test.ts`
-- `src/lib/watch/playerLifecycleRegressionLock.test.ts`
-- `src/lib/watch/androidWatchMediaCache.ts`
-- `src/lib/watch/androidWatchMediaCache.test.ts`
-- `docs/ai/CURRENT_TASK.md`
-- `docs/ai/CURSOR_REPORT.md`
+- `app.config.ts` — versionCode 22
+- `eas.json` — `appVersionSource: local` so preview APK uses 22
+- `app/edit/post.tsx` — owner edit screen
+- `app/_layout.tsx` — edit route
+- `app/(tabs)/watch.tsx` — Edit entry + post-edit snapshot patch
+- `app/profile/index.tsx` — own-video Edit
+- `components/WatchVideoCard.tsx` — Edit rail + edited indicator
+- `components/profile/ProfileTimeline.tsx` — Edit affordance
+- `src/lib/media/videoTrim.ts` + test
+- `src/lib/social/editOwnedPost.ts` + test
+- `src/lib/social/ownedPostEditSignal.ts` + test
+- `src/lib/social/uploadPostImage.ts`
+- `src/lib/video/videoEditState.ts` + tests — read/write `playback.inMs/outMs`
+- `src/lib/video/watchEditPlayback.test.ts` — web IN/OUT contract
+- `src/lib/feed/watchFeed.ts` — `fetchWatchVideoSnapshot`
+- `src/lib/watch/railLayout.ts` + test
+- `src/lib/i18n/messages/*` — edit strings
+- `docs/ai/CURRENT_TASK.md`, this report, `docs/ops/android-post-publish-editing-v1/`
 
 ## Migrations created
 
@@ -73,29 +31,36 @@ None.
 
 ## Security review
 
-No secrets. Cache size is local Media3 LRU, not a user-visible download. Transition logs have no URLs. Web/iOS/DB/payments untouched.
+- Owner filter is UUID match + `posts.update` / `articles.update` with `.eq("user_id", userId)`.
+- Non-owner load returns null; update is not called.
+- Patch refuses `id`, `user_id`, `created_at`, and engagement counters.
+- Unvalidated video replace aborts and leaves `video_path` unchanged. Failed switch deletes the candidate object only.
+- Image upload goes to `post-images/{userId}/…`. Video replace reuses existing owned `post-videos` upload.
+- No service-role key. No RLS bypass.
 
 ## Tests
 
-Focused vitest **92 passed / 8 files**.
+- `vitest` focused: `videoTrim`, `editOwnedPost`, `ownedPostEditSignal`, `watchEditPlayback`, `videoEditState`, `railLayout`, `i18n` — **36 passed** after localizing IN/OUT labels.
+- Device QA — **NOT_RUN** (no new APK installed).
 
 ## TypeScript
 
-Changed Watch files only.
+- `tsc --noEmit` reported 3 errors: pre-existing Watch V3 handoff typing at `watch.tsx:905`, and missing `expo-sharing` types (junction/`da449c9` baseline). No new errors in edit modules. Watch cache/window code was not “fixed” in this GO.
 
 ## Build
 
-FAIL — no APK/EAS. Installed Fold6 binary remains versionCode 20.
+- Source versionCode **22**. EAS preview start hung on `npx eas-cli` with no build id. No Play upload.
 
 ## git diff --check
 
-Clean.
+Clean (no whitespace errors reported).
 
 ## git status --short
 
-After local commit. Parent web `380a366` preserved. Dirty mobile parent not reset. Not pushed.
+Dirty isolated worktree only (edit port + docs). Parent `umtuba-mobile` and Watch V3 worktree were not reset. `node_modules` is a junction to the Watch V3 install (gitignored).
 
 ## Open issues
 
-- Device QA blocked until a non-Play install of this SHA.
-- Single-player playlist still a Central redesign decision.
+- APK not installed; Fold6 still on versionCode **20** / Watch V3 preview `6bc060ed`.
+- Watch honors IN/OUT after refresh/reopen, not realtime.
+- Nested Profile Edit is a second entry; primary is Watch rail.

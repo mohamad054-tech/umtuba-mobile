@@ -27,6 +27,7 @@ import {
   resolveSocialSoundPlaybackUriById,
 } from "@/src/lib/sounds/socialSoundPlayback";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { editedAtFromMediaPipeline } from "@/src/lib/media/videoTrim";
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import {
   resolveWatchTrimBounds,
@@ -127,6 +128,8 @@ export type WatchVideoCardProps = {
   onToggleSave: () => void;
   onOpenComments?: () => void;
   onShare?: () => void;
+  /** Owner-only. Hidden unless the viewer owns this post. */
+  onEditOwn?: () => void;
   /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
   onDeleteOwn?: () => void;
   /** Other people's content only — Guideline 1.2 report. */
@@ -748,6 +751,7 @@ function WatchVideoCardComponent({
   onToggleSave,
   onOpenComments,
   onShare,
+  onEditOwn,
   onDeleteOwn,
   onReport,
   onBlockUser,
@@ -1214,6 +1218,9 @@ function WatchVideoCardComponent({
           </Pressable>
           <Text style={styles.caption} numberOfLines={3}>
             {video.caption || video.title}
+            {editedAtFromMediaPipeline(video.mediaPipeline)
+              ? ` · ${t("watch.edited")}`
+              : ""}
           </Text>
           {publishedLabel ? (
             <Text
@@ -1324,6 +1331,20 @@ function WatchVideoCardComponent({
               {video.stats.shares}
             </Text>
           </Pressable>
+          {onEditOwn ? (
+            <Pressable
+              style={styles.action}
+              onPress={onEditOwn}
+              accessibilityRole="button"
+              accessibilityLabel={t("watch.editOwn")}
+              testID="watch-edit-own"
+            >
+              <Text style={styles.actionIcon}>✎</Text>
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {t("actions.edit")}
+              </Text>
+            </Pressable>
+          ) : null}
           {onDeleteOwn ? (
             <Pressable
               style={styles.action}

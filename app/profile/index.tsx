@@ -395,6 +395,14 @@ export default function ProfileScreen() {
     }
   }
 
+  function editTimelineItem(item: ProfileTimelineItem) {
+    if (item.kind !== "video" || !isOwn) return;
+    router.push({
+      pathname: "/edit/post",
+      params: { postId: String(item.postId) },
+    } as never);
+  }
+
   const textAlign = localeTextAlign(locale);
   const rootDirection = localeRootStyle(locale);
 
@@ -602,6 +610,7 @@ export default function ProfileScreen() {
                 postsFailed={activeTab !== "videos" ? postsFailed : false}
                 videosFailed={activeTab !== "posts" ? videosFailed : false}
                 onOpenVideo={openTimelineItem}
+                onEditVideo={isOwn ? editTimelineItem : undefined}
               />
             )}
 

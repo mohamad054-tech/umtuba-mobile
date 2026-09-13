@@ -17,7 +17,7 @@ describe("watchRailLayout", () => {
     expect(watchRailHeight(6)).toBe(6 * 44 + 5 * 8);
   });
 
-  it("fits owner Delete and other Report/Block on a 667pt cell (iPhone SE 3)", () => {
+  it("fits owner Edit+Delete and other Report/Block on a 667pt cell (iPhone SE 3)", () => {
     // Volume sits left of the rail, so only the top chips reserve rail space.
     const se3 = {
       cellHeight: 667 - 83,

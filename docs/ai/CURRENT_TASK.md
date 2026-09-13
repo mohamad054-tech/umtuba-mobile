@@ -1,36 +1,33 @@
-# CURRENT TASK — DESKTOP_ANDROID_WATCH_3_VIDEO_READY_WINDOW_CACHE_V3
+# CURRENT TASK — DESKTOP_ANDROID_POST_PUBLISH_EDITING_V1
 
 ## Status
 
-`COMPLETE_CODE_FIX_DEVICE_QA_NOT_RUN`
+`IMPLEMENTATION_COMPLETE / DEVICE_QA_NOT_RUN`
 
 ## Task
 
-Bounded Android Watch 3-video window: previous retained, current playing, next prepared. N+2 starts when the window slides. No Watch redesign, no feed change, no Web/iOS, no Play upload.
+Port owner post + video edit (before and after publish) to Android, isolated from Watch V3. Same Post ID, RLS/owner only, cancel/fail leave live post, IN/OUT trim + optional media replace, edited indicator. Watch honors published IN/OUT after refresh. Local Fold6 ADB install. No Play upload. No production web deploy.
 
 ## Authoritative source
 
-- Isolated worktree: `C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-WATCH-NEXT-VIDEO-TRANSITION-DELAY-V1`
-- Branch: `desktop/android-watch-next-video-transition-delay-v1`
-- Base: `a79f5d11b0432e825b9262c4d6dd41f28bd952dd`
-- Fix commit: `1a4b0f8b41ff388b99ffb136bbc39156d841e52f`
+- Isolated worktree: `C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-ANDROID-POST-PUBLISH-EDITING-V1`
+- Branch: `desktop/android-post-publish-editing-v1`
+- Base (phone / Watch V3): `da449c9e9f3c4c0371ecdd2999220b4f69ae4ec5`
+- Web reference (read-only): `C:\Users\1\Desktop\umtuba\worktrees\DESKTOP-UMTUBA-POST-PUBLISH-EDITING-V1` (`ab4a243` + `153f0ef`)
 
 ## Allowed scope
 
-- Android Watch prepare window / retain previous / bounded Media3 cache / V2-compatible first-frame handoff
+- Owner edit entry, edit screen, trim/preview, caption/article/hashtags, media replace, cover, Watch IN/OUT honor of `media_pipeline.playback`
 - Isolated worktree above
-- Local commit
+- Local tests, typecheck, local QA APK, Fold6 ADB install
 - `docs/ai/CURSOR_REPORT.md` and this file
 
 ## Forbidden scope
 
-- Web / iOS behavior
-- Parent web `380a366` and dirty mobile parent
-- Single-player / playlist Watch rewrite
-- Whole-feed preload, Play upload, Desktop writes, `_port_extract`
-
-## Isolation notes
-
-- V2 first-frame gated auto-next kept (compatible).
-- Android TextureView load window stays 0.
-- Fold6 authorized but installed versionCode 20 (not this SHA).
+- Watch V3 cache/window rewrite
+- Web Globe / Learning / Store / payments / branding
+- Dirty mobile parent / Watch V3 worktree mutation
+- Google Play upload
+- Production web deploy
+- Windows Desktop writes, `_port_extract`
+- RLS bypass

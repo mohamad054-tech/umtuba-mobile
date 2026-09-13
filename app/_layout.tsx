@@ -198,6 +198,7 @@ function LocalizedStack() {
         options={{ title: t("nav.conversation") }}
       />
       <Stack.Screen name="sound/[id]" options={{ title: t("sound.title") }} />
+      <Stack.Screen name="edit/post" options={{ title: t("edit.title") }} />
       <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
     </Stack>
   );

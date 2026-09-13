@@ -49,6 +49,11 @@ describe("VIDEO_EDIT_STATE", () => {
     expect((pipeline.edit as { soundId: string | null }).soundId).toBe(
       "11111111-1111-4111-8111-111111111111"
     );
+    expect(pipeline.playback).toEqual({
+      version: 1,
+      inMs: 500,
+      outMs: 4_000,
+    });
   });
 
   it("reads snake_case sound_id from media_pipeline for Watch", () => {

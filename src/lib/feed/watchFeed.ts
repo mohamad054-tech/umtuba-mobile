@@ -312,6 +312,29 @@ export async function fetchWatchFeedPage(
   };
 }
 
+export async function fetchWatchVideoSnapshot(
+  supabase: SupabaseClient,
+  postId: number
+): Promise<WatchVideo | null> {
+  if (!Number.isInteger(postId) || postId <= 0) return null;
+  const { data, error } = await supabase
+    .from("posts")
+    .select(postColumns)
+    .eq("id", postId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as VideoPostRow;
+  const initial = initialPlaybackSrc(row);
+  if (!initial.include) return null;
+  return mapRowToWatchVideo({
+    row,
+    playbackUrl: initial.src,
+    videoPath: initial.path,
+    likedByMe: false,
+    savedByMe: false,
+  });
+}
+
 export async function refreshPlaybackUrl(
   supabase: SupabaseClient,
   postId: number
