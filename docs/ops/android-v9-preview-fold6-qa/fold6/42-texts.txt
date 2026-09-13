@@ -1,0 +1,25 @@
+Zurück
+‹
+Einstellungen
+Konto, Datenschutz und App-Einstellungen.
+KONTO
+Profil bearbeiten
+Noch nicht verfügbar
+Passwort ändern
+›
+Abmelden
+Konto löschen
+DATENSCHUTZ
+Datenschutzeinstellungen
+Mitteilungsübersicht
+Systemmitteilungen
+Blockierte Konten
+ANWENDUNG
+Design: Dunkel
+Design
+Dunkel
+Sprache
+Deutsch
+Info
+App-Version: 1.0.0
+App-Version

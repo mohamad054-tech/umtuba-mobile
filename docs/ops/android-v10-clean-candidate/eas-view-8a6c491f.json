@@ -1,0 +1,45 @@
+﻿{
+  "id": "8a6c491f-e710-4439-9138-98b355db368a",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "artifacts": {
+    "buildUrl": "https://expo.dev/artifacts/eas/C7Xw9ZSKax09KKUyDpF5e8Z1-JzuMAUqZS1bLrMQfgI.apk",
+    "applicationArchiveUrl": "https://expo.dev/artifacts/eas/C7Xw9ZSKax09KKUyDpF5e8Z1-JzuMAUqZS1bLrMQfgI.apk"
+  },
+  "initiatingActor": {
+    "id": "b272aed1-369f-4528-b362-e55c5a622af2",
+    "displayName": "mohamadabutair"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/d2593b45-8f18-4c57-9d71-0419193cfd77/8a6c491f-e710-4439-9138-98b355db368a/2026-08-16T20%3A28%3A32Z-159b2c67-d9ee-4768-9899-be4c89d5a383.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260816%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260816T204324Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=2306fe7cc7a7a4acd39749345660ac2f45d07f17ab7beb36af98f0cda9116cf79b772a1db66e57fdb78c6071090dcf2ff4912a7469921163c73a44d3f06de5108fc8431ceaf849d738c89ef0dda2a2958155ad848d94361a8a6cd0edf25477fff3243affe1b41fff3ad5fd11e1686cc532ccc9f053ff7b05c427b72172161a8b21814416126e11fea27cf9822636f432a6f5aa56a952a5422175f940c962a2bdbf1fcf87029c640bc7ae43f8047f19e8c05ffd953b8ca0cf41771535194dfb70348c88d7b8db3dd6db9130c5ccacd342e47a92ac6cd1a1f2b70a628a434d1747198fa980452b7ff631016a6b505daad29f610139b408ec889a65543b13c08c42"
+  ],
+  "app": {
+    "id": "d2593b45-8f18-4c57-9d71-0419193cfd77",
+    "name": "UMTUBA",
+    "slug": "umtuba-mobile",
+    "ownerAccount": {
+      "id": "313f9686-6fce-4a77-a7c2-9d3e3aca0410",
+      "name": "umtuba"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "appIdentifier": "com.umtuba.app",
+  "sdkVersion": "57.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "10",
+  "gitCommitHash": "9e04a97ca4f8e7e8e0d6135d41c9deb8aa315d8d",
+  "gitCommitMessage": "fix(android): persist session and close reproduced loc leaks\n\nKeep a durable AsyncStorage session copy so Android Keystore miss cannot drop the refresh token, and ignore null INITIAL_SESSION during hydrate. Localize auth email validation and Live empty body, and stop German Nachrichten tab truncation. Stamp versionCode 10; leave iOS buildNumber at 6.",
+  "priority": "NORMAL",
+  "createdAt": "2026-08-16T20:28:30.374Z",
+  "updatedAt": "2026-08-16T20:42:02.433Z",
+  "message": "DESKTOP_ANDROID_CLEAN_CANDIDATE_CLOSEOUT_V1 preview APK no Play submit SHA 9e04a97ca4f8e7e8e0d6135d41c9deb8aa315d8d",
+  "completedAt": "2026-08-16T20:42:02.243Z",
+  "expirationDate": "2026-08-30T20:28:30.410Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 1801,
+    "buildQueueTime": 4681,
+    "buildDuration": 805387
+  }
+}

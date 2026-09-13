@@ -1,48 +1,46 @@
-# CURSOR_REPORT — PC2 iOS App Store Execution Preparation V2
-
-```text
-TASK_ID = PC2_IOS_BUILD_APP_STORE_EXECUTION_PREPARATION_V2
-DEVICE = PC2
-DEVICE_ROLE = IOS_APP_STORE_EXECUTION_PRIMARY
-CENTRAL_COORDINATOR = SERVER
-AUTHORITATIVE_BASE_SHA = db7f927467eb2a5416b612c330bfa8440bcf50f0
-COMMIT_SHA = 6fd5852f3461e470deee80cd150d577557c49075
-BRANCH = pc2/ios-app-store-execution-prep-v2
-IOS_BUILD_CONFIG_READY = YES
-EAS_IOS_READY = NO
-TESTFLIGHT_SUBMIT = NOT_ATTEMPTED
-APP_STORE_UPLOAD = NOT_ATTEMPTED
-PUSH = NO
-```
+# CURSOR_REPORT
 
 ## Summary
 
-Closed iOS policy gaps that could be fixed without a new backend: Watch Report/Block UI, device-local hide/block, unused camera/mic removal, Team ID in Expo iOS config, and operator-ready App Store docs. Server-side UGC report remains unbound (20260928 SQL off alpha). Expo/EAS are not logged in on PC2. Do not submit.
+`DESKTOP_ANDROID_USER_REPORTED_DEFECT_REPRO_V1` ran evidence-only on Fold6 `RFCX718LVHK` against the already-installed v10 candidate (`1.0.0` / versionCode **10** / SHA `9e04a97`). Central then issued a new GO for Android v11 surgical Fold6 QA from SHA `7b33bae`. This task **stopped immediately**. STATUS = **SUPERSEDED**.
+
+Device not uninstalled. Product source not modified. No rebuild. No Play upload. No Production submission. Incomplete items marked NOT_FINISHED.
+
+Packet: `docs/ops/android-v10-user-reported-defect-repro/`
+
+```
+TASK_ID = DESKTOP_ANDROID_USER_REPORTED_DEFECT_REPRO_V1
+STATUS = SUPERSEDED
+DEVICE = RFCX718LVHK / SM-F956B
+INSTALLED_VERSION_NAME = 1.0.0
+INSTALLED_VERSION_CODE = 10
+INSTALLED_SOURCE_SHA_IF_KNOWN = 9e04a97ca4f8e7e8e0d6135d41c9deb8aa315d8d
+CREATE_STALE_STATE_REPRODUCED = YES
+MISSING_100_POINTS_REPRODUCED = NOT_FINISHED
+OVER_DURATION_PUBLISH_REPRODUCED = YES
+RETRY_STALE_ASSET_REPRODUCED = NO
+FALSE_RED_LIKE_REPRODUCED = YES
+OWN_PROFILE_DEFECT_REPRODUCED = YES
+SHARE_DEFECT_REPRODUCED = YES
+COMMENT_DEFECT_REPRODUCED = YES
+LANGUAGE_SELECTOR_DEFECT_REPRODUCED = NO
+SOURCE_CHANGED = NO
+FIX_IMPLEMENTED = NO
+PLAY_UPLOAD = NO
+PRODUCTION_SUBMISSION = NO
+CENTRAL_ACTION_REQUIRED = YES
+```
 
 ## Exact files changed
 
-- `app.config.ts`
-- `app/(tabs)/create.tsx`
-- `app/(tabs)/watch.tsx`
-- `app/_layout.tsx`
-- `app/blocked-users.tsx`
-- `app/messages/[id].tsx`
-- `app/settings.tsx`
-- `components/WatchVideoCard.tsx`
-- `package.json`
-- `package-lock.json`
-- `src/lib/ios/appStoreConfig.test.ts`
-- `src/lib/permissions/foundation.ts`
-- `src/lib/profile/profilePresentation.test.ts`
-- `src/lib/settings/supportLinks.ts`
-- `src/lib/social/ugcModeration.ts`
-- `src/lib/social/ugcModerationShared.ts`
-- `src/lib/social/ugcModeration.test.ts`
-- `docs/app-store/OPERATOR_PACKET.md`
-- `docs/app-store/APP_PRIVACY.md`
-- `docs/app-store/REVIEWER_NOTES.md`
-- `docs/app-store/SCREENSHOT_MATRIX.md`
-- `docs/ai/CURSOR_REPORT.md`
+**Product source: none.** HEAD remains `9e04a97ca4f8e7e8e0d6135d41c9deb8aa315d8d`.
+
+Evidence / handoff only (not committed):
+
+- `docs/ai/CURSOR_REPORT.md` (this file)
+- `docs/ops/android-v10-user-reported-defect-repro/*`
+
+Mobile parent `3b33561` dirty tree: **untouched**. Store/Learning: **untouched**.
 
 ## Migrations created
 
@@ -50,32 +48,36 @@ None.
 
 ## Security review
 
-No secrets printed. Team ID written only in committed Expo iOS config (`ios.appleTeamId`), matching live AASA `M6HDH86Z55.com.umtuba.app`. No new public-doc leak. No competing UGC backend. Local block/hide is device-only. Report fails closed while the 20260928 adapter is unbound. Android `android.permissions` array unchanged. Live remains hidden on iOS.
+- No secrets, `.env`, service-role keys, or passwords printed.
+- Play-review login used from existing local env file; lengths only logged.
+- Safe generated navy clips only. Personal camera videos not published.
+- 90s over-duration Publish was **not** tapped.
+- Nothing written to the Windows Desktop. `_port_extract` untouched.
 
 ## Tests
 
-`tsc --noEmit` PASS. Focused shared/iOS vitest 109 PASS. Full suite 385 PASS / 1 FAIL (`src/lib/wallet/format.test.ts` locale grouping — pre-existing Arabic-numeral environment, not this change).
+Not run (evidence-only; no product source change).
 
 ## TypeScript
 
-PASS.
+Not run.
 
 ## Build
 
-Config-only. No `eas build`. No Xcode. Expo/EAS not logged in.
+Not performed. Installed v10 left as-is for the v11 Fold6 GO.
 
 ## git diff --check
 
-Clean.
+Not applicable for product source (none). Evidence docs only.
 
 ## git status --short
 
-See commit on `pc2/ios-app-store-execution-prep-v2`. Not pushed.
+Evidence/docs under `docs/ops/android-v10-user-reported-defect-repro/` and this report. No product source dirty from this task.
 
 ## Open issues
 
-- EAS/Expo login missing on PC2
-- Server-side UGC report queue unbound
-- Reviewer account not created
-- Screenshots not captured
-- No Central TestFlight or App Store GO
+- Task SUPERSEDED by Central v11 SHA `7b33bae` Fold6 QA. Fold6 required for that install.
+- NOT_FINISHED: new-user 100 points; language reset-to-device; Like toggle follow-up.
+- Reproduced on v10 (for Central, not a release authorization): Create stale state; over-duration Publish enabled; false red Like; own Profile incomplete; Share/Comment coming-soon no-ops.
+- Language selector **did** change UI (Arabic + RTL + restart persist) on the path exercised.
+- Do not treat this packet as v11 evidence. Do not declare release authorization.

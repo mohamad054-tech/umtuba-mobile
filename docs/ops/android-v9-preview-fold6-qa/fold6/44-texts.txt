@@ -1,0 +1,4 @@
+Abmelden
+Sitzung auf diesem Gerät beenden?
+ABBRECHEN
+ABMELDEN

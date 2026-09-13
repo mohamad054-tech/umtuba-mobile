@@ -1,0 +1,3 @@
+fix(android): persist session and close reproduced loc leaks
+
+Keep a durable AsyncStorage session copy so Android Keystore miss cannot drop the refresh token, and ignore null INITIAL_SESSION during hydrate. Localize auth email validation and Live empty body, and stop German Nachrichten tab truncation. Stamp versionCode 10; leave iOS buildNumber at 6.

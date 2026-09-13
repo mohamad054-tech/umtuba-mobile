@@ -1,0 +1,4 @@
+Sign out |  | [129,1005][839,1076]
+End your session on this device? |  | [66,1097][902,1154]
+CANCEL |  | [324,1234][526,1376]
+SIGN OUT |  | [98,1234][324,1376]

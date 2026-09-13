@@ -1,0 +1,14 @@
+{
+  "id": "b0425996-1697-427d-8c47-be8a437f042b",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "distribution": "STORE",
+  "buildProfile": "production",
+  "appIdentifier": "com.umtuba.app",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "10",
+  "gitCommitHash": "9e04a97ca4f8e7e8e0d6135d41c9deb8aa315d8d",
+  "completedAt": "2026-08-17T08:16:55.188Z",
+  "artifactKind": "aab",
+  "expoBuildUrl": "https://expo.dev/accounts/umtuba/projects/umtuba-mobile/builds/b0425996-1697-427d-8c47-be8a437f042b"
+}

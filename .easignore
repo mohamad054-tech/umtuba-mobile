@@ -1,0 +1,52 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# local ops evidence and uncommitted handoff docs (do not upload APKs)
+docs/ops/
+docs/ai/CURRENT_TASK.md
+docs/ai/PROJECT_STATE.md
+docs/ai/CURSOR_REPORT.md
+*.apk
+*.aab

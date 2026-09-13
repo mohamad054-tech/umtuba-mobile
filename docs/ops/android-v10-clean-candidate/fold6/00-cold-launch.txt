@@ -1,0 +1,7 @@
+﻿Starting: Intent { cmp=com.umtuba.app/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.umtuba.app/.MainActivity
+TotalTime: 533
+WaitTime: 534
+Complete

@@ -1,0 +1,4 @@
+﻿Sign out
+End your session on this device?
+CANCEL
+SIGN OUT

@@ -1,0 +1,25 @@
+﻿Back
+‹
+Settings
+Account, privacy, and app preferences.
+ACCOUNT
+Edit profile
+Not available yet
+Change password
+›
+Sign out
+Delete account
+PRIVACY
+Privacy settings
+Notifications inbox
+System notification settings
+Blocked users
+APP
+Theme: Dark
+Theme
+Dark
+Language
+English
+About
+App version: 1.0.0
+App version

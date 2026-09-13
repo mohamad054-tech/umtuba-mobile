@@ -1,0 +1,12 @@
+{
+  "id": "1a1b51c7-adbe-4f30-a7dd-97ce14cd7a3d",
+  "status": "NEW",
+  "platform": "ANDROID",
+  "buildProfile": "preview",
+  "appIdentifier": "com.umtuba.app",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "9",
+  "gitCommitHash": "2f0628cf8fd4ea2246366fb8cc919962188186a9",
+  "message": "DESKTOP_ANDROID_V9_PREVIEW_BUILD_V1 preview APK no Play submit SHA 2f0628cf8fd4ea2246366fb8cc919962188186a9",
+  "createdAt": "2026-08-16T18:11:58.794Z"
+}

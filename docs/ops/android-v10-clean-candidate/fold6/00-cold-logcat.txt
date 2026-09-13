@@ -1,0 +1,7 @@
+﻿
+08-16 23:45:47.522 21964 22093 D ProfileInstaller: Installing profile for com.umtuba.app
+08-16 23:45:47.663 21302 21528 I artd    : GetBestInfo: odex next to the dex file 
+(/data/app/~~PMwi-QYCyQqSGnSTiGQjuw==/com.umtuba.app-hJ1Ui7QhMFmtc7hu2LqZ0w==/oat/arm64/base.odex) is kOatUpToDate 
+with filter 'verify' executable 'false'
+
+

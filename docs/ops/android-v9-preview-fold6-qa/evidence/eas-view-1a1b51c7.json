@@ -1,0 +1,49 @@
+﻿{
+  "id": "1a1b51c7-adbe-4f30-a7dd-97ce14cd7a3d",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "artifacts": {
+    "buildUrl": "https://expo.dev/artifacts/eas/wmlUD8DRAp3C2Zo-WDUe3JYdnxH4veyJxOggYP1xU7A.apk",
+    "applicationArchiveUrl": "https://expo.dev/artifacts/eas/wmlUD8DRAp3C2Zo-WDUe3JYdnxH4veyJxOggYP1xU7A.apk"
+  },
+  "fingerprint": {
+    "id": "01a00bc5-f8fc-789b-8a6f-5c117fde8ebf",
+    "hash": "dd298d403ace18414dbd1311b7fd5b825a233d30"
+  },
+  "initiatingActor": {
+    "id": "b272aed1-369f-4528-b362-e55c5a622af2",
+    "displayName": "mohamadabutair"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/d2593b45-8f18-4c57-9d71-0419193cfd77/1a1b51c7-adbe-4f30-a7dd-97ce14cd7a3d/2026-08-16T18%3A12%3A02Z-6554bec0-dfed-4f59-8421-b92518c078ae.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260816%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260816T183436Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=9f4f6301a67203ff31c90b587fc89d641ec2f775a1dfae8fe013452b95b4b9c8abffd9b71198aa7827785b47a36eec1d0f7194341d48a184224160709c7765e655ffe2f3fb4470594e3aaed927c7f879806ed455f2cdbc50d6ad626ed4e0d70b1b600ea195c76b6870648988c8285c56a2621fdb47b1dd9bbdf7c14b5e245b11b3ccd420b5767322286991e9155f155b053d4bbe96ef6f3c836e253782d7fcecf43e7137aaaa5596141bf05f2cd88daa26184d93301160fa6e57ef9536dbb97a2f07e731e520a60e17981da1dc2b8c524c6c01f4ac8a1b5f36fb2b7efa765af26224aae98d196aae614a1025c35645a97941d17d9d41def3241d9e08c13f8823"
+  ],
+  "app": {
+    "id": "d2593b45-8f18-4c57-9d71-0419193cfd77",
+    "name": "UMTUBA",
+    "slug": "umtuba-mobile",
+    "ownerAccount": {
+      "id": "313f9686-6fce-4a77-a7c2-9d3e3aca0410",
+      "name": "umtuba"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "appIdentifier": "com.umtuba.app",
+  "sdkVersion": "57.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "9",
+  "gitCommitHash": "2f0628cf8fd4ea2246366fb8cc919962188186a9",
+  "gitCommitMessage": "fix(android): align expo-localization to Expo SDK 57 to stop launch crash\n\nSDK 54 expo-localization 17.x called ReturnType(KClass), which SDK 57 expo-modules-kotlin no longer has. Bump Android versionCode to 9; leave iOS buildNumber at 6.\n\nCo-authored-by: Cursor <cursoragent@cursor.com>",
+  "priority": "NORMAL",
+  "createdAt": "2026-08-16T18:11:58.794Z",
+  "updatedAt": "2026-08-16T18:26:12.743Z",
+  "message": "DESKTOP_ANDROID_V9_PREVIEW_BUILD_V1 preview APK no Play submit SHA 2f0628cf8fd4ea2246366fb8cc919962188186a9",
+  "completedAt": "2026-08-16T18:26:12.578Z",
+  "expirationDate": "2026-08-30T18:11:58.834Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 3277,
+    "buildQueueTime": 4576,
+    "buildDuration": 845931
+  }
+}

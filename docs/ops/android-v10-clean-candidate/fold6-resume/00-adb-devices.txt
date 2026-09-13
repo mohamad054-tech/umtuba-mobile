@@ -1,0 +1,3 @@
+﻿List of devices attached
+RFCX718LVHK            device product:q6qxxx model:SM_F956B device:q6q transport_id:2
+

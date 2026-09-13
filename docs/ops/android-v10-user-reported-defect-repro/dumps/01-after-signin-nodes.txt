@@ -1,0 +1,5 @@
+Save sign-in info to Samsung Pass? |  | [89,1546][879,1641]
+Save عنوان البريد الإلكتروني and كلمة مرور to autofill them the next time you sign in. |  | [89,1641][879,1765]
+حفظ |  | [89,1807][879,1902]
+Never for this app or website |  | [89,1944][879,2039]
+إلغاء |  | [89,2081][879,2176]
