@@ -1,7 +1,7 @@
 import { Redirect, Tabs } from "expo-router";
 import { Platform, Text, type ColorValue } from "react-native";
 
-import { GlobalBackButton } from "@/components/GlobalBackButton";
+import { useGlobalBackHeaderSlots } from "@/components/GlobalBackButton";
 import { WalletTierBadge } from "@/components/WalletTierBadge";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
@@ -25,6 +25,7 @@ function TabLabel({
 export default function TabLayout() {
   const { session, loading, passwordRecoveryPending } = useAuth();
   const { t } = useTranslation();
+  const backHeader = useGlobalBackHeaderSlots(() => <WalletTierBadge />);
 
   if (!loading && session && passwordRecoveryPending) {
     return <Redirect href="/(auth)/update-password" />;
@@ -46,8 +47,8 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         ...GLOBAL_BACK_TITLE_OPTIONS,
-        headerLeft: () => <GlobalBackButton />,
-        headerRight: () => <WalletTierBadge />,
+        headerLeft: backHeader.headerLeft,
+        headerRight: backHeader.headerRight,
       }}
     >
       <Tabs.Screen

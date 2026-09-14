@@ -7,12 +7,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
-import { GlobalBackButton } from "@/components/GlobalBackButton";
+import { useGlobalBackStackHeaderOptions } from "@/components/GlobalBackButton";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { I18nProvider, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
 import { saveReferralAttribution } from "@/src/lib/auth/referralAttribution";
-import { GLOBAL_STACK_HEADER_OPTIONS } from "@/src/lib/nav/globalBack";
 import {
   establishEmailConfirmSession,
   isEmailConfirmCallbackUrl,
@@ -150,14 +149,14 @@ function ConfigNeeded({ onRetry }: { onRetry: () => void }) {
 
 function LocalizedStack() {
   const { t } = useTranslation();
+  const backHeader = useGlobalBackStackHeaderOptions();
   return (
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,
         contentStyle: { backgroundColor: colors.bg },
-        ...GLOBAL_STACK_HEADER_OPTIONS,
-        headerLeft: () => <GlobalBackButton />,
+        ...backHeader,
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

@@ -5,13 +5,16 @@ import {
   useRouter,
   useSegments,
 } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, type ColorValue } from "react-native";
 
 import { useTranslation } from "@/src/lib/i18n";
 import { backGlyph } from "@/src/lib/i18n/rtl";
 import {
+  GLOBAL_HEADER_LAYOUT_DIRECTION,
+  GLOBAL_STACK_HEADER_OPTIONS,
   applyGlobalBackDecision,
+  assignHeaderSlots,
   previousRouteNameFromState,
   resolveGlobalBack,
 } from "@/src/lib/nav/globalBack";
@@ -52,6 +55,24 @@ export function useGlobalBack() {
   }, [navigation, pathname, profileHasOtherUser, router, segments]);
 }
 
+export function useGlobalBackHeaderSlots(trailing?: () => ReactNode) {
+  const { direction } = useTranslation();
+  const leading = (): ReactNode => <GlobalBackButton />;
+  return assignHeaderSlots(direction, leading, trailing);
+}
+
+export function useGlobalBackStackHeaderOptions() {
+  const slots = useGlobalBackHeaderSlots();
+  return {
+    ...GLOBAL_STACK_HEADER_OPTIONS,
+    headerLeft: slots.headerLeft,
+    headerRight: slots.headerRight,
+    unstable_nativeProps: {
+      headerConfig: { direction: GLOBAL_HEADER_LAYOUT_DIRECTION },
+    },
+  };
+}
+
 export function GlobalBackButton({
   tintColor = colors.text,
 }: GlobalBackButtonProps) {
@@ -79,7 +100,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    paddingRight: 4,
+    paddingHorizontal: 4,
   },
   arrow: {
     fontSize: 36,

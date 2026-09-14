@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  GLOBAL_HEADER_LAYOUT_DIRECTION,
   GLOBAL_STACK_HEADER_OPTIONS,
   applyGlobalBackDecision,
+  assignHeaderSlots,
   classifySurface,
   isInternalRouteName,
   isRedirectOnlyRoute,
   isValidHistoryPrevious,
+  leadingHeaderBarSlot,
   normalizeNavPath,
   parentFallbackHref,
   previousRouteNameFromState,
@@ -34,6 +37,8 @@ describe("internal route labels", () => {
     expect(GLOBAL_STACK_HEADER_OPTIONS.headerBackButtonDisplayMode).toBe(
       "minimal"
     );
+    expect(GLOBAL_STACK_HEADER_OPTIONS.headerBackVisible).toBe(false);
+    expect(GLOBAL_HEADER_LAYOUT_DIRECTION).toBe("ltr");
     expect(isRedirectOnlyRoute("(tabs)")).toBe(false);
     expect(isRedirectOnlyRoute("index")).toBe(true);
     expect(isValidHistoryPrevious("(tabs)", "/settings")).toBe(true);
@@ -254,6 +259,57 @@ describe("resolveGlobalBack", () => {
     expect(action).toBe("noop");
     expect(nav.back).not.toHaveBeenCalled();
     expect(nav.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("header slot placement", () => {
+  it("keeps LTR secondary Back in the left slot with a matching touch target", () => {
+    expect(leadingHeaderBarSlot("ltr")).toBe("left");
+    expect(assignHeaderSlots("ltr", "back", "wallet")).toEqual({
+      headerLeft: "back",
+      headerRight: "wallet",
+    });
+  });
+
+  it("places RTL secondary Back in the right slot so the touch target matches the chevron", () => {
+    expect(leadingHeaderBarSlot("rtl")).toBe("right");
+    expect(assignHeaderSlots("rtl", "back")).toEqual({
+      headerLeft: undefined,
+      headerRight: "back",
+    });
+    expect(assignHeaderSlots("rtl", "back", "wallet")).toEqual({
+      headerLeft: "wallet",
+      headerRight: "back",
+    });
+    expect(GLOBAL_HEADER_LAYOUT_DIRECTION).toBe("ltr");
+  });
+});
+
+describe("Profile → Settings → Back", () => {
+  it("never no-ops on Settings; history-back or replace to Profile", () => {
+    expect(
+      resolveGlobalBack({
+        canGoBack: true,
+        currentPath: "/settings",
+        segments: ["settings"],
+        previousRouteName: "(tabs)",
+      })
+    ).toEqual({ action: "history-back" });
+    expect(
+      resolveGlobalBack({
+        canGoBack: false,
+        currentPath: "/settings",
+        segments: ["settings"],
+      })
+    ).toEqual({ action: "replace", href: "/(tabs)/profile" });
+    expect(
+      resolveGlobalBack({
+        canGoBack: true,
+        currentPath: "/settings",
+        segments: ["settings"],
+        previousRouteName: "index",
+      }).action
+    ).not.toBe("noop");
   });
 });
 

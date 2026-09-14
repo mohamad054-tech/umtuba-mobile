@@ -3,6 +3,8 @@
  * Arrow stays visible on root/tab surfaces but never exits the app.
  */
 
+import type { TextDirection } from "@/src/lib/i18n/locales";
+
 export const PRIMARY_TAB_PATHS = [
   "/(tabs)/watch",
   "/(tabs)/discover",
@@ -29,12 +31,37 @@ export const SECONDARY_PATHS = [
 export const GLOBAL_BACK_TITLE_OPTIONS = {
   headerBackTitle: "",
   headerBackTitleVisible: false,
+  headerBackVisible: false,
 };
 
 export const GLOBAL_STACK_HEADER_OPTIONS = {
   ...GLOBAL_BACK_TITLE_OPTIONS,
   headerBackButtonDisplayMode: "minimal" as const,
 };
+
+/**
+ * Native stack headers must keep physical left/right slots.
+ * I18nManager RTL + headerLeft visually mirrors the chevron to the
+ * trailing edge while the Pressable frame stays on the leading edge.
+ */
+export const GLOBAL_HEADER_LAYOUT_DIRECTION = "ltr" as const;
+
+export type HeaderBarSlot = "left" | "right";
+
+export function leadingHeaderBarSlot(direction: TextDirection): HeaderBarSlot {
+  return direction === "rtl" ? "right" : "left";
+}
+
+export function assignHeaderSlots<T>(
+  direction: TextDirection,
+  leading: T,
+  trailing?: T
+): { headerLeft?: T; headerRight?: T } {
+  if (direction === "rtl") {
+    return { headerLeft: trailing, headerRight: leading };
+  }
+  return { headerLeft: leading, headerRight: trailing };
+}
 
 export type NavSurface = "root" | "auth-root" | "secondary" | "redirect";
 
