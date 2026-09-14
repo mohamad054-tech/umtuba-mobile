@@ -1,0 +1,33 @@
+# Mirror .gitignore so the upload does not replace it with a narrower set.
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+/ios
+/android
+.env
+.env.*
+!.env.example
+
+# Local device evidence / previous APKs — do not upload
+docs/ai/pc2-fold6-camera-upload-audit/
+docs/ai/pc2-fold6-e2e-autofix/
+release-artifacts/
+supabase/
+.easignore
