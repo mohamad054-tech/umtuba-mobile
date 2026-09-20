@@ -30,3 +30,13 @@ export function watchEngineTargetIsDrawable(input: {
       input.targetMediaId === input.firstFrameMediaId
   );
 }
+
+/**
+ * TextureView / expo-video will not fire onFirstFrameRender when the
+ * current surface is opacity 0. Hiding until first frame is a deadlock:
+ * duration can advance (player is playing) while the picture never appears.
+ * Build 23 preview 353f16f2 hit WATCH_NO_BLACK_SURFACE this way.
+ */
+export function shouldHideWatchEngineCurrentSurfaceUntilFirstFrame(): false {
+  return false;
+}

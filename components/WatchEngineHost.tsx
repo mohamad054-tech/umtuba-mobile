@@ -45,8 +45,8 @@ import {
   canNewWatchEngineAudioBecomeAudible,
   createWatchEngineTimelineStore,
   runWatchEngineOutgoingAudioHandoff,
+  shouldHideWatchEngineCurrentSurfaceUntilFirstFrame,
   subscribeWatchEngineAudioHandoff,
-  watchEngineTargetIsDrawable,
   type WatchEngineReadiness,
   type WatchEngineSeekCommand,
   type WatchEngineTimeline,
@@ -54,6 +54,9 @@ import {
 } from "@/src/lib/watch/engine";
 import { ANALYTICS_EVENTS, track } from "@/src/lib/analytics/client";
 import { colors } from "@/src/theme/colors";
+
+const NEVER_HIDE_CURRENT_SURFACE =
+  shouldHideWatchEngineCurrentSurfaceUntilFirstFrame();
 
 export type WatchEngineHostHandle = {
   snapToIndex: (index: number) => void;
@@ -438,26 +441,15 @@ export const WatchEngineHost = forwardRef<
         screenFocused,
         userPaused: userPaused && isCurrent,
       });
-      const incomingDrawable = watchEngineTargetIsDrawable({
-        targetMediaId: isCurrent ? mediaId : null,
-        firstFrameMediaId: firstFrameById[mediaId] ? mediaId : null,
-      });
       const audible =
         audioOwner === mediaId &&
         isCurrent &&
         wantsPlay &&
-        (audioHandoffTick >= 0) &&
+        audioHandoffTick >= 0 &&
         canNewWatchEngineAudioBecomeAudible();
       return (
         <View style={{ height: itemHeight, backgroundColor: "#000" }}>
           {mount && playable && resolvedSrc ? (
-            <View
-              style={{
-                flex: 1,
-                opacity: !isCurrent || incomingDrawable ? 1 : 0,
-              }}
-              pointerEvents="none"
-            >
             <WatchEnginePlayer
               key={mediaId}
               src={resolvedSrc}
@@ -510,7 +502,6 @@ export const WatchEngineHost = forwardRef<
                 if (isCurrent) onActiveEnded();
               }}
             />
-            </View>
           ) : null}
           <WatchEngineChromeBridge
             mediaId={mediaId}
@@ -567,7 +558,7 @@ export const WatchEngineHost = forwardRef<
       scrollEventThrottle={16}
       onEndReached={onRequestMore}
       onEndReachedThreshold={0.6}
-      extraData={`${extraData ?? ""}:${watchEngineSrcSignature(videos)}:${Object.keys(firstFrameById).length}:${userPaused ? "1" : "0"}`}
+      extraData={`${extraData ?? ""}:${watchEngineSrcSignature(videos)}:${Object.keys(firstFrameById).length}:${userPaused ? "1" : "0"}:${NEVER_HIDE_CURRENT_SURFACE ? "hide" : "show"}`}
       windowSize={5}
       maxToRenderPerBatch={3}
       initialNumToRender={2}

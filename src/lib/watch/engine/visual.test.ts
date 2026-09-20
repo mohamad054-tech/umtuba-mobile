@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   resolveWatchEngineVisualLayer,
+  shouldHideWatchEngineCurrentSurfaceUntilFirstFrame,
   watchEngineAllowsEmptyTexture,
   watchEngineTargetIsDrawable,
 } from "./visual";
@@ -16,6 +17,16 @@ describe("watch engine visual continuity", () => {
     });
     expect(layer).toBe("outgoing");
     expect(watchEngineAllowsEmptyTexture(layer)).toBe(false);
+  });
+
+  it("never hides the current TextureView while waiting for first frame", () => {
+    expect(shouldHideWatchEngineCurrentSurfaceUntilFirstFrame()).toBe(false);
+    expect(
+      watchEngineTargetIsDrawable({
+        targetMediaId: "post-1",
+        firstFrameMediaId: null,
+      })
+    ).toBe(false);
   });
 
   it("shows incoming only when the target first frame is ready", () => {

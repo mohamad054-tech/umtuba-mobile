@@ -110,6 +110,7 @@ export type {
 } from "./types";
 export {
   resolveWatchEngineVisualLayer,
+  shouldHideWatchEngineCurrentSurfaceUntilFirstFrame,
   watchEngineAllowsEmptyTexture,
   watchEngineTargetIsDrawable,
 } from "./visual";
