@@ -32,6 +32,7 @@ import {
 } from "@/src/lib/auth/referralAttribution";
 import { shouldSkipInitialSessionClobber } from "@/src/lib/auth/sessionHydration";
 import type { UserProfile } from "@/src/lib/auth/types";
+import { ANALYTICS_EVENTS, identifyAnalyticsUser, resetAnalyticsUser, track } from "@/src/lib/analytics/client";
 import { unregisterPushOnLogout } from "@/src/lib/push/service";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { clearWatchOfflineManifestForAccount } from "@/src/lib/watch/watchOfflineManifest";
@@ -239,6 +240,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await applySession(data.session);
+      identifyAnalyticsUser(data.session?.user?.id);
+      track(ANALYTICS_EVENTS.login, {});
     },
     [applySession]
   );
@@ -322,6 +325,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await applySession(data.session);
       await claimReferralAfterSignup();
+      identifyAnalyticsUser(data.session?.user?.id ?? data.user?.id);
+      track(ANALYTICS_EVENTS.sign_up_completed, {});
     },
     [applySession, t]
   );
@@ -348,6 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setPasswordRecoveryPending(false);
     await applySession(null);
+    resetAnalyticsUser();
   }, [applySession, user?.id]);
 
   const markPasswordRecoveryPending = useCallback(() => {

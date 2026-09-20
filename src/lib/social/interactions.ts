@@ -322,9 +322,15 @@ async function performTogglePostLike(
     return { ok: false, message: "Unable to update like. Please try again." };
   }
 
+  const liked = asBoolean(payload.liked);
+  if (liked) {
+    const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+    track(ANALYTICS_EVENTS.video_like, { post_id: postId });
+  }
+
   return {
     ok: true,
-    liked: asBoolean(payload.liked),
+    liked,
     likes: asNumber(payload.likes),
   };
 }
@@ -454,6 +460,9 @@ export async function recordPostShare(
   if (!payload) {
     return { ok: false, message: "Unable to record share. Please try again." };
   }
+
+  const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+  track(ANALYTICS_EVENTS.video_share, { post_id: postId });
 
   return {
     ok: true,

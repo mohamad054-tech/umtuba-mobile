@@ -249,3 +249,25 @@ export function shouldConsumeHardwareBack(
   }
   return exitNav?.action !== "system-exit";
 }
+
+/**
+ * beforeRemove + hardware Back can race: exitWatchToEntry clears the arm,
+ * then beforeRemove sees unarmed + canGoBack and re-arms. Mark exiting so
+ * the confirming back is allowed through.
+ */
+export type WatchBeforeRemoveAction =
+  | "allow"
+  | "prevent-and-close-nested"
+  | "prevent-and-arm";
+
+export function resolveWatchBeforeRemove(input: {
+  exiting: boolean;
+  decision: WatchRootBackDecision;
+}): WatchBeforeRemoveAction {
+  if (input.exiting) return "allow";
+  if (input.decision.action === "close-nested") {
+    return "prevent-and-close-nested";
+  }
+  if (input.decision.action === "arm-exit") return "prevent-and-arm";
+  return "allow";
+}

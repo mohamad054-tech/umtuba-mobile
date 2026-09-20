@@ -206,6 +206,7 @@ import {
 import {
   isWatchRootSurface,
   peekWatchEntryHref,
+  resolveWatchBeforeRemove,
   resolveWatchExitNavigation,
   resolveWatchHeaderArrowNavigation,
   resolveWatchRootBack,
@@ -317,6 +318,7 @@ export default function WatchScreen() {
   const cacheSyncGenerationRef = useRef(0);
   const programmaticAdvanceUntilRef = useRef(0);
   const armedUntilMsRef = useRef<number | null>(null);
+  const exitingWatchRef = useRef(false);
   const screenFocusedRef = useRef(true);
   const commentPostIdRef = useRef<number | null>(null);
   const shareSheetOpenRef = useRef(false);
@@ -466,6 +468,7 @@ export default function WatchScreen() {
     useCallback(() => {
       setScreenFocused(true);
       screenFocusedRef.current = true;
+      exitingWatchRef.current = false;
       void Promise.all([loadBlockedUsers(), loadHiddenPostIds()]).then(
         ([users, posts]) => {
           setBlockedUserIds(new Set(users.map((row) => row.userId)));
@@ -606,6 +609,7 @@ export default function WatchScreen() {
   }, []);
 
   const exitWatchToEntry = useCallback(() => {
+    exitingWatchRef.current = true;
     const state = navigation.getState() as
       | { index?: number; routes?: Array<{ name?: string }> }
       | undefined;
@@ -714,12 +718,16 @@ export default function WatchScreen() {
         return;
       }
       const decision = decideWatchRootBack();
-      if (decision.action === "close-nested") {
+      const beforeRemove = resolveWatchBeforeRemove({
+        exiting: exitingWatchRef.current,
+        decision,
+      });
+      if (beforeRemove === "prevent-and-close-nested") {
         event.preventDefault();
         closeWatchInPlaceOverlay();
         return;
       }
-      if (decision.action === "arm-exit") {
+      if (beforeRemove === "prevent-and-arm" && decision.action === "arm-exit") {
         event.preventDefault();
         armWatchExit(decision.armedUntilMs);
       }

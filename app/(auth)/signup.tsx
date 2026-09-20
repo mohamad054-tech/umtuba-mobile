@@ -11,6 +11,7 @@ import {
 import { PasswordField } from "@/components/auth/PasswordField";
 import { AuthScreen } from "@/components/AuthScreen";
 import { normalizeReferralCode } from "@/src/contracts/referral";
+import { ANALYTICS_EVENTS, track } from "@/src/lib/analytics/client";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   signupEmailAutofillProps,
@@ -66,6 +67,7 @@ export default function SignupScreen() {
         setError(t(validationKey));
         return;
       }
+      track(ANALYTICS_EVENTS.sign_up_started, { surface: "other" });
       await signUp({
         email,
         password,

@@ -1,5 +1,5 @@
 import { useRouter, type Href } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ANALYTICS_EVENTS, track } from "@/src/lib/analytics/client";
 import { DiscoverCard } from "@/components/discover/DiscoverCard";
 import { DiscoverSearchBar } from "@/components/discover/DiscoverSearchBar";
 import {
@@ -126,6 +127,19 @@ export default function DiscoverScreen() {
     error: query.trim() ? error : null,
     resultCount: searchResults.length,
   });
+  const lastSearchCaptureRef = useRef("");
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      lastSearchCaptureRef.current = "";
+      return;
+    }
+    if (searchPhase !== "results" && searchPhase !== "empty") return;
+    if (lastSearchCaptureRef.current === trimmed) return;
+    lastSearchCaptureRef.current = trimmed;
+    track(ANALYTICS_EVENTS.search_performed, { surface: "discover" });
+  }, [query, searchPhase]);
 
   const onCategoryPress = (category: DiscoverCategory) => {
     const href = mapDiscoverCategoryHref(category.id);

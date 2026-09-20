@@ -42,12 +42,17 @@ import {
   resolveWatchEngineSnapOffset,
   watchEngineSrcSignature,
   WatchEnginePlayer,
+  canNewWatchEngineAudioBecomeAudible,
   createWatchEngineTimelineStore,
+  runWatchEngineOutgoingAudioHandoff,
+  subscribeWatchEngineAudioHandoff,
+  watchEngineTargetIsDrawable,
   type WatchEngineReadiness,
   type WatchEngineSeekCommand,
   type WatchEngineTimeline,
   type WatchEngineTimelineStore,
 } from "@/src/lib/watch/engine";
+import { ANALYTICS_EVENTS, track } from "@/src/lib/analytics/client";
 import { colors } from "@/src/theme/colors";
 
 export type WatchEngineHostHandle = {
@@ -175,6 +180,14 @@ export const WatchEngineHost = forwardRef<
     null
   );
   const [userPaused, setUserPaused] = useState(false);
+  const [audioHandoffTick, setAudioHandoffTick] = useState(0);
+  const lastViewedPostRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return subscribeWatchEngineAudioHandoff(() => {
+      setAudioHandoffTick((value) => value + 1);
+    });
+  }, []);
 
   useEffect(() => {
     setUserPaused(false);
@@ -313,13 +326,21 @@ export const WatchEngineHost = forwardRef<
         itemHeight: itemHeightRef.current,
         velocityY: event.nativeEvent.velocity?.y,
       });
+      runWatchEngineOutgoingAudioHandoff({
+        fromMediaId: videos[dragStartIndexRef.current]
+          ? watchEngineMediaId(videos[dragStartIndexRef.current]!)
+          : null,
+        toMediaId: videos[state.targetIndex]
+          ? watchEngineMediaId(videos[state.targetIndex]!)
+          : null,
+      });
       snapGenRef.current = state.snapGeneration;
       if (effects.snap) {
         snapOnce(effects.snap.index);
       }
       applyEngineState();
     },
-    [applyEngineState, snapOnce]
+    [applyEngineState, snapOnce, videos]
   );
 
   const onMomentumScrollEnd = useCallback(
@@ -417,10 +438,26 @@ export const WatchEngineHost = forwardRef<
         screenFocused,
         userPaused: userPaused && isCurrent,
       });
-      const audible = audioOwner === mediaId && isCurrent && wantsPlay;
+      const incomingDrawable = watchEngineTargetIsDrawable({
+        targetMediaId: isCurrent ? mediaId : null,
+        firstFrameMediaId: firstFrameById[mediaId] ? mediaId : null,
+      });
+      const audible =
+        audioOwner === mediaId &&
+        isCurrent &&
+        wantsPlay &&
+        (audioHandoffTick >= 0) &&
+        canNewWatchEngineAudioBecomeAudible();
       return (
         <View style={{ height: itemHeight, backgroundColor: "#000" }}>
           {mount && playable && resolvedSrc ? (
+            <View
+              style={{
+                flex: 1,
+                opacity: !isCurrent || incomingDrawable ? 1 : 0,
+              }}
+              pointerEvents="none"
+            >
             <WatchEnginePlayer
               key={mediaId}
               src={resolvedSrc}
@@ -457,6 +494,13 @@ export const WatchEngineHost = forwardRef<
                   firstFrameReady: true,
                 });
                 applyEngineState();
+                if (isCurrent && item.postId && lastViewedPostRef.current !== item.postId) {
+                  lastViewedPostRef.current = item.postId;
+                  track(ANALYTICS_EVENTS.video_view, {
+                    post_id: item.postId,
+                    surface: "watch",
+                  });
+                }
               }}
               onTimeline={(id, next) => {
                 if (!isCurrent) return;
@@ -466,6 +510,7 @@ export const WatchEngineHost = forwardRef<
                 if (isCurrent) onActiveEnded();
               }}
             />
+            </View>
           ) : null}
           <WatchEngineChromeBridge
             mediaId={mediaId}
@@ -482,6 +527,7 @@ export const WatchEngineHost = forwardRef<
     },
     [
       applyEngineState,
+      audioHandoffTick,
       audioOwner,
       itemHeight,
       muted,

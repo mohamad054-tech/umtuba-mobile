@@ -13,6 +13,7 @@ import {
   peekWatchEntryHref,
   resetWatchEntryContextForTests,
   WATCH_HEADER_ARROW_IN_APP_FALLBACK,
+  resolveWatchBeforeRemove,
   resolveWatchExitNavigation,
   resolveWatchHeaderArrowNavigation,
   resolveWatchRootBack,
@@ -283,6 +284,46 @@ describe("resolveWatchHeaderArrowNavigation", () => {
         previousRouteName: null,
       })
     ).toEqual({ action: "replace", href: "/(tabs)/discover" });
+  });
+});
+
+describe("WATCH_BACK_DOUBLE_PRESS beforeRemove race", () => {
+  it("does not re-arm the confirming back after exit has started", () => {
+    const first = resolveWatchRootBack({
+      nowMs: 10_000,
+      armedUntilMs: null,
+      nestedOverlayOpen: false,
+      atWatchRoot: true,
+    });
+    expect(first.action).toBe("arm-exit");
+    const confirm = resolveWatchRootBack({
+      nowMs: 10_400,
+      armedUntilMs: first.action === "arm-exit" ? first.armedUntilMs : null,
+      nestedOverlayOpen: false,
+      atWatchRoot: true,
+    });
+    expect(confirm.action).toBe("exit");
+    expect(
+      resolveWatchBeforeRemove({ exiting: true, decision: confirm })
+    ).toBe("allow");
+    expect(
+      resolveWatchBeforeRemove({
+        exiting: true,
+        decision: {
+          action: "arm-exit",
+          armedUntilMs: 11_800,
+        },
+      })
+    ).toBe("allow");
+  });
+
+  it("still arms the first back when not exiting", () => {
+    expect(
+      resolveWatchBeforeRemove({
+        exiting: false,
+        decision: { action: "arm-exit", armedUntilMs: 1 },
+      })
+    ).toBe("prevent-and-arm");
   });
 });
 

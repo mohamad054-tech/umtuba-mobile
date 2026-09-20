@@ -204,6 +204,9 @@ export async function createPostComment(
     supabase.from("posts").select("comments").eq("id", postId).maybeSingle(),
   ]);
 
+  const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+  track(ANALYTICS_EVENTS.comment_posted, { post_id: postId });
+
   return {
     ok: true,
     comment: mapCommentRow(data as PostCommentRow, profiles.get(userId), userId),

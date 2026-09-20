@@ -4,7 +4,7 @@ const config: ExpoConfig = {
   name: "UMTUBA",
   slug: "umtuba-mobile",
   owner: "umtuba",
-  version: "1.0.22",
+  version: "1.0.23",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "umtuba",
@@ -175,6 +175,9 @@ const config: ExpoConfig = {
     eas: {
       projectId: "d2593b45-8f18-4c57-9d71-0419193cfd77",
     },
+    // Literal env reads so Metro/EAS inline the values. Do not use a dynamic env name.
+    posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY ?? "",
+    posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "",
   },
 };
 

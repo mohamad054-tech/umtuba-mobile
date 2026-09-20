@@ -268,6 +268,9 @@ export async function reportWatchPost(input: {
     };
   }
 
+  const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+  track(ANALYTICS_EVENTS.report_submitted, { kind: "post" });
+
   return {
     ok: true,
     postId: input.postId,
@@ -332,6 +335,9 @@ export async function reportWatchUser(input: {
       message: UGC_MODERATION_ERRORS.reportFailed,
     };
   }
+
+  const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+  track(ANALYTICS_EVENTS.report_submitted, { kind: "user" });
 
   return {
     ok: true,

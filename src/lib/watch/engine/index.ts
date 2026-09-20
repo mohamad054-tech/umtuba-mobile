@@ -3,6 +3,15 @@ export {
   watchEngineAudioOwnerCount,
 } from "./audio";
 export {
+  AUDIBLE_WATCH_ENGINE_PLAYERS_MAX,
+  canNewWatchEngineAudioBecomeAudible,
+  noteWatchEnginePlayerNativePlaying,
+  registerWatchEngineAudioPlayer,
+  runWatchEngineOutgoingAudioHandoff,
+  subscribeWatchEngineAudioHandoff,
+  WATCH_ENGINE_AUDIO_MIXING_MODE,
+} from "./audioHandoff";
+export {
   planWatchEngineDiskWindow,
   WATCH_ENGINE_CURRENT,
   WATCH_ENGINE_FORWARD_READY,

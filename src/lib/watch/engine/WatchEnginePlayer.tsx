@@ -7,6 +7,12 @@ import { resolveProgressRatio } from "@/src/lib/watch/playbackPolicy";
 import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 
 import {
+  canNewWatchEngineAudioBecomeAudible,
+  noteWatchEnginePlayerNativePlaying,
+  registerWatchEngineAudioPlayer,
+  WATCH_ENGINE_AUDIO_MIXING_MODE,
+} from "./audioHandoff";
+import {
   watchEnginePlayerSource,
   watchEnginePlayerSourceEquals,
 } from "./playerSource";
@@ -68,7 +74,7 @@ export function WatchEnginePlayer({
     instance.loop = false;
     instance.muted = true;
     instance.volume = 0;
-    instance.audioMixingMode = "mixWithOthers";
+    instance.audioMixingMode = WATCH_ENGINE_AUDIO_MIXING_MODE;
     instance.staysActiveInBackground = false;
     instance.showNowPlayingNotification = false;
     instance.keepScreenOnWhilePlaying = true;
@@ -83,14 +89,30 @@ export function WatchEnginePlayer({
   });
 
   useEffect(() => {
-    player.muted = !audible || muted;
-    player.volume = audible && !muted ? volume : 0;
+    registerWatchEngineAudioPlayer(mediaId, player);
+    return () => {
+      registerWatchEngineAudioPlayer(mediaId, null);
+    };
+  }, [mediaId, player]);
+
+  useEffect(() => {
+    const allowUnmute = audible && canNewWatchEngineAudioBecomeAudible();
+    player.muted = !allowUnmute || muted;
+    player.volume = allowUnmute && !muted ? volume : 0;
+    if (!allowUnmute && (audible || !canPlay)) {
+      player.muted = true;
+      player.volume = 0;
+    }
     if (canPlay) {
       player.play();
     } else {
       player.pause();
     }
-  }, [audible, canPlay, muted, player, volume]);
+  }, [audible, canPlay, mediaId, muted, player, volume]);
+
+  useEventListener(player, "playingChange", ({ isPlaying }) => {
+    noteWatchEnginePlayerNativePlaying(mediaId, isPlaying === true);
+  });
 
   useEffect(() => {
     if (!seekRequest) return;

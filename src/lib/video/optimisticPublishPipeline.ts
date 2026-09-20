@@ -120,6 +120,9 @@ export async function runOptimisticPublishPipeline(
       return getOptimisticWatchRecord(clientId);
     }
 
+    const { ANALYTICS_EVENTS, track } = await import("@/src/lib/analytics/client");
+    track(ANALYTICS_EVENTS.post_published, { post_id: published.postId });
+
     await deps.clearOrphan(uploaded.path);
     const remoteSrc = deps.peekSignedUrl?.(uploaded.path) ?? null;
     const reconciled = reconcileOptimisticWithServer(

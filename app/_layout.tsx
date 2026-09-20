@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
 import { useGlobalHeaderSlots } from "@/components/GlobalBackButton";
+import { PostHogRoot } from "@/src/lib/analytics/PostHogRoot";
 import { AuthProvider, useAuth } from "@/src/lib/auth/AuthContext";
 import { I18nProvider, useI18n, useTranslation } from "@/src/lib/i18n";
 import { POST_AUTH_HREF } from "@/src/lib/auth/postAuthDestination";
@@ -250,6 +251,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <I18nProvider>
         <AuthProvider>
+          <PostHogRoot />
           <ThemeProvider value={navTheme}>
             <StatusBar style="light" />
             <SplashGate>
