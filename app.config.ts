@@ -4,7 +4,7 @@ const config: ExpoConfig = {
   name: "UMTUBA",
   slug: "umtuba-mobile",
   owner: "umtuba",
-  version: "1.0.23",
+  version: "1.0.25",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "umtuba",

@@ -1,24 +1,13 @@
 {
-  "task_id": "FIX_WATCH_REPLAY_ON_BECOME_CURRENT_V1",
-  "owner_goal": "When a Watch clip becomes current after it ended or is near the end, restart from 0, reset the progress bar, and autoplay. Do not break save, hide-watched, audio handoff, never-hide surface, double-back, or PostHog. One preview EAS APK. No Play, production profile, or version change.",
-  "base_sha": "c48671d64f2c1c2ee8c8cf3e026a49d0a4666504",
+  "task_id": "EAS_STORE_AAB_BUILD_25_V1",
+  "owner_goal": "Set versionName 1.0.25, production Android AAB from feat/app-web-parity-v1 after Fold6 OWNER_PASS at 70cf6c9e. Remote versionCode must become 25. No eas submit, no Play upload. Tag build-25.",
+  "base_sha": "70cf6c9e1d2fdf3cce205d31d8438379b17d8fb5",
   "product_area": "watch",
   "allowed_files": [
     "docs/ai/**",
-    "app/(tabs)/watch.tsx",
-    "components/WatchEngineHost.tsx",
-    "src/lib/watch/engine/WatchEnginePlayer.tsx",
-    "src/lib/watch/engine/index.ts",
-    "src/lib/watch/engine/replayOnBecomeCurrent.ts",
-    "src/lib/watch/engine/replayOnBecomeCurrent.test.ts",
-    "src/lib/watch/engine/timelineStore.ts",
-    "src/lib/watch/engine/timelineStore.test.ts"
+    "app.config.ts"
   ],
   "allowed_modules": [
-    "watch",
-    "media_video",
-    "audio",
-    "cache",
     "regression_lock"
   ],
   "forbidden_modules": ["um_streak", "store", "learning"],
@@ -38,12 +27,6 @@
     "src/lib/watch/engine/visual.test.ts",
     "src/lib/watch/engine/audioHandoff.test.ts",
     "src/lib/nav/watchRootExit.test.ts",
-    "src/lib/analytics/events.test.ts",
-    "src/lib/video/**/*.test.ts",
-    "src/lib/umStreak/**/*.test.ts",
-    "src/lib/messenger/**/*.test.ts",
-    "src/lib/auth/**/*.test.ts",
-    "src/lib/profile/**/*.test.ts",
     "src/lib/regressionLock/**/*.test.ts",
     "src/lib/watch/**/*.test.ts",
     "src/lib/watch/playerLifecycle.test.ts",
@@ -69,8 +52,8 @@
   "production_allowed": false,
   "push_allowed": true,
   "max_eas_builds": 1,
-  "authorized_sha": "c48671d64f2c1c2ee8c8cf3e026a49d0a4666504",
-  "owner_status_claim": "NONE",
-  "device_evidence": "Fold6 OWNER: save + hide-watched PASS; replay-on-swipe-back FAIL at c48671d6 — bar full, paused.",
-  "notes": "Previous replay only ran when nextIndex was null (last clip). Ended players stay mounted in the retained previous window at currentTime=end. Restart whenever a clip becomes current if ended or near end. Preview EAS only. Do not hide TextureView or change version."
+  "authorized_sha": "70cf6c9e1d2fdf3cce205d31d8438379b17d8fb5",
+  "owner_status_claim": "OWNER_PASS",
+  "device_evidence": "Fold6 OWNER_PASS at 70cf6c9e: replay, back, save, hide-watched, audio, no black screen.",
+  "notes": "Remote Android versionCode is 24; production autoIncrement must yield 25. If not 25, stop. No eas submit. Tag build-25 on the built commit."
 }
