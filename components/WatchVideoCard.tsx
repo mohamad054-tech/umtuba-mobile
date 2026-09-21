@@ -1646,10 +1646,7 @@ function WatchVideoCardComponent({
             hitSlop={8}
           >
             <Text
-              style={[
-                styles.username,
-                { textAlign: captionAlign, writingDirection: captionDirection },
-              ]}
+              style={styles.username}
               numberOfLines={1}
             >
               {video.author.username}
@@ -2128,6 +2125,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   meta: {
+    alignSelf: "flex-start",
     maxWidth: "72%",
     zIndex: 5,
   },
@@ -2188,6 +2186,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 15,
     marginBottom: 4,
+    textAlign: "left",
   },
   caption: {
     color: colors.textMuted,
