@@ -17,6 +17,7 @@ import {
   watchEnginePlayerSourceEquals,
 } from "./playerSource";
 import { shouldStartWatchEnginePlayback } from "./readiness";
+import { shouldRestartWatchClipOnBecomeCurrent } from "./replayOnBecomeCurrent";
 import {
   resolveWatchEngineSeekSeconds,
   type WatchEngineSeekCommand,
@@ -104,6 +105,23 @@ export function WatchEnginePlayer({
       player.volume = 0;
     }
     if (canPlay) {
+      const duration =
+        typeof player.duration === "number" && Number.isFinite(player.duration)
+          ? player.duration
+          : 0;
+      const currentTime =
+        typeof player.currentTime === "number" && Number.isFinite(player.currentTime)
+          ? player.currentTime
+          : 0;
+      if (
+        shouldRestartWatchClipOnBecomeCurrent({
+          currentTime,
+          duration,
+          ratio: duration > 0 ? currentTime / duration : 0,
+        })
+      ) {
+        player.currentTime = 0;
+      }
       player.play();
     } else {
       player.pause();

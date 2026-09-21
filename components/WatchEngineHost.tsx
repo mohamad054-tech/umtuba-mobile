@@ -46,6 +46,8 @@ import {
   createWatchEngineTimelineStore,
   runWatchEngineOutgoingAudioHandoff,
   shouldHideWatchEngineCurrentSurfaceUntilFirstFrame,
+  shouldRestartWatchClipOnBecomeCurrent,
+  watchTimelineRestarted,
   subscribeWatchEngineAudioHandoff,
   type WatchEngineReadiness,
   type WatchEngineSeekCommand,
@@ -188,6 +190,7 @@ export const WatchEngineHost = forwardRef<
   const [userPaused, setUserPaused] = useState(false);
   const [audioHandoffTick, setAudioHandoffTick] = useState(0);
   const lastViewedPostRef = useRef<number | null>(null);
+  const endedMediaIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     return subscribeWatchEngineAudioHandoff(() => {
@@ -197,8 +200,34 @@ export const WatchEngineHost = forwardRef<
 
   useEffect(() => {
     setUserPaused(false);
+    const current = videos[settledIndex];
+    if (!current) {
+      setSeekRequest(null);
+      return;
+    }
+    const mediaId = watchEngineMediaId(current);
+    const timeline = timelineStoreRef.current.get(mediaId);
+    const ended = endedMediaIdsRef.current.has(mediaId);
+    if (
+      shouldRestartWatchClipOnBecomeCurrent({
+        ended,
+        currentTime: timeline?.currentTime,
+        duration: timeline?.duration,
+        ratio: timeline?.ratio,
+      })
+    ) {
+      endedMediaIdsRef.current.delete(mediaId);
+      timelineStoreRef.current.set(mediaId, watchTimelineRestarted(timeline));
+      seekTokenRef.current += 1;
+      setSeekRequest({
+        mediaId,
+        token: seekTokenRef.current,
+        ratio: 0,
+      });
+      return;
+    }
     setSeekRequest(null);
-  }, [settledIndex]);
+  }, [settledIndex, videos]);
 
   const onSeekRatio = useCallback((ratio: number) => {
     const current = videos[settledRef.current];
@@ -299,9 +328,13 @@ export const WatchEngineHost = forwardRef<
     setUserPaused(false);
     const current = videos[settledRef.current];
     if (!current) return;
+    const mediaId = watchEngineMediaId(current);
+    endedMediaIdsRef.current.delete(mediaId);
+    const timeline = timelineStoreRef.current.get(mediaId);
+    timelineStoreRef.current.set(mediaId, watchTimelineRestarted(timeline));
     seekTokenRef.current += 1;
     setSeekRequest({
-      mediaId: watchEngineMediaId(current),
+      mediaId,
       token: seekTokenRef.current,
       ratio: 0,
     });
@@ -515,10 +548,23 @@ export const WatchEngineHost = forwardRef<
               }}
               onTimeline={(id, next) => {
                 if (!isCurrent) return;
+                const restartingToStart =
+                  seekRequest?.mediaId === id && seekRequest.ratio === 0;
+                if (
+                  restartingToStart &&
+                  shouldRestartWatchClipOnBecomeCurrent({
+                    currentTime: next.currentTime,
+                    duration: next.duration,
+                    ratio: next.ratio,
+                  })
+                ) {
+                  return;
+                }
                 timelineStoreRef.current.set(id, next);
                 if (item.postId) onActiveTimeline?.(item.postId, next);
               }}
-              onEnded={() => {
+              onEnded={(id) => {
+                endedMediaIdsRef.current.add(id);
                 if (isCurrent) onActiveEnded();
               }}
             />

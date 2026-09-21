@@ -69,6 +69,12 @@ export {
 } from "./seek";
 export type { WatchEngineSeekCommand } from "./seek";
 export {
+  shouldRestartWatchClipOnBecomeCurrent,
+  watchTimelineRestarted,
+  WATCH_RESTART_NEAR_END_RATIO,
+  WATCH_RESTART_NEAR_END_SECONDS,
+} from "./replayOnBecomeCurrent";
+export {
   createWatchEngineTimelineStore,
   shouldRebuildWatchEngineRenderItemOnTimelineTick,
 } from "./timelineStore";
