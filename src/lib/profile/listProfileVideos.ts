@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { createVideoSignedUrl } from "@/src/lib/feed/watchFeed";
+
 export const PROFILE_VIDEO_PAGE_SIZE = 24;
 
 export type ProfileVideoItem = {
@@ -8,6 +10,8 @@ export type ProfileVideoItem = {
   likes: number;
   views: number;
   posterUrl: string | null;
+  previewUrl: string | null;
+  videoPath: string | null;
   createdAt: string;
 };
 
@@ -34,6 +38,7 @@ export function mapProfileVideoRow(row: {
   likes?: unknown;
   views?: unknown;
   image_url?: unknown;
+  video_path?: unknown;
   created_at?: unknown;
 }): ProfileVideoItem | null {
   const postId = parseNonNegInt(row.id);
@@ -42,14 +47,38 @@ export function mapProfileVideoRow(row: {
     typeof row.content === "string" && row.content.trim()
       ? row.content.trim()
       : "UMTUBA";
+  const videoPath =
+    typeof row.video_path === "string" && row.video_path.trim()
+      ? row.video_path.trim()
+      : null;
   return {
     postId,
     title,
     likes: parseNonNegInt(row.likes),
     views: parseNonNegInt(row.views),
     posterUrl: cleanHttpUrl(row.image_url),
+    previewUrl: null,
+    videoPath,
     createdAt: typeof row.created_at === "string" ? row.created_at : "",
   };
+}
+
+export async function attachProfileVideoPreviews(
+  supabase: SupabaseClient,
+  videos: ProfileVideoItem[]
+): Promise<ProfileVideoItem[]> {
+  return Promise.all(
+    videos.map(async (video) => {
+      if (video.posterUrl) return video;
+      if (!video.videoPath) return video;
+      try {
+        const previewUrl = await createVideoSignedUrl(supabase, video.videoPath);
+        return previewUrl ? { ...video, previewUrl } : video;
+      } catch {
+        return video;
+      }
+    })
+  );
 }
 
 /** Published ready videos owned by this profile. Honest empty when none. */
@@ -68,7 +97,7 @@ export async function listProfileVideos(
 
   const { data, error } = await supabase
     .from("posts")
-    .select("id, content, likes, views, image_url, created_at")
+    .select("id, content, likes, views, image_url, video_path, created_at")
     .eq("user_id", userId)
     .eq("post_type", "video")
     .eq("media_status", "ready")
@@ -82,9 +111,10 @@ export async function listProfileVideos(
     return { videos: [], failed: true };
   }
 
-  const videos = (data ?? [])
+  const mapped = (data ?? [])
     .map((row) => mapProfileVideoRow(row))
     .filter((row): row is ProfileVideoItem => row != null);
+  const videos = await attachProfileVideoPreviews(supabase, mapped);
 
   return { videos };
 }

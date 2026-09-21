@@ -18,6 +18,8 @@ describe("mapProfileVideoRow", () => {
       likes: 3,
       views: 40,
       posterUrl: "https://cdn.example/p.jpg",
+      previewUrl: null,
+      videoPath: null,
       createdAt: "2026-08-17T00:00:00Z",
     });
   });

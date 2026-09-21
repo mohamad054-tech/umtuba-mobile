@@ -14,6 +14,7 @@ export type ProfileTimelineItem =
       postId: number;
       title: string;
       posterUrl: string | null;
+      previewUrl: string | null;
       createdAt: string;
     };
 
@@ -40,6 +41,7 @@ export function buildProfileTimeline(
       postId: video.postId,
       title: video.title,
       posterUrl: video.posterUrl,
+      previewUrl: video.previewUrl,
       createdAt: video.createdAt,
     })),
   ];

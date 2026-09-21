@@ -28,6 +28,8 @@ describe("buildProfileTimeline", () => {
           likes: 0,
           views: 0,
           posterUrl: "https://cdn.example/v.jpg",
+          previewUrl: null,
+          videoPath: "u/clip.mp4",
           createdAt: "2026-08-19T00:00:00Z",
         },
       ]

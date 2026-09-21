@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import ProfileVideoThumb from "@/components/profile/ProfileVideoThumb";
 import type { ProfileTranslate } from "@/components/profile/profileUi";
 import type { AppLocale } from "@/src/lib/i18n/locales";
 import { localeTextAlign } from "@/src/lib/i18n/rtl";
@@ -87,6 +88,11 @@ export default function ProfileTimeline({
                   style={postMediaStyle}
                   resizeMode={PROFILE_MEDIA_RESIZE_MODE}
                   accessibilityIgnoresInvertColors
+                />
+              ) : item.previewUrl ? (
+                <ProfileVideoThumb
+                  uri={item.previewUrl}
+                  style={[postMediaStyle, { aspectRatio: mediaBox.aspectRatio }]}
                 />
               ) : (
                 <View
