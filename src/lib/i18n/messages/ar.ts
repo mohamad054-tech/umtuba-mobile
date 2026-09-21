@@ -77,6 +77,10 @@ export const arMessages: MobileMessages = {
   "settings.notificationsInbox": "صندوق الإشعارات",
   "settings.systemNotifications": "إعدادات إشعارات النظام",
   "settings.systemNotificationsHint": "يفتح إعدادات الجهاز لأذونات الإشعارات",
+  "settings.pushPermissionTitle": "ابقَ على اطلاع",
+  "settings.pushPermissionBody":
+    "اسمح بالإشعارات لتصلك الإعجابات والرسائل ونشاط حسابك.",
+  "settings.pushPermissionContinue": "متابعة",
   "settings.blockedUsers": "الحسابات المحظورة",
   "settings.blockedUsersHint": "حسابات مخفية على هذا الجهاز",
   "settings.theme": "المظهر",

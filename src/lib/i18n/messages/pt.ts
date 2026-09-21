@@ -84,6 +84,10 @@ export const ptMessages: MobileMessages = {
   "settings.systemNotifications": "Notificações do sistema",
   "settings.systemNotificationsHint":
     "Abre as configurações do dispositivo para permissões de notificação",
+  "settings.pushPermissionTitle": "Fique por dentro",
+  "settings.pushPermissionBody":
+    "Permita notificações para curtidas, mensagens e atividade da conta.",
+  "settings.pushPermissionContinue": "Continuar",
   "settings.blockedUsers": "Contas bloqueadas",
   "settings.blockedUsersHint": "Contas ocultas neste dispositivo",
   "settings.theme": "Tema",

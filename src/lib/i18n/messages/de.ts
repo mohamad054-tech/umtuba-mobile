@@ -82,6 +82,10 @@ export const deMessages: MobileMessages = {
   "settings.systemNotifications": "Systemmitteilungen",
   "settings.systemNotificationsHint":
     "Öffnet die Geräteeinstellungen für Mitteilungsrechte",
+  "settings.pushPermissionTitle": "Bleib auf dem Laufenden",
+  "settings.pushPermissionBody":
+    "Erlaube Mitteilungen, um Likes, Nachrichten und Aktivitäten zu erhalten.",
+  "settings.pushPermissionContinue": "Weiter",
   "settings.blockedUsers": "Blockierte Konten",
   "settings.blockedUsersHint": "Auf diesem Gerät ausgeblendete Konten",
   "settings.theme": "Design",

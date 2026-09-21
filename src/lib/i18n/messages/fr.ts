@@ -81,6 +81,10 @@ export const frMessages: MobileMessages = {
   "settings.systemNotifications": "Notifications système",
   "settings.systemNotificationsHint":
     "Ouvre les réglages de l’appareil pour les autorisations de notification",
+  "settings.pushPermissionTitle": "Restez informé",
+  "settings.pushPermissionBody":
+    "Autorisez les notifications pour les j’aime, les messages et l’activité.",
+  "settings.pushPermissionContinue": "Continuer",
   "settings.blockedUsers": "Comptes bloqués",
   "settings.blockedUsersHint": "Comptes masqués sur cet appareil",
   "settings.theme": "Thème",

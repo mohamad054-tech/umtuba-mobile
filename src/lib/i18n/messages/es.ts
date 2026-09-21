@@ -81,6 +81,10 @@ export const esMessages: MobileMessages = {
   "settings.systemNotifications": "Notificaciones del sistema",
   "settings.systemNotificationsHint":
     "Abre los ajustes del dispositivo para los permisos de notificación",
+  "settings.pushPermissionTitle": "Mantente al día",
+  "settings.pushPermissionBody":
+    "Permite notificaciones para enterarte de me gusta, mensajes y actividad.",
+  "settings.pushPermissionContinue": "Continuar",
   "settings.blockedUsers": "Cuentas bloqueadas",
   "settings.blockedUsersHint": "Cuentas ocultas en este dispositivo",
   "settings.theme": "Tema",

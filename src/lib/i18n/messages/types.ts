@@ -80,6 +80,9 @@ export type MobileMessages = {
   "settings.notificationsInbox": string;
   "settings.systemNotifications": string;
   "settings.systemNotificationsHint": string;
+  "settings.pushPermissionTitle": string;
+  "settings.pushPermissionBody": string;
+  "settings.pushPermissionContinue": string;
   "settings.blockedUsers": string;
   "settings.blockedUsersHint": string;
   "settings.theme": string;

@@ -1,10 +1,17 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
-import { AppState, Platform, type AppStateStatus } from "react-native";
+import { Alert, AppState, Platform, type AppStateStatus } from "react-native";
 import { useRouter } from "expo-router";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
+import { useTranslation } from "@/src/lib/i18n";
 import { notificationResponseToHref } from "@/src/lib/push/navigation";
+import {
+  pushFriendlyAskStorageKey,
+  shouldExplainPushPermission,
+  type PushInspectStatus,
+} from "@/src/lib/push/permissionPrompt";
 import {
   configurePushNotificationHandler,
   registerPushForUser,
@@ -19,8 +26,22 @@ import {
  *
  * Logout token removal is handled in AuthContext.signOut (while session is valid).
  */
+function mapInspectStatus(
+  granted: boolean,
+  canAskAgain: boolean,
+  status?: Notifications.PermissionStatus
+): PushInspectStatus {
+  if (granted) return "granted";
+  if (status === Notifications.PermissionStatus.UNDETERMINED) return "undetermined";
+  if (status === Notifications.PermissionStatus.DENIED || !canAskAgain) {
+    return "denied";
+  }
+  return canAskAgain ? "undetermined" : "denied";
+}
+
 export function PushNotificationsBridge() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user, loading, passwordRecoveryPending } = useAuth();
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const handledResponseIds = useRef<Set<string>>(new Set());
@@ -32,8 +53,44 @@ export function PushNotificationsBridge() {
   useEffect(() => {
     if (loading || passwordRecoveryPending || Platform.OS === "web") return;
     if (!user?.id) return;
-    void registerPushForUser(user.id);
-  }, [loading, passwordRecoveryPending, user?.id]);
+    const userId = user.id;
+    void (async () => {
+      if (Platform.OS === "android") {
+        const current = await Notifications.getPermissionsAsync();
+        const permission = mapInspectStatus(
+          current.granted,
+          current.canAskAgain,
+          current.status
+        );
+        const storageKey = pushFriendlyAskStorageKey(userId);
+        const alreadyAsked = (await AsyncStorage.getItem(storageKey)) === "1";
+        if (
+          shouldExplainPushPermission({
+            os: Platform.OS,
+            osVersion: typeof Platform.Version === "number" ? Platform.Version : 0,
+            permission,
+            alreadyAsked,
+          })
+        ) {
+          await AsyncStorage.setItem(storageKey, "1");
+          await new Promise<void>((resolve) => {
+            Alert.alert(
+              t("settings.pushPermissionTitle"),
+              t("settings.pushPermissionBody"),
+              [
+                {
+                  text: t("settings.pushPermissionContinue"),
+                  onPress: () => resolve(),
+                },
+              ],
+              { cancelable: false, onDismiss: () => resolve() }
+            );
+          });
+        }
+      }
+      await registerPushForUser(userId);
+    })();
+  }, [loading, passwordRecoveryPending, t, user?.id]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;

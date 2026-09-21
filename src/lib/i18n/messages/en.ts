@@ -80,6 +80,10 @@ export const enMessages: MobileMessages = {
   "settings.systemNotifications": "System notification settings",
   "settings.systemNotificationsHint":
     "Opens device settings for notification permissions",
+  "settings.pushPermissionTitle": "Stay in the loop",
+  "settings.pushPermissionBody":
+    "Allow notifications so you can hear about likes, messages, and activity.",
+  "settings.pushPermissionContinue": "Continue",
   "settings.blockedUsers": "Blocked users",
   "settings.blockedUsersHint": "Accounts hidden on this device",
   "settings.theme": "Theme",
