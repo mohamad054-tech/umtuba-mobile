@@ -155,15 +155,39 @@ function LiveGlyph({ color, size }: { color: ColorValue; size: number }) {
 }
 
 function MessagesGlyph({ color, size }: { color: ColorValue; size: number }) {
+  const tail = size * 0.2;
   return (
     <View
       style={{
         width: size,
-        height: size * 0.72,
-        borderRadius: 5,
-        ...stroke(color),
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
       }}
-    />
+    >
+      <View
+        style={{
+          width: size * 0.9,
+          height: size * 0.62,
+          borderRadius: size * 0.16,
+          ...stroke(color),
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          left: size * 0.14,
+          bottom: size * 0.08,
+          width: 0,
+          height: 0,
+          borderStyle: "solid",
+          borderTopWidth: tail,
+          borderRightWidth: tail * 0.9,
+          borderTopColor: color,
+          borderRightColor: "transparent",
+        }}
+      />
+    </View>
   );
 }
 
