@@ -1,5 +1,10 @@
 import { clampUnitRatio } from "./playbackPolicy";
-import { watchRailBottomOffset, watchRailHeight } from "./railLayout";
+import {
+  watchRailBottomOffset,
+  watchRailHeight,
+  watchTimelineBottom,
+  WATCH_PROGRESS_TRACK_HEIGHT,
+} from "./railLayout";
 
 /** Opposite the action rail (physical right in LTR and RTL). */
 export const WATCH_VOLUME_SIDE = "left" as const;
@@ -176,10 +181,11 @@ export function watchChromeRects(input: {
   progress: WatchRect;
 } {
   const actionCount = input.actionCount ?? 6;
-  const timelineBottom = Math.max(12, input.bottomInset + 10);
+  const timelineBottom = watchTimelineBottom(input.bottomInset);
   const railBottom = watchRailBottomOffset(input.bottomInset);
   const railHeight = watchRailHeight(actionCount);
   const captionHeight = 84;
+  const progressHeight = Math.max(20, WATCH_PROGRESS_TRACK_HEIGHT + 18);
   return {
     back: {
       x: 0,
@@ -195,15 +201,15 @@ export function watchChromeRects(input: {
     },
     captions: {
       x: 16,
-      y: input.cellHeight - timelineBottom - 36 - captionHeight,
+      y: input.cellHeight - timelineBottom - 10 - captionHeight,
       width: Math.round(input.cellWidth * 0.72),
       height: captionHeight,
     },
     progress: {
-      x: 16,
-      y: input.cellHeight - timelineBottom - 48,
-      width: Math.max(0, input.cellWidth - 32),
-      height: 48,
+      x: 0,
+      y: input.cellHeight - timelineBottom - progressHeight,
+      width: input.cellWidth,
+      height: progressHeight,
     },
   };
 }

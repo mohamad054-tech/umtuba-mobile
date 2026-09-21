@@ -2,10 +2,13 @@
 export const WATCH_RAIL_ACTION_MIN_HEIGHT = 44;
 export const WATCH_RAIL_GAP = 8;
 /**
- * Clears the timeline clock row + tall scrub hit. 52px sat the last rail
- * label (Delete / Supprimer / Eliminar) on top of the duration clock.
+ * Clears the thin 2px progress track at the cell bottom. The old 84px extra
+ * reserved the clock row + tall scrub hit that covered the video.
  */
-export const WATCH_RAIL_BOTTOM_EXTRA = 84;
+export const WATCH_RAIL_BOTTOM_EXTRA = 28;
+/** Flush to the Watch cell bottom so the track does not sit on the picture. */
+export const WATCH_TIMELINE_BOTTOM = 0;
+export const WATCH_PROGRESS_TRACK_HEIGHT = 2;
 /** Keeps long action labels inside the rail column, not over the clock. */
 export const WATCH_RAIL_ACTION_LABEL_MAX_WIDTH = 72;
 /** Physical-right gutter so the duration clock stays left of the rail. */
@@ -27,9 +30,12 @@ export function watchRailHeight(
   );
 }
 
+export function watchTimelineBottom(_bottomInset?: number): number {
+  return WATCH_TIMELINE_BOTTOM;
+}
+
 export function watchRailBottomOffset(bottomInset: number): number {
-  const timelineBottom = Math.max(12, bottomInset + 10);
-  return timelineBottom + WATCH_RAIL_BOTTOM_EXTRA;
+  return watchTimelineBottom(bottomInset) + WATCH_RAIL_BOTTOM_EXTRA;
 }
 
 /**

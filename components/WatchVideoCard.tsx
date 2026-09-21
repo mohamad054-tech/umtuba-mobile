@@ -47,7 +47,6 @@ import {
 } from "@/src/lib/feed/videoStoragePath";
 import {
   canSeekWithDuration,
-  formatPlaybackClock,
   isLikelyExpiredPlaybackUrl,
   resolveEffectiveAudio,
   resolveProgressRatio,
@@ -105,10 +104,10 @@ import {
   WATCH_RAIL_ACTION_MIN_HEIGHT,
   WATCH_RAIL_COMPACT_GAP,
   WATCH_RAIL_GAP,
-  WATCH_TIMELINE_TRAILING_GUTTER,
   WATCH_VOLUME_RIGHT_CLEARANCE,
   watchRailBottomOffset,
   watchRailShouldCompact,
+  watchTimelineBottom,
 } from "@/src/lib/watch/railLayout";
 import { WATCH_VIDEO_CONTENT_FIT } from "@/src/lib/watch/watchVideoFit";
 import {
@@ -1465,7 +1464,7 @@ function WatchVideoCardComponent({
     .filter(Boolean)
     .join(". ");
 
-  const timelineBottom = Math.max(12, bottomInset + 10);
+  const timelineBottom = watchTimelineBottom(bottomInset);
 
   return (
     <View
@@ -1633,7 +1632,7 @@ function WatchVideoCardComponent({
         />
 
         <View
-          style={[styles.meta, { marginBottom: timelineBottom + 36 }]}
+          style={[styles.meta, { marginBottom: timelineBottom + 10 }]}
           pointerEvents="box-none"
         >
           <Pressable
@@ -1868,26 +1867,12 @@ function WatchVideoCardComponent({
           collapsable={false}
           pointerEvents="box-none"
         >
-          <View
-            style={[
-              styles.timelineTimes,
-              { paddingRight: WATCH_TIMELINE_TRAILING_GUTTER },
-            ]}
-          >
-            <Text style={styles.timeText}>
-              {formatPlaybackClock(chromeTimeline.currentTime)}
-            </Text>
-            <Text style={styles.timeText}>
-              {formatPlaybackClock(chromeTimeline.duration)}
-            </Text>
-          </View>
           {shouldExposeWatchScrub(chromeTimeline.duration) ? (
             <ScrubBar
               ratio={isActive ? chromeTimeline.ratio : 0}
               accessibilityLabel={t("watch.seek")}
               onSeekRatio={onSeekRatio}
               onGestureActiveChange={onScrubActive}
-              tall
             />
           ) : (
             <WatchProgressTrack ratio={isActive ? chromeTimeline.ratio : 0} />
@@ -2187,17 +2172,15 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   progressTrack: {
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.72)",
+    height: 2,
+    borderRadius: 0,
+    backgroundColor: "rgba(255,255,255,0.28)",
     overflow: "hidden",
     justifyContent: "center",
   },
   progressFill: {
-    height: 4,
-    borderRadius: 999,
+    height: 2,
+    borderRadius: 0,
     backgroundColor: "#FFFFFF",
   },
   username: {
@@ -2270,12 +2253,12 @@ const styles = StyleSheet.create({
   },
   timeline: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
     zIndex: 8,
     elevation: 8,
-    paddingTop: 4,
-    paddingBottom: 2,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   timelineTimes: {
     flexDirection: "row",
@@ -2291,35 +2274,33 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   scrubHit: {
-    justifyContent: "center",
-    minHeight: 36,
-    paddingVertical: 12,
+    justifyContent: "flex-end",
+    minHeight: 22,
+    paddingVertical: 0,
   },
   scrubHitTall: {
-    minHeight: 48,
-    paddingVertical: 14,
+    minHeight: 22,
+    paddingVertical: 0,
   },
   scrubTrack: {
-    height: 5,
-    borderRadius: 999,
+    height: 2,
+    borderRadius: 0,
     overflow: "visible",
     justifyContent: "center",
     direction: WATCH_SCRUB_LAYOUT_DIRECTION,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.72)",
   },
   scrubFill: {
     position: "absolute",
     left: 0,
-    height: 5,
+    height: 2,
     borderRadius: 999,
   },
   scrubThumb: {
     position: "absolute",
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginLeft: -7,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: -4,
     backgroundColor: colors.text,
     borderWidth: 1,
     borderColor: colors.accentCyan,

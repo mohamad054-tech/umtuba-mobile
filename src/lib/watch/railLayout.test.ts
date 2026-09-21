@@ -10,6 +10,7 @@ import {
   WATCH_RAIL_ACTION_MIN_HEIGHT,
   WATCH_RAIL_BOTTOM_EXTRA,
   WATCH_RAIL_COMPACT_GAP,
+  watchTimelineBottom,
   WATCH_TIMELINE_TRAILING_GUTTER,
 } from "./railLayout";
 
@@ -42,9 +43,10 @@ describe("watchRailLayout", () => {
     ).toBe(true);
   });
 
-  it("lifts the rail above the timeline clock and keeps labels in-column", () => {
-    expect(WATCH_RAIL_BOTTOM_EXTRA).toBeGreaterThanOrEqual(84);
-    expect(watchRailBottomOffset(0)).toBe(12 + WATCH_RAIL_BOTTOM_EXTRA);
+  it("lifts the rail above the thin bottom track and keeps labels in-column", () => {
+    expect(WATCH_RAIL_BOTTOM_EXTRA).toBe(28);
+    expect(watchTimelineBottom(34)).toBe(0);
+    expect(watchRailBottomOffset(0)).toBe(WATCH_RAIL_BOTTOM_EXTRA);
     expect(WATCH_RAIL_ACTION_LABEL_MAX_WIDTH).toBeLessThanOrEqual(72);
     expect(WATCH_TIMELINE_TRAILING_GUTTER).toBeGreaterThanOrEqual(56);
   });
