@@ -274,6 +274,7 @@ export const ptMessages: MobileMessages = {
   "watch.muteVideo": "Silenciar vídeo",
   "watch.unmuteVideo": "Ativar o som do vídeo",
   "watch.pressBackAgainToExit": "Toque em Voltar novamente para sair de Assistir",
+  "watch.viewsCount": "{count} visualizações",
 
   "discover.loading": "Carregando Descobrir…",
   "discover.unavailable": "Descobrir indisponível",

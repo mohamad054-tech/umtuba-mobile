@@ -276,6 +276,7 @@ export const deMessages: MobileMessages = {
   "watch.muteVideo": "Video stummschalten",
   "watch.unmuteVideo": "Ton des Videos einschalten",
   "watch.pressBackAgainToExit": "Erneut auf Zurück tippen, um Ansehen zu verlassen",
+  "watch.viewsCount": "{count} Aufrufe",
 
   "discover.loading": "Entdecken wird geladen…",
   "discover.unavailable": "Entdecken nicht verfügbar",

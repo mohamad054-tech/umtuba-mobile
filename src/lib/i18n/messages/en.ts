@@ -265,6 +265,7 @@ export const enMessages: MobileMessages = {
   "watch.muteVideo": "Mute video",
   "watch.unmuteVideo": "Unmute video",
   "watch.pressBackAgainToExit": "Press Back again to exit Watch",
+  "watch.viewsCount": "{count} views",
 
   "discover.loading": "Loading Discover…",
   "discover.unavailable": "Discover unavailable",

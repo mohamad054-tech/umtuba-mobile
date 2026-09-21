@@ -260,6 +260,7 @@ export const arMessages: MobileMessages = {
   "watch.muteVideo": "كتم الفيديو",
   "watch.unmuteVideo": "إلغاء كتم الفيديو",
   "watch.pressBackAgainToExit": "اضغط رجوع مرة أخرى للخروج من شاهد",
+  "watch.viewsCount": "{count} مشاهدة",
 
   "discover.loading": "جارٍ تحميل اكتشف…",
   "discover.unavailable": "اكتشف غير متاح",

@@ -257,6 +257,7 @@ export type MobileMessages = {
   "watch.muteVideo": string;
   "watch.unmuteVideo": string;
   "watch.pressBackAgainToExit": string;
+  "watch.viewsCount": string;
 
   "discover.loading": string;
   "discover.unavailable": string;

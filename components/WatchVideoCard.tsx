@@ -32,6 +32,7 @@ import {
   resolveSocialSoundPlaybackUriById,
 } from "@/src/lib/sounds/socialSoundPlayback";
 import { getSupabase } from "@/src/lib/supabase/client";
+import { formatInteractionCount } from "@/src/lib/social/formatCount";
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import {
   resolveWatchTrimBounds,
@@ -1094,6 +1095,7 @@ function WatchVideoCardComponent({
     [video.durationMs, video.mediaPipeline]
   );
   const publishedLabel = formatPublishedAt(video.publishedAt, locale);
+  const viewsLabel = formatInteractionCount(video.stats.views);
   const editAudioScale = watchEditAudioScale(edit);
   const [timeline, setTimeline] = useState<TimelineState>({
     currentTime: 0,
@@ -1690,16 +1692,28 @@ function WatchVideoCardComponent({
             onHashtagPress={onHashtagPress}
             onMentionPress={onMentionPress}
           />
-          {publishedLabel ? (
+          <View style={styles.metaFacts} pointerEvents="none">
             <Text
-              style={styles.publishedAt}
+              style={styles.viewsLabel}
               numberOfLines={1}
               accessibilityRole="text"
-              accessibilityLabel={publishedLabel}
+              accessibilityLabel={t("watch.viewsCount", {
+                values: { count: viewsLabel },
+              })}
             >
-              {publishedLabel}
+              👁 {viewsLabel}
             </Text>
-          ) : null}
+            {publishedLabel ? (
+              <Text
+                style={styles.publishedAt}
+                numberOfLines={1}
+                accessibilityRole="text"
+                accessibilityLabel={publishedLabel}
+              >
+                {publishedLabel}
+              </Text>
+            ) : null}
+          </View>
           {edit.soundId ? (
             <Pressable
               onPress={() => onOpenSound?.(edit.soundId as string)}
@@ -2129,6 +2143,18 @@ const styles = StyleSheet.create({
     maxWidth: "72%",
     zIndex: 5,
   },
+  metaFacts: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  viewsLabel: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
   followChip: {
     alignSelf: "flex-start",
     marginTop: 6,
@@ -2197,7 +2223,6 @@ const styles = StyleSheet.create({
     color: colors.textSubtle,
     fontSize: 12,
     lineHeight: 16,
-    marginTop: 4,
   },
   soundChip: {
     alignSelf: "flex-start",
