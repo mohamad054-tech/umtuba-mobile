@@ -3,6 +3,7 @@ import { Link, useFocusEffect, useLocalSearchParams, usePathname, useRouter } fr
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -69,6 +70,10 @@ import {
 } from "@/src/lib/social/follows";
 import { defaultShareLinkPort } from "@/src/lib/social/sharePost";
 import { getSupabase } from "@/src/lib/supabase/client";
+import {
+  pickAvatarFromLibrary,
+  uploadPickedAvatar,
+} from "@/src/lib/profile/uploadAvatar";
 import { colors } from "@/src/theme/colors";
 
 export default function ProfileScreen() {
@@ -109,6 +114,7 @@ export default function ProfileScreen() {
   const [requestedTab, setRequestedTab] = useState<string | null>(
     typeof params.tab === "string" ? params.tab : null
   );
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const target = useMemo(
     () =>
@@ -386,6 +392,56 @@ export default function ProfileScreen() {
     }
   }, [t, view.displayName, view.username]);
 
+  const onChangePhoto = useCallback(async () => {
+    if (!user?.id || photoBusy) return;
+    setPhotoBusy(true);
+    try {
+      const picked = await pickAvatarFromLibrary();
+      if (!picked.ok) {
+        if (picked.reason === "cancelled") return;
+        if (picked.reason === "denied") {
+          Alert.alert(
+            t("profile.photoPermissionTitle"),
+            t("profile.photoPermissionBody")
+          );
+          return;
+        }
+        Alert.alert(
+          t("profile.changePhoto"),
+          picked.reason === "type"
+            ? t("profile.photoTypeInvalid")
+            : picked.reason === "size"
+              ? t("profile.photoTooLarge")
+              : t("profile.photoUploadFailed")
+        );
+        return;
+      }
+      const uploaded = await uploadPickedAvatar(
+        getSupabase(),
+        user.id,
+        picked
+      );
+      if (!uploaded.ok) {
+        Alert.alert(
+          t("profile.changePhoto"),
+          uploaded.reason === "auth"
+            ? t("profile.photoSignIn")
+            : uploaded.reason === "type"
+              ? t("profile.photoTypeInvalid")
+              : uploaded.reason === "size"
+                ? t("profile.photoTooLarge")
+                : t("profile.photoUploadFailed")
+        );
+        return;
+      }
+      await restore({ silent: true });
+    } catch {
+      Alert.alert(t("profile.changePhoto"), t("profile.photoUploadFailed"));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }, [photoBusy, restore, t, user?.id]);
+
   function openTimelineItem(item: ProfileTimelineItem) {
     if (item.kind === "video") {
       router.push({
@@ -480,6 +536,8 @@ export default function ProfileScreen() {
           windowWidth={windowWidth}
           isOwn={isOwn}
           onOpenAbout={() => setRequestedTab("about")}
+          onChangePhoto={isOwn ? () => void onChangePhoto() : undefined}
+          photoBusy={photoBusy}
         />
 
         <View style={[styles.columnHost, { width: windowWidth }]}>

@@ -52,6 +52,8 @@ type ProfileHeroProps = {
   windowWidth: number;
   isOwn: boolean;
   onOpenAbout?: () => void;
+  onChangePhoto?: () => void;
+  photoBusy?: boolean;
 };
 
 export default function ProfileHero({
@@ -62,6 +64,8 @@ export default function ProfileHero({
   windowWidth,
   isOwn,
   onOpenAbout,
+  onChangePhoto,
+  photoBusy,
 }: ProfileHeroProps) {
   const textAlign = localeTextAlign(locale);
   const direction = localeWritingDirection(locale);
@@ -98,16 +102,22 @@ export default function ProfileHero({
         <View style={styles.coverFade} />
       </View>
 
-      <View
+      <Pressable
         style={styles.avatar}
+        onPress={isOwn ? onChangePhoto : undefined}
+        disabled={!isOwn || !onChangePhoto || photoBusy}
+        accessibilityRole={isOwn && onChangePhoto ? "button" : "image"}
+        accessibilityState={{ busy: Boolean(photoBusy), disabled: !isOwn }}
         accessibilityLabel={
-          view.hasReliableIdentity
-            ? t("profile.avatarFor", {
-                values: {
-                  name: view.displayName || view.username || t("profile.you"),
-                },
-              })
-            : t("profile.avatarPlaceholder")
+          isOwn
+            ? t("profile.changePhoto")
+            : view.hasReliableIdentity
+              ? t("profile.avatarFor", {
+                  values: {
+                    name: view.displayName || view.username || t("profile.you"),
+                  },
+                })
+              : t("profile.avatarPlaceholder")
         }
       >
         {view.avatarUrl ? (
@@ -121,7 +131,12 @@ export default function ProfileHero({
             {view.avatarInitial}
           </Text>
         )}
-      </View>
+        {isOwn ? (
+          <View style={styles.avatarBadge} pointerEvents="none">
+            <Text style={styles.avatarBadgeText}>＋</Text>
+          </View>
+        ) : null}
+      </Pressable>
 
       <View style={[styles.identity, { direction }]}>
         <Text style={[styles.eyebrow, { textAlign }]}>
@@ -328,6 +343,23 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 32,
     fontWeight: "700",
+  },
+  avatarBadge: {
+    position: "absolute",
+    end: 2,
+    bottom: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.accentCyan,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarBadgeText: {
+    color: colors.bg,
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 18,
   },
   identity: {
     paddingHorizontal: 20,

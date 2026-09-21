@@ -445,6 +445,13 @@ export type MobileMessages = {
   "profile.followListLoading": string;
   "profile.openVideo": string;
   "profile.editProfile": string;
+  "profile.changePhoto": string;
+  "profile.photoPermissionTitle": string;
+  "profile.photoPermissionBody": string;
+  "profile.photoTypeInvalid": string;
+  "profile.photoTooLarge": string;
+  "profile.photoUploadFailed": string;
+  "profile.photoSignIn": string;
   "profile.posts": string;
   "profile.postsEmpty": string;
   "profile.postsFailed": string;
