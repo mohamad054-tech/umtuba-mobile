@@ -273,6 +273,11 @@ export const frMessages: MobileMessages = {
   "watch.unmuteVideo": "Activer le son de la vidéo",
   "watch.pressBackAgainToExit": "Appuyez encore sur Retour pour quitter Regarder",
   "watch.viewsCount": "{count} vues",
+  "watch.relativeJustNow": "À l’instant",
+  "watch.relativeMinutes": "il y a {count} min",
+  "watch.relativeHours": "il y a {count} h",
+  "watch.relativeYesterday": "Hier",
+  "watch.relativeDays": "il y a {count} jours",
 
   "discover.loading": "Chargement de Découvrir…",
   "discover.unavailable": "Découvrir indisponible",

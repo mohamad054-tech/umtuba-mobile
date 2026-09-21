@@ -275,6 +275,11 @@ export const ptMessages: MobileMessages = {
   "watch.unmuteVideo": "Ativar o som do vídeo",
   "watch.pressBackAgainToExit": "Toque em Voltar novamente para sair de Assistir",
   "watch.viewsCount": "{count} visualizações",
+  "watch.relativeJustNow": "Agora",
+  "watch.relativeMinutes": "há {count} min",
+  "watch.relativeHours": "há {count} h",
+  "watch.relativeYesterday": "Ontem",
+  "watch.relativeDays": "há {count} dias",
 
   "discover.loading": "Carregando Descobrir…",
   "discover.unavailable": "Descobrir indisponível",

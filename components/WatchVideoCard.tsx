@@ -33,7 +33,10 @@ import {
 } from "@/src/lib/sounds/socialSoundPlayback";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { formatInteractionCount } from "@/src/lib/social/formatCount";
-import { formatPublishedAt } from "@/src/lib/time/publishedAt";
+import {
+  formatPublishedAt,
+  resolveRelativePublishedAt,
+} from "@/src/lib/time/publishedAt";
 import {
   resolveWatchTrimBounds,
   shouldEndAtTrim,
@@ -1094,7 +1097,20 @@ function WatchVideoCardComponent({
     () => watchEditFromPipeline(video.mediaPipeline, video.durationMs ?? null),
     [video.durationMs, video.mediaPipeline]
   );
-  const publishedLabel = formatPublishedAt(video.publishedAt, locale);
+  const relativePublished = resolveRelativePublishedAt(video.publishedAt);
+  const publishedLabel = relativePublished
+    ? relativePublished.kind === "justNow"
+      ? t("watch.relativeJustNow")
+      : relativePublished.kind === "minutes"
+        ? t("watch.relativeMinutes", { values: { count: relativePublished.count } })
+        : relativePublished.kind === "hours"
+          ? t("watch.relativeHours", { values: { count: relativePublished.count } })
+          : relativePublished.kind === "yesterday"
+            ? t("watch.relativeYesterday")
+            : relativePublished.kind === "days"
+              ? t("watch.relativeDays", { values: { count: relativePublished.count } })
+              : formatPublishedAt(video.publishedAt, locale)
+    : "";
   const viewsLabel = formatInteractionCount(video.stats.views);
   const editAudioScale = watchEditAudioScale(edit);
   const [timeline, setTimeline] = useState<TimelineState>({

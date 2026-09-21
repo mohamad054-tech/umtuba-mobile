@@ -258,6 +258,11 @@ export type MobileMessages = {
   "watch.unmuteVideo": string;
   "watch.pressBackAgainToExit": string;
   "watch.viewsCount": string;
+  "watch.relativeJustNow": string;
+  "watch.relativeMinutes": string;
+  "watch.relativeHours": string;
+  "watch.relativeYesterday": string;
+  "watch.relativeDays": string;
 
   "discover.loading": string;
   "discover.unavailable": string;

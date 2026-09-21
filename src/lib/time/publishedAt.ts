@@ -78,6 +78,53 @@ export function normalizeFormatLocale(locale: string | null | undefined): string
  * Viewer-local timezone unless `timeZone` is passed (tests use UTC).
  * Hard-coded month names are forbidden — Intl supplies them.
  */
+export type RelativePublishedParts =
+  | { kind: "justNow" }
+  | { kind: "minutes"; count: number }
+  | { kind: "hours"; count: number }
+  | { kind: "yesterday" }
+  | { kind: "days"; count: number }
+  | { kind: "absolute" };
+
+const RELATIVE_JUST_NOW_MS = 45_000;
+const RELATIVE_HOUR_MS = 60 * 60 * 1000;
+const RELATIVE_DAY_MS = 24 * RELATIVE_HOUR_MS;
+const RELATIVE_MAX_DAYS = 30;
+
+function startOfLocalDay(ms: number): number {
+  const date = new Date(ms);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+/**
+ * Short Watch chrome date. Same source as formatPublishedAt (`created_at`).
+ * Older than 30 days falls back to the absolute formatter.
+ */
+export function resolveRelativePublishedAt(
+  iso: string | null | undefined,
+  nowMs = Date.now()
+): RelativePublishedParts | null {
+  const date = parseServerDate(iso);
+  if (!date) return null;
+  const then = date.getTime();
+  if (!Number.isFinite(then) || !Number.isFinite(nowMs)) return null;
+  const delta = Math.max(0, nowMs - then);
+  if (delta < RELATIVE_JUST_NOW_MS) return { kind: "justNow" };
+  if (delta < RELATIVE_HOUR_MS) {
+    return { kind: "minutes", count: Math.max(1, Math.floor(delta / 60_000)) };
+  }
+  const today = startOfLocalDay(nowMs);
+  const thatDay = startOfLocalDay(then);
+  const dayDiff = Math.round((today - thatDay) / RELATIVE_DAY_MS);
+  if (dayDiff <= 0) {
+    return { kind: "hours", count: Math.max(1, Math.floor(delta / RELATIVE_HOUR_MS)) };
+  }
+  if (dayDiff === 1) return { kind: "yesterday" };
+  if (dayDiff < RELATIVE_MAX_DAYS) return { kind: "days", count: dayDiff };
+  return { kind: "absolute" };
+}
+
 export function formatPublishedAt(
   iso: string | null | undefined,
   locale: string,

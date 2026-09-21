@@ -273,6 +273,11 @@ export const esMessages: MobileMessages = {
   "watch.unmuteVideo": "Activar sonido del video",
   "watch.pressBackAgainToExit": "Pulsa Atrás de nuevo para salir de Ver",
   "watch.viewsCount": "{count} vistas",
+  "watch.relativeJustNow": "Ahora mismo",
+  "watch.relativeMinutes": "hace {count} min",
+  "watch.relativeHours": "hace {count} h",
+  "watch.relativeYesterday": "Ayer",
+  "watch.relativeDays": "hace {count} días",
 
   "discover.loading": "Cargando Descubrir…",
   "discover.unavailable": "Descubrir no disponible",

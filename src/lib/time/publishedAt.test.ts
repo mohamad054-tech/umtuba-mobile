@@ -6,6 +6,7 @@ import {
   formatPublishedAt,
   parseServerDate,
   resolveAuthoritativePublishedAt,
+  resolveRelativePublishedAt,
 } from "./publishedAt";
 
 const SAMPLE = "2026-08-19T20:02:00.000Z";
@@ -79,5 +80,28 @@ describe("publication timestamp contract", () => {
     const utc = formatPublishedAt(SAMPLE, "en-US", "UTC");
     const tokyo = formatPublishedAt(SAMPLE, "en-US", "Asia/Tokyo");
     expect(utc).not.toBe(tokyo);
+  });
+
+  it("resolves a short relative Watch date from created_at", () => {
+    const now = Date.parse("2026-08-22T12:00:00.000Z");
+    expect(resolveRelativePublishedAt("2026-08-22T11:59:30.000Z", now)).toEqual({
+      kind: "justNow",
+    });
+    expect(resolveRelativePublishedAt("2026-08-22T11:10:00.000Z", now)).toEqual({
+      kind: "minutes",
+      count: 50,
+    });
+    expect(resolveRelativePublishedAt("2026-08-22T09:00:00.000Z", now)).toEqual({
+      kind: "hours",
+      count: 3,
+    });
+    expect(resolveRelativePublishedAt("2026-08-19T12:00:00.000Z", now)).toEqual({
+      kind: "days",
+      count: 3,
+    });
+    expect(resolveRelativePublishedAt("2026-06-01T12:00:00.000Z", now)).toEqual({
+      kind: "absolute",
+    });
+    expect(resolveRelativePublishedAt("", now)).toBeNull();
   });
 });

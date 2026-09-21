@@ -277,6 +277,11 @@ export const deMessages: MobileMessages = {
   "watch.unmuteVideo": "Ton des Videos einschalten",
   "watch.pressBackAgainToExit": "Erneut auf Zurück tippen, um Ansehen zu verlassen",
   "watch.viewsCount": "{count} Aufrufe",
+  "watch.relativeJustNow": "Gerade eben",
+  "watch.relativeMinutes": "vor {count} Min.",
+  "watch.relativeHours": "vor {count} Std.",
+  "watch.relativeYesterday": "Gestern",
+  "watch.relativeDays": "vor {count} Tagen",
 
   "discover.loading": "Entdecken wird geladen…",
   "discover.unavailable": "Entdecken nicht verfügbar",

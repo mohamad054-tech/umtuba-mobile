@@ -266,6 +266,11 @@ export const enMessages: MobileMessages = {
   "watch.unmuteVideo": "Unmute video",
   "watch.pressBackAgainToExit": "Press Back again to exit Watch",
   "watch.viewsCount": "{count} views",
+  "watch.relativeJustNow": "Just now",
+  "watch.relativeMinutes": "{count}m ago",
+  "watch.relativeHours": "{count}h ago",
+  "watch.relativeYesterday": "Yesterday",
+  "watch.relativeDays": "{count} days ago",
 
   "discover.loading": "Loading Discover…",
   "discover.unavailable": "Discover unavailable",

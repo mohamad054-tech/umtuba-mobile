@@ -261,6 +261,11 @@ export const arMessages: MobileMessages = {
   "watch.unmuteVideo": "إلغاء كتم الفيديو",
   "watch.pressBackAgainToExit": "اضغط رجوع مرة أخرى للخروج من شاهد",
   "watch.viewsCount": "{count} مشاهدة",
+  "watch.relativeJustNow": "الآن",
+  "watch.relativeMinutes": "منذ {count} د",
+  "watch.relativeHours": "منذ {count} س",
+  "watch.relativeYesterday": "أمس",
+  "watch.relativeDays": "منذ {count} أيام",
 
   "discover.loading": "جارٍ تحميل اكتشف…",
   "discover.unavailable": "اكتشف غير متاح",
