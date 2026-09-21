@@ -263,6 +263,19 @@ describe("togglePostLike — still RPC", () => {
     expect(result).toEqual({ ok: true, liked: true, likes: 8 });
   });
 
+  it("does not block liking the viewer’s own post", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { liked: true, likes: 1 },
+      error: null,
+    }));
+    const result = await togglePostLike({ rpc } as never, OTHER_POST_ID);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("toggle_post_like", {
+      p_post_id: OTHER_POST_ID,
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("shares one like write while in flight", async () => {
     resetTogglePostLikeInflightForTests();
     vi.useFakeTimers();
