@@ -200,6 +200,7 @@ export const esMessages: MobileMessages = {
   "watch.caughtUp": "Ya estás al día.",
   "watch.likeFailed": "No se pudo marcar Me gusta",
   "watch.saveFailed": "No se pudo guardar",
+  "watch.signInToSave": "Inicia sesión para guardar este video.",
   "watch.deleteTitle": "Eliminar video",
   "watch.deleteBody":
     "Esto quita tu video de Ver. No se puede deshacer.",

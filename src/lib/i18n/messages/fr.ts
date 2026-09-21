@@ -200,6 +200,7 @@ export const frMessages: MobileMessages = {
   "watch.caughtUp": "Vous êtes à jour.",
   "watch.likeFailed": "Échec du « J’aime »",
   "watch.saveFailed": "Échec de l’enregistrement",
+  "watch.signInToSave": "Connecte-toi pour enregistrer cette vidéo.",
   "watch.deleteTitle": "Supprimer la vidéo",
   "watch.deleteBody":
     "Cela retire votre vidéo de Regarder. Cette action est définitive.",

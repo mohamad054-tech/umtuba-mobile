@@ -193,6 +193,7 @@ export const enMessages: MobileMessages = {
   "watch.caughtUp": "You’re caught up.",
   "watch.likeFailed": "Like failed",
   "watch.saveFailed": "Save failed",
+  "watch.signInToSave": "Please sign in to save this video.",
   "watch.deleteTitle": "Delete video",
   "watch.deleteBody":
     "This removes your video from Watch. This cannot be undone.",

@@ -60,6 +60,7 @@ const NEVER_HIDE_CURRENT_SURFACE =
 
 export type WatchEngineHostHandle = {
   snapToIndex: (index: number) => void;
+  replayFromStart: () => void;
 };
 
 export type WatchEngineHostProps = {
@@ -77,6 +78,7 @@ export type WatchEngineHostProps = {
   screenFocused: boolean;
   listScrollEnabled: boolean;
   onActiveEnded: () => void;
+  onActiveTimeline?: (postId: number, timeline: WatchEngineTimeline) => void;
   onReadiness?: (input: {
     mediaId: string;
     readiness: WatchEngineReadiness;
@@ -149,6 +151,7 @@ export const WatchEngineHost = forwardRef<
     screenFocused,
     listScrollEnabled,
     onActiveEnded,
+    onActiveTimeline,
     onReadiness,
     listFooter,
     extraData,
@@ -292,7 +295,23 @@ export const WatchEngineHost = forwardRef<
     [finishSnap, snapOffset, snapping]
   );
 
-  useImperativeHandle(ref, () => ({ snapToIndex: snapOnce }), [snapOnce]);
+  const replayFromStart = useCallback(() => {
+    setUserPaused(false);
+    const current = videos[settledRef.current];
+    if (!current) return;
+    seekTokenRef.current += 1;
+    setSeekRequest({
+      mediaId: watchEngineMediaId(current),
+      token: seekTokenRef.current,
+      ratio: 0,
+    });
+  }, [videos]);
+
+  useImperativeHandle(
+    ref,
+    () => ({ snapToIndex: snapOnce, replayFromStart }),
+    [replayFromStart, snapOnce]
+  );
 
   const onScrollBeginDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -497,6 +516,7 @@ export const WatchEngineHost = forwardRef<
               onTimeline={(id, next) => {
                 if (!isCurrent) return;
                 timelineStoreRef.current.set(id, next);
+                if (item.postId) onActiveTimeline?.(item.postId, next);
               }}
               onEnded={() => {
                 if (isCurrent) onActiveEnded();
@@ -523,6 +543,7 @@ export const WatchEngineHost = forwardRef<
       itemHeight,
       muted,
       onActiveEnded,
+      onActiveTimeline,
       renderChrome,
       emitReadiness,
       firstFrameById,

@@ -203,6 +203,7 @@ export const deMessages: MobileMessages = {
   "watch.caughtUp": "Sie sind auf dem neuesten Stand.",
   "watch.likeFailed": "Gefällt-mir fehlgeschlagen",
   "watch.saveFailed": "Speichern fehlgeschlagen",
+  "watch.signInToSave": "Melde dich an, um dieses Video zu speichern.",
   "watch.deleteTitle": "Video löschen",
   "watch.deleteBody":
     "Dadurch wird Ihr Video aus Ansehen entfernt. Das kann nicht rückgängig gemacht werden.",

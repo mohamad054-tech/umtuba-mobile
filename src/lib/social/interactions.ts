@@ -336,14 +336,8 @@ async function performTogglePostLike(
 }
 
 /**
- * Persist Watch saves through `post_saves` RLS, not `toggle_post_save`.
- *
- * Production `toggle_post_save` is SECURITY INVOKER. Saving another user's
- * post then calls `award_um_points_to_user` / `try_award_activity_score`,
- * which 20260723 revoked from `authenticated`. The insert rolls back and
- * the client surfaces "Unable to update save." Own-video saves skip that
- * block; other-user saves do not. Table RLS still allows the viewer's own
- * bookmark row; `sync_post_saves_count` keeps `posts.saves` in sync.
+ * Persist Watch saves through `toggle_post_save`, same as the website.
+ * Saved state is loaded separately from `post_saves` so it survives relaunch.
  */
 export function togglePostSave(
   supabase: SupabaseClient,
@@ -366,11 +360,25 @@ export function togglePostSave(
   return work;
 }
 
+function mapToggleSaveRpcError(message: string): ActionResult<ToggleSaveResult> {
+  const lower = message.toLowerCase();
+  if (lower.includes("authentication required")) {
+    return {
+      ok: false,
+      message: "Please sign in to save this video.",
+      requiresAuth: true,
+    };
+  }
+  if (lower.includes("post not found")) {
+    return { ok: false, message: "This video cannot be saved." };
+  }
+  return { ok: false, message: "Unable to save this video. Please try again." };
+}
+
 async function performTogglePostSave(
   supabase: SupabaseClient,
   postId: number
 ): Promise<ActionResult<ToggleSaveResult>> {
-
   const {
     data: { user },
     error: authError,
@@ -379,66 +387,28 @@ async function performTogglePostSave(
   if (authError || !user?.id) {
     return {
       ok: false,
-      message: "Please sign in to save posts.",
+      message: "Please sign in to save this video.",
       requiresAuth: true,
     };
   }
 
-  const existing = await supabase
-    .from("post_saves")
-    .select("post_id")
-    .eq("user_id", user.id)
-    .eq("post_id", postId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("toggle_post_save", {
+    p_post_id: postId,
+  });
 
-  if (existing.error) {
-    return { ok: false, message: "Unable to update save. Please try again." };
+  if (error) {
+    return mapToggleSaveRpcError(error.message || "");
   }
 
-  let saved: boolean;
-
-  if (existing.data) {
-    const { error } = await supabase
-      .from("post_saves")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("post_id", postId);
-
-    if (error) {
-      return { ok: false, message: "Unable to update save. Please try again." };
-    }
-    saved = false;
-  } else {
-    const { error } = await supabase.from("post_saves").insert({
-      user_id: user.id,
-      post_id: postId,
-    });
-
-    if (error) {
-      const code = "code" in error ? String(error.code) : "";
-      const message = (error.message || "").toLowerCase();
-      if (code === "23505" || message.includes("duplicate")) {
-        saved = true;
-      } else {
-        return { ok: false, message: "Unable to update save. Please try again." };
-      }
-    } else {
-      saved = true;
-    }
+  const payload = parseRpcJson(data);
+  if (!payload) {
+    return { ok: false, message: "Unable to save this video. Please try again." };
   }
-
-  const { data: postRow } = await supabase
-    .from("posts")
-    .select("saves")
-    .eq("id", postId)
-    .maybeSingle();
 
   return {
     ok: true,
-    saved,
-    // Count read is optional. A failed/missing posts.saves row must not
-    // imply the bookmark write failed, and must not report 0 after a save.
-    saves: asNumber(postRow?.saves, saved ? 1 : 0),
+    saved: asBoolean(payload.saved),
+    saves: asNumber(payload.saves),
   };
 }
 

@@ -65,8 +65,16 @@ import {
 } from "@/src/lib/feed/watchPlaybackPrep";
 import {
   fetchWatchFeedPage,
+  loadWatchHideEntriesForViewer,
   refreshPlaybackUrl,
 } from "@/src/lib/feed/watchFeed";
+import { rememberQualifiedWatch } from "@/src/lib/video/rememberQualifiedWatch";
+import {
+  createConsecutiveWatchTracker,
+  sanitizeWatchHideEntries,
+  type WatchHideEntry,
+} from "@/src/lib/video/watchHidePolicy";
+import { readLocalWatchHideEntries } from "@/src/lib/video/watchHideStorage";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import {
   registerMountedWatchInstance,
@@ -287,6 +295,12 @@ export default function WatchScreen() {
   );
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<number>>(
     () => new Set()
+  );
+  const hideEntriesRef = useRef<WatchHideEntry[]>([]);
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  userIdRef.current = user?.id ?? null;
+  const qualifiedWatchTrackerRef = useRef(
+    createConsecutiveWatchTracker({ onQualified: () => {} })
   );
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [shareSheet, setShareSheet] = useState<WatchShareSheetSnapshot | null>(
@@ -760,12 +774,20 @@ export default function WatchScreen() {
       setError(null);
       try {
         const supabase = getSupabase();
+        const guestWatched = await readLocalWatchHideEntries();
+        const hideEntries = await loadWatchHideEntriesForViewer(
+          supabase,
+          user?.id ?? null,
+          guestWatched
+        );
+        hideEntriesRef.current = hideEntries;
         const startup = await resolveWatchStartupFeed({
           accountId: user?.id ?? null,
           fetchFeed: () =>
             fetchWatchFeedPage(supabase, {
               focusPostId,
               limit: 12,
+              hideEntries,
             }),
         });
         urlGenerationRef.current += 1;
@@ -840,7 +862,10 @@ export default function WatchScreen() {
     setLoadingMore(true);
     try {
       const supabase = getSupabase();
-      const page = await fetchWatchFeedPage(supabase, { cursor });
+      const page = await fetchWatchFeedPage(supabase, {
+        cursor,
+        hideEntries: hideEntriesRef.current,
+      });
       setVideos((prev) =>
         applyOptimisticWatchRecordsToList(mergeWatchVideos(prev, page.videos))
       );
@@ -1375,9 +1400,23 @@ export default function WatchScreen() {
     });
   }, []);
 
+  const askSaveSignIn = useCallback(() => {
+    Alert.alert(t("watch.save"), t("watch.signInToSave"), [
+      { text: t("actions.cancel"), style: "cancel" },
+      {
+        text: t("actions.signIn"),
+        onPress: () => router.push("/(auth)/login"),
+      },
+    ]);
+  }, [router, t]);
+
   const onToggleSave = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
+      if (!user) {
+        askSaveSignIn();
+        return;
+      }
       const snapshot = {
         savedByMe: video.savedByMe,
         saves: video.stats.saves,
@@ -1394,6 +1433,10 @@ export default function WatchScreen() {
           savedByMe: snapshot.savedByMe,
           stats: { ...video.stats, saves: snapshot.saves },
         });
+        if (result.requiresAuth) {
+          askSaveSignIn();
+          return;
+        }
         Alert.alert(t("watch.saveFailed"), result.message);
         return;
       }
@@ -1402,7 +1445,7 @@ export default function WatchScreen() {
         stats: { ...video.stats, saves: result.saves },
       });
     },
-    [patchVideo, t]
+    [askSaveSignIn, patchVideo, t, user]
   );
 
   const onEnsureFollow = useCallback(
@@ -1652,11 +1695,46 @@ export default function WatchScreen() {
       itemCount: videosLengthRef.current,
     });
     if (nextIndex == null) {
+      engineHostRef.current?.replayFromStart();
       return;
     }
     markWatchTransition(Platform.OS, "current_end", { index: nextIndex });
     scrollToWatchIndex(nextIndex, 0, { animated: true });
   }, [autoNext, scrollToWatchIndex]);
+
+  const rememberActiveQualifiedWatch = useCallback((postId: number) => {
+    void rememberQualifiedWatch(
+      getSupabase(),
+      postId,
+      userIdRef.current
+    ).then(() => {
+      hideEntriesRef.current = sanitizeWatchHideEntries([
+        ...hideEntriesRef.current,
+        { postId, watchedAt: Date.now() },
+      ]);
+    });
+  }, []);
+
+  const activePostId = videos[activeIndex]?.postId ?? null;
+
+  useEffect(() => {
+    qualifiedWatchTrackerRef.current = createConsecutiveWatchTracker({
+      onQualified: () => {
+        if (activePostId) rememberActiveQualifiedWatch(activePostId);
+      },
+    });
+  }, [activePostId, rememberActiveQualifiedWatch]);
+
+  const onActiveTimeline = useCallback(
+    (postId: number, timeline: { currentTime: number }) => {
+      if (postId !== activePostId) return;
+      qualifiedWatchTrackerRef.current.ingest(
+        timeline.currentTime * 1000,
+        true
+      );
+    },
+    [activePostId]
+  );
 
   const refreshSrcFor = useCallback(async (video: WatchVideo) => {
     if (!video.postId) return null;
@@ -2000,6 +2078,7 @@ export default function WatchScreen() {
           screenFocused={screenFocused}
           listScrollEnabled={listScrollEnabled}
           onActiveEnded={onActiveEnded}
+          onActiveTimeline={onActiveTimeline}
           onReadiness={({ mediaId, readiness }) => {
             engineReadinessRef.current = { mediaId, readiness };
             if (readiness === "ready-buffered") {

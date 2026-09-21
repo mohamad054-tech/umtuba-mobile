@@ -189,6 +189,7 @@ export const arMessages: MobileMessages = {
   "watch.caughtUp": "لقد شاهدت كل الجديد.",
   "watch.likeFailed": "تعذّر تسجيل الإعجاب",
   "watch.saveFailed": "تعذّر الحفظ",
+  "watch.signInToSave": "سجّل الدخول لحفظ هذا الفيديو.",
   "watch.deleteTitle": "حذف الفيديو",
   "watch.deleteBody": "سيُزال فيديوك من شاهد. لا يمكن التراجع عن ذلك.",
   "watch.deleteFailed": "تعذّر الحذف",

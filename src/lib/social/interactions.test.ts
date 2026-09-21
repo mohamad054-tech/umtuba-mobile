@@ -19,80 +19,32 @@ import {
 const VIEWER = "11111111-1111-4111-8111-111111111111";
 const OTHER_POST_ID = 99;
 
-type SaveRow = { user_id: string; post_id: number };
-
 function createSaveClient(options: {
   userId?: string | null;
-  existing?: SaveRow | null;
-  savesCount?: number;
-  insertError?: { message: string; code?: string } | null;
-  deleteError?: { message: string } | null;
-  selectError?: { message: string } | null;
-  countError?: { message: string } | null;
+  saved?: boolean;
+  saves?: number;
+  rpcError?: { message: string } | null;
+  rpcDelayMs?: number;
 }) {
-  const saves: SaveRow[] = options.existing ? [options.existing] : [];
-  const rpc = vi.fn();
   const calls: Array<{ table: string; op: string; payload?: unknown }> = [];
-
-  const from = vi.fn((table: string) => {
-    if (table === "post_saves") {
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              maybeSingle: vi.fn(async () => {
-                calls.push({ table, op: "select" });
-                if (options.selectError) {
-                  return { data: null, error: options.selectError };
-                }
-                return { data: saves[0] ?? null, error: null };
-              }),
-            })),
-          })),
-        })),
-        insert: vi.fn(async (payload: SaveRow) => {
-          calls.push({ table, op: "insert", payload });
-          if (options.insertError) {
-            return { data: null, error: options.insertError };
-          }
-          saves.push(payload);
-          return { data: payload, error: null };
-        }),
-        delete: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(async () => {
-              calls.push({ table, op: "delete" });
-              if (options.deleteError) {
-                return { data: null, error: options.deleteError };
-              }
-              saves.splice(0, saves.length);
-              return { data: null, error: null };
-            }),
-          })),
-        })),
-      };
+  const rpc = vi.fn(async (name: string, args: { p_post_id: number }) => {
+    calls.push({ table: "rpc", op: name, payload: args });
+    if (options.rpcDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.rpcDelayMs));
     }
-
-    if (table === "posts") {
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => {
-              calls.push({ table, op: "select-count" });
-              if (options.countError) {
-                return { data: null, error: options.countError };
-              }
-              return {
-                data: { saves: options.savesCount ?? (saves.length > 0 ? 1 : 0) },
-                error: null,
-              };
-            }),
-          })),
-        })),
-      };
+    if (options.rpcError) {
+      return { data: null, error: options.rpcError };
     }
-
-    throw new Error(`unexpected table ${table}`);
+    return {
+      data: {
+        saved: options.saved ?? true,
+        saves: options.saves ?? 1,
+      },
+      error: null,
+    };
+  });
+  const from = vi.fn(() => {
+    throw new Error("togglePostSave must use toggle_post_save, not table writes");
   });
 
   return {
@@ -108,59 +60,45 @@ function createSaveClient(options: {
   };
 }
 
-describe("togglePostSave — other-user Watch bookmark", () => {
+describe("togglePostSave — website toggle_post_save RPC", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetTogglePostSaveInflightForTests();
   });
 
-  it("does not call toggle_post_save (INVOKER + revoked award helpers)", async () => {
-    const supabase = createSaveClient({ userId: VIEWER, savesCount: 4 });
-    await togglePostSave(supabase as never, OTHER_POST_ID);
-    expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  it("guest is auth-gated without writing post_saves", async () => {
+  it("guest is auth-gated without calling toggle_post_save", async () => {
     const supabase = createSaveClient({ userId: null });
     const result = await togglePostSave(supabase as never, OTHER_POST_ID);
     expect(result).toEqual({
       ok: false,
-      message: "Please sign in to save posts.",
+      message: "Please sign in to save this video.",
       requiresAuth: true,
     });
+    expect(supabase.rpc).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("saves another user's video via the viewer's post_saves row", async () => {
-    const supabase = createSaveClient({ userId: VIEWER, savesCount: 4 });
+  it("saves through toggle_post_save", async () => {
+    const supabase = createSaveClient({
+      userId: VIEWER,
+      saved: true,
+      saves: 4,
+    });
     const result = await togglePostSave(supabase as never, OTHER_POST_ID);
     expect(result).toEqual({ ok: true, saved: true, saves: 4 });
-    expect(supabase.calls).toContainEqual({
-      table: "post_saves",
-      op: "insert",
-      payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
+    expect(supabase.rpc).toHaveBeenCalledWith("toggle_post_save", {
+      p_post_id: OTHER_POST_ID,
     });
   });
 
-  it("unsaves an existing bookmark without rejecting own-or-other owner", async () => {
+  it("unsaves through toggle_post_save", async () => {
     const supabase = createSaveClient({
       userId: VIEWER,
-      existing: { user_id: VIEWER, post_id: OTHER_POST_ID },
-      savesCount: 3,
+      saved: false,
+      saves: 3,
     });
     const result = await togglePostSave(supabase as never, OTHER_POST_ID);
     expect(result).toEqual({ ok: true, saved: false, saves: 3 });
-    expect(supabase.calls.some((call) => call.op === "delete")).toBe(true);
-    expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  it("treats a unique-violation insert as already saved", async () => {
-    const supabase = createSaveClient({
-      userId: VIEWER,
-      insertError: { message: "duplicate key value", code: "23505" },
-      savesCount: 1,
-    });
-    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
-    expect(result).toEqual({ ok: true, saved: true, saves: 1 });
   });
 
   it("rejects a non-positive post id before touching the session", async () => {
@@ -170,84 +108,42 @@ describe("togglePostSave — other-user Watch bookmark", () => {
     expect(supabase.auth.getUser).not.toHaveBeenCalled();
   });
 
-  it("does not report success when the post_saves insert fails", async () => {
+  it("maps an expired session to a sign-in request", async () => {
     const supabase = createSaveClient({
       userId: VIEWER,
-      insertError: { message: "permission denied", code: "42501" },
+      rpcError: { message: "Authentication required" },
     });
     const result = await togglePostSave(supabase as never, OTHER_POST_ID);
     expect(result).toEqual({
       ok: false,
-      message: "Unable to update save. Please try again.",
+      message: "Please sign in to save this video.",
+      requiresAuth: true,
     });
   });
 
-  it("does not report success when unsave delete fails", async () => {
+  it("does not report success when toggle_post_save fails", async () => {
     const supabase = createSaveClient({
       userId: VIEWER,
-      existing: { user_id: VIEWER, post_id: OTHER_POST_ID },
-      deleteError: { message: "permission denied" },
+      rpcError: { message: "permission denied" },
     });
     const result = await togglePostSave(supabase as never, OTHER_POST_ID);
     expect(result).toEqual({
       ok: false,
-      message: "Unable to update save. Please try again.",
+      message: "Unable to save this video. Please try again.",
     });
   });
 
-  it("does not report success when the existing-save lookup fails", async () => {
+  it("shares one save RPC while in flight", async () => {
     const supabase = createSaveClient({
       userId: VIEWER,
-      selectError: { message: "network" },
+      saved: true,
+      saves: 3,
     });
-    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
-    expect(result).toEqual({
-      ok: false,
-      message: "Unable to update save. Please try again.",
-    });
-    expect(supabase.calls.some((call) => call.op === "insert")).toBe(false);
-    expect(supabase.calls.some((call) => call.op === "delete")).toBe(false);
-  });
-
-  it("keeps the bookmark when award/notification RPCs would throw", async () => {
-    const supabase = createSaveClient({ userId: VIEWER, savesCount: 4 });
-    supabase.rpc.mockImplementation(async (name: string) => {
-      throw new Error(`side effect ${name} must not run`);
-    });
-    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
-    expect(result).toEqual({ ok: true, saved: true, saves: 4 });
-    expect(supabase.rpc).not.toHaveBeenCalled();
-    expect(supabase.calls).toContainEqual({
-      table: "post_saves",
-      op: "insert",
-      payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
-    });
-  });
-
-  it("treats a failed posts.saves count read as optional after a successful save", async () => {
-    const supabase = createSaveClient({
-      userId: VIEWER,
-      countError: { message: "timeout" },
-    });
-    const result = await togglePostSave(supabase as never, OTHER_POST_ID);
-    expect(result).toEqual({ ok: true, saved: true, saves: 1 });
-    expect(supabase.calls).toContainEqual({
-      table: "post_saves",
-      op: "insert",
-      payload: { user_id: VIEWER, post_id: OTHER_POST_ID },
-    });
-  });
-
-  it("shares one save write while in flight", async () => {
-    resetTogglePostSaveInflightForTests();
-    const supabase = createSaveClient({ userId: VIEWER, savesCount: 3 });
     const first = togglePostSave(supabase as never, OTHER_POST_ID);
     const second = togglePostSave(supabase as never, OTHER_POST_ID);
     const [a, b] = await Promise.all([first, second]);
     expect(a).toEqual(b);
-    expect(
-      supabase.calls.filter((call) => call.op === "insert")
-    ).toHaveLength(1);
+    expect(supabase.rpc).toHaveBeenCalledTimes(1);
   });
 });
 

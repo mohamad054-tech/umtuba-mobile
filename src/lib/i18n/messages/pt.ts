@@ -202,6 +202,7 @@ export const ptMessages: MobileMessages = {
   "watch.caughtUp": "Você está em dia.",
   "watch.likeFailed": "Falha ao curtir",
   "watch.saveFailed": "Falha ao salvar",
+  "watch.signInToSave": "Entre para salvar este vídeo.",
   "watch.deleteTitle": "Excluir vídeo",
   "watch.deleteBody":
     "Isso remove seu vídeo de Assistir. Não dá para desfazer.",

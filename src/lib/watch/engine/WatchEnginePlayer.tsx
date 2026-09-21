@@ -121,10 +121,11 @@ export function WatchEnginePlayer({
       typeof player.duration === "number" && Number.isFinite(player.duration)
         ? player.duration
         : 0;
-    const seconds = resolveWatchEngineSeekSeconds({
-      ratio: seekRequest.ratio,
-      duration,
-    });
+    const seconds =
+      resolveWatchEngineSeekSeconds({
+        ratio: seekRequest.ratio,
+        duration,
+      }) ?? (seekRequest.ratio === 0 ? 0 : null);
     if (seconds == null) return;
     lastSeekTokenRef.current = seekRequest.token;
     player.currentTime = seconds;

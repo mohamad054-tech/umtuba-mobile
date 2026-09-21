@@ -20,6 +20,14 @@ import {
   viewerLikedFromState,
 } from "@/src/lib/social/interactions";
 import { resolveAuthoritativePublishedAt } from "@/src/lib/time/publishedAt";
+import { loadRecentWatchCompletions } from "@/src/lib/supabase/watchCompletions";
+import {
+  composeFeedWithWatchHide,
+  MIN_UNWATCHED_FEED,
+  recentHiddenPostIds,
+  sanitizeWatchHideEntries,
+  type WatchHideEntry,
+} from "@/src/lib/video/watchHidePolicy";
 
 export type VideoPostRow = {
   id: number;
@@ -90,7 +98,7 @@ export function mapRowToWatchVideo(input: MappedPlaybackRow): WatchVideo {
     poster: row.image_url ?? undefined,
     title: caption.slice(0, 80) || "UMTUBA",
     caption,
-    location: { city: "", country: "" },
+    location: { city: "", country: "" }, // Never show UMTUBA/Worldwide under the name.
     music: "",
     aiSummary: "",
     translation: "",
@@ -196,6 +204,7 @@ export type FetchWatchFeedInput = {
   cursor?: WatchFeedCursor | null;
   focusPostId?: number | null;
   limit?: number;
+  hideEntries?: WatchHideEntry[];
 };
 
 /** Put the focused post first so Watch `activeIndex` 0 surfaces it. */
@@ -216,6 +225,25 @@ export function promoteFocusedWatchRow<T extends { id: number }>(
   return [target, ...rows.filter((row) => row.id !== focusPostId)];
 }
 
+async function fetchReadyVideoRowsByIds(
+  supabase: SupabaseClient,
+  ids: number[]
+): Promise<VideoPostRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from("posts")
+    .select(postColumns)
+    .in("id", ids)
+    .eq("post_type", "video")
+    .eq("media_status", "ready")
+    .not("video_path", "is", null);
+  if (error || !data) return [];
+  const byId = new Map((data as VideoPostRow[]).map((row) => [row.id, row]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is VideoPostRow => row != null);
+}
+
 export async function fetchWatchFeedPage(
   supabase: SupabaseClient,
   input: FetchWatchFeedInput = {}
@@ -225,6 +253,10 @@ export async function fetchWatchFeedPage(
     30
   );
   const cursor = input.cursor ?? null;
+  const hideEntries = sanitizeWatchHideEntries(input.hideEntries ?? []);
+  const hiddenIds = recentHiddenPostIds(hideEntries);
+  const extra = hiddenIds.size > 0 ? Math.min(hiddenIds.size, 40) : 0;
+  const fetchLimit = Math.min(limit + extra, 80);
 
   let query = supabase
     .from("posts")
@@ -234,7 +266,7 @@ export async function fetchWatchFeedPage(
     .not("video_path", "is", null)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(limit + 1);
+    .limit(fetchLimit + 1);
 
   if (cursor) {
     query = query.or(
@@ -269,8 +301,33 @@ export async function fetchWatchFeedPage(
     rows = promoteFocusedWatchRow(rows, focused, input.focusPostId);
   }
 
-  const hasMore = rows.length > limit;
-  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const hasMore = rows.length > fetchLimit;
+  const pageRows = hasMore ? rows.slice(0, fetchLimit) : rows;
+  let visibleRows = composeFeedWithWatchHide(
+    pageRows,
+    (row) => row.id,
+    hideEntries,
+    {
+      keepPostId: input.focusPostId,
+      minUnwatched: cursor ? 0 : MIN_UNWATCHED_FEED,
+    }
+  );
+
+  if (!cursor && visibleRows.length < MIN_UNWATCHED_FEED) {
+    const have = new Set(visibleRows.map((row) => row.id));
+    const oldestMissing = hideEntries
+      .filter(
+        (entry) =>
+          hiddenIds.has(entry.postId) &&
+          entry.postId !== input.focusPostId &&
+          !have.has(entry.postId)
+      )
+      .sort((a, b) => a.watchedAt - b.watchedAt)
+      .slice(0, MIN_UNWATCHED_FEED - visibleRows.length)
+      .map((entry) => entry.postId);
+    const backfill = await fetchReadyVideoRowsByIds(supabase, oldestMissing);
+    visibleRows = [...visibleRows, ...backfill];
+  }
 
   const {
     data: { user },
@@ -279,12 +336,12 @@ export async function fetchWatchFeedPage(
   const viewerState = await loadViewerInteractionState(
     supabase,
     user?.id,
-    pageRows.map((row) => row.id)
+    visibleRows.map((row) => row.id)
   );
 
   const videos: WatchVideo[] = [];
 
-  for (const row of pageRows) {
+  for (const row of visibleRows) {
     const initial = initialPlaybackSrc(row);
     if (!initial.include) continue;
     const state = viewerState.get(row.id);
@@ -310,6 +367,15 @@ export async function fetchWatchFeedPage(
     nextCursor,
     usedDemoFallback: false,
   };
+}
+
+export async function loadWatchHideEntriesForViewer(
+  supabase: SupabaseClient,
+  userId: string | null | undefined,
+  guestEntries: WatchHideEntry[]
+): Promise<WatchHideEntry[]> {
+  const server = await loadRecentWatchCompletions(supabase, userId);
+  return sanitizeWatchHideEntries([...guestEntries, ...server]);
 }
 
 export async function refreshPlaybackUrl(

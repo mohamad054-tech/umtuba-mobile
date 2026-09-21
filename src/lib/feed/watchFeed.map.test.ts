@@ -44,6 +44,10 @@ describe("mapRowToWatchVideo", () => {
     expect(video.source).toBe("supabase");
     expect(video.videoPath).toBe("user/clip.mp4");
     expect(video.publishedAt).toBe("2026-01-01T00:00:00Z");
+    expect(video.location).toEqual({ city: "", country: "" });
+    expect(`${video.location.city} ${video.location.country}`).not.toMatch(
+      /Worldwide|UMTUBA/i
+    );
   });
 
   it("does not mark liked from a global like count", () => {

@@ -188,6 +188,7 @@ export type MobileMessages = {
   "watch.caughtUp": string;
   "watch.likeFailed": string;
   "watch.saveFailed": string;
+  "watch.signInToSave": string;
   "watch.deleteTitle": string;
   "watch.deleteBody": string;
   "watch.deleteFailed": string;
