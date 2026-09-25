@@ -4,7 +4,7 @@ const config: ExpoConfig = {
   name: "UMTUBA",
   slug: "umtuba-mobile",
   owner: "umtuba",
-  version: "1.0.27",
+  version: "1.0.28",
   orientation: "portrait",
   icon: "./assets/images/icon-1024.png",
   scheme: "umtuba",
@@ -71,6 +71,7 @@ const config: ExpoConfig = {
     adaptiveIcon: {
       backgroundColor: "#000000",
       foregroundImage: "./assets/images/android-icon-foreground.png",
+      monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
     intentFilters: [
@@ -151,8 +152,8 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        icon: "./assets/images/icon.png",
-        color: "#050510",
+        icon: "./assets/images/notification-icon.png",
+        color: "#D4AF37",
         defaultChannel: "default",
       },
     ],
