@@ -185,7 +185,7 @@ import {
 } from "@/src/lib/watch/watchRetainedPlaybackFallback";
 import {
   preserveWatchPostAcrossLayoutSession,
-  resolveFrozenWatchViewport,
+  resolveWatchListContainerViewport,
   resolveWatchNativePage,
 } from "@/src/lib/watch/watchViewport";
 import {
@@ -279,6 +279,7 @@ export default function WatchScreen() {
   const [muted, setMuted] = useState(DEFAULT_WATCH_MUTED);
   const [volume, setVolume] = useState(DEFAULT_WATCH_VOLUME);
   const [autoNext, setAutoNext] = useState(DEFAULT_WATCH_AUTO_NEXT);
+  const [showPlaybackNotice, setShowPlaybackNotice] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -447,9 +448,28 @@ export default function WatchScreen() {
     itemHeightRef.current = itemHeight;
   }, [itemHeight]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setShowPlaybackNotice(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next !== "active") return;
+      viewportFrozenRef.current = { height: null, width: null };
+    });
+    const dimensions = Dimensions.addEventListener("change", () => {
+      viewportFrozenRef.current = { height: null, width: null };
+    });
+    return () => {
+      sub.remove();
+      dimensions.remove();
+    };
+  }, []);
+
   const onWatchListLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
-    const resolved = resolveFrozenWatchViewport({
+    const resolved = resolveWatchListContainerViewport({
       frozenHeight: viewportFrozenRef.current.height,
       frozenWidth: viewportFrozenRef.current.width,
       measuredHeight: height,
@@ -1808,6 +1828,7 @@ export default function WatchScreen() {
         muted={muted}
         volume={volume}
         autoNext={autoNext}
+        showPlaybackNotice={index === activeIndex && showPlaybackNotice}
         isLastItem={index >= visibleVideos.length - 1}
         appState={appState}
         screenFocused={screenFocused}
@@ -1923,6 +1944,7 @@ export default function WatchScreen() {
       playbackGeneration,
       appState,
       autoNext,
+      showPlaybackNotice,
       warmNextSurface,
       warmedTargetIndex,
       tryCompletePendingManualHandoff,

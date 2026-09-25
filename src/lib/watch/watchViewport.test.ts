@@ -24,6 +24,7 @@ import {
   preserveWatchPostAcrossLayoutSession,
   reconcileWatchActiveIndex,
   resolveFrozenWatchViewport,
+  resolveWatchListContainerViewport,
   resolveManualFirstWatchNativePin,
   resolveWatchManualSettleCommit,
   resolveWatchNativePage,
@@ -81,6 +82,22 @@ describe("5 TextureView size changes do not move snap points", () => {
     expect(
       resolveWatchPagingMetrics(squareTexture.height ?? 0)?.snapToInterval
     ).toBe(FROZEN_HEIGHT);
+    const lateList = resolveWatchListContainerViewport({
+      frozenHeight: 640,
+      frozenWidth: 360,
+      measuredHeight: 860,
+      measuredWidth: 360,
+    });
+    expect(lateList.height).toBe(860);
+    expect(lateList.isNewSession).toBe(true);
+    const fold = resolveWatchListContainerViewport({
+      frozenHeight: 860,
+      frozenWidth: 360,
+      measuredHeight: 720,
+      measuredWidth: 840,
+    });
+    expect(fold.height).toBe(720);
+    expect(fold.width).toBe(840);
   });
 });
 

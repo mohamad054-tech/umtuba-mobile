@@ -176,6 +176,8 @@ export type WatchVideoCardProps = {
   /** In-app VideoPlayer.volume 0–1. */
   volume: number;
   autoNext: boolean;
+  /** One short notice for the whole feed. Hidden on every other video. */
+  showPlaybackNotice?: boolean;
   /** Last feed item — loop safely when auto-next cannot advance. */
   isLastItem: boolean;
   appState: AppLifecycleState;
@@ -1030,6 +1032,7 @@ function WatchVideoCardComponent({
   muted,
   volume,
   autoNext,
+  showPlaybackNotice = false,
   isLastItem,
   appState,
   screenFocused,
@@ -1612,6 +1615,7 @@ function WatchVideoCardComponent({
           </View>
         ) : null}
 
+        {showPlaybackNotice ? (
         <View
           style={[styles.topControls, { top: Math.max(16, topInset + 8) }]}
           pointerEvents="box-none"
@@ -1639,6 +1643,7 @@ function WatchVideoCardComponent({
             </Text>
           </Pressable>
         </View>
+        ) : null}
 
         <WatchSideVolumeControl
           volume={volume}

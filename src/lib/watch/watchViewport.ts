@@ -87,6 +87,62 @@ export function resolveFrozenWatchViewport(input: {
   };
 }
 
+/** Real list-container changes. Ignores 1px jitter, accepts fold and late window size. */
+export const WATCH_LIST_HEIGHT_CORRECTION_PX = 24;
+
+export function resolveWatchListContainerViewport(input: {
+  frozenHeight: number | null;
+  frozenWidth: number | null;
+  measuredHeight: number;
+  measuredWidth: number;
+}): {
+  height: number | null;
+  width: number | null;
+  isNewSession: boolean;
+  heightChanged: boolean;
+} {
+  const measuredH = toWatchListPixels(input.measuredHeight);
+  const measuredW = toWatchListPixels(input.measuredWidth);
+  if (measuredH == null) {
+    return {
+      height: input.frozenHeight,
+      width: input.frozenWidth,
+      isNewSession: false,
+      heightChanged: false,
+    };
+  }
+  if (input.frozenHeight == null) {
+    return {
+      height: measuredH,
+      width: measuredW,
+      isNewSession: true,
+      heightChanged: true,
+    };
+  }
+  const widthSession =
+    measuredW != null &&
+    input.frozenWidth != null &&
+    isWatchViewportLayoutSessionChange({
+      frozenWidth: input.frozenWidth,
+      nextWidth: measuredW,
+    });
+  const heightDelta = Math.abs(measuredH - input.frozenHeight);
+  if (!widthSession && heightDelta < WATCH_LIST_HEIGHT_CORRECTION_PX) {
+    return {
+      height: input.frozenHeight,
+      width: input.frozenWidth,
+      isNewSession: false,
+      heightChanged: false,
+    };
+  }
+  return {
+    height: measuredH,
+    width: measuredW ?? input.frozenWidth,
+    isNewSession: true,
+    heightChanged: measuredH !== input.frozenHeight,
+  };
+}
+
 export function resolveWatchPagingMetrics(itemHeight: number): {
   itemHeight: number;
   snapToInterval: number;

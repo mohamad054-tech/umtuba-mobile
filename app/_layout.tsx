@@ -195,7 +195,7 @@ function SplashGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
+    <View style={introStyles.stage}>
       {children}
       {showIntro ? (
         <GoldIntro
@@ -205,7 +205,7 @@ function SplashGate({ children }: { children: ReactNode }) {
           }}
         />
       ) : null}
-    </>
+    </View>
   );
 }
 
@@ -286,6 +286,9 @@ function LocalizedStack() {
 }
 
 const introStyles = StyleSheet.create({
+  stage: {
+    flex: 1,
+  },
   root: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000000",
