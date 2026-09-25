@@ -113,7 +113,13 @@ const config: ExpoConfig = {
       {
         image: "./assets/images/splash-icon.png",
         resizeMode: "contain",
+        // Largest size that still sits inside Android's splash circle.
+        imageWidth: 136,
         backgroundColor: "#000000",
+        dark: {
+          image: "./assets/images/splash-icon.png",
+          backgroundColor: "#000000",
+        },
       },
     ],
     [

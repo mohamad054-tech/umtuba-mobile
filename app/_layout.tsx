@@ -2,8 +2,17 @@ import { DarkTheme, Stack, ThemeProvider, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Animated,
+  AppState,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
@@ -39,6 +48,51 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+let playedIntro = false;
+
+function GoldIntro({ onDone }: { onDone: () => void }) {
+  const opacity = useState(() => new Animated.Value(0))[0];
+  const done = useRef(onDone);
+  done.current = onDone;
+  const { width } = useWindowDimensions();
+  const size = Math.round(width * 0.6);
+
+  useEffect(() => {
+    let closed = false;
+    const finish = () => {
+      if (closed) return;
+      closed = true;
+      done.current();
+    };
+    const fade = Animated.sequence([
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.delay(420),
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]);
+    fade.start(({ finished }) => {
+      if (finished) finish();
+    });
+    const cap = setTimeout(finish, 1000);
+    return () => {
+      fade.stop();
+      clearTimeout(cap);
+    };
+  }, [opacity]);
+
+  return (
+    <View style={introStyles.root} pointerEvents="auto">
+      <Animated.View style={{ opacity }}>
+        <Image
+          source={require("../assets/images/splash-icon.png")}
+          style={{ width: size, height: size }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+      </Animated.View>
+    </View>
+  );
+}
 
 const navTheme = {
   ...DarkTheme,
@@ -114,14 +168,25 @@ function DeepLinkHandler() {
 function SplashGate({ children }: { children: ReactNode }) {
   const { loading, configError, restore } = useAuth();
   const { ready } = useI18n();
+  const [showIntro, setShowIntro] = useState(!playedIntro);
+  const appReady = !loading && ready;
 
   useEffect(() => {
-    if (!loading && ready) {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") return;
+      playedIntro = true;
+      setShowIntro(false);
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (appReady) {
       void SplashScreen.hideAsync();
     }
-  }, [loading, ready]);
+  }, [appReady]);
 
-  if (loading || !ready) {
+  if (!appReady) {
     return null;
   }
 
@@ -129,7 +194,19 @@ function SplashGate({ children }: { children: ReactNode }) {
     return <ConfigNeeded onRetry={() => void restore()} />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {showIntro ? (
+        <GoldIntro
+          onDone={() => {
+            playedIntro = true;
+            setShowIntro(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function ConfigNeeded({ onRetry }: { onRetry: () => void }) {
@@ -207,6 +284,16 @@ function LocalizedStack() {
     </Stack>
   );
 }
+
+const introStyles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000000",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 50,
+  },
+});
 
 const configStyles = StyleSheet.create({
   root: {
