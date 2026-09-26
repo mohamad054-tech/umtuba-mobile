@@ -139,11 +139,16 @@ export function WatchEnginePlayer({
       typeof player.duration === "number" && Number.isFinite(player.duration)
         ? player.duration
         : 0;
+    const requestedSeconds = seekRequest.seconds;
     const seconds =
-      resolveWatchEngineSeekSeconds({
-        ratio: seekRequest.ratio,
-        duration,
-      }) ?? (seekRequest.ratio === 0 ? 0 : null);
+      typeof requestedSeconds === "number" &&
+      Number.isFinite(requestedSeconds) &&
+      requestedSeconds >= 0
+        ? requestedSeconds
+        : (resolveWatchEngineSeekSeconds({
+            ratio: seekRequest.ratio,
+            duration,
+          }) ?? (seekRequest.ratio === 0 ? 0 : null));
     if (seconds == null) return;
     lastSeekTokenRef.current = seekRequest.token;
     player.currentTime = seconds;

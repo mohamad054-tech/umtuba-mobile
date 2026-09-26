@@ -44,6 +44,7 @@ import {
   WatchEngineHost,
   type WatchEngineHostHandle,
 } from "@/components/WatchEngineHost";
+import { WatchReadingPanel } from "@/components/WatchReadingPanel";
 import { WatchVideoCard } from "@/components/WatchVideoCard";
 import type { WatchFeedCursor, WatchVideo } from "@/src/contracts/watch";
 import { getErrorMessage } from "@/src/contracts/validation";
@@ -85,6 +86,11 @@ import {
 import { buildWatchSoundHref } from "@/src/lib/nav/watchSoundOrigin";
 import { parseProfileUserId } from "@/src/lib/profile/resolveTarget";
 import { buildWatchCreatorProfileHref } from "@/src/lib/profile/watchAvatarHref";
+import {
+  consumeWatchReturn,
+  rememberWatchLeave,
+  type WatchReadingText,
+} from "@/src/lib/watch/watchLeavePosition";
 import {
   applySuccessfulDeleteToList,
   deletePostForOwner,
@@ -259,6 +265,11 @@ export default function WatchScreen() {
   const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const engineHostRef = useRef<WatchEngineHostHandle>(null);
+  const playbackSecondsRef = useRef(0);
+  const [reading, setReading] = useState<WatchReadingText | null>(null);
+  const readingRef = useRef<WatchReadingText | null>(null);
+  readingRef.current = reading;
+  const [readingPaused, setReadingPaused] = useState(false);
   const params = useLocalSearchParams<{ post?: string | string[] }>();
   const rawPost = Array.isArray(params.post) ? params.post[0] : params.post;
   const focusPostId =
@@ -580,6 +591,23 @@ export default function WatchScreen() {
   const visibleVideosRef = useRef(visibleVideos);
   visibleVideosRef.current = visibleVideos;
 
+  useFocusEffect(
+    useCallback(() => {
+      const frame = requestAnimationFrame(() => {
+        const postId =
+          visibleVideosRef.current[activeIndexRef.current]?.postId ?? null;
+        const restore = postId ? consumeWatchReturn(postId) : null;
+        if (!restore) return;
+        if (restore.positionSec > 0.2) {
+          engineHostRef.current?.resumeAtSeconds(restore.positionSec);
+        }
+        setReading(restore.reading);
+        setReadingPaused(false);
+      });
+      return () => cancelAnimationFrame(frame);
+    }, [])
+  );
+
   useEffect(() => {
     const pending = pendingManualRef.current;
     if (!pending) return;
@@ -717,6 +745,12 @@ export default function WatchScreen() {
     if (!shouldInterceptWatchRootBack(Platform.OS)) return;
 
     const onBack = () => {
+      if (readingRef.current) {
+        setReading(null);
+        setReadingPaused(false);
+        engineHostRef.current?.setPaused(false);
+        return true;
+      }
       if (!isWatchRootSurface(pathname, segments)) return false;
       const decision = decideWatchRootBack();
       if (decision.action === "close-nested") {
@@ -1805,6 +1839,7 @@ export default function WatchScreen() {
   const onActiveTimeline = useCallback(
     (postId: number, timeline: { currentTime: number }) => {
       if (postId !== activePostId) return;
+      playbackSecondsRef.current = timeline.currentTime;
       qualifiedWatchTrackerRef.current.ingest(
         timeline.currentTime * 1000,
         true
@@ -1971,6 +2006,12 @@ export default function WatchScreen() {
         onOpenProfile={() => {
           const href = buildWatchCreatorProfileHref(item.author, item.postId);
           if (href) {
+            if (item.postId && item.postId === activePostId) {
+              rememberWatchLeave({
+                postId: item.postId,
+                positionSec: playbackSecondsRef.current,
+              });
+            }
             rememberProfileBackContext({
               origin: "watch",
               via: null,
@@ -2042,6 +2083,7 @@ export default function WatchScreen() {
       refreshSrcFor,
       router,
       screenFocused,
+      activePostId,
       visibleVideos.length,
       volume,
     ]
@@ -2259,6 +2301,23 @@ export default function WatchScreen() {
       >
         <IdentityHeader title={t("watch.title")} onBack={onWatchHeaderArrow} />
       </View>
+      {reading ? (
+        <WatchReadingPanel
+          title={reading.title}
+          body={reading.body}
+          paused={readingPaused}
+          onTogglePause={() => {
+            const next = !readingPaused;
+            setReadingPaused(next);
+            engineHostRef.current?.setPaused(next);
+          }}
+          onClose={() => {
+            setReading(null);
+            setReadingPaused(false);
+            engineHostRef.current?.setPaused(false);
+          }}
+        />
+      ) : null}
       {preparingShare ? (
         <View style={styles.preparing} pointerEvents="none">
           <ActivityIndicator

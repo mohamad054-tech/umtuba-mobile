@@ -9,6 +9,8 @@ import {
 export type WatchEngineSeekCommand = {
   token: number;
   ratio: number;
+  /** Absolute seconds. Wins over ratio so a return can resume mid-video. */
+  seconds?: number | null;
 };
 
 export function resolveWatchEngineSeekSeconds(input: {

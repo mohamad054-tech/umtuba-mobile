@@ -4,6 +4,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   PanResponder,
   Platform,
@@ -1680,13 +1681,36 @@ function WatchVideoCardComponent({
             })}
             accessibilityState={{ disabled: !onOpenProfile }}
             hitSlop={8}
+            style={styles.creatorRow}
           >
-            <Text
-              style={styles.username}
-              numberOfLines={1}
-            >
-              {video.author.username}
-            </Text>
+            {/^https?:\/\//i.test(video.author.avatar) ? (
+              <Image
+                source={{ uri: video.author.avatar }}
+                style={styles.creatorPhoto}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <View style={styles.creatorPhoto}>
+                <Text style={styles.creatorLetter}>
+                  {(video.author.avatar || video.author.username || "U")
+                    .replace(/^@/, "")
+                    .slice(0, 1)
+                    .toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.creatorNames}>
+              <Text style={styles.username} numberOfLines={1}>
+                {video.author.username}
+              </Text>
+              {video.author.name &&
+              video.author.name.replace(/^@/, "") !==
+                video.author.username.replace(/^@/, "") ? (
+                <Text style={styles.creatorName} numberOfLines={1}>
+                  {video.author.name}
+                </Text>
+              ) : null}
+            </View>
           </Pressable>
           {showFollow && onEnsureFollow ? (
             <Pressable
@@ -2339,11 +2363,40 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: "#FFFFFF",
   },
+  creatorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+  },
+  creatorPhoto: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(251,191,36,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  creatorLetter: {
+    color: colors.accentAmber,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  creatorNames: {
+    flexShrink: 1,
+  },
+  creatorName: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   username: {
     color: colors.text,
     fontWeight: "700",
     fontSize: 15,
-    marginBottom: 4,
     textAlign: "left",
   },
   caption: {

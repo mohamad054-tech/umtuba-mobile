@@ -13,7 +13,13 @@ export type ProfileVideoItem = {
   previewUrl: string | null;
   videoPath: string | null;
   createdAt: string;
+  articleId: string | null;
 };
+
+const PROFILE_VIDEO_COLUMNS =
+  "id, content, likes, views, image_url, video_path, created_at, article_id";
+const PROFILE_VIDEO_COLUMNS_BASE =
+  "id, content, likes, views, image_url, video_path, created_at";
 
 function parseNonNegInt(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value ?? 0);
@@ -32,6 +38,16 @@ function cleanHttpUrl(value: unknown): string | null {
   }
 }
 
+function cleanArticleId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    trimmed
+  )
+    ? trimmed
+    : null;
+}
+
 export function mapProfileVideoRow(row: {
   id: unknown;
   content?: unknown;
@@ -40,6 +56,7 @@ export function mapProfileVideoRow(row: {
   image_url?: unknown;
   video_path?: unknown;
   created_at?: unknown;
+  article_id?: unknown;
 }): ProfileVideoItem | null {
   const postId = parseNonNegInt(row.id);
   if (!Number.isInteger(postId) || postId <= 0) return null;
@@ -60,7 +77,25 @@ export function mapProfileVideoRow(row: {
     previewUrl: null,
     videoPath,
     createdAt: typeof row.created_at === "string" ? row.created_at : "",
+    articleId: cleanArticleId(row.article_id),
   };
+}
+
+export async function fetchProfileArticle(
+  supabase: SupabaseClient,
+  articleId: string
+): Promise<{ title: string; body: string } | null> {
+  if (!cleanArticleId(articleId)) return null;
+  const { data, error } = await supabase
+    .from("articles")
+    .select("title, body")
+    .eq("id", articleId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const title = typeof data.title === "string" ? data.title.trim() : "";
+  const body = typeof data.body === "string" ? data.body.trim() : "";
+  if (!body) return null;
+  return { title, body };
 }
 
 export async function attachProfileVideoPreviews(
@@ -103,15 +138,20 @@ export async function fetchProfileVideoById(
   postId: number
 ): Promise<ProfileVideoItem | null> {
   if (!userId || !Number.isInteger(postId) || postId <= 0) return null;
-  const { data, error } = await supabase
-    .from("posts")
-    .select("id, content, likes, views, image_url, video_path, created_at")
-    .eq("id", postId)
-    .eq("user_id", userId)
-    .eq("post_type", "video")
-    .eq("media_status", "ready")
-    .not("video_path", "is", null)
-    .maybeSingle();
+  const load = (columns: string) =>
+    supabase
+      .from("posts")
+      .select(columns)
+      .eq("id", postId)
+      .eq("user_id", userId)
+      .eq("post_type", "video")
+      .eq("media_status", "ready")
+      .not("video_path", "is", null)
+      .maybeSingle();
+  let { data, error } = await load(PROFILE_VIDEO_COLUMNS);
+  if (error && /article_id/i.test(error.message ?? "")) {
+    ({ data, error } = await load(PROFILE_VIDEO_COLUMNS_BASE));
+  }
   if (error || !data) return null;
   const mapped = mapProfileVideoRow(data);
   if (!mapped) return null;
@@ -134,17 +174,28 @@ export async function listProfileVideos(
   );
   const mapped: ProfileVideoItem[] = [];
   let from = 0;
+  let columns = PROFILE_VIDEO_COLUMNS;
   while (mapped.length < 200) {
-    const { data, error } = await supabase
-      .from("posts")
-      .select("id, content, likes, views, image_url, video_path, created_at")
-      .eq("user_id", userId)
-      .eq("post_type", "video")
-      .eq("media_status", "ready")
-      .not("video_path", "is", null)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, from + pageSize - 1);
+    const run = (selected: string) =>
+      supabase
+        .from("posts")
+        .select(selected)
+        .eq("user_id", userId)
+        .eq("post_type", "video")
+        .eq("media_status", "ready")
+        .not("video_path", "is", null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, from + pageSize - 1);
+    let { data, error } = await run(columns);
+    if (
+      error &&
+      columns !== PROFILE_VIDEO_COLUMNS_BASE &&
+      /article_id/i.test(error.message ?? "")
+    ) {
+      columns = PROFILE_VIDEO_COLUMNS_BASE;
+      ({ data, error } = await run(columns));
+    }
 
     if (error) {
       console.error("listProfileVideos failed:", error);

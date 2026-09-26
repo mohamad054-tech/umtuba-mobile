@@ -453,6 +453,9 @@ export type MobileMessages = {
   "profile.followingFailed": string;
   "profile.followListLoading": string;
   "profile.openVideo": string;
+  "profile.wasWatching": string;
+  "profile.continueWatching": string;
+  "profile.readArticle": string;
   "profile.editProfile": string;
   "profile.changePhoto": string;
   "profile.photoPermissionTitle": string;

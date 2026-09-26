@@ -64,6 +64,8 @@ const NEVER_HIDE_CURRENT_SURFACE =
 export type WatchEngineHostHandle = {
   snapToIndex: (index: number) => void;
   replayFromStart: () => void;
+  resumeAtSeconds: (seconds: number) => void;
+  setPaused: (paused: boolean) => void;
 };
 
 export type WatchEngineHostProps = {
@@ -402,10 +404,33 @@ export const WatchEngineHost = forwardRef<
     });
   }, [videos]);
 
+  const resumeAtSeconds = useCallback(
+    (seconds: number) => {
+      const current = videos[settledRef.current];
+      if (!current) return;
+      if (!Number.isFinite(seconds) || seconds < 0) return;
+      const mediaId = watchEngineMediaId(current);
+      endedMediaIdsRef.current.delete(mediaId);
+      setUserPaused(false);
+      seekTokenRef.current += 1;
+      setSeekRequest({
+        mediaId,
+        token: seekTokenRef.current,
+        ratio: 0,
+        seconds,
+      });
+    },
+    [videos]
+  );
+
+  const setPaused = useCallback((paused: boolean) => {
+    setUserPaused(paused);
+  }, []);
+
   useImperativeHandle(
     ref,
-    () => ({ snapToIndex: snapOnce, replayFromStart }),
-    [replayFromStart, snapOnce]
+    () => ({ snapToIndex: snapOnce, replayFromStart, resumeAtSeconds, setPaused }),
+    [replayFromStart, resumeAtSeconds, setPaused, snapOnce]
   );
 
   const onScrollBeginDrag = useCallback(
@@ -640,7 +665,12 @@ export const WatchEngineHost = forwardRef<
               onTimeline={(id, next) => {
                 if (!isCurrent) return;
                 const restartingToStart =
-                  seekRequest?.mediaId === id && seekRequest.ratio === 0;
+                  seekRequest?.mediaId === id &&
+                  seekRequest.ratio === 0 &&
+                  !(
+                    typeof seekRequest.seconds === "number" &&
+                    seekRequest.seconds > 0.2
+                  );
                 if (
                   restartingToStart &&
                   shouldRestartWatchClipOnBecomeCurrent({

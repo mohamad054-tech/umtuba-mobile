@@ -1,10 +1,9 @@
 import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
 import { Link, useFocusEffect, useLocalSearchParams, usePathname, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +20,7 @@ import ProfileLoadingSkeleton from "@/components/profile/ProfileLoadingSkeleton"
 import ProfileStatsRow from "@/components/profile/ProfileStatsRow";
 import ProfileTabStrip from "@/components/profile/ProfileTabStrip";
 import ProfileTimeline from "@/components/profile/ProfileTimeline";
+import WatchedVideoCard from "@/components/profile/WatchedVideoCard";
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
 import { chevronGlyph, localeRootStyle, localeTextAlign } from "@/src/lib/i18n/rtl";
@@ -36,11 +36,20 @@ import {
   type ProfilePostItem,
 } from "@/src/lib/profile/listProfilePosts";
 import {
+  fetchProfileArticle,
   fetchProfileVideoById,
   listProfileVideos,
-  placeProfileVideoFirst,
   type ProfileVideoItem,
 } from "@/src/lib/profile/listProfileVideos";
+import {
+  shouldShowWatchedVideoCard,
+  watchedVideoReadingOffer,
+  type WatchedVideoReading,
+} from "@/src/lib/profile/watchedVideoCard";
+import {
+  armWatchReading,
+  attachWatchReading,
+} from "@/src/lib/watch/watchLeavePosition";
 import { emptyProfileAboutExtras } from "@/src/lib/profile/profileAbout";
 import {
   resolveProfileContentWidth,
@@ -119,6 +128,10 @@ export default function ProfileScreen() {
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [videos, setVideos] = useState<ProfileVideoItem[]>([]);
+  const [watchedVideo, setWatchedVideo] = useState<ProfileVideoItem | null>(null);
+  const [watchedReading, setWatchedReading] = useState<WatchedVideoReading | null>(
+    null
+  );
   const [videosFailed, setVideosFailed] = useState(false);
   const [posts, setPosts] = useState<ProfilePostItem[]>([]);
   const [postsFailed, setPostsFailed] = useState(false);
@@ -128,7 +141,6 @@ export default function ProfileScreen() {
     typeof rawFocusPost === "string" && /^\d+$/.test(rawFocusPost)
       ? Number(rawFocusPost)
       : null;
-  const scrollRef = useRef<ScrollView>(null);
   const [requestedTab, setRequestedTab] = useState<string | null>(
     focusPostId ? "videos" : typeof params.tab === "string" ? params.tab : null
   );
@@ -207,6 +219,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!contentUserId) {
       setVideos([]);
+      setWatchedVideo(null);
       setPosts([]);
       setVideosFailed(false);
       setPostsFailed(false);
@@ -231,20 +244,22 @@ export default function ProfileScreen() {
         getProfileFollowSnapshot(supabase, contentUserId),
       ]);
       if (cancelled) return;
-      let nextVideos = placeProfileVideoFirst(videoPage.videos, focusPostId);
-      if (
-        focusPostId &&
-        !nextVideos.some((video) => video.postId === focusPostId)
-      ) {
-        const pinned = await fetchProfileVideoById(
-          supabase,
-          contentUserId,
-          focusPostId
-        );
-        if (pinned) nextVideos = [pinned, ...nextVideos];
+      const nextVideos = videoPage.videos;
+      let watched: ProfileVideoItem | null = null;
+      if (shouldShowWatchedVideoCard(focusPostId)) {
+        watched =
+          nextVideos.find((video) => video.postId === focusPostId) ?? null;
+        if (!watched && focusPostId) {
+          watched = await fetchProfileVideoById(
+            supabase,
+            contentUserId,
+            focusPostId
+          );
+        }
       }
       if (cancelled) return;
       setVideos(nextVideos);
+      setWatchedVideo(watched);
       setVideosFailed(Boolean(videoPage.failed));
       setPosts(postPage.posts);
       setPostsFailed(Boolean(postPage.failed));
@@ -260,6 +275,29 @@ export default function ProfileScreen() {
       cancelled = true;
     };
   }, [contentUserId, focusPostId, isOwn]);
+
+  useEffect(() => {
+    if (!watchedVideo) {
+      setWatchedReading(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const article = watchedVideo.articleId
+        ? await fetchProfileArticle(getSupabase(), watchedVideo.articleId)
+        : null;
+      if (cancelled) return;
+      const offer = watchedVideoReadingOffer({
+        caption: watchedVideo.title,
+        article,
+      });
+      setWatchedReading(offer);
+      attachWatchReading(watchedVideo.postId, offer);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [watchedVideo]);
 
   const view = buildProfilePresentation(
     isOwn ? profile : otherProfile,
@@ -540,18 +578,19 @@ export default function ProfileScreen() {
     }
   }, [photoBusy, restore, t, user?.id]);
 
-  const revealFocusedVideo = useCallback((view: View) => {
-    const scroll = scrollRef.current;
-    const handle = scroll ? findNodeHandle(scroll) : null;
-    if (!scroll || handle == null) return;
-    view.measureLayout(
-      handle,
-      (_x, y) => {
-        scroll.scrollTo({ y: Math.max(0, y - 12), animated: false });
-      },
-      () => undefined
-    );
-  }, []);
+  function returnToWatchedVideo(openReading: boolean) {
+    if (!watchedVideo) return;
+    attachWatchReading(watchedVideo.postId, watchedReading);
+    if (openReading && watchedReading) armWatchReading();
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.push({
+      pathname: "/(tabs)/watch",
+      params: { post: String(watchedVideo.postId) },
+    });
+  }
 
   function openTimelineItem(item: ProfileTimelineItem) {
     if (item.kind === "video") {
@@ -636,10 +675,24 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
       <ScrollView
-        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
+        {watchedVideo ? (
+          <View style={[styles.columnHost, { width: windowWidth }]}>
+            <View style={[styles.column, { width: columnWidth }]}>
+              <WatchedVideoCard
+                locale={locale}
+                t={t}
+                title={watchedVideo.title}
+                imageUrl={watchedVideo.posterUrl ?? watchedVideo.previewUrl}
+                showReading={watchedReading != null}
+                onContinue={() => returnToWatchedVideo(false)}
+                onRead={() => returnToWatchedVideo(true)}
+              />
+            </View>
+          </View>
+        ) : null}
         <ProfileHero
           view={view}
           locale={locale}
@@ -774,7 +827,6 @@ export default function ProfileScreen() {
                 videosFailed={activeTab !== "posts" ? videosFailed : false}
                 onOpenVideo={openTimelineItem}
                 focusPostId={focusPostId}
-                onRevealFocus={revealFocusedVideo}
               />
             )}
 

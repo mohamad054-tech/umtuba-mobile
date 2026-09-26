@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   focusedCard: {
-    borderColor: colors.accentCyan,
+    borderColor: colors.accentAmber,
     borderWidth: 2,
   },
   postCard: {
