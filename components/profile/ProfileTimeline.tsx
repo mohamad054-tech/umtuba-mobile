@@ -82,17 +82,17 @@ export default function ProfileTimeline({
           >
             <Text style={styles.postKind}>{kindLabel}</Text>
             {item.kind === "video" ? (
-              item.posterUrl ? (
+              item.previewUrl ? (
+                <ProfileVideoThumb
+                  uri={item.previewUrl}
+                  style={[postMediaStyle, { aspectRatio: mediaBox.aspectRatio }]}
+                />
+              ) : item.posterUrl ? (
                 <Image
                   source={{ uri: item.posterUrl }}
                   style={postMediaStyle}
                   resizeMode={PROFILE_MEDIA_RESIZE_MODE}
                   accessibilityIgnoresInvertColors
-                />
-              ) : item.previewUrl ? (
-                <ProfileVideoThumb
-                  uri={item.previewUrl}
-                  style={[postMediaStyle, { aspectRatio: mediaBox.aspectRatio }]}
                 />
               ) : (
                 <View

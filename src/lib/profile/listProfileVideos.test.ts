@@ -37,11 +37,11 @@ describe("mapProfileVideoRow", () => {
 
 describe("listProfileVideos", () => {
   it("queries ready videos for the profile owner only", async () => {
-    const limit = vi.fn(async () => ({
+    const range = vi.fn(async () => ({
       data: [{ id: 5, content: "A", likes: 1, views: 2, image_url: null, created_at: "" }],
       error: null,
     }));
-    const orderId = vi.fn(() => ({ limit }));
+    const orderId = vi.fn(() => ({ range }));
     const orderCreated = vi.fn(() => ({ order: orderId }));
     const not = vi.fn(() => ({ order: orderCreated }));
     const eqMedia = vi.fn(() => ({ not }));

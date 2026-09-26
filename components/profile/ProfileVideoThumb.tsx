@@ -11,9 +11,9 @@ export default function ProfileVideoThumb({ uri, style }: ProfileVideoThumbProps
   const player = useVideoPlayer(uri, (instance) => {
     instance.muted = true;
     instance.volume = 0;
-    instance.loop = false;
-    instance.currentTime = 0.08;
-    instance.pause();
+    instance.loop = true;
+    instance.currentTime = 0;
+    instance.play();
   });
 
   return (

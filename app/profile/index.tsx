@@ -69,6 +69,14 @@ import {
   toggleProfileFollow,
 } from "@/src/lib/social/follows";
 import { defaultShareLinkPort } from "@/src/lib/social/sharePost";
+import {
+  blockUserLocally,
+  reportWatchUser,
+  UGC_REPORT_REASONS,
+  UGC_REPORT_REASON_LABELS,
+  viewerMaySeeBlockControl,
+  viewerMaySeeReportControl,
+} from "@/src/lib/social/ugcModeration";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   pickAvatarFromLibrary,
@@ -392,6 +400,73 @@ export default function ProfileScreen() {
     }
   }, [t, view.displayName, view.username]);
 
+  const onMoreProfile = useCallback(() => {
+    const targetId = contentUserId;
+    if (!targetId || isOwn) return;
+    const report = () => {
+      if (!viewerMaySeeReportControl(user?.id, targetId)) {
+        Alert.alert(t("report.failed"));
+        return;
+      }
+      Alert.alert(t("actions.report"), t("report.what"), [
+        { text: t("actions.cancel"), style: "cancel" },
+        ...UGC_REPORT_REASONS.map((reason) => ({
+          text: UGC_REPORT_REASON_LABELS[reason],
+          onPress: () => {
+            void (async () => {
+              const result = await reportWatchUser({
+                viewerId: user?.id,
+                targetUserId: targetId,
+                reason,
+              });
+              Alert.alert(
+                result.ok ? t("report.submitted") : t("report.failed"),
+                result.ok ? t("report.thanksAccount") : result.message
+              );
+            })();
+          },
+        })),
+      ]);
+    };
+    const block = () => {
+      if (!viewerMaySeeBlockControl(user?.id, targetId)) return;
+      Alert.alert(
+        t("block.title"),
+        t("block.body", { values: { username: view.username || "" } }),
+        [
+          { text: t("actions.cancel"), style: "cancel" },
+          {
+            text: t("actions.block"),
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const result = await blockUserLocally({
+                  viewerId: user?.id,
+                  targetUserId: targetId,
+                  username: view.username,
+                });
+                Alert.alert(
+                  result.ok ? t("block.done") : t("block.failed"),
+                  result.ok
+                    ? result.localOnly
+                      ? t("block.localOnly")
+                      : t("block.serverAndLocal")
+                    : result.message
+                );
+              })();
+            },
+          },
+        ]
+      );
+    };
+    Alert.alert(t("watch.quickActions"), undefined, [
+      { text: t("actions.report"), onPress: report },
+      { text: t("actions.block"), onPress: block },
+      { text: t("profile.share"), onPress: () => void onShare() },
+      { text: t("actions.cancel"), style: "cancel" },
+    ]);
+  }, [contentUserId, isOwn, onShare, t, user?.id, view.username]);
+
   const onChangePhoto = useCallback(async () => {
     if (!user?.id || photoBusy) return;
     setPhotoBusy(true);
@@ -597,6 +672,7 @@ export default function ProfileScreen() {
                 onEdit={() => router.push("/settings")}
                 onFollow={() => void onToggleFollow()}
                 onShare={() => void onShare()}
+                onMore={isOwn ? undefined : onMoreProfile}
               />
             ) : null}
 

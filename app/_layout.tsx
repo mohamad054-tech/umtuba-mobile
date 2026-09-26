@@ -10,7 +10,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -51,12 +50,12 @@ SplashScreen.preventAutoHideAsync();
 
 let playedIntro = false;
 
+const SPLASH_LOGO = 136;
+
 function GoldIntro({ onDone }: { onDone: () => void }) {
-  const opacity = useState(() => new Animated.Value(0))[0];
+  const opacity = useState(() => new Animated.Value(1))[0];
   const done = useRef(onDone);
   done.current = onDone;
-  const { width } = useWindowDimensions();
-  const size = Math.round(width * 0.6);
 
   useEffect(() => {
     let closed = false;
@@ -66,9 +65,8 @@ function GoldIntro({ onDone }: { onDone: () => void }) {
       done.current();
     };
     const fade = Animated.sequence([
-      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
       Animated.delay(420),
-      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0, duration: 380, useNativeDriver: true }),
     ]);
     fade.start(({ finished }) => {
       if (finished) finish();
@@ -85,7 +83,7 @@ function GoldIntro({ onDone }: { onDone: () => void }) {
       <Animated.View style={{ opacity }}>
         <Image
           source={require("../assets/images/splash-icon.png")}
-          style={{ width: size, height: size }}
+          style={{ width: SPLASH_LOGO, height: SPLASH_LOGO }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors
         />
@@ -290,11 +288,12 @@ const introStyles = StyleSheet.create({
     flex: 1,
   },
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#000000",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 50,
+    elevation: 50,
   },
 });
 

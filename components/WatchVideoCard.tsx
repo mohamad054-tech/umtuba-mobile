@@ -3,11 +3,13 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type GestureResponderEvent,
   type LayoutChangeEvent,
@@ -196,6 +198,8 @@ export type WatchVideoCardProps = {
   onShare?: () => void;
   /** Owner-only. Hidden unless the viewer owns this post (UAF-12). */
   onDeleteOwn?: () => void;
+  onCopyLink?: () => void;
+  onEditCaption?: (caption: string) => void;
   /** Other people's content only — Guideline 1.2 report. */
   onReport?: () => void;
   /** Other accounts only — Guideline 1.2 block. */
@@ -1047,6 +1051,8 @@ function WatchVideoCardComponent({
   onOpenComments,
   onShare,
   onDeleteOwn,
+  onCopyLink,
+  onEditCaption,
   onReport,
   onBlockUser,
   onOpenProfile,
@@ -1073,11 +1079,10 @@ function WatchVideoCardComponent({
   const captionDirection = localeWritingDirection(locale);
   const followState = watchFollowChipState(following);
   const { user } = useAuth();
-  const railActionCount =
-    4 +
-    (onDeleteOwn ? 1 : 0) +
-    (onReport ? 1 : 0) +
-    (onBlockUser ? 1 : 0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [captionOpen, setCaptionOpen] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState(video.caption || video.title || "");
+  const railActionCount = 5;
   const compactRail =
     cellHeight != null &&
     watchRailShouldCompact({
@@ -1842,51 +1847,19 @@ function WatchVideoCardComponent({
               </Text>
             )}
           </Pressable>
-          {onDeleteOwn ? (
-            <Pressable
-              style={styles.action}
-              onPress={onDeleteOwn}
-              accessibilityRole="button"
-              accessibilityLabel={t("watch.deleteOwn")}
-            >
-              <Text style={[styles.actionIcon, styles.deleteIcon]}>⌫</Text>
-              {compactRail ? null : (
-                <Text style={styles.actionCount} numberOfLines={1}>
-                  {t("actions.delete")}
-                </Text>
-              )}
-            </Pressable>
-          ) : null}
-          {onReport ? (
-            <Pressable
-              style={styles.action}
-              onPress={onReport}
-              accessibilityRole="button"
-              accessibilityLabel={t("watch.reportVideo")}
-            >
-              <Text style={styles.actionIcon}>⚑</Text>
-              {compactRail ? null : (
-                <Text style={styles.actionCount} numberOfLines={1}>
-                  {t("actions.report")}
-                </Text>
-              )}
-            </Pressable>
-          ) : null}
-          {onBlockUser ? (
-            <Pressable
-              style={styles.action}
-              onPress={onBlockUser}
-              accessibilityRole="button"
-              accessibilityLabel={t("watch.blockAccount")}
-            >
-              <Text style={styles.actionIcon}>⊘</Text>
-              {compactRail ? null : (
-                <Text style={styles.actionCount} numberOfLines={1}>
-                  {t("actions.block")}
-                </Text>
-              )}
-            </Pressable>
-          ) : null}
+          <Pressable
+            style={styles.action}
+            onPress={() => setMoreOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t("watch.quickActions")}
+          >
+            <Text style={styles.actionIcon}>⋯</Text>
+            {compactRail ? null : (
+              <Text style={styles.actionCount} numberOfLines={1}>
+                {t("watch.quickActions")}
+              </Text>
+            )}
+          </Pressable>
         </View>
 
         {/*
@@ -1911,6 +1884,122 @@ function WatchVideoCardComponent({
           )}
         </View>
       </View>
+      <Modal
+        visible={moreOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoreOpen(false)}
+      >
+        <Pressable style={styles.moreBackdrop} onPress={() => setMoreOpen(false)}>
+          <Pressable style={styles.moreSheet} onPress={() => undefined}>
+            {onEditCaption ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setCaptionDraft(video.caption || video.title || "");
+                  setMoreOpen(false);
+                  setCaptionOpen(true);
+                }}
+              >
+                <Text style={styles.moreText}>{t("create.caption")}</Text>
+              </Pressable>
+            ) : null}
+            {onCopyLink ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setMoreOpen(false);
+                  onCopyLink();
+                }}
+              >
+                <Text style={styles.moreText}>{t("watch.copyLink")}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.moreRow}
+              onPress={() => {
+                setMoreOpen(false);
+                onToggleAutoNext();
+              }}
+            >
+              <Text style={styles.moreText}>
+                {autoNext ? t("watch.autoNextOn") : t("watch.autoNextOff")}
+              </Text>
+            </Pressable>
+            {onNotInterested ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setMoreOpen(false);
+                  onNotInterested();
+                }}
+              >
+                <Text style={styles.moreText}>{t("watch.notInterested")}</Text>
+              </Pressable>
+            ) : null}
+            {onReport ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setMoreOpen(false);
+                  onReport();
+                }}
+              >
+                <Text style={styles.moreText}>{t("actions.report")}</Text>
+              </Pressable>
+            ) : null}
+            {onBlockUser ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setMoreOpen(false);
+                  onBlockUser();
+                }}
+              >
+                <Text style={styles.moreText}>{t("actions.block")}</Text>
+              </Pressable>
+            ) : null}
+            {onDeleteOwn ? (
+              <Pressable
+                style={styles.moreRow}
+                onPress={() => {
+                  setMoreOpen(false);
+                  onDeleteOwn();
+                }}
+              >
+                <Text style={[styles.moreText, styles.deleteIcon]}>{t("actions.delete")}</Text>
+              </Pressable>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={captionOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCaptionOpen(false)}
+      >
+        <Pressable style={styles.moreBackdrop} onPress={() => setCaptionOpen(false)}>
+          <Pressable style={styles.moreSheet} onPress={() => undefined}>
+            <Text style={styles.moreText}>{t("create.caption")}</Text>
+            <TextInput
+              value={captionDraft}
+              onChangeText={setCaptionDraft}
+              style={styles.captionInput}
+              multiline
+            />
+            <Pressable
+              style={styles.moreRow}
+              onPress={() => {
+                setCaptionOpen(false);
+                onEditCaption?.(captionDraft);
+              }}
+            >
+              <Text style={styles.moreText}>{t("watch.save")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       {paneStatus === "error" ? (
         <View
           style={styles.retryOverlay}
@@ -2279,6 +2368,37 @@ const styles = StyleSheet.create({
   },
   deleteIcon: {
     color: colors.danger,
+  },
+  moreBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+  },
+  moreSheet: {
+    backgroundColor: "#12121c",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 12,
+    gap: 4,
+  },
+  moreRow: {
+    minHeight: 48,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  moreText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  captionInput: {
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 12,
+    minHeight: 80,
+    padding: 10,
+    marginVertical: 8,
   },
   on: {
     color: colors.accentViolet,

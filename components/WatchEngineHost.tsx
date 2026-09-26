@@ -374,7 +374,7 @@ export const WatchEngineHost = forwardRef<
   const onScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       lastOffsetRef.current = event.nativeEvent.contentOffset.y;
-      const { state, effects } = engineRef.current.releaseGesture({
+      const { state } = engineRef.current.releaseGesture({
         fromIndex: dragStartIndexRef.current,
         currentOffset: event.nativeEvent.contentOffset.y,
         dragStartOffset: dragStartOffsetRef.current,
@@ -390,12 +390,9 @@ export const WatchEngineHost = forwardRef<
           : null,
       });
       snapGenRef.current = state.snapGeneration;
-      if (effects.snap) {
-        snapOnce(effects.snap.index);
-      }
       applyEngineState();
     },
-    [applyEngineState, snapOnce, videos]
+    [applyEngineState, videos]
   );
 
   const onMomentumScrollEnd = useCallback(
@@ -609,6 +606,8 @@ export const WatchEngineHost = forwardRef<
       keyExtractor={(item) => watchEngineMediaId(item)}
       renderItem={renderItem}
       pagingEnabled={false}
+      snapToInterval={itemHeight > 0 ? itemHeight : undefined}
+      snapToAlignment="start"
       scrollEnabled={listScrollEnabled}
       showsVerticalScrollIndicator={false}
       disableIntervalMomentum

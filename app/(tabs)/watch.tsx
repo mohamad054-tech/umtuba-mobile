@@ -25,6 +25,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -257,10 +258,11 @@ export default function WatchScreen() {
   const { t } = useTranslation();
   const listRef = useRef<FlatList<WatchVideo>>(null);
   const engineHostRef = useRef<WatchEngineHostHandle>(null);
-  const params = useLocalSearchParams<{ post?: string }>();
+  const params = useLocalSearchParams<{ post?: string | string[] }>();
+  const rawPost = Array.isArray(params.post) ? params.post[0] : params.post;
   const focusPostId =
-    typeof params.post === "string" && /^\d+$/.test(params.post)
-      ? Number(params.post)
+    typeof rawPost === "string" && /^\d+$/.test(rawPost)
+      ? Number(rawPost)
       : null;
 
   const optimisticTick = useSyncExternalStore(
@@ -835,6 +837,11 @@ export default function WatchScreen() {
             navigationGeneration: arbiterRef.current.navigationGeneration,
           })
         );
+        if (focusPostId != null) {
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+          });
+        }
       } catch (err) {
         setError(getErrorMessage(err, t("watch.loadFailed")));
       } finally {
@@ -849,6 +856,12 @@ export default function WatchScreen() {
   useEffect(() => {
     void loadInitial();
   }, [loadInitial]);
+
+  useEffect(() => {
+    if (focusPostId == null || loading) return;
+    if (videos[0]?.postId !== focusPostId) return;
+    engineHostRef.current?.snapToIndex(0);
+  }, [focusPostId, loading, videos]);
 
   useEffect(() => {
     const optimistic = listOptimisticWatchRecords();
@@ -1484,6 +1497,36 @@ export default function WatchScreen() {
     [followByAuthor, t]
   );
 
+  const onCopyWatchLink = useCallback(
+    async (postId: number) => {
+      const url = `https://umtuba.com/watch?post=${postId}`;
+      try {
+        await Share.share({ message: url });
+      } catch {
+        Alert.alert(t("watch.copyLink"), url);
+      }
+    },
+    [t]
+  );
+
+  const onEditCaption = useCallback(
+    async (video: WatchVideo, caption: string) => {
+      if (!video.postId || !user?.id) return;
+      const next = caption.trim();
+      const { error: updateError } = await getSupabase()
+        .from("posts")
+        .update({ content: next })
+        .eq("id", video.postId)
+        .eq("user_id", user.id);
+      if (updateError) {
+        Alert.alert(t("watch.saveFailed"), updateError.message);
+        return;
+      }
+      patchVideo(video.id, { caption: next, title: next || video.title });
+    },
+    [patchVideo, t, user?.id]
+  );
+
   const onNotInterested = useCallback(
     async (video: WatchVideo) => {
       if (!video.postId) return;
@@ -1855,7 +1898,17 @@ export default function WatchScreen() {
             : undefined
         }
         onNotInterested={
-          item.postId ? () => void onNotInterested(item) : undefined
+          item.postId && !viewerMaySeeDeleteControl(user?.id, item.author.id)
+            ? () => void onNotInterested(item)
+            : undefined
+        }
+        onCopyLink={
+          item.postId ? () => void onCopyWatchLink(item.postId as number) : undefined
+        }
+        onEditCaption={
+          item.postId && viewerMaySeeDeleteControl(user?.id, item.author.id)
+            ? (caption) => void onEditCaption(item, caption)
+            : undefined
         }
         onOpenComments={
           item.postId
@@ -1965,6 +2018,8 @@ export default function WatchScreen() {
       onToggleSave,
       onEnsureFollow,
       onNotInterested,
+      onCopyWatchLink,
+      onEditCaption,
       playbackRate,
       followByAuthor,
       user?.id,

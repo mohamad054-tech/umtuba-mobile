@@ -14,6 +14,7 @@ type ProfileActionsRowProps = {
   onEdit: () => void;
   onFollow: () => void;
   onShare: () => void;
+  onMore?: () => void;
 };
 
 export default function ProfileActionsRow({
@@ -27,6 +28,7 @@ export default function ProfileActionsRow({
   onEdit,
   onFollow,
   onShare,
+  onMore,
 }: ProfileActionsRowProps) {
   return (
     <View style={styles.block}>
@@ -67,6 +69,16 @@ export default function ProfileActionsRow({
           )}
         </Pressable>
       )}
+      {!isOwn && onMore ? (
+        <Pressable
+          style={styles.secondaryBtn}
+          onPress={onMore}
+          accessibilityRole="button"
+          accessibilityLabel={t("watch.quickActions")}
+        >
+          <Text style={styles.secondaryBtnText}>⋯</Text>
+        </Pressable>
+      ) : null}
       {canShare ? (
         <Pressable
           style={[styles.secondaryBtn, shareBusy && styles.buttonDisabled]}

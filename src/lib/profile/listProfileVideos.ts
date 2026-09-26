@@ -69,7 +69,6 @@ export async function attachProfileVideoPreviews(
 ): Promise<ProfileVideoItem[]> {
   return Promise.all(
     videos.map(async (video) => {
-      if (video.posterUrl) return video;
       if (!video.videoPath) return video;
       try {
         const previewUrl = await createVideoSignedUrl(supabase, video.videoPath);
@@ -90,30 +89,35 @@ export async function listProfileVideos(
   if (!userId) {
     return { videos: [], failed: true };
   }
-  const limit = Math.min(
+  const pageSize = Math.min(
     Math.max(options?.limit ?? PROFILE_VIDEO_PAGE_SIZE, 1),
-    48
+    PROFILE_VIDEO_PAGE_SIZE
   );
+  const mapped: ProfileVideoItem[] = [];
+  let from = 0;
+  while (mapped.length < 200) {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("id, content, likes, views, image_url, video_path, created_at")
+      .eq("user_id", userId)
+      .eq("post_type", "video")
+      .eq("media_status", "ready")
+      .not("video_path", "is", null)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, from + pageSize - 1);
 
-  const { data, error } = await supabase
-    .from("posts")
-    .select("id, content, likes, views, image_url, video_path, created_at")
-    .eq("user_id", userId)
-    .eq("post_type", "video")
-    .eq("media_status", "ready")
-    .not("video_path", "is", null)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    console.error("listProfileVideos failed:", error);
-    return { videos: [], failed: true };
+    if (error) {
+      console.error("listProfileVideos failed:", error);
+      return { videos: [], failed: true };
+    }
+    const page = (data ?? [])
+      .map((row) => mapProfileVideoRow(row))
+      .filter((row): row is ProfileVideoItem => row != null);
+    mapped.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
   }
-
-  const mapped = (data ?? [])
-    .map((row) => mapProfileVideoRow(row))
-    .filter((row): row is ProfileVideoItem => row != null);
   const videos = await attachProfileVideoPreviews(supabase, mapped);
 
   return { videos };
