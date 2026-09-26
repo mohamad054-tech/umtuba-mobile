@@ -51,6 +51,16 @@ describe("watchRailLayout", () => {
     expect(WATCH_TIMELINE_TRAILING_GUTTER).toBeGreaterThanOrEqual(56);
   });
 
+  it("places the action stack in the lower half on a tall phone", () => {
+    const cellHeight = 2000;
+    const actionCount = 5;
+    const bottom = watchRailBottomOffset(0, cellHeight, actionCount, false);
+    const centerFromBottom = bottom + watchRailHeight(actionCount) / 2;
+    expect(bottom).toBeGreaterThan(WATCH_RAIL_BOTTOM_EXTRA);
+    expect(centerFromBottom / cellHeight).toBeGreaterThan(0.22);
+    expect(centerFromBottom / cellHeight).toBeLessThan(0.4);
+  });
+
   it("compacts only short cells and keeps 44pt targets", () => {
     expect(WATCH_RAIL_COMPACT_GAP).toBe(4);
     expect(WATCH_HEADER_RAIL_RESERVED).toBe(120);

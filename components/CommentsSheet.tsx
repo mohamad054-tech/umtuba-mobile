@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/lib/auth/AuthContext";
 import { useTranslation } from "@/src/lib/i18n";
@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/social/comments";
 import { getSupabase } from "@/src/lib/supabase/client";
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
+import { sheetBottomPadding } from "@/src/lib/ui/sheetSafeBottom";
 import { colors } from "@/src/theme/colors";
 
 type CommentsSheetProps = {
@@ -110,7 +111,15 @@ export function CommentsSheet({
           accessibilityLabel={t("actions.close")}
         />
         <View
-          style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: sheetBottomPadding(
+                insets.bottom,
+                initialWindowMetrics?.insets.bottom ?? 0
+              ),
+            },
+          ]}
         >
           <View style={styles.header}>
             <View>

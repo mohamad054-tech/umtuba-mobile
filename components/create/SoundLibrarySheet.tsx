@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import {
+  initialWindowMetrics,
   SafeAreaProvider,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
@@ -20,6 +21,7 @@ import {
   SOUND_LIBRARY_HEADER_ACTION_MIN_HEIGHT,
   soundLibraryTopInset,
 } from "@/src/lib/sounds/soundLibraryEscape";
+import { sheetBottomPadding } from "@/src/lib/ui/sheetSafeBottom";
 import { getSupabase } from "@/src/lib/supabase/client";
 import {
   canUseSoundInEditor,
@@ -100,7 +102,10 @@ function SoundLibraryBody({
     saved.length === 0;
 
   const topPad = soundLibraryTopInset(insets.top, Platform.OS);
-  const bottomPad = Math.max(insets.bottom, 16);
+  const bottomPad = sheetBottomPadding(
+    insets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0
+  );
 
   const renderSection = (label: string, sounds: SocialSound[]) => {
     if (sounds.length === 0) return null;

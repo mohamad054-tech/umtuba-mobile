@@ -20,14 +20,14 @@ describe("EDITOR_EXIT", () => {
   it("FOOTER_CTA_VISIBLE: primary footer is at least 44pt with safe-area pad", () => {
     expect(EDITOR_FOOTER_CTA_MIN_HEIGHT).toBeGreaterThanOrEqual(44);
     expect(EDITOR_HEADER_ACTION_MIN_HEIGHT).toBeGreaterThanOrEqual(44);
-    expect(editorFooterPaddingBottom(34)).toBe(34);
-    expect(editorFooterPaddingBottom(0)).toBeGreaterThanOrEqual(12);
-    expect(editorFooterPaddingBottom(-8)).toBeGreaterThanOrEqual(12);
+    expect(editorFooterPaddingBottom(34)).toBe(54);
+    expect(editorFooterPaddingBottom(0)).toBeGreaterThanOrEqual(32);
+    expect(editorFooterPaddingBottom(-8)).toBeGreaterThanOrEqual(32);
   });
 
   it("SAFE_AREA: iPhone 13 home-indicator inset is applied, not clipped", () => {
-    expect(editorFooterPaddingBottom(34)).toBe(34);
-    expect(editorFooterPaddingBottom(20)).toBe(20);
+    expect(editorFooterPaddingBottom(34)).toBe(54);
+    expect(editorFooterPaddingBottom(20)).toBe(40);
   });
 
   it("DOUBLE_TAP_GUARD: second Continue is ignored", () => {

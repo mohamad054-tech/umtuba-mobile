@@ -6,12 +6,13 @@
 export const EDITOR_FOOTER_CTA_MIN_HEIGHT = 48;
 export const EDITOR_HEADER_ACTION_MIN_HEIGHT = 44;
 export const EDITOR_FOOTER_MIN_BOTTOM_PAD = 12;
+export const EDITOR_FOOTER_COMFORT_PX = 20;
 
 export type EditorExitIntent = "continue" | "back";
 
 export function editorFooterPaddingBottom(safeAreaBottom: number): number {
   const inset = Number.isFinite(safeAreaBottom) ? Math.max(0, safeAreaBottom) : 0;
-  return Math.max(inset, EDITOR_FOOTER_MIN_BOTTOM_PAD);
+  return Math.max(inset, EDITOR_FOOTER_MIN_BOTTOM_PAD) + EDITOR_FOOTER_COMFORT_PX;
 }
 
 export function createEditorExitGuard() {

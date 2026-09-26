@@ -6,6 +6,10 @@ export const WATCH_RAIL_GAP = 8;
  * reserved the clock row + tall scrub hit that covered the video.
  */
 export const WATCH_RAIL_BOTTOM_EXTRA = 28;
+/** Where the action stack's center sits, measured up from the cell bottom. */
+export const WATCH_RAIL_LOWER_HALF_ANCHOR = 0.3;
+/** Small lift so the name stays clear of the bottom bar. */
+export const WATCH_META_BOTTOM_LIFT = 18;
 /** Flush to the Watch cell bottom so the track does not sit on the picture. */
 export const WATCH_TIMELINE_BOTTOM = 0;
 export const WATCH_PROGRESS_TRACK_HEIGHT = 2;
@@ -34,8 +38,23 @@ export function watchTimelineBottom(_bottomInset?: number): number {
   return WATCH_TIMELINE_BOTTOM;
 }
 
-export function watchRailBottomOffset(bottomInset: number): number {
-  return watchTimelineBottom(bottomInset) + WATCH_RAIL_BOTTOM_EXTRA;
+export function watchMetaBottom(bottomInset: number): number {
+  return watchTimelineBottom(bottomInset) + 10 + WATCH_META_BOTTOM_LIFT;
+}
+
+export function watchRailBottomOffset(
+  bottomInset: number,
+  cellHeight = 0,
+  actionCount = 0,
+  compact = false
+): number {
+  const minClear = watchTimelineBottom(bottomInset) + WATCH_RAIL_BOTTOM_EXTRA;
+  if (!(cellHeight > 0) || actionCount <= 0) return minClear;
+  const railHeight = watchRailHeight(actionCount, { compact });
+  const desired = Math.round(cellHeight * WATCH_RAIL_LOWER_HALF_ANCHOR - railHeight / 2);
+  const maxBottom = cellHeight - WATCH_HEADER_RAIL_RESERVED - railHeight - 8;
+  if (maxBottom < minClear) return minClear;
+  return Math.max(minClear, Math.min(desired, maxBottom));
 }
 
 /**

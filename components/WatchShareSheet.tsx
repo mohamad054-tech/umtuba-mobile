@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTranslation } from "@/src/lib/i18n";
 import type { WatchShareChoice } from "@/src/lib/social/shareEntry";
 import type { WatchShareMode } from "@/src/lib/social/sharePost";
+import { sheetBottomPadding } from "@/src/lib/ui/sheetSafeBottom";
 import { colors } from "@/src/theme/colors";
 
 type WatchShareSheetProps = {
@@ -41,7 +42,15 @@ export function WatchShareSheet({
         testID="watch-share-backdrop"
       />
       <View
-        style={[styles.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}
+        style={[
+          styles.sheet,
+          {
+            paddingBottom: sheetBottomPadding(
+              insets.bottom,
+              initialWindowMetrics?.insets.bottom ?? 0
+            ),
+          },
+        ]}
       >
         <Text style={styles.title}>{t("watch.share")}</Text>
         {choices.map((choice) => (

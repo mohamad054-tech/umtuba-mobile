@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   isRtlLocale,
@@ -12,6 +13,7 @@ import {
   type WatchPlaybackSpeed,
   type WatchQuickActionId,
 } from "@/src/lib/watch/watchQuickActions";
+import { sheetBottomPadding } from "@/src/lib/ui/sheetSafeBottom";
 import { colors } from "@/src/theme/colors";
 
 type Props = {
@@ -50,6 +52,11 @@ export function WatchQuickActions({
   onFollow,
 }: Props) {
   const { t, locale } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const sheetBottom = sheetBottomPadding(
+    insets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0
+  );
   const align = localeTextAlign(locale);
   const writingDirection = localeWritingDirection(locale);
 
@@ -67,7 +74,10 @@ export function WatchQuickActions({
         accessibilityLabel={t("actions.close")}
         testID="watch-quick-actions"
       >
-        <Pressable style={styles.sheet} onPress={() => undefined}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: sheetBottom }]}
+          onPress={() => undefined}
+        >
           <Text style={[styles.title, { textAlign: align, writingDirection }]}>
             {t("watch.quickActions")}
           </Text>

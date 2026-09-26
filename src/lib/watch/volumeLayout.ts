@@ -1,5 +1,6 @@
 import { clampUnitRatio } from "./playbackPolicy";
 import {
+  watchMetaBottom,
   watchRailBottomOffset,
   watchRailHeight,
   watchTimelineBottom,
@@ -182,7 +183,11 @@ export function watchChromeRects(input: {
 } {
   const actionCount = input.actionCount ?? 6;
   const timelineBottom = watchTimelineBottom(input.bottomInset);
-  const railBottom = watchRailBottomOffset(input.bottomInset);
+  const railBottom = watchRailBottomOffset(
+    input.bottomInset,
+    input.cellHeight,
+    actionCount
+  );
   const railHeight = watchRailHeight(actionCount);
   const captionHeight = 84;
   const progressHeight = Math.max(20, WATCH_PROGRESS_TRACK_HEIGHT + 18);
@@ -201,7 +206,7 @@ export function watchChromeRects(input: {
     },
     captions: {
       x: 16,
-      y: input.cellHeight - timelineBottom - 10 - captionHeight,
+      y: input.cellHeight - watchMetaBottom(input.bottomInset) - captionHeight,
       width: Math.round(input.cellWidth * 0.72),
       height: captionHeight,
     },

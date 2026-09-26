@@ -1,4 +1,5 @@
 import { useEventListener } from "expo";
+import { initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -111,6 +112,7 @@ import {
   WATCH_RAIL_COMPACT_GAP,
   WATCH_RAIL_GAP,
   WATCH_VOLUME_RIGHT_CLEARANCE,
+  watchMetaBottom,
   watchRailBottomOffset,
   watchRailShouldCompact,
   watchTimelineBottom,
@@ -141,6 +143,7 @@ import {
   watchFollowChipState,
 } from "@/src/lib/watch/watchCaption";
 import { watchPrefersReducedMotion } from "@/src/lib/watch/watchReduceMotion";
+import { sheetBottomPadding } from "@/src/lib/ui/sheetSafeBottom";
 import { colors } from "@/src/theme/colors";
 
 const PLAY_PAUSE_FEEDBACK_MS = 700;
@@ -1075,6 +1078,11 @@ function WatchVideoCardComponent({
   onEngineSeekRatio,
 }: WatchVideoCardProps) {
   const { t, locale } = useTranslation();
+  const safeInsets = useSafeAreaInsets();
+  const sheetBottom = sheetBottomPadding(
+    safeInsets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0
+  );
   const captionAlign = localeTextAlign(locale);
   const captionDirection = localeWritingDirection(locale);
   const followState = watchFollowChipState(following);
@@ -1660,7 +1668,7 @@ function WatchVideoCardComponent({
         />
 
         <View
-          style={[styles.meta, { marginBottom: timelineBottom + 10 }]}
+          style={[styles.meta, { marginBottom: watchMetaBottom(bottomInset) }]}
           pointerEvents="box-none"
         >
           <Pressable
@@ -1761,7 +1769,15 @@ function WatchVideoCardComponent({
           key={`rail-${video.postId ?? video.id}-${video.likedByMe === true ? 1 : 0}`}
           style={[
             styles.rail,
-            { bottom: watchRailBottomOffset(bottomInset), gap: railGap },
+            {
+              bottom: watchRailBottomOffset(
+                bottomInset,
+                cellHeight ?? 0,
+                railActionCount,
+                compactRail
+              ),
+              gap: railGap,
+            },
           ]}
           pointerEvents="box-none"
           collapsable={false}
@@ -1891,7 +1907,10 @@ function WatchVideoCardComponent({
         onRequestClose={() => setMoreOpen(false)}
       >
         <Pressable style={styles.moreBackdrop} onPress={() => setMoreOpen(false)}>
-          <Pressable style={styles.moreSheet} onPress={() => undefined}>
+          <Pressable
+            style={[styles.moreSheet, { paddingBottom: sheetBottom }]}
+            onPress={() => undefined}
+          >
             {onEditCaption ? (
               <Pressable
                 style={styles.moreRow}
@@ -1980,7 +1999,10 @@ function WatchVideoCardComponent({
         onRequestClose={() => setCaptionOpen(false)}
       >
         <Pressable style={styles.moreBackdrop} onPress={() => setCaptionOpen(false)}>
-          <Pressable style={styles.moreSheet} onPress={() => undefined}>
+          <Pressable
+            style={[styles.moreSheet, { paddingBottom: sheetBottom }]}
+            onPress={() => undefined}
+          >
             <Text style={styles.moreText}>{t("create.caption")}</Text>
             <TextInput
               value={captionDraft}
