@@ -69,7 +69,7 @@ export async function attachProfileVideoPreviews(
 ): Promise<ProfileVideoItem[]> {
   return Promise.all(
     videos.map(async (video) => {
-      if (!video.videoPath) return video;
+      if (video.posterUrl || !video.videoPath) return video;
       try {
         const previewUrl = await createVideoSignedUrl(supabase, video.videoPath);
         return previewUrl ? { ...video, previewUrl } : video;
