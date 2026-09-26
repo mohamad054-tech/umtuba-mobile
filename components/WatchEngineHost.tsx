@@ -19,6 +19,7 @@ import Animated, {
   Easing,
   cancelAnimation,
   runOnJS,
+  runOnUI,
   scrollTo,
   useAnimatedReaction,
   useAnimatedRef,
@@ -191,6 +192,61 @@ export const WatchEngineHost = forwardRef<
   const [audioHandoffTick, setAudioHandoffTick] = useState(0);
   const lastViewedPostRef = useRef<number | null>(null);
   const endedMediaIdsRef = useRef(new Set<string>());
+  const wasScreenFocusedRef = useRef(screenFocused);
+  const heldReturnIndexRef = useRef<number | null>(null);
+  const screenFocusedRef = useRef(screenFocused);
+  screenFocusedRef.current = screenFocused;
+
+  const pinHeldIndex = useCallback(
+    (index: number) => {
+      const offset = resolveWatchEngineSnapOffset({
+        index,
+        itemHeight: itemHeightRef.current,
+      });
+      if (offset == null) return;
+      cancelAnimation(snapOffset);
+      snappingRef.current = false;
+      snapping.value = false;
+      lastOffsetRef.current = offset;
+      settledRef.current = index;
+      const list = listRef.current as {
+        scrollToOffset?: (args: { offset: number; animated: boolean }) => void;
+      } | null;
+      list?.scrollToOffset?.({ offset, animated: false });
+      runOnUI(() => {
+        scrollTo(listRef, 0, offset, false);
+      })();
+    },
+    [listRef, snapOffset, snapping]
+  );
+
+  useEffect(() => {
+    const wasFocused = wasScreenFocusedRef.current;
+    wasScreenFocusedRef.current = screenFocused;
+    if (!screenFocused) {
+      heldReturnIndexRef.current =
+        settledRef.current > 0 ? settledRef.current : null;
+      return;
+    }
+    if (wasFocused) return;
+    const index = heldReturnIndexRef.current;
+    if (index == null) return;
+    pinHeldIndex(index);
+    const timers = [32, 120, 280].map((ms) =>
+      setTimeout(() => {
+        if (heldReturnIndexRef.current === index) pinHeldIndex(index);
+      }, ms)
+    );
+    const stop = setTimeout(() => {
+      if (heldReturnIndexRef.current === index) {
+        heldReturnIndexRef.current = null;
+      }
+    }, 360);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(stop);
+    };
+  }, [pinHeldIndex, screenFocused]);
 
   useEffect(() => {
     return subscribeWatchEngineAudioHandoff(() => {
@@ -262,12 +318,18 @@ export const WatchEngineHost = forwardRef<
   }, [mediaIds, settledIndex, videos]);
 
   const applyEngineState = useCallback(() => {
+    if (!screenFocusedRef.current) return;
+    const held = heldReturnIndexRef.current;
+    if (held != null) {
+      pinHeldIndex(held);
+      return;
+    }
     const state = engineRef.current.getState();
     setAudioOwner(state.audioOwner);
     if (state.gesturePhase === "idle" && state.settledIndex !== settledRef.current) {
       onSettledIndex(state.settledIndex);
     }
-  }, [onSettledIndex]);
+  }, [onSettledIndex, pinHeldIndex]);
 
   const finishSnap = useCallback(
     (offset: number) => {
@@ -348,6 +410,7 @@ export const WatchEngineHost = forwardRef<
 
   const onScrollBeginDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      heldReturnIndexRef.current = null;
       cancelAnimation(snapOffset);
       snappingRef.current = false;
       snapping.value = false;
@@ -362,17 +425,35 @@ export const WatchEngineHost = forwardRef<
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!screenFocusedRef.current) return;
       const offset = event.nativeEvent.contentOffset.y;
+      const held = heldReturnIndexRef.current;
+      if (held != null) {
+        const expected = resolveWatchEngineSnapOffset({
+          index: held,
+          itemHeight: itemHeightRef.current,
+        });
+        if (expected != null && Math.abs(offset - expected) > 2) {
+          pinHeldIndex(held);
+          return;
+        }
+      }
       lastOffsetRef.current = offset;
       if (!(itemHeightRef.current > 0)) return;
       const visible = Math.round(offset / itemHeightRef.current);
       engineRef.current.moveGesture(visible);
     },
-    []
+    [pinHeldIndex]
   );
 
   const onScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!screenFocusedRef.current) return;
+      const held = heldReturnIndexRef.current;
+      if (held != null) {
+        pinHeldIndex(held);
+        return;
+      }
       lastOffsetRef.current = event.nativeEvent.contentOffset.y;
       const { state } = engineRef.current.releaseGesture({
         fromIndex: dragStartIndexRef.current,
@@ -392,13 +473,26 @@ export const WatchEngineHost = forwardRef<
       snapGenRef.current = state.snapGeneration;
       applyEngineState();
     },
-    [applyEngineState, videos]
+    [applyEngineState, pinHeldIndex, videos]
   );
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!screenFocusedRef.current) return;
       if (snappingRef.current) return;
-      lastOffsetRef.current = event.nativeEvent.contentOffset.y;
+      const offset = event.nativeEvent.contentOffset.y;
+      const held = heldReturnIndexRef.current;
+      if (held != null) {
+        const expected = resolveWatchEngineSnapOffset({
+          index: held,
+          itemHeight: itemHeightRef.current,
+        });
+        if (expected != null && Math.abs(offset - expected) > 2) {
+          pinHeldIndex(held);
+          return;
+        }
+      }
+      lastOffsetRef.current = offset;
       const { effects } = engineRef.current.nativeSettled({
         offset: event.nativeEvent.contentOffset.y,
         itemHeight: itemHeightRef.current,

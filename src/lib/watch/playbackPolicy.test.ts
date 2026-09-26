@@ -32,6 +32,7 @@ import {
   resolveWatchIndexFromScrollOffset,
   resolveWatchOwnedIndex,
   resolveWatchScrollOffset,
+  shouldReloadWatchFeed,
   sanitizePlaybackError,
   serializeWatchAutoNextPreference,
   serializeWatchMutedPreference,
@@ -413,6 +414,41 @@ describe("auto-next preference and end-of-clip policy", () => {
         itemCount: 0,
       })
     ).toBeNull();
+  });
+
+  it("keeps a loaded home feed when Watch is covered and then shown again", () => {
+    expect(
+      shouldReloadWatchFeed({
+        screenFocused: false,
+        appliedFocusPostId: null,
+        nextFocusPostId: 42,
+        loadedCount: 8,
+      })
+    ).toBe(false);
+    expect(
+      shouldReloadWatchFeed({
+        screenFocused: true,
+        appliedFocusPostId: null,
+        nextFocusPostId: null,
+        loadedCount: 8,
+      })
+    ).toBe(false);
+    expect(
+      shouldReloadWatchFeed({
+        screenFocused: true,
+        appliedFocusPostId: undefined,
+        nextFocusPostId: null,
+        loadedCount: 0,
+      })
+    ).toBe(true);
+    expect(
+      shouldReloadWatchFeed({
+        screenFocused: true,
+        appliedFocusPostId: null,
+        nextFocusPostId: 42,
+        loadedCount: 8,
+      })
+    ).toBe(true);
   });
 
   it("computes scroll offsets from measured item height", () => {

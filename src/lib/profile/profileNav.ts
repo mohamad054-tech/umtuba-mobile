@@ -80,6 +80,7 @@ export function buildStackedProfileHref(input: {
   username?: string | null;
   userId?: string | null;
   origin: ProfileNavOrigin;
+  postId?: number | null;
 }): string | null {
   const userId = parseProfileUserId(input.userId);
   const username = normalizeUsername(input.username ?? "");
@@ -90,6 +91,9 @@ export function buildStackedProfileHref(input: {
   if (username) params.set("u", username);
   if (userId) params.set("id", userId);
   params.set("from", input.origin);
+  if (input.postId != null && Number.isInteger(input.postId) && input.postId > 0) {
+    params.set("post", String(input.postId));
+  }
   return `${STACKED_PROFILE_PATH}?${params.toString()}`;
 }
 

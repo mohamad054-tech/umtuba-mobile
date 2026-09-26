@@ -411,6 +411,27 @@ export function resolveWatchScrollOffset(
 }
 
 /**
+ * Home feed must stay where the viewer left it when a creator profile
+ * covers Watch and then closes. A new post focus while Watch is on screen
+ * still reloads. Coming back to a feed that is already loaded does not.
+ */
+export function shouldReloadWatchFeed(input: {
+  screenFocused: boolean;
+  appliedFocusPostId: number | null | undefined;
+  nextFocusPostId: number | null;
+  loadedCount: number;
+}): boolean {
+  if (!input.screenFocused) return false;
+  if (
+    input.appliedFocusPostId === input.nextFocusPostId &&
+    input.loadedCount > 0
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Diagnostic helper only. Watch paging ownership is viewability +
  * claimActiveIndex. Cache / scroll-offset math must not write activeIndex.
  */

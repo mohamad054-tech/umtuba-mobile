@@ -1,4 +1,13 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, type ReactNode } from "react";
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import type { ProfileTranslate } from "@/components/profile/profileUi";
 import type { AppLocale } from "@/src/lib/i18n/locales";
@@ -13,6 +22,47 @@ import {
 import { formatPublishedAt } from "@/src/lib/time/publishedAt";
 import { colors } from "@/src/theme/colors";
 
+function FocusCard({
+  active,
+  onReveal,
+  children,
+  style,
+  onPress,
+  disabled,
+  accessibilityRole,
+  accessibilityLabel,
+}: {
+  active: boolean;
+  onReveal?: (view: View) => void;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  onPress?: () => void;
+  disabled?: boolean;
+  accessibilityRole?: "button" | "text";
+  accessibilityLabel: string;
+}) {
+  const ref = useRef<View>(null);
+  useEffect(() => {
+    if (!active || !onReveal) return;
+    const frame = requestAnimationFrame(() => {
+      if (ref.current) onReveal(ref.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [active, onReveal]);
+  return (
+    <View ref={ref} collapsable={false} style={style}>
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={accessibilityLabel}
+      >
+        {children}
+      </Pressable>
+    </View>
+  );
+}
+
 type ProfileTimelineProps = {
   locale: AppLocale;
   t: ProfileTranslate;
@@ -22,6 +72,8 @@ type ProfileTimelineProps = {
   postsFailed?: boolean;
   videosFailed?: boolean;
   onOpenVideo: (item: ProfileTimelineItem) => void;
+  focusPostId?: number | null;
+  onRevealFocus?: (view: View) => void;
 };
 
 export default function ProfileTimeline({
@@ -33,6 +85,8 @@ export default function ProfileTimeline({
   postsFailed,
   videosFailed,
   onOpenVideo,
+  focusPostId = null,
+  onRevealFocus,
 }: ProfileTimelineProps) {
   const textAlign = localeTextAlign(locale);
   const postMediaStyle = [styles.postMedia, { aspectRatio: mediaBox.aspectRatio }];
@@ -66,10 +120,13 @@ export default function ProfileTimeline({
         const title =
           item.kind === "video" ? item.title : item.content || kindLabel;
         const canOpen = item.kind === "video";
+        const focused = canOpen && item.postId === focusPostId;
         return (
-          <Pressable
+          <FocusCard
             key={`${item.kind}-${item.postId}`}
-            style={styles.postCard}
+            active={focused}
+            onReveal={onRevealFocus}
+            style={[styles.postCard, focused ? styles.focusedCard : null]}
             onPress={canOpen ? () => onOpenVideo(item) : undefined}
             disabled={!canOpen}
             accessibilityRole={canOpen ? "button" : "text"}
@@ -118,7 +175,7 @@ export default function ProfileTimeline({
             {published ? (
               <Text style={styles.postPublished}>{published}</Text>
             ) : null}
-          </Pressable>
+          </FocusCard>
         );
       })}
     </View>
@@ -129,6 +186,10 @@ const styles = StyleSheet.create({
   timeline: {
     paddingHorizontal: PROFILE_TIMELINE_GUTTER_DP,
     gap: 12,
+  },
+  focusedCard: {
+    borderColor: colors.accentCyan,
+    borderWidth: 2,
   },
   postCard: {
     borderWidth: 1,

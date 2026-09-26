@@ -80,6 +80,45 @@ export async function attachProfileVideoPreviews(
   );
 }
 
+/** Keep the video the viewer was watching at the front of this profile. */
+export function placeProfileVideoFirst(
+  videos: readonly ProfileVideoItem[],
+  postId: number | null
+): ProfileVideoItem[] {
+  if (postId == null || !Number.isInteger(postId) || postId <= 0) {
+    return [...videos];
+  }
+  const index = videos.findIndex((video) => video.postId === postId);
+  if (index <= 0) return [...videos];
+  const next = videos.slice();
+  const [hit] = next.splice(index, 1);
+  if (!hit) return [...videos];
+  next.unshift(hit);
+  return next;
+}
+
+export async function fetchProfileVideoById(
+  supabase: SupabaseClient,
+  userId: string,
+  postId: number
+): Promise<ProfileVideoItem | null> {
+  if (!userId || !Number.isInteger(postId) || postId <= 0) return null;
+  const { data, error } = await supabase
+    .from("posts")
+    .select("id, content, likes, views, image_url, video_path, created_at")
+    .eq("id", postId)
+    .eq("user_id", userId)
+    .eq("post_type", "video")
+    .eq("media_status", "ready")
+    .not("video_path", "is", null)
+    .maybeSingle();
+  if (error || !data) return null;
+  const mapped = mapProfileVideoRow(data);
+  if (!mapped) return null;
+  const [withPreview] = await attachProfileVideoPreviews(supabase, [mapped]);
+  return withPreview ?? mapped;
+}
+
 /** Published ready videos owned by this profile. Honest empty when none. */
 export async function listProfileVideos(
   supabase: SupabaseClient,

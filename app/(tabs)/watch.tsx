@@ -147,6 +147,7 @@ import {
   quantizeWatchVolume,
   resolveNextWatchIndex,
   resolveWatchScrollOffset,
+  shouldReloadWatchFeed,
   saveWatchAutoNextPreference,
   saveWatchMutedPreference,
   saveWatchVolumePreference,
@@ -853,9 +854,22 @@ export default function WatchScreen() {
     [applyWatchIndexDecision, focusPostId, t, user?.id]
   );
 
+  const appliedFocusPostRef = useRef<number | null | undefined>(undefined);
+
   useEffect(() => {
+    if (
+      !shouldReloadWatchFeed({
+        screenFocused,
+        appliedFocusPostId: appliedFocusPostRef.current,
+        nextFocusPostId: focusPostId,
+        loadedCount: videosLengthRef.current,
+      })
+    ) {
+      return;
+    }
+    appliedFocusPostRef.current = focusPostId;
     void loadInitial();
-  }, [loadInitial]);
+  }, [focusPostId, loadInitial, screenFocused]);
 
   useEffect(() => {
     if (focusPostId == null || loading) return;
@@ -1955,7 +1969,7 @@ export default function WatchScreen() {
           router.push(href as never);
         }}
         onOpenProfile={() => {
-          const href = buildWatchCreatorProfileHref(item.author);
+          const href = buildWatchCreatorProfileHref(item.author, item.postId);
           if (href) {
             rememberProfileBackContext({
               origin: "watch",

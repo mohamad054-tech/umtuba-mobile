@@ -1,9 +1,10 @@
 import { useStackedOriginBackEffects } from "@/components/GlobalBackButton";
 import { Link, useFocusEffect, useLocalSearchParams, usePathname, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  findNodeHandle,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,7 +36,9 @@ import {
   type ProfilePostItem,
 } from "@/src/lib/profile/listProfilePosts";
 import {
+  fetchProfileVideoById,
   listProfileVideos,
+  placeProfileVideoFirst,
   type ProfileVideoItem,
 } from "@/src/lib/profile/listProfileVideos";
 import { emptyProfileAboutExtras } from "@/src/lib/profile/profileAbout";
@@ -97,6 +100,7 @@ export default function ProfileScreen() {
     u?: string;
     id?: string;
     tab?: string;
+    post?: string | string[];
     from?: string;
     via?: string;
     listId?: string;
@@ -119,8 +123,14 @@ export default function ProfileScreen() {
   const [posts, setPosts] = useState<ProfilePostItem[]>([]);
   const [postsFailed, setPostsFailed] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
+  const rawFocusPost = Array.isArray(params.post) ? params.post[0] : params.post;
+  const focusPostId =
+    typeof rawFocusPost === "string" && /^\d+$/.test(rawFocusPost)
+      ? Number(rawFocusPost)
+      : null;
+  const scrollRef = useRef<ScrollView>(null);
   const [requestedTab, setRequestedTab] = useState<string | null>(
-    typeof params.tab === "string" ? params.tab : null
+    focusPostId ? "videos" : typeof params.tab === "string" ? params.tab : null
   );
   const [photoBusy, setPhotoBusy] = useState(false);
 
@@ -221,7 +231,20 @@ export default function ProfileScreen() {
         getProfileFollowSnapshot(supabase, contentUserId),
       ]);
       if (cancelled) return;
-      setVideos(videoPage.videos);
+      let nextVideos = placeProfileVideoFirst(videoPage.videos, focusPostId);
+      if (
+        focusPostId &&
+        !nextVideos.some((video) => video.postId === focusPostId)
+      ) {
+        const pinned = await fetchProfileVideoById(
+          supabase,
+          contentUserId,
+          focusPostId
+        );
+        if (pinned) nextVideos = [pinned, ...nextVideos];
+      }
+      if (cancelled) return;
+      setVideos(nextVideos);
       setVideosFailed(Boolean(videoPage.failed));
       setPosts(postPage.posts);
       setPostsFailed(Boolean(postPage.failed));
@@ -236,7 +259,7 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [contentUserId, isOwn]);
+  }, [contentUserId, focusPostId, isOwn]);
 
   const view = buildProfilePresentation(
     isOwn ? profile : otherProfile,
@@ -517,6 +540,19 @@ export default function ProfileScreen() {
     }
   }, [photoBusy, restore, t, user?.id]);
 
+  const revealFocusedVideo = useCallback((view: View) => {
+    const scroll = scrollRef.current;
+    const handle = scroll ? findNodeHandle(scroll) : null;
+    if (!scroll || handle == null) return;
+    view.measureLayout(
+      handle,
+      (_x, y) => {
+        scroll.scrollTo({ y: Math.max(0, y - 12), animated: false });
+      },
+      () => undefined
+    );
+  }, []);
+
   function openTimelineItem(item: ProfileTimelineItem) {
     if (item.kind === "video") {
       router.push({
@@ -600,6 +636,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.root, rootDirection]} edges={["bottom"]}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
       >
@@ -736,6 +773,8 @@ export default function ProfileScreen() {
                 postsFailed={activeTab !== "videos" ? postsFailed : false}
                 videosFailed={activeTab !== "posts" ? videosFailed : false}
                 onOpenVideo={openTimelineItem}
+                focusPostId={focusPostId}
+                onRevealFocus={revealFocusedVideo}
               />
             )}
 

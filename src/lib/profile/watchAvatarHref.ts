@@ -5,13 +5,17 @@ import { buildStackedProfileHref } from "@/src/lib/profile/profileNav";
  * Profile tab. `/profile?u=` is captured by `/(tabs)/profile` and Back
  * cannot return to Watch.
  */
-export function buildWatchCreatorProfileHref(author: {
-  id?: string | null;
-  username?: string | null;
-}): string | null {
+export function buildWatchCreatorProfileHref(
+  author: {
+    id?: string | null;
+    username?: string | null;
+  },
+  postId?: number | null
+): string | null {
   return buildStackedProfileHref({
     username: author.username,
     userId: author.id,
     origin: "watch",
+    postId,
   });
 }

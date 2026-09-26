@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { listProfileVideos, mapProfileVideoRow } from "./listProfileVideos";
+import {
+  listProfileVideos,
+  mapProfileVideoRow,
+  placeProfileVideoFirst,
+} from "./listProfileVideos";
 
 describe("mapProfileVideoRow", () => {
   it("maps a published video without inventing identity", () => {
@@ -32,6 +36,19 @@ describe("mapProfileVideoRow", () => {
         image_url: "javascript:alert(1)",
       })?.posterUrl
     ).toBeNull();
+  });
+});
+
+describe("placeProfileVideoFirst", () => {
+  it("moves the video the viewer was watching to the front", () => {
+    const videos = [
+      { postId: 1, title: "a", likes: 0, views: 0, posterUrl: null, previewUrl: null, videoPath: null, createdAt: "" },
+      { postId: 9, title: "b", likes: 0, views: 0, posterUrl: null, previewUrl: null, videoPath: null, createdAt: "" },
+    ];
+    expect(placeProfileVideoFirst(videos, 9).map((video) => video.postId)).toEqual([9, 1]);
+    expect(placeProfileVideoFirst(videos, 1).map((video) => video.postId)).toEqual([1, 9]);
+    expect(placeProfileVideoFirst(videos, null)).toEqual(videos);
+    expect(placeProfileVideoFirst(videos, 3).map((video) => video.postId)).toEqual([1, 9]);
   });
 });
 

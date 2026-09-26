@@ -112,6 +112,28 @@ describe("Watch creator avatar → other-user Profile", () => {
     ).toEqual({ kind: "own" });
   });
 
+  it("puts the watched video first only when the profile is opened from that video", () => {
+    const fromVideo = buildWatchCreatorProfileHref(
+      { id: CREATOR_ID, username: "ada" },
+      99
+    );
+    expect(hrefParams(fromVideo!).get("post")).toBe("99");
+
+    const normal = buildWatchCreatorProfileHref({
+      id: CREATOR_ID,
+      username: "ada",
+    });
+    expect(hrefParams(normal!).has("post")).toBe(false);
+    expect(
+      hrefParams(
+        buildWatchCreatorProfileHref(
+          { id: CREATOR_ID, username: "ada" },
+          0
+        )!
+      ).has("post")
+    ).toBe(false);
+  });
+
   it("does not navigate without a username or profile id", () => {
     expect(buildWatchCreatorProfileHref({ id: null, username: "" })).toBeNull();
     expect(
